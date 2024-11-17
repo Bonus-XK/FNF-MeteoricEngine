@@ -47,6 +47,13 @@ class VisualsUISubState extends BaseOptionsMenu
 			'bool',
 			false);
 		addOption(option);
+
+		var option:Option = new Option('Hide Watermark',
+			'如果你勾选了，那么左下角水印将不会显示',
+			'hideWatermark',
+			'bool',
+			false);
+		addOption(option);
 		
 		var option:Option = new Option('Time Bar:',
 			"你想让时间条怎么显示？",
@@ -99,6 +106,13 @@ class VisualsUISubState extends BaseOptionsMenu
 		option.onChange = onChangeFPSCounter;
 		#end
 		
+		var option:Option = new Option('FPS Engine Version',
+			'如果你不勾选，那么帧数计数器下的引擎版本将不会显示',
+			'showVer',
+			'bool',
+			true);
+		addOption(option);
+
 		var option:Option = new Option('Pause Screen Song:',
 			"你想让你停下来放什么音乐？",
 			'pauseMusic',

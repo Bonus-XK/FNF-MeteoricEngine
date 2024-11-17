@@ -123,8 +123,6 @@ class FPS extends TextField
 		text += "\nstage3DDC: " + Context3DStats.contextDrawCalls(DrawCallContext.STAGE3D);
 		#end
 		displayMod = Paths.currentModDirectory;
-
-		text += 'Meteoric Engine v1.0\nBased on Psych Engine';
-
+		if (ClientPrefs.showVer) text += 'Meteoric Engine v' + Main.meVersion + '\nBased on Psych Engine';
 	}
 }

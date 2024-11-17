@@ -83,16 +83,16 @@ class PlayState extends MusicBeatState
 	public static var STRUM_X_MIDDLESCROLL = -278;
 
 	public static var ratingStuff:Array<Dynamic> = [
-		['无法评价', 0.3], //From 0% to 19%
-		['你在干什么', 0.5], //From 20% to 39%
-		['史', 0.6], //From 40% to 49%
-		['超差！', 0.69], //From 50% to 59%
-		['差', 0.7], //From 60% to 68%
-		['一般', 0.8], //69%
-		['好！', 0.89], //From 70% to 79%
-		['酷！', 0.9], //From 80% to 89%
-		['棒！', 1], //From 90% to 99%
-		['疯狂的', 1] //The value on this one isn't used actually, since Perfect is always "1"
+		['E', 0.3], //From 0% to 19%
+		['D', 0.5], //From 20% to 39%
+		['C', 0.6], //From 40% to 49%
+		['B', 0.69], //From 50% to 59%
+		['A', 0.7], //From 60% to 68%
+		['AA', 0.8], //69%
+		['AAA', 0.89], //From 70% to 79%
+		['AAAA', 0.9], //From 80% to 89%
+		['AAAAA', 0.99], //From 90% to 99%
+		['S', 1] //The value on this one isn't used actually, since Perfect is always "1"
 	];
 
 	//event variables
@@ -1171,7 +1171,7 @@ class PlayState extends MusicBeatState
 		songTxt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		songTxt.scrollFactor.set();
 		songTxt.borderSize = 1;
-		if (!ClientPrefs.hideHud) {
+		if (!ClientPrefs.hideHud && !ClientPrefs.hideWatermark) {
 			songTxt.visible = true;
 		} else {
 			songTxt.visible = false;
@@ -2331,7 +2331,7 @@ class PlayState extends MusicBeatState
 	{
 		scoreTxt.text = '分数：' + songScore
 		+ ' 失误：' + songMisses
-		+ ' 评分：' + ratingName
+		+ ' 评级：' + ratingName
 		+ (ratingName != '?' ? ' (${Highscore.floorDecimal(ratingPercent * 100, 2)}%) - $ratingFC' : '');
 
 		if(ClientPrefs.scoreZoom && !miss && !cpuControlled)
@@ -2354,7 +2354,7 @@ class PlayState extends MusicBeatState
 		}
 		else if(health >= 1.65)
 		{
-			scoreTxt.setFormat(Paths.font("vcr.ttf"), 17, FlxColor.GREEN, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			scoreTxt.setFormat(Paths.font("vcr.ttf"), 17, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		}
 		else
 		{
@@ -5293,11 +5293,8 @@ class PlayState extends MusicBeatState
 
 			// Rating FC
 			ratingFC = "";
-			if (sicks > 0) ratingFC = "全连（高评分）";
-			if (goods > 0) ratingFC = "全连（较高评分）";
-			if (bads > 0 || shits > 0) ratingFC = "全连";
-			if (songMisses > 0 && songMisses < 10) ratingFC = "有失误";
-			else if (songMisses >= 10) ratingFC = "有失误（10以上）";
+			if (songMisses < 1) ratingFC = "全连";
+			if (songMisses > 0) ratingFC = "有失误";
 		}
 		updateScore(badHit); // score will only update after rating is calculated, if it's a badHit, it shouldn't bounce -Ghost
 		setOnLuas('rating', ratingPercent);
