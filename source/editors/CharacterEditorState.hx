@@ -142,14 +142,14 @@ class CharacterEditorState extends MusicBeatState
 		camFollow.screenCenter();
 		add(camFollow);
 
-		var tipTextArray:Array<String> = "E/Q - Camera Zoom In/Out
-		\nR - Reset Camera Zoom
-		\nJKLI - Move Camera
-		\nW/S - Previous/Next Animation
-		\nSpace - Play Animation
-		\nArrow Keys - Move Character Offset
-		\nT - Reset Current Offset
-		\nHold Shift to Move 10x faster\n".split('\n');
+		var tipTextArray:Array<String> = "E/Q - 镜头放大/缩小
+		\nR - 重置镜头大小
+		\nJKLI - 移动镜头
+		\nW/S - 上一个/下一个动作
+		\nSpace - 播放动作
+		\nArrow Keys - 移动角色偏移量
+		\nT - 重置角色偏移量
+		\n按住 Shift 速度提高加速 10 倍\n".split('\n');
 
 		for (i in 0...tipTextArray.length-1)
 		{

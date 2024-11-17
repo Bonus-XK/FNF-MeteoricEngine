@@ -80,7 +80,7 @@ class ModsMenuState extends MusicBeatState
 		add(bg);
 		bg.screenCenter();
 
-		noModsTxt = new FlxText(0, 0, FlxG.width, "你没有任何MOD安装在Meteoric Engine！\n但是模组可能已经加载！\n按下 ESC 返回主菜单", 48);
+		noModsTxt = new FlxText(0, 0, FlxG.width, "你没有任何MOD安装在Meteoric Engine！\n但是模组可能已经加载！\n按下 Enter 打开香蕉网下载模组\n按下 ESC 返回主菜单", 48);
 		noModsTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		noModsTxt.scrollFactor.set();
 		noModsTxt.borderSize = 2;
@@ -471,6 +471,11 @@ class ModsMenuState extends MusicBeatState
 			noModsTxt.alpha = 1 - Math.sin((Math.PI * noModsSine) / 180);
 		}
 
+        if (controls.ACCEPT)
+		{
+			CoolUtil.browserLoad('https://gamebanana.com/');
+		}
+		
 		if(canExit && controls.BACK)
 		{
 			if(colorTween != null) {

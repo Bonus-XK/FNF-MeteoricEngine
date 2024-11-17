@@ -360,7 +360,7 @@ class WeekEditorState extends MusicBeatState
 		if(isMissing) {
 			weekThing.visible = false;
 			missingFileText.visible = true;
-			missingFileText.text = 'MISSING FILE: images/storymenu/' + assetName + '.png';
+			missingFileText.text = '未找到贴图：images/storymenu/' + assetName + '.png';
 		}
 		recalculateStuffPosition();
 

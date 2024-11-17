@@ -338,20 +338,20 @@ class ChartingState extends MusicBeatState
 		UI_box.scrollFactor.set();
 
 		text =
-		"W/S or Mouse Wheel - Change Conductor's strum time
-		\nA/D - Go to the previous/next section
-		\nLeft/Right - Change Snap
-		\nUp/Down - Change Conductor's Strum Time with Snapping
-		\nLeft Bracket / Right Bracket - Change Song Playback Rate (SHIFT to go Faster)
-		\nALT + Left Bracket / Right Bracket - Reset Song Playback Rate
-		\nHold Shift to move 4x faster
-		\nHold Control and click on an arrow to select it
-		\nZ/X - Zoom in/out
+		"W/S 或 鼠标滚轮 - 上下移动铺面
+		\nA/D - 转到上一/下一部分
+		\nLeft/Right - 更改捕捉
+		\nUp/Down - 使用 Snapping 更改 Conductor 的 Strum Time
+		\n左括号 / 右括号 - 更改歌曲播放速率（按住 SHIFT 键可加快速度）
+		\nALT + 左括号 / 右括号 - 重置歌曲播放速率
+		\n按住 Shift 以 4 倍速编辑铺面
+		\n按住 CTRL 并用 鼠标左键点击你要选择的箭头
+		\nZ/X - 放大/缩小
 		\n
-		\nEsc - Test your chart inside Chart Editor
-		\nEnter - Play your chart
-		\nQ/E - Decrease/Increase Note Sustain Length
-		\nSpace - Stop/Resume song";
+		\nEsc - 在铺面编辑器测试你的铺子（不加载贴图）
+		\nEnter - 测试你的铺子
+		\nQ/E - 减少/增加音符长音长度
+		\nSpace - 终止、继续播放曲目";
 
 		var tipTextArray:Array<String> = text.split('\n');
 		for (i in 0...tipTextArray.length) {

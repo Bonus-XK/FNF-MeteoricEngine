@@ -42,20 +42,20 @@ class DialogueCharacterEditorState extends MusicBeatState
 	var daText:TypedAlphabet = null;
 
 	private static var TIP_TEXT_MAIN:String =
-	'JKLI - Move camera (Hold Shift to move 4x faster)
-	\nQ/E - Zoom out/in
-	\nR - Reset Camera
-	\nH - Toggle Speech Bubble
-	\nSpace - Reset text';
+	'JKLI - 移动摄像机（按住 Shift 键可将移动速度提高 4 倍）
+	\nQ/E - 放大/缩小
+	\nR - 重置镜头
+	\nH - 切换对话框样式
+	\nSpace - 重置文本';
 
 	private static var TIP_TEXT_OFFSET:String =
-	'JKLI - Move camera (Hold Shift to move 4x faster)
-	\nQ/E - Zoom out/in
-	\nR - Reset Camera
-	\nH - Toggle Ghosts
-	\nWASD - Move Looping animation offset (Red)
-	\nArrow Keys - Move Idle/Finished animation offset (Blue)
-	\nHold Shift to move offsets 10x faster';
+	'JKLI - 移动摄像机（按住 Shift 键可将移动速度提高 4 倍）
+	\nQ/E - 放大/缩小
+	\nR - 重置镜头
+	\nH - 切换 Ghosts？
+	\nWASD - 移动循环动画偏移 （红色）
+	\nArrow Keys - 移动 待机/完成 动画偏移（蓝色）
+	\n按住 Shift 键可将偏移速度提高 10 倍';
 
 	var tipText:FlxText;
 	var offsetLoopText:FlxText;
