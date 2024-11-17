@@ -127,32 +127,32 @@ class EditorPlayState extends MusicBeatState
 		noteTypeMap.clear();
 		noteTypeMap = null;
 
-		scoreTxt = new FlxText(10, FlxG.height - 50, FlxG.width - 20, "Hits: 0 | Misses: 0", 20);
+		scoreTxt = new FlxText(10, FlxG.height - 50, FlxG.width - 20, "击打数：0 | 失误：0", 20);
 		scoreTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		scoreTxt.scrollFactor.set();
 		scoreTxt.borderSize = 1.25;
 		scoreTxt.visible = !ClientPrefs.hideHud;
 		add(scoreTxt);
 		
-		sectionTxt = new FlxText(10, 580, FlxG.width - 20, "Section: 0", 20);
+		sectionTxt = new FlxText(10, 580, FlxG.width - 20, "环节：0", 20);
 		sectionTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		sectionTxt.scrollFactor.set();
 		sectionTxt.borderSize = 1.25;
 		add(sectionTxt);
 		
-		beatTxt = new FlxText(10, sectionTxt.y + 30, FlxG.width - 20, "Beat: 0", 20);
+		beatTxt = new FlxText(10, sectionTxt.y + 30, FlxG.width - 20, "节拍：0", 20);
 		beatTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		beatTxt.scrollFactor.set();
 		beatTxt.borderSize = 1.25;
 		add(beatTxt);
 
-		stepTxt = new FlxText(10, beatTxt.y + 30, FlxG.width - 20, "Step: 0", 20);
+		stepTxt = new FlxText(10, beatTxt.y + 30, FlxG.width - 20, "步数：0", 20);
 		stepTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		stepTxt.scrollFactor.set();
 		stepTxt.borderSize = 1.25;
 		add(stepTxt);
 
-		var tipText:FlxText = new FlxText(10, FlxG.height - 24, 0, 'Press ESC to Go Back to Chart Editor', 16);
+		var tipText:FlxText = new FlxText(10, FlxG.height - 24, 0, '按下 ESC 返回铺面编辑器', 16);
 		tipText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tipText.borderSize = 2;
 		tipText.scrollFactor.set();
@@ -499,10 +499,10 @@ class EditorPlayState extends MusicBeatState
 		}
 
 		keyShit();
-		scoreTxt.text = 'Hits: ' + songHits + ' | Misses: ' + songMisses;
-		sectionTxt.text = 'Beat: ' + curSection;
-		beatTxt.text = 'Beat: ' + curBeat;
-		stepTxt.text = 'Step: ' + curStep;
+		scoreTxt.text = '击打数：' + songHits + ' | 失误：' + songMisses;
+		sectionTxt.text = '环节：' + curSection;
+		beatTxt.text = '节拍：' + curBeat;
+		stepTxt.text = '步数：' + curStep;
 		super.update(elapsed);
 	}
 	
