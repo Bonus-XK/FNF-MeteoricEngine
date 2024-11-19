@@ -122,6 +122,12 @@ class VisualsUISubState extends BaseOptionsMenu
 		addOption(option);
 		option.onChange = onChangePauseMusic;
 
+		var option:Option = new Option('Check for Updates',
+			'勾选此选项来检查你的ME引擎是不是最新的',
+			'checkForUpdates',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('Combo Stacking',
 			"如果不勾选，评级和连击将不会叠加，节省系统内存并使其更易于加载铺子",
 			'comboStacking',
