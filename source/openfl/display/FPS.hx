@@ -111,7 +111,22 @@ class FPS extends TextField
 		text += '${getInterval(mem)} / ${getInterval(memPeak)}\n';
 		#end
 
-		textColor = 0xFFFFFFFF;
+		if (ClientPrefs.fpsColor == 'WHITE'){
+			textColor = 0xFFFFFFFF;
+		}else if (ClientPrefs.fpsColor == 'Cyan'){
+			textColor = 0xFF00FFFF;
+		}else if (ClientPrefs.fpsColor == 'Blue'){
+			textColor = 0xFF0000FF;
+		}else if (ClientPrefs.fpsColor == 'Red'){
+			textColor = 0xFFFF0000;
+		}else if (ClientPrefs.fpsColor == 'Green'){
+			textColor = 0xFF00FF00;
+		}else if (ClientPrefs.fpsColor == 'Yellow'){
+			textColor = 0xFFFFFF00;
+		}else{
+			textColor = 0xFFFFFFFF;
+		}
+
 		if (memoryMegas > 3000 || times.length <= 60) // there is kinda no reason why it should warn you if you have 50% of 240 FPS
 		{
 			textColor = 0xFFFF0000;

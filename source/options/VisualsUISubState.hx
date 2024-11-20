@@ -113,6 +113,14 @@ class VisualsUISubState extends BaseOptionsMenu
 			true);
 		addOption(option);
 
+		var option:Option = new Option('FPS Display Color: ',
+		    "你想让你的FPS计数器显示什么颜色？",
+			'fpsColor',
+			'string',
+			'White',
+			['White', 'Cyan', 'Blue', 'Red', 'Green', 'Yellow']);
+		addOption(option);
+		
 		var option:Option = new Option('Pause Screen Song:',
 			"你想让你停下来放什么音乐？",
 			'pauseMusic',

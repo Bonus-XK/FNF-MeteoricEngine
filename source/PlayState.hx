@@ -2348,11 +2348,11 @@ class PlayState extends MusicBeatState
 			});
 		}
 
-		if(health <= 0.35)
+		if(health <= 0.4)
 		{
 			scoreTxt.setFormat(Paths.font("vcr.ttf"), 17, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		}
-		else if(health >= 1.65)
+		else if(health >= 1.55)
 		{
 			scoreTxt.setFormat(Paths.font("vcr.ttf"), 17, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		}
