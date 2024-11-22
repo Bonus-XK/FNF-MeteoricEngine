@@ -1,32 +1,5 @@
 package options;
 
-#if desktop
-import Discord.DiscordClient;
-#end
-import flash.text.TextField;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.addons.display.FlxGridOverlay;
-import flixel.group.FlxGroup.FlxTypedGroup;
-import flixel.math.FlxMath;
-import flixel.text.FlxText;
-import flixel.util.FlxColor;
-import lime.utils.Assets;
-import flixel.FlxSubState;
-import flash.text.TextField;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.util.FlxSave;
-import haxe.Json;
-import flixel.tweens.FlxEase;
-import flixel.tweens.FlxTween;
-import flixel.util.FlxTimer;
-import flixel.input.keyboard.FlxKey;
-import flixel.graphics.FlxGraphic;
-import Controls;
-
-using StringTools;
-
 class GameplaySettingsSubState extends BaseOptionsMenu
 {
 	public function new()
@@ -34,54 +7,48 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		title = 'Gameplay Settings';
 		rpcTitle = 'Gameplay Settings Menu'; //for Discord Rich Presence
 
-		var option:Option = new Option('Controller Mode',
-			'如果你用手柄（？）来玩这个游戏，就打开这个选项',
-			'controllerMode',
-			'bool',
-			false);
-		addOption(option);
-
 		//I'd suggest using "Downscroll" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('Downscroll', //Name
-			'如果你习惯让箭头朝下，那么就勾选这个选项', //Description
+			'If checked, notes go Down instead of Up, simple enough.', //Description
 			'downScroll', //Save data variable name
-			'bool', //Variable type
-			false); //Default value
+			'bool'); //Variable type
 		addOption(option);
 
 		var option:Option = new Option('Middlescroll',
-			'如果你勾选了，那么你的箭头会居中显示，对方的箭头分布在两边',
+			'If checked, your notes get centered.',
 			'middleScroll',
-			'bool',
-			false);
+			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Opponent Notes',
-			'如果你不勾选，对方箭头将不会显示，反之，对方箭头会显示',
+			'If unchecked, opponent notes get hidden.',
 			'opponentStrums',
-			'bool',
-			true);
+			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Ghost Tapping',
-			"如果你勾选了，那么你空按箭头将不会扣血。",
+			"If checked, you won't get misses from pressing keys\nwhile there are no notes able to be hit.",
 			'ghostTapping',
-			'bool',
-			true);
+			'bool');
 		addOption(option);
+		
+		var option:Option = new Option('Auto Pause',
+			"If checked, the game automatically pauses if the screen isn't on focus.",
+			'autoPause',
+			'bool');
+		addOption(option);
+		option.onChange = onChangeAutoPause;
 
 		var option:Option = new Option('Disable Reset Button',
-			"如果你勾选了，那么你按下 R 键就不会重置你的分数",
+			"If checked, pressing Reset won't do anything.",
 			'noReset',
-			'bool',
-			false);
+			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Hitsound Volume',
-			'如果你把数值调的越大，那么你按下箭头的声音就越大',
+			'Funny notes does \"Tick!\" when you hit them."',
 			'hitsoundVolume',
-			'percent',
-			0);
+			'percent');
 		addOption(option);
 		option.scrollSpeed = 1.6;
 		option.minValue = 0.0;
@@ -91,10 +58,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.onChange = onChangeHitsoundVolume;
 
 		var option:Option = new Option('Rating Offset',
-			'调整数值，让你的箭头必须按下的更晚',
+			'Changes how late/early you have to hit for a "Sick!"\nHigher values mean you have to hit later.',
 			'ratingOffset',
-			'int',
-			0);
+			'int');
 		option.displayFormat = '%vms';
 		option.scrollSpeed = 20;
 		option.minValue = -30;
@@ -102,10 +68,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Sick! Hit Window',
-			'更改您击中 “棒” 的时间，以毫秒为单位',
+			'Changes the amount of time you have\nfor hitting a "Sick!" in milliseconds.',
 			'sickWindow',
-			'int',
-			45);
+			'int');
 		option.displayFormat = '%vms';
 		option.scrollSpeed = 15;
 		option.minValue = 15;
@@ -113,10 +78,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Good Hit Window',
-			'更改您击中 “酷” 的时间，以毫秒为单位',
+			'Changes the amount of time you have\nfor hitting a "Good" in milliseconds.',
 			'goodWindow',
-			'int',
-			90);
+			'int');
 		option.displayFormat = '%vms';
 		option.scrollSpeed = 30;
 		option.minValue = 15;
@@ -124,10 +88,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Bad Hit Window',
-			'更改您击中 “你在等什么” 的时间，以毫秒为单位',
+			'Changes the amount of time you have\nfor hitting a "Bad" in milliseconds.',
 			'badWindow',
-			'int',
-			135);
+			'int');
 		option.displayFormat = '%vms';
 		option.scrollSpeed = 60;
 		option.minValue = 15;
@@ -135,14 +98,13 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Safe Frames',
-			'调整数值，让判定变宽或变窄',
+			'Changes how many frames you have for\nhitting a note earlier or late.',
 			'safeFrames',
-			'float',
-			7.5);
+			'float');
 		option.scrollSpeed = 5;
 		option.minValue = 2;
-		option.maxValue = 50;
-		option.changeValue = 0.5;
+		option.maxValue = 10;
+		option.changeValue = 0.1;
 		addOption(option);
 
 		super();
@@ -150,6 +112,11 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 
 	function onChangeHitsoundVolume()
 	{
-		FlxG.sound.play(Paths.sound('hitsound'), ClientPrefs.hitsoundVolume);
+		FlxG.sound.play(Paths.sound('hitsound'), ClientPrefs.data.hitsoundVolume);
+	}
+
+	function onChangeAutoPause()
+	{
+		FlxG.autoPause = ClientPrefs.data.autoPause;
 	}
 }

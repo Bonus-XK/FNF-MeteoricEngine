@@ -104,24 +104,24 @@ class FPS extends TextField
 		}
 
 		text = ''; // quick reset
-		if (ClientPrefs.showFPS) text += times.length + ' FPS\n';
+		if (ClientPrefs.data.showFPS) text += times.length + ' FPS\n';
 		var memoryMegas:Float = 0;
 			
 		#if openfl
 		text += '${getInterval(mem)} / ${getInterval(memPeak)}\n';
 		#end
 
-		if (ClientPrefs.fpsColor == 'WHITE'){
+		if (ClientPrefs.data.fpsColor == 'WHITE'){
 			textColor = 0xFFFFFFFF;
-		}else if (ClientPrefs.fpsColor == 'Cyan'){
+		}else if (ClientPrefs.data.fpsColor == 'Cyan'){
 			textColor = 0xFF00FFFF;
-		}else if (ClientPrefs.fpsColor == 'Blue'){
+		}else if (ClientPrefs.data.fpsColor == 'Blue'){
 			textColor = 0xFF0000FF;
-		}else if (ClientPrefs.fpsColor == 'Red'){
+		}else if (ClientPrefs.data.fpsColor == 'Red'){
 			textColor = 0xFFFF0000;
-		}else if (ClientPrefs.fpsColor == 'Green'){
+		}else if (ClientPrefs.data.fpsColor == 'Green'){
 			textColor = 0xFF00FF00;
-		}else if (ClientPrefs.fpsColor == 'Yellow'){
+		}else if (ClientPrefs.data.fpsColor == 'Yellow'){
 			textColor = 0xFFFFFF00;
 		}else{
 			textColor = 0xFFFFFFFF;
@@ -137,7 +137,6 @@ class FPS extends TextField
 		text += "\nstageDC: " + Context3DStats.contextDrawCalls(DrawCallContext.STAGE);
 		text += "\nstage3DDC: " + Context3DStats.contextDrawCalls(DrawCallContext.STAGE3D);
 		#end
-		displayMod = Paths.currentModDirectory;
-		if (ClientPrefs.showVer) text += 'Meteoric Engine v' + Main.meVersion + '\nBased on Psych Engine';
+		if (ClientPrefs.data.showVer) text += 'Meteoric Engine v' + Main.meVersion + '\nBased on Psych Engine';
 	}
 }
