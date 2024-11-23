@@ -36,7 +36,7 @@ class VisualsUISubState extends BaseOptionsMenu
 
 			noteSkins.insert(0, ClientPrefs.defaultData.noteSkin); //Default skin always comes first
 			var option:Option = new Option('Note Skins:',
-				"Select your prefered Note skin.",
+				"选择你的箭头样式：",
 				'noteSkin',
 				'string',
 				noteSkins);
@@ -53,7 +53,7 @@ class VisualsUISubState extends BaseOptionsMenu
 
 			noteSplashes.insert(0, ClientPrefs.defaultData.splashSkin); //Default skin always comes first
 			var option:Option = new Option('Note Splashes:',
-				"如果你不勾选，那么按下箭头时不会有打击粒子",
+				"选择你的箭头打击粒子样式：",
 				'splashSkin',
 				'string',
 				noteSplashes);
@@ -61,7 +61,7 @@ class VisualsUISubState extends BaseOptionsMenu
 		}
 
 		var option:Option = new Option('Note Splash Opacity',
-			'How much transparent should the Note Splashes be.',
+			'调整箭头打击粒子的透明度',
 			'splashAlpha',
 			'percent');
 		option.scrollSpeed = 1.6;
@@ -151,14 +151,14 @@ class VisualsUISubState extends BaseOptionsMenu
 
 		#if desktop
 		var option:Option = new Option('Discord Rich Presence',
-			"Uncheck this to prevent accidental leaks, it will hide the Application from your \"Playing\" box on Discord",
+			"取消选中此项以防止意外泄漏，它将在Discord的“播放”框中隐藏应用程序",
 			'discordRPC',
 			'bool');
 		addOption(option);
 		#end
 
 		var option:Option = new Option('Combo Stacking',
-			"If unchecked, Ratings and Combo won't stack, saving on System Memory and making them easier to read",
+			"如果未选中，Rank和Combo将不会堆叠，从而节省系统内存并使其更易于读铺",
 			'comboStacking',
 			'bool');
 		addOption(option);

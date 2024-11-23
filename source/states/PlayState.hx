@@ -83,15 +83,15 @@ class PlayState extends MusicBeatState
 	public static var STRUM_X_MIDDLESCROLL = -278;
 
 	public static var ratingStuff:Array<Dynamic> = [
-		['E', 0.2], //From 0% to 19%
-		['D', 0.4], //From 20% to 39%
-		['C', 0.5], //From 40% to 49%
-		['B', 0.6], //From 50% to 59%
-		['A', 0.69], //From 60% to 68%
-		['AA', 0.7], //69%
-		['AAA', 0.8], //From 70% to 79%
+		['E', 0.3], //From 0% to 19%
+		['D', 0.5], //From 20% to 39%
+		['C', 0.6], //From 40% to 49%
+		['B', 0.69], //From 50% to 59%
+		['A', 0.7], //From 60% to 68%
+		['AA', 0.8], //69%
+		['AAA', 0.89], //From 70% to 79%
 		['AAAA', 0.9], //From 80% to 89%
-		['AAAAA', 1], //From 90% to 99%
+		['AAAAA', 0.99], //From 90% to 99%
 		['S', 1] //The value on this one isn't used actually, since Perfect is always "1"
 	];
 
@@ -551,8 +551,8 @@ class PlayState extends MusicBeatState
 		scoreTxt.visible = !ClientPrefs.data.hideHud;
 		add(scoreTxt);
 
-		songTxt = new FlxText(12, FlxG.height - 24, 0, "", 8);
-		songTxt.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		songTxt = new FlxText(12, healthBar.y + 55, 0, "", 12);
+		songTxt.setFormat(Paths.font("future.ttf"), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		songTxt.scrollFactor.set();
 		songTxt.borderSize = 1;
 		if (!ClientPrefs.data.hideHud && !ClientPrefs.data.hideWatermark) {
@@ -580,6 +580,7 @@ class PlayState extends MusicBeatState
 		iconP1.cameras = [camHUD];
 		iconP2.cameras = [camHUD];
 		scoreTxt.cameras = [camHUD];
+		songTxt.cameras = [camHUD];
 
 		botplayTxt.cameras = [camHUD];
 		timeBar.cameras = [camHUD];

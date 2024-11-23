@@ -15,38 +15,38 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Middlescroll',
-			'If checked, your notes get centered.',
+			'如果被选中，那么箭头将居中显示',
 			'middleScroll',
 			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Opponent Notes',
-			'If unchecked, opponent notes get hidden.',
+			'如果不被选中，那么对手箭头将不会显示',
 			'opponentStrums',
 			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Ghost Tapping',
-			"If checked, you won't get misses from pressing keys\nwhile there are no notes able to be hit.",
+			"如果选中，在没有可点击的箭头时，您不会因为乱按而Miss",
 			'ghostTapping',
 			'bool');
 		addOption(option);
 		
 		var option:Option = new Option('Auto Pause',
-			"If checked, the game automatically pauses if the screen isn't on focus.",
+			"你想让游戏在后台运行吗",
 			'autoPause',
 			'bool');
 		addOption(option);
 		option.onChange = onChangeAutoPause;
 
 		var option:Option = new Option('Disable Reset Button',
-			"If checked, pressing Reset won't do anything.",
+			"如果被选中，那么按下重置键就不会有任何反应",
 			'noReset',
 			'bool');
 		addOption(option);
 
 		var option:Option = new Option('Hitsound Volume',
-			'Funny notes does \"Tick!\" when you hit them."',
+			'当你按下有趣的箭头时，它们会“叮！”',
 			'hitsoundVolume',
 			'percent');
 		addOption(option);
@@ -58,7 +58,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.onChange = onChangeHitsoundVolume;
 
 		var option:Option = new Option('Rating Offset',
-			'Changes how late/early you have to hit for a "Sick!"\nHigher values mean you have to hit later.',
+			'更改您必须为“Sick”打晚/早！更高的值意味着您必须稍后打',
 			'ratingOffset',
 			'int');
 		option.displayFormat = '%vms';
@@ -68,7 +68,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Sick! Hit Window',
-			'Changes the amount of time you have\nfor hitting a "Sick!" in milliseconds.',
+			'更改您按下“Sick!”的时间（以毫秒为单位）',
 			'sickWindow',
 			'int');
 		option.displayFormat = '%vms';
@@ -78,7 +78,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Good Hit Window',
-			'Changes the amount of time you have\nfor hitting a "Good" in milliseconds.',
+			'以毫秒为单位更改按下“Good”的时间',
 			'goodWindow',
 			'int');
 		option.displayFormat = '%vms';
@@ -88,7 +88,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Bad Hit Window',
-			'Changes the amount of time you have\nfor hitting a "Bad" in milliseconds.',
+			'以毫秒为单位更改您按下“Bad”的时间',
 			'badWindow',
 			'int');
 		option.displayFormat = '%vms';
@@ -98,12 +98,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Safe Frames',
-			'Changes how many frames you have for\nhitting a note earlier or late.',
+			'更改提前或延迟按下箭头的帧数',
 			'safeFrames',
 			'float');
 		option.scrollSpeed = 5;
 		option.minValue = 2;
-		option.maxValue = 10;
+		option.maxValue = 50;
 		option.changeValue = 0.1;
 		addOption(option);
 

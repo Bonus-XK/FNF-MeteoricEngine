@@ -13,14 +13,16 @@ class OutdatedState extends MusicBeatState
 		add(bg);
 
 		warnText = new FlxText(0, 0, FlxG.width,
-			"Sup bro, looks like you're running an   \n
-			outdated version of Psych Engine (" + Main.meVersion + "),\n
-			please update to " + TitleState.updateVersion + "!\n
-			Press ESCAPE to proceed anyway.\n
+			"你好，感谢使用该引擎！\n
+			你可能正在运行老版本ME引擎，您的版本如下：" + Main.meVersion + "\n
+			请尽快升级到最新的ME引擎！\n
+			最新的版本是：" + TitleState.updateVersion + "\n
+			> 按下 Enter 进入 Github 下载最新版本\n
+			> 按下 ESC 忽略此界面\n
 			\n
-			Thank you for using the Engine!",
+			不更新今晚上Bonus-XK会去你被窝里玩哦！",
 			32);
-		warnText.setFormat("VCR OSD Mono", 32, FlxColor.WHITE, CENTER);
+		warnText.setFormat(Paths.font("future.ttf"), 32, FlxColor.RED, LEFT);
 		warnText.screenCenter(Y);
 		add(warnText);
 	}
@@ -30,7 +32,7 @@ class OutdatedState extends MusicBeatState
 		if(!leftState) {
 			if (controls.ACCEPT) {
 				leftState = true;
-				CoolUtil.browserLoad("https://github.com/ShadowMario/FNF-PsychEngine/releases");
+				CoolUtil.browserLoad("https://github.com/Bonus-XK/FNF-MeteoricEngine/releases");
 			}
 			else if(controls.BACK) {
 				leftState = true;
