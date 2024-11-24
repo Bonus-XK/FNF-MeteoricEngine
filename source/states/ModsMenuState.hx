@@ -6,6 +6,7 @@ import backend.Mods;
 import flixel.ui.FlxButton;
 import flixel.FlxBasic;
 import openfl.display.BitmapData;
+import openfl.Lib;
 import flash.geom.Rectangle;
 import lime.utils.Assets;
 import tjson.TJSON as Json;
@@ -55,6 +56,8 @@ class ModsMenuState extends MusicBeatState
 
 	override function create()
 	{
+		Lib.application.window.title = "FNF':Meteoric Engine - Mods List";
+		
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 		WeekData.setDirectoryFromWeek();

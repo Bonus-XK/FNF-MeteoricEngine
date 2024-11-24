@@ -2,6 +2,7 @@ package states;
 
 import backend.Achievements;
 import objects.AttachedAchievement;
+import openfl.Lib;
 
 class AchievementsMenuState extends MusicBeatState
 {
@@ -14,6 +15,8 @@ class AchievementsMenuState extends MusicBeatState
 	private var descText:FlxText;
 
 	override function create() {
+		Lib.application.window.title = "FNF':Meteoric Engine - Awards Menu";
+		
 		#if desktop
 		DiscordClient.changePresence("Achievements Menu", null);
 		#end

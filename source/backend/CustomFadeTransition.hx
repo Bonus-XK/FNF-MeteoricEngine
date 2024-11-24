@@ -1,82 +1,236 @@
 package backend;
 
 import flixel.util.FlxGradient;
+import flixel.text.FlxText;
+import flixel.tweens.FlxTween;
+import flixel.util.FlxColor;
+import flixel.FlxSubState;
+import flixel.FlxSprite;
+import openfl.utils.Assets;
+import flixel.FlxObject;
 
-class CustomFadeTransition extends MusicBeatSubstate {
+import states.MainMenuState;
+ 
+class CustomFadeTransition extends FlxSubState {
 	public static var finishCallback:Void->Void;
 	private var leTween:FlxTween = null;
 	public static var nextCamera:FlxCamera;
 	var isTransIn:Bool = false;
-	var transBlack:FlxSprite;
-	var transGradient:FlxSprite;
-
-	public function new(duration:Float, isTransIn:Bool) {
-		super();
-
+	var duration:Float;
+	
+	var loadLeft:FlxSprite;
+	var loadRight:FlxSprite;
+	var loadAlpha:FlxSprite;
+	var WaterMark:FlxText;
+	var EventText:FlxText;
+	
+	var loadLeftTween:FlxTween;
+	var loadRightTween:FlxTween;
+	var loadAlphaTween:FlxTween;
+	var EventTextTween:FlxTween;
+	var loadTextTween:FlxTween;
+    
+    
+	public function new(duration:Float, isTransIn:Bool) {		
 		this.isTransIn = isTransIn;
-		var zoom:Float = FlxMath.bound(FlxG.camera.zoom, 0.05, 1);
-		var width:Int = Std.int(FlxG.width / zoom);
-		var height:Int = Std.int(FlxG.height / zoom);
-		transGradient = FlxGradient.createGradientFlxSprite(1, height, (isTransIn ? [0x0, FlxColor.BLACK] : [FlxColor.BLACK, 0x0]));
-		transGradient.scale.x = width;
-		transGradient.updateHitbox();
-		transGradient.scrollFactor.set();
-		add(transGradient);
-
-		transBlack = new FlxSprite().makeGraphic(1, height + 400, FlxColor.BLACK);
-		transBlack.scale.x = width;
-		transBlack.updateHitbox();
-		transBlack.scrollFactor.set();
-		add(transBlack);
-
-		transGradient.x -= (width - FlxG.width) / 2;
-		transBlack.x = transGradient.x;
-
-		if(isTransIn) {
-			transGradient.y = transBlack.y - transBlack.height;
-			FlxTween.tween(transGradient, {y: transGradient.height + 50}, duration, {
-				onComplete: function(twn:FlxTween) {
-					close();
-				},
-			ease: FlxEase.linear});
-		} else {
-			transGradient.y = -transGradient.height;
-			transBlack.y = transGradient.y - transBlack.height + 50;
-			leTween = FlxTween.tween(transGradient, {y: transGradient.height + 50}, duration, {
+		this.duration = duration;
+		
+		super();
+	}
+	
+	override function create()
+	{
+		cameras = [FlxG.cameras.list[FlxG.cameras.list.length-1]];
+		
+		if(ClientPrefs.data.CustomFade == 'Move'){
+		loadRight = new FlxSprite(isTransIn ? 0 : 1280, 0).loadGraphic(Paths.image('loadingR'));
+		loadRight.scrollFactor.set();
+		loadRight.antialiasing = ClientPrefs.data.antialiasing;		
+		add(loadRight);
+		loadRight.setGraphicSize(FlxG.width, FlxG.height);
+		loadRight.updateHitbox();
+		
+		loadLeft = new FlxSprite(isTransIn ? 0 : -1280, 0).loadGraphic(Paths.image('loadingL'));
+		loadLeft.scrollFactor.set();
+		loadLeft.antialiasing = ClientPrefs.data.antialiasing;
+		add(loadLeft);
+		loadLeft.setGraphicSize(FlxG.width, FlxG.height);
+		loadLeft.updateHitbox();
+		
+		WaterMark = new FlxText(isTransIn ? 50 : -1230, 720 - 50 - 50 * 2, 0, 'ME ENGINE V' + Main.meVersion, 50);
+		WaterMark.scrollFactor.set();
+		WaterMark.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		WaterMark.antialiasing = ClientPrefs.data.antialiasing;
+		add(WaterMark);
+        
+        EventText= new FlxText(isTransIn ? 50 : -1230, 720 - 50 - 50, 0, 'LOADING . . . . . . ', 50);
+		EventText.scrollFactor.set();
+		EventText.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		EventText.antialiasing = ClientPrefs.data.antialiasing;
+		add(EventText);
+		
+		if(!isTransIn) {
+		    try{
+			FlxG.sound.play(Paths.sound('loading_close_move'));
+			}
+			if (!ClientPrefs.data.CustomFadeText) {
+			    EventText.text = '';
+			    WaterMark.text = '';
+			}
+			loadLeftTween = FlxTween.tween(loadLeft, {x: 0}, duration, {
 				onComplete: function(twn:FlxTween) {
 					if(finishCallback != null) {
 						finishCallback();
 					}
 				},
-			ease: FlxEase.linear});
-		}
-
-		if(nextCamera != null) {
-			transBlack.cameras = [nextCamera];
-			transGradient.cameras = [nextCamera];
-		}
-		nextCamera = null;
-	}
-
-	override function update(elapsed:Float) {
-		if(isTransIn) {
-			transBlack.y = transGradient.y + transGradient.height;
+			ease: FlxEase.expoInOut});
+			
+			loadRightTween = FlxTween.tween(loadRight, {x: 0}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.expoInOut});
+			
+			loadTextTween = FlxTween.tween(WaterMark, {x: 50}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.expoInOut});
+			
+			EventTextTween = FlxTween.tween(EventText, {x: 50}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.expoInOut});
+			
 		} else {
-			transBlack.y = transGradient.y - transBlack.height;
+		    try{
+			    FlxG.sound.play(Paths.sound('loading_open_move'));
+			}
+			EventText.text = 'COMPLETED !';
+			if (!ClientPrefs.data.CustomFadeText) {
+			    EventText.text = '';
+			    WaterMark.text = '';
+			}
+			loadLeftTween = FlxTween.tween(loadLeft, {x: -1280}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.expoInOut});
+			
+			loadRightTween = FlxTween.tween(loadRight, {x: 1280}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.expoInOut});
+			
+			loadTextTween = FlxTween.tween(WaterMark, {x: -1230}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.expoInOut});
+			
+			EventTextTween = FlxTween.tween(EventText, {x: -1230}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.expoInOut});
+			
+			
 		}
-		super.update(elapsed);
-		if(isTransIn) {
-			transBlack.y = transGradient.y + transGradient.height;
+		}
+		else{
+		loadAlpha = new FlxSprite( 0, 0).loadGraphic(Paths.image('loadingAlpha'));
+		loadAlpha.scrollFactor.set();
+		loadAlpha.antialiasing = ClientPrefs.data.antialiasing;		
+		add(loadAlpha);
+		loadAlpha.setGraphicSize(FlxG.width, FlxG.height);
+		loadAlpha.updateHitbox();
+		
+		WaterMark = new FlxText( 50, 720 - 50 - 50 * 2, 0, 'ME ENGINE V' + Main.meVersion, 50);
+		WaterMark.scrollFactor.set();
+		WaterMark.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		WaterMark.antialiasing = ClientPrefs.data.antialiasing;
+		add(WaterMark);
+        
+        EventText= new FlxText( 50, 720 - 50 - 50, 0, 'LOADING . . . . . . ', 50);
+		EventText.scrollFactor.set();
+		EventText.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		EventText.antialiasing = ClientPrefs.data.antialiasing;
+		add(EventText);
+		
+		if(!isTransIn) {
+		    try{
+			    FlxG.sound.play(Paths.sound('loading_close_alpha'));
+			}
+			if (!ClientPrefs.data.CustomFadeText) {
+			    EventText.text = '';
+			    WaterMark.text = '';
+			}
+			WaterMark.alpha = 0;
+			EventText.alpha = 0;
+			loadAlpha.alpha = 0;
+			loadAlphaTween = FlxTween.tween(loadAlpha, {alpha: 1}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.sineInOut});
+			
+			loadTextTween = FlxTween.tween(WaterMark, {alpha: 1}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.sineInOut});
+			
+			EventTextTween = FlxTween.tween(EventText, {alpha: 1}, duration, {
+				onComplete: function(twn:FlxTween) {
+					if(finishCallback != null) {
+						finishCallback();
+					}
+				},
+			ease: FlxEase.sineInOut});
+			
 		} else {
-			transBlack.y = transGradient.y - transBlack.height;
-		}
-	}
-
-	override function destroy() {
-		if(leTween != null) {
-			finishCallback();
-			leTween.cancel();
-		}
-		super.destroy();
+		    try{
+			    FlxG.sound.play(Paths.sound('loading_open_alpha'));
+            }
+			EventText.text = 'COMPLETED !';
+			if (!ClientPrefs.data.CustomFadeText) {
+			    EventText.text = '';
+			    WaterMark.text = '';
+			}
+			loadAlphaTween = FlxTween.tween(loadAlpha, {alpha: 0}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.sineInOut});
+			
+			loadTextTween = FlxTween.tween(WaterMark, {alpha: 0}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.sineInOut});
+			
+			EventTextTween = FlxTween.tween(EventText, {alpha: 0}, duration, {
+				onComplete: function(twn:FlxTween) {
+					close();
+				},
+			ease: FlxEase.sineInOut});
+			
+			
+    		}
+		}        
+		
+		super.create();
 	}
 }

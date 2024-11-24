@@ -1,5 +1,7 @@
 package states;
 
+import openfl.Lib;
+
 class OutdatedState extends MusicBeatState
 {
 	public static var leftState:Bool = false;
@@ -12,6 +14,8 @@ class OutdatedState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(bg);
 
+		Lib.application.window.title = "FNF':Meteoric Engine - Outdated Version";
+		
 		warnText = new FlxText(0, 0, FlxG.width,
 			"你好，感谢使用该引擎！\n
 			你可能正在运行老版本ME引擎，您的版本如下：" + Main.meVersion + "\n

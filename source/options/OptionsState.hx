@@ -2,6 +2,7 @@ package options;
 
 import states.MainMenuState;
 import backend.StageData;
+import openfl.Lib;
 
 class OptionsState extends MusicBeatState
 {
@@ -32,6 +33,8 @@ class OptionsState extends MusicBeatState
 	var selectorRight:Alphabet;
 
 	override function create() {
+		Lib.application.window.title = "FNF':Meteoric Engine - Options Menu";
+
 		#if desktop
 		DiscordClient.changePresence("Options Menu", null);
 		#end

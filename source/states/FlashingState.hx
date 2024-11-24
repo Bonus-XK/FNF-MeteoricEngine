@@ -5,6 +5,7 @@ import flixel.FlxSubState;
 import flixel.effects.FlxFlicker;
 import lime.app.Application;
 import flixel.addons.transition.FlxTransitionableState;
+import openfl.Lib;
 
 class FlashingState extends MusicBeatState
 {
@@ -18,6 +19,8 @@ class FlashingState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(bg);
 
+		Lib.application.window.title = "FNF':Meteoric Engine - <!>Warning";
+		
 		warnText = new FlxText(0, 0, FlxG.width,
 			"<!>警告\n
 			本游戏包含少数频闪内容\n

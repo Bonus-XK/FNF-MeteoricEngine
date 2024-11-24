@@ -13,6 +13,7 @@ import lime.app.Application;
 import objects.AchievementPopup;
 import states.editors.MasterEditorMenu;
 import options.OptionsState;
+import openfl.Lib;
 
 class MainMenuState extends MusicBeatState
 {
@@ -37,6 +38,8 @@ class MainMenuState extends MusicBeatState
 
 	override function create()
 	{
+		Lib.application.window.title = "FNF':Meteoric Engine - Main Menu";
+		
 		#if MODS_ALLOWED
 		Mods.pushGlobalMods();
 		#end

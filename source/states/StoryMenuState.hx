@@ -6,6 +6,7 @@ import backend.Song;
 
 import flixel.group.FlxGroup;
 import flixel.graphics.FlxGraphic;
+import openfl.Lib;
 
 import objects.MenuItem;
 import objects.MenuCharacter;
@@ -45,6 +46,8 @@ class StoryMenuState extends MusicBeatState
 	{
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
+		
+	    Lib.application.window.title = "FNF':Meteoric Engine - Select Week:";
 
 		PlayState.isStoryMode = true;
 		WeekData.reloadWeekFiles(true);

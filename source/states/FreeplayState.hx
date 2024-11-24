@@ -6,6 +6,7 @@ import backend.Song;
 
 import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
+import openfl.Lib;
 
 import objects.HealthIcon;
 import states.editors.ChartingState;
@@ -49,6 +50,8 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
+		Lib.application.window.title = "FNF':Meteoric Engine - Select Song:";
+		
 		//Paths.clearStoredMemory();
 		//Paths.clearUnusedMemory();
 		

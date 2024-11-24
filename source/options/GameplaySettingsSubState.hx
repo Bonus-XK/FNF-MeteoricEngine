@@ -32,6 +32,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 		
+		var option:Option = new Option('Smooth health',
+		    "如果选中，你的血量条显示起来将会很丝滑",
+			'smoothHealth',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('Auto Pause',
 			"你想让游戏在后台运行吗",
 			'autoPause',

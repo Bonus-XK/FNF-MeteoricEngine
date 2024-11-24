@@ -6,6 +6,7 @@ import sys.io.File;
 #end
 
 import objects.AttachedSprite;
+import openfl.Lib;
 
 class CreditsState extends MusicBeatState
 {
@@ -25,6 +26,8 @@ class CreditsState extends MusicBeatState
 
 	override function create()
 	{
+		Lib.application.window.title = "FNF':Meteoric Engine - Credits";
+		
 		#if desktop
 		// Updating Discord Rich Presence
 		DiscordClient.changePresence("In the Menus", null);

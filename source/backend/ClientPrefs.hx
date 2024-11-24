@@ -15,6 +15,8 @@ class SaveVariables {
 	public var showVer:Bool = true;
 	public var fpsColor:String = 'White';
 	public var flashing:Bool = true;
+	public var CustomFade:String = 'Move';
+	public var CustomFadeText:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
 	public var noteSkin:String = 'Default';
@@ -23,7 +25,7 @@ class SaveVariables {
 	public var lowQuality:Bool = false;
 	public var shaders:Bool = true;
 	public var cacheOnGPU:Bool = #if !switch false #else true #end; //From Stilic
-	public var framerate:Int = 60;
+	public var framerate:Int = 120;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
 	public var hideWatermark:Bool = false;
@@ -40,6 +42,7 @@ class SaveVariables {
 		[0xFFFF884E, 0xFFFFFAF5, 0xFF6C0000]];
 
 	public var ghostTapping:Bool = true;
+	public var smoothHealth:Bool = true;
 	public var timeBarType:String = 'Time Left';
 	public var noReset:Bool = false;
 	public var healthBarAlpha:Float = 1;

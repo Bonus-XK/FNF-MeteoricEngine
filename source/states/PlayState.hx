@@ -31,6 +31,7 @@ import flixel.animation.FlxAnimationController;
 import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
 import openfl.events.KeyboardEvent;
+import openfl.Lib;
 import tjson.TJSON as Json;
 
 import cutscenes.CutsceneHandler;
@@ -175,10 +176,12 @@ class PlayState extends MusicBeatState
 
 	public var gfSpeed:Int = 1;
 	public var health:Float = 1;
+	public var smoothHealth:Float = 1;
 	public var combo:Int = 0;
 
 	public var healthBar:HealthBar;
 	public var timeBar:HealthBar;
+	public var healthBarOverlay:FlxSprite;
 	var songPercent:Float = 0;
 
 	public var ratingsData:Array<Rating> = Rating.loadDefault();
@@ -523,7 +526,7 @@ class PlayState extends MusicBeatState
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 		moveCameraSection();
 
-		healthBar = new HealthBar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return health, 0, 2);
+		healthBar = new HealthBar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return (ClientPrefs.data.smoothHealth) ? smoothHealth : health, 0, 2);
 		healthBar.screenCenter(X);
 		healthBar.leftToRight = false;
 		healthBar.scrollFactor.set();
@@ -532,6 +535,18 @@ class PlayState extends MusicBeatState
 		reloadHealthBarColors();
 		add(healthBar);
 
+		healthBarOverlay = new FlxSprite().loadGraphic(Paths.image('healthBarOverlay'));
+		healthBarOverlay.y = FlxG.height * 0.89;
+		healthBarOverlay.screenCenter(X);
+		healthBarOverlay.scrollFactor.set();
+		healthBarOverlay.visible = !ClientPrefs.data.hideHud;
+        healthBarOverlay.color = FlxColor.BLACK;
+		healthBarOverlay.blend = MULTIPLY;
+		healthBarOverlay.x = healthBar.x;
+	    healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha;
+		healthBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
+		add(healthBarOverlay); healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha; if(ClientPrefs.data.downScroll) healthBarOverlay.y = 0.11 * FlxG.height;
+		
 		iconP1 = new HealthIcon(boyfriend.healthIcon, true);
 		iconP1.y = healthBar.y - 75;
 		iconP1.visible = !ClientPrefs.data.hideHud;
@@ -563,6 +578,8 @@ class PlayState extends MusicBeatState
 		add(songTxt);
 		songTxt.text = curSong + " (" + storyDifficultyText + ") " + "| 流星引擎 v" + Main.meVersion;
 
+		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong;
+
 		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, "AutoPlay", 32);
 		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		botplayTxt.scrollFactor.set();
@@ -577,10 +594,11 @@ class PlayState extends MusicBeatState
 		notes.cameras = [camHUD];
 
 		healthBar.cameras = [camHUD];
+		healthBarOverlay.cameras = [camHUD];
 		iconP1.cameras = [camHUD];
 		iconP2.cameras = [camHUD];
 		scoreTxt.cameras = [camHUD];
-		songTxt.cameras = [camHUD];
+		songTxt.cameras = [camOther];
 
 		botplayTxt.cameras = [camHUD];
 		timeBar.cameras = [camHUD];
@@ -723,7 +741,7 @@ class PlayState extends MusicBeatState
 		luaDebugGroup.add(newText);
 		#end
 	}
-
+	
 	public function reloadHealthBarColors() {
 		healthBar.setColors(FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]),
 			FlxColor.fromRGB(boyfriend.healthColorArray[0], boyfriend.healthColorArray[1], boyfriend.healthColorArray[2]));
@@ -1148,7 +1166,7 @@ class PlayState extends MusicBeatState
 		scoreTxt.text = 'Score: ' + songScore
 		+ ' // Misses: ' + songMisses
 		+ ' // Rank: ' + ratingName
-		+ ' // Accuracy: ' + CoolUtil.floorDecimal(ratingPercent * 100, 2)
+		+ ' // Accuracy: ' + CoolUtil.floorDecimal(ratingPercent * 100, 2) + '%'
 		+ ' // FC Status: ' + ratingFC;
 		callOnScripts('onUpdateScore', [miss]);
 	}
@@ -1609,6 +1627,9 @@ class PlayState extends MusicBeatState
 				boyfriendIdleTime = 0;
 			}
 		}
+
+		var mult:Float = FlxMath.lerp(smoothHealth, health, ((health / smoothHealth) * (elapsed * 8)) * playbackRate);
+		smoothHealth = mult;
 
 		super.update(elapsed);
 

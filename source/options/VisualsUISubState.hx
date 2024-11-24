@@ -96,6 +96,19 @@ class VisualsUISubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('Custom Cutscene',
+		    "选择你的过场动画样式：",
+			'CustomFade',
+			'string',
+			['Move', 'Alpha']);
+		addOption(option);
+
+		var option:Option = new Option('Cutscene Text',
+		    "如果你不勾选，将会关闭过场动画的引擎版本和事件指示器",
+			'CustomFadeText',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('Camera Zooms',
 			"如果你不勾选，那么镜头就不会缩放（我不知道）",
 			'camZooms',

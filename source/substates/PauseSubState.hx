@@ -11,6 +11,7 @@ import flixel.util.FlxStringUtil;
 import states.StoryMenuState;
 import states.FreeplayState;
 import options.OptionsState;
+import openfl.Lib;
 
 class PauseSubState extends MusicBeatSubstate
 {
@@ -138,6 +139,8 @@ class PauseSubState extends MusicBeatSubstate
 
 		regenMenu();
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
+
+	    Lib.application.window.title = "FNF':Meteoric Engine - Pause";
 	}
 
 	var holdTime:Float = 0;
@@ -236,6 +239,7 @@ class PauseSubState extends MusicBeatSubstate
 			{
 				case "Back to Game":
 					close();
+					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
 				case 'Change Difficulty':
 					menuItems = difficultyChoices;
 					deleteSkipTimeText();

@@ -4,7 +4,6 @@ import backend.WeekData;
 import backend.Highscore;
 
 import flixel.input.keyboard.FlxKey;
-import flixel.addons.transition.FlxTransitionableState;
 import flixel.graphics.frames.FlxAtlasFrames;
 import flixel.graphics.frames.FlxFrame;
 import flixel.group.FlxGroup;
@@ -14,6 +13,8 @@ import tjson.TJSON as Json;
 import openfl.Assets;
 import openfl.display.Bitmap;
 import openfl.display.BitmapData;
+import openfl.Lib;
+import flixel.addons.display.FlxBackdrop;
 
 import shaders.ColorSwap;
 
@@ -78,6 +79,8 @@ class TitleState extends MusicBeatState
 	{
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
+		
+        Lib.application.window.title = "FNF':Meteoric Engine - Intro";
 
 		#if LUA_ALLOWED
 		Mods.pushGlobalMods();
@@ -165,8 +168,6 @@ class TitleState extends MusicBeatState
 		MusicBeatState.switchState(new ChartingState());
 		#else
 		if(FlxG.save.data.flashing == null && !FlashingState.leftState) {
-			FlxTransitionableState.skipNextTransIn = true;
-			FlxTransitionableState.skipNextTransOut = true;
 			MusicBeatState.switchState(new FlashingState());
 		} else {
 			if (initialized)
@@ -465,8 +466,6 @@ class TitleState extends MusicBeatState
 
 							FlxTween.tween(black, {alpha: 1}, 1, {onComplete:
 								function(twn:FlxTween) {
-									FlxTransitionableState.skipNextTransIn = true;
-									FlxTransitionableState.skipNextTransOut = true;
 									MusicBeatState.switchState(new TitleState());
 								}
 							});
