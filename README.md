@@ -1,7 +1,7 @@
 # Meteoric Engine
 
 #### 介绍
-一个 **小学生** 开发的FNF引擎，汉化了游戏大部分内容，基于Psych Engine v0.6.3
+一个 **小学生** 开发的FNF引擎，汉化了游戏大部分内容，基于Psych Engine v0.7.1h
 
 #### 内容
 
