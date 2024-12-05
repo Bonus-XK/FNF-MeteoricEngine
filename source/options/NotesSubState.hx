@@ -167,7 +167,7 @@ class NotesSubState extends MusicBeatSubstate
 
 	function updateTip()
 	{
-		tipTxt.text = '按住 ' + (!controls.controllerMode ? '再转移到' : 'Left Shoulder Button') + ' + 按 R 可重置所有箭头';
+		tipTxt.text = '按住 SHIFT + R 可重置所有箭头';
 	}
 
 	var _storedColor:FlxColor;

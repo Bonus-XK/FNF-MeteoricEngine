@@ -2,22 +2,22 @@ package backend;
 
 class Achievements {
 	public static var achievementsStuff:Array<Dynamic> = [ //Name, Description, Achievement save tag, Hidden achievement
-		["Freaky on a Friday Night",	"Play on a Friday... Night.",						'friday_night_play',	 true],
-		["She Calls Me Daddy Too",		"Beat Week 1 on Hard with no Misses.",				'week1_nomiss',			false],
-		["No More Tricks",				"Beat Week 2 on Hard with no Misses.",				'week2_nomiss',			false],
-		["Call Me The Hitman",			"Beat Week 3 on Hard with no Misses.",				'week3_nomiss',			false],
-		["Lady Killer",					"Beat Week 4 on Hard with no Misses.",				'week4_nomiss',			false],
-		["Missless Christmas",			"Beat Week 5 on Hard with no Misses.",				'week5_nomiss',			false],
-		["Highscore!!",					"Beat Week 6 on Hard with no Misses.",				'week6_nomiss',			false],
-		["God Effing Damn It!",			"Beat Week 7 on Hard with no Misses.",				'week7_nomiss',			false],
-		["What a Funkin' Disaster!",	"Complete a Song with a rating lower than 20%.",	'ur_bad',				false],
-		["Perfectionist",				"Complete a Song with a rating of 100%.",			'ur_good',				false],
-		["Roadkill Enthusiast",			"Watch the Henchmen die over 50 times.",			'roadkill_enthusiast',	false],
-		["Oversinging Much...?",		"Hold down a note for 10 seconds.",					'oversinging',			false],
-		["Hyperactive",					"Finish a Song without going Idle.",				'hype',					false],
-		["Just the Two of Us",			"Finish a Song pressing only two keys.",			'two_keys',				false],
-		["Toaster Gamer",				"Have you tried to run the game on a toaster?",		'toastie',				false],
-		["Debugger",					"Beat the \"Test\" Stage from the Chart Editor.",	'debugger',				 true]
+		["周五晚上的怪异Freaky on a Friday Night",	"在星期五的晚上玩这个游戏",						'friday_night_play',	 true],
+		["她也叫我爸爸She Calls Me Daddy Too",		"用Hard难度打败第一周且无失误",				'week1_nomiss',			false],
+		["不再有技巧No More Tricks",				"用Hard难度打败第二周且无失误",				'week2_nomiss',			false],
+		["叫我杀手Call Me The Hitman",			"用Hard难度打败第三周且无失误",				'week3_nomiss',			false],
+		["女士杀手Lady Killer",					"用Hard难度打败第四周且无失误",				'week4_nomiss',			false],
+		["没有失误的万圣节Missless Christmas",			"用Hard难度打败第五周且无失误",				'week5_nomiss',			false],
+		["高分！！Highscore!!",					"用Hard难度打败第六周且无失误",				'week6_nomiss',			false],
+		["该死的！God Effing Damn It!",			"用Hard难度打败第七周且无失误",				'week7_nomiss',			false],
+		["多么有趣的灾难！What a Funkin' Disaster!",	"完成一首准确率低于20%的曲目",	'ur_bad',				false],
+		["完美主义者 Perfectionist",				"完成一首准确率为100%的曲目",			'ur_good',				false],
+		["公路杀手爱好者 Roadkill Enthusiast",			"看死亡界面50次",			'roadkill_enthusiast',	false],
+		["过度说唱……？Oversinging Much...?",		"按住箭头十秒钟",					'oversinging',			false],
+		["活跃 Hyperactive",					"在不进入空闲状态的情况下完成一首曲目",				'hype',					false],
+		["只有我们两个人 Just the Two of Us",			"只用两个按键完成一首曲目",			'two_keys',				false],
+		["烤面包机玩家 Toaster Gamer",				"你有没有尝试过在烤面包机上运行游戏",		'toastie',				false],
+		["调试者 Debugger",					"在铺面编辑器加载并打败 Test 曲目",	'debugger',				 true]
 	];
 	public static var achievementsMap:Map<String, Bool> = new Map<String, Bool>();
 

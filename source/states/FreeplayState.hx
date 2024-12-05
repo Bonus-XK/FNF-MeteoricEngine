@@ -50,7 +50,7 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
-		Lib.application.window.title = "FNF':Meteoric Engine - Select Song:";
+		Lib.application.window.title = "FNF':Meteoric Engine - Select Song";
 		
 		//Paths.clearStoredMemory();
 		//Paths.clearUnusedMemory();
@@ -100,7 +100,7 @@ class FreeplayState extends MusicBeatState
 
 		for (i in 0...songs.length)
 		{
-			var songText:Alphabet = new Alphabet(90, 320, songs[i].songName, true);
+			var songText:Alphabet = new Alphabet(320, 320, songs[i].songName, true);
 			songText.targetY = i;
 			grpSongs.add(songText);
 
@@ -239,7 +239,7 @@ class FreeplayState extends MusicBeatState
 			ratingSplit[1] += '0';
 		}
 
-		scoreText.text = '最佳成绩：' + lerpScore + ' (' + ratingSplit.join('.') + '%)';
+		scoreText.text = '最佳成绩：' + lerpScore + ' | 准确率：' + ratingSplit.join('.') + '%';
 		positionHighscore();
 
 		var shiftMult:Int = 1;
@@ -317,6 +317,7 @@ class FreeplayState extends MusicBeatState
 		{
 			if(instPlaying != curSelected)
 			{
+				Lib.application.window.title = "FNF':Meteoric Engine - Select Song: " + curSelected;
 				#if PRELOAD_ALL
 				destroyFreeplayVocals();
 				FlxG.sound.music.volume = 0;

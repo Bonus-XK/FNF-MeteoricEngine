@@ -9,7 +9,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 
 		//I'd suggest using "Downscroll" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('Downscroll', //Name
-			'If checked, notes go Down instead of Up, simple enough.', //Description
+			'如果被选中，那么UI界面将会垂直调换', //Description
 			'downScroll', //Save data variable name
 			'bool'); //Variable type
 		addOption(option);
@@ -32,9 +32,21 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 		
+		var option:Option = new Option('SB Engine Iconbop',
+		    "如果选中，那么将会启用SB Engine的小图标跳动",
+			'sbIconBop',
+			'bool');
+	    addOption(option);
+		
 		var option:Option = new Option('Smooth health',
 		    "如果选中，你的血量条显示起来将会很丝滑",
 			'smoothHealth',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('Health Bar Overlay',
+		    "如果选中，在血量条上将会显示一层阴影",
+			'healthBarOverlay',
 			'bool');
 		addOption(option);
 

@@ -28,7 +28,9 @@ class SaveVariables {
 	public var framerate:Int = 120;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
+	public var scoreTxtFont:String = 'Original';
 	public var hideWatermark:Bool = false;
+	public var healthBarOverlay:Bool = true;
 	public var noteOffset:Int = 0;
 	public var arrowRGB:Array<Array<FlxColor>> = [
 		[0xFFC24B99, 0xFFFFFFFF, 0xFF3C1F56],
@@ -43,6 +45,7 @@ class SaveVariables {
 
 	public var ghostTapping:Bool = true;
 	public var smoothHealth:Bool = true;
+	public var sbIconBop:Bool = true;
 	public var timeBarType:String = 'Time Left';
 	public var noReset:Bool = false;
 	public var healthBarAlpha:Float = 1;

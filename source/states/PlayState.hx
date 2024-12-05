@@ -84,16 +84,22 @@ class PlayState extends MusicBeatState
 	public static var STRUM_X_MIDDLESCROLL = -278;
 
 	public static var ratingStuff:Array<Dynamic> = [
-		['E', 0.3], //From 0% to 19%
-		['D', 0.5], //From 20% to 39%
-		['C', 0.6], //From 40% to 49%
-		['B', 0.69], //From 50% to 59%
-		['A', 0.7], //From 60% to 68%
-		['AA', 0.8], //69%
-		['AAA', 0.89], //From 70% to 79%
-		['AAAA', 0.9], //From 80% to 89%
-		['AAAAA', 0.99], //From 90% to 99%
-		['S', 1] //The value on this one isn't used actually, since Perfect is always "1"
+		['D', 0.6], //From 0% to 19%
+		['C', 0.7], //From 20% to 39%
+		['B', 0.8], //From 40% to 49%
+		['A', 0.9], //From 50% to 59%
+		['A.', 0.93], //From 60% to 68%
+		['A:', 0.95], //69%
+		['AA', 0.96], //From 70% to 79%
+		['AA.', 0.97], //From 80% to 89%
+		['AA:', 0.98], //From 90% to 99%
+		['AAA', 0.983], 
+		['AAA.', 0.987], 
+		['AAA:', 0.99], 
+		['AAAA.', 0.993], 
+		['AAAA:', 0.997], 
+		['AAAAA', 0.999], 
+		['S', 1]
 	];
 
 	//event variables
@@ -534,12 +540,16 @@ class PlayState extends MusicBeatState
 		healthBar.alpha = ClientPrefs.data.healthBarAlpha;
 		reloadHealthBarColors();
 		add(healthBar);
-
+		
 		healthBarOverlay = new FlxSprite().loadGraphic(Paths.image('healthBarOverlay'));
 		healthBarOverlay.y = FlxG.height * 0.89;
 		healthBarOverlay.screenCenter(X);
 		healthBarOverlay.scrollFactor.set();
-		healthBarOverlay.visible = !ClientPrefs.data.hideHud;
+		if (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay) {
+			healthBarOverlay.visible = true;
+		} else {
+			healthBarOverlay.visible = false;
+		}
         healthBarOverlay.color = FlxColor.BLACK;
 		healthBarOverlay.blend = MULTIPLY;
 		healthBarOverlay.x = healthBar.x;
@@ -560,9 +570,16 @@ class PlayState extends MusicBeatState
 		add(iconP2);
 
 		scoreTxt = new FlxText(0, healthBar.y + 40, FlxG.width, "", 20);
-		scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
+			scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			scoreTxt.borderSize = 1.25;
+		}
+
+		if(ClientPrefs.data.scoreTxtFont == "Original"){
+			scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			scoreTxt.borderSize = 1.25;
+		}
 		scoreTxt.scrollFactor.set();
-		scoreTxt.borderSize = 1.25;
 		scoreTxt.visible = !ClientPrefs.data.hideHud;
 		add(scoreTxt);
 
@@ -1164,10 +1181,46 @@ class PlayState extends MusicBeatState
 		}
 
 		scoreTxt.text = 'Score: ' + songScore
-		+ ' // Misses: ' + songMisses
-		+ ' // Rank: ' + ratingName
-		+ ' // Accuracy: ' + CoolUtil.floorDecimal(ratingPercent * 100, 2) + '%'
-		+ ' // FC Status: ' + ratingFC;
+		+ ' | Misses: ' + songMisses
+		+ ' | Rank: ' + ratingName
+		+ ' | Accuracy: ' + CoolUtil.floorDecimal(ratingPercent * 100, 2) + '%'
+		+ ' | ' + ratingFC;
+		if(health <= 0.4)
+		{
+		    if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
+			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+
+		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+		}
+		else if(health >= 1.55)
+		{
+		    if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
+			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+
+		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+		}
+		else
+		{
+			if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
+			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+
+		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			    scoreTxt.borderSize = 1.25;
+		    }
+		}
 		callOnScripts('onUpdateScore', [miss]);
 	}
 
@@ -1636,6 +1689,7 @@ class PlayState extends MusicBeatState
 		setOnScripts('curDecStep', curDecStep);
 		setOnScripts('curDecBeat', curDecBeat);
 
+	if(ClientPrefs.data.sbIconBop){
 		var speed:Float = 1;
 		if (iconP1.angle >= 0) {
 			speed *= playbackRate;
@@ -1656,6 +1710,7 @@ class PlayState extends MusicBeatState
 				iconP2.angle += speed;
 			}
 		}
+	}
 
 		if(botplayTxt != null && botplayTxt.visible) {
 			botplaySine += 180 * elapsed;
@@ -3105,6 +3160,7 @@ class PlayState extends MusicBeatState
 		if (generatedMusic)
 			notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
 
+	if(ClientPrefs.data.sbIconBop){
 		if (curBeat % gfSpeed == 0) {
 			if (curBeat % (gfSpeed * 2) == 0) {
 				iconP1.scale.set(0.8, 0.8);
@@ -3120,6 +3176,7 @@ class PlayState extends MusicBeatState
 				iconP1.angle = 15;
 			}
 		}
+	}
 
 		iconP1.scale.set(1.2, 1.2);
 		iconP2.scale.set(1.2, 1.2);

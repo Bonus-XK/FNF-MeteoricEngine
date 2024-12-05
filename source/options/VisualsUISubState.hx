@@ -77,6 +77,13 @@ class VisualsUISubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('Score Txt Font: ',
+		    "选择信息文字使用的字体：",
+			'scoreTxtFont',
+			'string',
+			['Original', 'Bahnschrift']);
+		addOption(option);
+
 		var option:Option = new Option('Hide Watermark',
 			'如果你勾选了，那么左下角水印将不会显示',
 			'hideWatermark',
