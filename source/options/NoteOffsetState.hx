@@ -152,7 +152,7 @@ class NoteOffsetState extends MusicBeatState
 		add(blackBox);
 
 		changeModeText = new FlxText(0, 4, FlxG.width, "", 32);
-		changeModeText.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER);
+		changeModeText.setFormat(Paths.font("future.ttf"), 32, FlxColor.WHITE, CENTER);
 		changeModeText.scrollFactor.set();
 		changeModeText.cameras = [camHUD];
 		add(changeModeText);
