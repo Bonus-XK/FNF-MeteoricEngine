@@ -119,7 +119,7 @@ class MainMenuState extends MusicBeatState
 		FlxG.camera.follow(camFollow, null, 0);
 
 		if (TitleState.mainUpdateCheck){
-		    var versionShit:FlxText = new FlxText(12, FlxG.height - 25, 0, "Meteoric Engine v" + Main.meVersion + " 新版本：" + TitleState.updateVersion, 12);
+		    var versionShit:FlxText = new FlxText(12, FlxG.height - 45, 0, "Meteoric Engine v" + Main.meVersion + "（旧版本）\n新版本：" + TitleState.updateVersion, 12);
 			versionShit.scrollFactor.set();
 		    versionShit.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			add(versionShit);
