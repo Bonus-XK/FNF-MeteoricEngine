@@ -70,6 +70,8 @@ class TitleState extends MusicBeatState
 	#end
 
 	var mustUpdate:Bool = false;
+	public static var mainUpdateCheck:Bool = false;
+	public static var mainNewVer:String = '';
 
 	var titleJSON:TitleData;
 
@@ -108,9 +110,11 @@ class TitleState extends MusicBeatState
 				updateVersion = data.split('\n')[0].trim();
 				var curVersion:String = Main.meVersion.trim();
 				trace('version online: ' + updateVersion + ', your version: ' + curVersion);
+				mainNewVer = updateVersion;
 				if(updateVersion != curVersion) {
 					trace('versions arent matching!');
 					mustUpdate = true;
+					mainUpdateCheck = mustUpdate;
 				}
 			}
 
