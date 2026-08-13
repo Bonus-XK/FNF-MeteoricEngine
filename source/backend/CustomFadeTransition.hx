@@ -42,7 +42,7 @@ class CustomFadeTransition extends FlxSubState {
 	{
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length-1]];
 		
-		if(ClientPrefs.data.CustomFade == 'Move'){
+		if(ClientPrefs.data.CustomFade == '移动'){
 		loadRight = new FlxSprite(isTransIn ? 0 : 1280, 0).loadGraphic(Paths.image('loadingR'));
 		loadRight.scrollFactor.set();
 		loadRight.antialiasing = ClientPrefs.data.antialiasing;		

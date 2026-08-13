@@ -25,6 +25,9 @@ class MenuCharacterEditorState extends MusicBeatState
 	var defaultCharacters:Array<String> = ['dad', 'bf', 'gf'];
 
 	override function create() {
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		characterFile = {
 			image: 'Menu_Dad',
 			scale: 1,
@@ -51,14 +54,14 @@ class MenuCharacterEditorState extends MusicBeatState
 		add(grpWeekCharacters);
 
 		txtOffsets = new FlxText(20, 10, 0, "[0, 0]", 32);
-		txtOffsets.setFormat("VCR OSD Mono", 32, FlxColor.WHITE, CENTER);
+		txtOffsets.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, CENTER);
 		txtOffsets.alpha = 0.7;
 		add(txtOffsets);
 
 		var tipText:FlxText = new FlxText(0, 540, FlxG.width,
-			"Arrow Keys - Change Offset (Hold shift for 10x speed)
-			\nSpace - Play \"Start Press\" animation (Boyfriend Character Type)", 16);
-		tipText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER);
+			"方向键 - 调整偏移（按住 Shift 加速 10 倍）
+			\n空格 - 播放 \"按下\" 动画（男友角色类型）", 16);
+		tipText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER);
 		tipText.scrollFactor.set();
 		add(tipText);
 
@@ -72,9 +75,15 @@ class MenuCharacterEditorState extends MusicBeatState
 	var UI_typebox:FlxUITabMenu;
 	var UI_mainbox:FlxUITabMenu;
 	var blockPressWhileTypingOn:Array<FlxUIInputText> = [];
+	function uiFont(t:FlxText):Void
+	{
+		if (t == null) return;
+		t.setFormat(Paths.font('future.ttf'), t.size, t.color, t.alignment, t.borderStyle, t.borderColor);
+	}
+
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Character Type', label: 'Character Type'},
+			{name: 'Character Type', label: '角色类型'},
 		];
 		UI_typebox = new FlxUITabMenu(null, tabs, true);
 		UI_typebox.resize(120, 180);
@@ -85,7 +94,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		add(UI_typebox);
 
 		var tabs = [
-			{name: 'Character', label: 'Character'},
+			{name: 'Character', label: '角色'},
 		];
 		UI_mainbox = new FlxUITabMenu(null, tabs, true);
 		UI_mainbox.resize(240, 180);
@@ -95,16 +104,18 @@ class MenuCharacterEditorState extends MusicBeatState
 		addCharacterUI();
 		add(UI_mainbox);
 
-		var loadButton:FlxButton = new FlxButton(0, 480, "Load Character", function() {
+		var loadButton:FlxButton = new FlxButton(0, 480, "加载角色", function() {
 			loadCharacter();
 		});
+		uiFont(loadButton.label);
 		loadButton.screenCenter(X);
 		loadButton.x -= 60;
 		add(loadButton);
 	
-		var saveButton:FlxButton = new FlxButton(0, 480, "Save Character", function() {
+		var saveButton:FlxButton = new FlxButton(0, 480, "保存角色", function() {
 			saveCharacter();
 		});
+		uiFont(saveButton.label);
 		saveButton.screenCenter(X);
 		saveButton.x += 60;
 		add(saveButton);
@@ -118,21 +129,24 @@ class MenuCharacterEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_typebox);
 		tab_group.name = "Character Type";
 
-		opponentCheckbox = new FlxUICheckBox(10, 20, null, null, "Opponent", 100);
+		opponentCheckbox = new FlxUICheckBox(10, 20, null, null, "对手", 100);
+		uiFont(opponentCheckbox.button.label);
 		opponentCheckbox.callback = function()
 		{
 			curTypeSelected = 0;
 			updateCharTypeBox();
 		};
 
-		boyfriendCheckbox = new FlxUICheckBox(opponentCheckbox.x, opponentCheckbox.y + 40, null, null, "Boyfriend", 100);
+		boyfriendCheckbox = new FlxUICheckBox(opponentCheckbox.x, opponentCheckbox.y + 40, null, null, "男友", 100);
+		uiFont(boyfriendCheckbox.button.label);
 		boyfriendCheckbox.callback = function()
 		{
 			curTypeSelected = 1;
 			updateCharTypeBox();
 		};
 
-		girlfriendCheckbox = new FlxUICheckBox(boyfriendCheckbox.x, boyfriendCheckbox.y + 40, null, null, "Girlfriend", 100);
+		girlfriendCheckbox = new FlxUICheckBox(boyfriendCheckbox.x, boyfriendCheckbox.y + 40, null, null, "女友", 100);
+		uiFont(girlfriendCheckbox.button.label);
 		girlfriendCheckbox.callback = function()
 		{
 			curTypeSelected = 2;
@@ -152,32 +166,46 @@ class MenuCharacterEditorState extends MusicBeatState
 	var flipXCheckbox:FlxUICheckBox;
 	function addCharacterUI() {
 		var tab_group = new FlxUI(null, UI_mainbox);
-		tab_group.name = "Character";
+		tab_group.name = "角色";
 		
 		imageInputText = new FlxUIInputText(10, 20, 80, characterFile.image, 8);
+		uiFont(imageInputText);
 		blockPressWhileTypingOn.push(imageInputText);
 		idleInputText = new FlxUIInputText(10, imageInputText.y + 35, 100, characterFile.idle_anim, 8);
+		uiFont(idleInputText);
 		blockPressWhileTypingOn.push(idleInputText);
 		confirmInputText = new FlxUIInputText(10, idleInputText.y + 35, 100, characterFile.confirm_anim, 8);
+		uiFont(confirmInputText);
 		blockPressWhileTypingOn.push(confirmInputText);
 
-		flipXCheckbox = new FlxUICheckBox(10, confirmInputText.y + 30, null, null, "Flip X", 100);
+		flipXCheckbox = new FlxUICheckBox(10, confirmInputText.y + 30, null, null, "水平翻转", 100);
+		uiFont(flipXCheckbox.button.label);
 		flipXCheckbox.callback = function()
 		{
 			grpWeekCharacters.members[curTypeSelected].flipX = flipXCheckbox.checked;
 			characterFile.flipX = flipXCheckbox.checked;
 		};
 
-		var reloadImageButton:FlxButton = new FlxButton(140, confirmInputText.y + 30, "Reload Char", function() {
+		var reloadImageButton:FlxButton = new FlxButton(140, confirmInputText.y + 30, "重新加载", function() {
 			reloadSelectedCharacter();
 		});
+		uiFont(reloadImageButton.label);
 		
 		scaleStepper = new FlxUINumericStepper(140, imageInputText.y, 0.05, 1, 0.1, 30, 2);
+		@:privateAccess
+		uiFont(scaleStepper.text_field);
 
-		var confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, 'Start Press animation on the .XML:');
-		tab_group.add(new FlxText(10, imageInputText.y - 18, 0, 'Image file name:'));
-		tab_group.add(new FlxText(10, idleInputText.y - 18, 0, 'Idle animation on the .XML:'));
-		tab_group.add(new FlxText(scaleStepper.x, scaleStepper.y - 18, 0, 'Scale:'));
+		var confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, 'XML 中的按下动画：');
+		var imageDescText = new FlxText(10, imageInputText.y - 18, 0, '图片文件名：');
+		var idleDescText = new FlxText(10, idleInputText.y - 18, 0, 'XML 中的待机动画：');
+		var scaleDescText = new FlxText(scaleStepper.x, scaleStepper.y - 18, 0, '缩放：');
+		uiFont(confirmDescText);
+		uiFont(imageDescText);
+		uiFont(idleDescText);
+		uiFont(scaleDescText);
+		tab_group.add(imageDescText);
+		tab_group.add(idleDescText);
+		tab_group.add(scaleDescText);
 		tab_group.add(flipXCheckbox);
 		tab_group.add(reloadImageButton);
 		tab_group.add(confirmDescText);

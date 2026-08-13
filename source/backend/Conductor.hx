@@ -10,6 +10,7 @@ typedef BPMChangeEvent =
 	var songTime:Float;
 	var bpm:Float;
 	@:optional var stepCrochet:Float;
+	@:optional var index:Int;
 }
 
 class Conductor
@@ -44,17 +45,40 @@ class Conductor
 		return lastChange.stepCrochet*4;
 	}
 
-	public static function getBPMFromSeconds(time:Float){
+	public static function getBPMFromSeconds(time:Float):BPMChangeEvent {
 		var lastChange:BPMChangeEvent = {
 			stepTime: 0,
 			songTime: 0,
 			bpm: bpm,
-			stepCrochet: stepCrochet
+			stepCrochet: stepCrochet,
+			index: 0
 		}
 		for (i in 0...Conductor.bpmChangeMap.length)
 		{
 			if (time >= Conductor.bpmChangeMap[i].songTime)
 				lastChange = Conductor.bpmChangeMap[i];
+		}
+
+		return lastChange;
+	}
+
+	public static function getBPMFromSecondsCached(time:Float, startIndex:Int):BPMChangeEvent {
+		var lastChange:BPMChangeEvent = {
+			stepTime: 0,
+			songTime: 0,
+			bpm: bpm,
+			stepCrochet: stepCrochet,
+			index: 0
+		}
+		var map = Conductor.bpmChangeMap;
+		var i:Int = startIndex;
+		while (i < map.length)
+		{
+			if (time >= map[i].songTime) {
+				lastChange = map[i];
+				lastChange.index = i;
+			} else break;
+			i++;
 		}
 
 		return lastChange;

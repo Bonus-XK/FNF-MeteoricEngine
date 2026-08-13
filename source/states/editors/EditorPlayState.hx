@@ -555,12 +555,16 @@ class EditorPlayState extends MusicBeatSubstate
 
 		var seperatedScore:Array<Int> = [];
 
-		if(combo >= 1000) {
-			seperatedScore.push(Math.floor(combo / 1000) % 10);
+		// 任意位数分解：原逻辑千位封顶，连击超过 9999 会显示错乱（10000 显示成 0000）
+		var tempCombo:Int = combo;
+		while (tempCombo > 0)
+		{
+			seperatedScore.push(tempCombo % 10);
+			tempCombo = Std.int(tempCombo / 10);
 		}
-		seperatedScore.push(Math.floor(combo / 100) % 10);
-		seperatedScore.push(Math.floor(combo / 10) % 10);
-		seperatedScore.push(combo % 10);
+		if (seperatedScore.length == 0) seperatedScore.push(0);
+		while (seperatedScore.length < 3) seperatedScore.push(0); // 不足 3 位补零，保持原布局
+		seperatedScore.reverse();
 
 		var daLoop:Int = 0;
 		var xThing:Float = 0;
@@ -805,7 +809,6 @@ class EditorPlayState extends MusicBeatSubstate
 			if (!note.isSustainNote)
 			{
 				combo++;
-				if(combo > 9999) combo = 9999;
 				popUpScore(note);
 			}
 

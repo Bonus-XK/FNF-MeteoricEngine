@@ -398,6 +398,14 @@ class AlphaCharacter extends FlxSprite
 				animation.addByPrefix(anim, anim, 24);
 				animation.play(anim, true);
 			}
+			// Safety: if animation has no frames, use 'a' as final fallback
+			if(animation.curAnim == null || animation.curAnim.numFrames <= 0)
+			{
+				if(suffix != ' bold') suffix = ' normal';
+				anim = 'a' + suffix;
+				animation.addByPrefix(anim, anim, 24);
+				animation.play(anim, true);
+			}
 		}
 		updateHitbox();
 	}

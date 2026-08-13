@@ -8,8 +8,8 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 	var boyfriend:Character = null;
 	public function new()
 	{
-		title = 'Graphics';
-		rpcTitle = 'Graphics Settings Menu'; //for Discord Rich Presence
+		title = '图像设置';
+		rpcTitle = '图像设置菜单'; //for Discord Rich Presence
 
 		boyfriend = new Character(840, 170, 'bf', true);
 		boyfriend.setGraphicSize(Std.int(boyfriend.width * 0.75));
@@ -19,35 +19,41 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		boyfriend.visible = false;
 
 		//I'd suggest using "Low Quality" as an example for making your own option since it is the simplest here
-		var option:Option = new Option('Low Quality', //Name
-			'如果选中，则禁用一些背景细节，减少加载时间并提高性能', //Description
+		var option:Option = new Option('低画质', //Name
+			'开启后，禁用部分背景细节，缩短加载时间并提升性能', //Description
 			'lowQuality', //Save data variable name
 			'bool'); //Variable type
 		addOption(option);
 
-		var option:Option = new Option('Anti-Aliasing',
-			'如果未选中，则禁用抗锯齿，以更清晰的视觉效果为代价提高性能',
+		var option:Option = new Option('抗锯齿',
+			'关闭后，禁用抗锯齿，画面边缘更锐利，同时提升性能',
 			'antialiasing',
 			'bool');
 		option.onChange = onChangeAntiAliasing; //Changing onChange is only needed if you want to make a special interaction after it changes the value
 		addOption(option);
 		antialiasingOption = optionsArray.length-1;
 
-		var option:Option = new Option('Shaders', //Name
-			"如果未选中，则禁用光影。它用于一些视觉效果，也用于较弱的PC的CPU密集型", //Description
+		var option:Option = new Option('光影效果', //Name
+			'关闭后，禁用光影特效。光影用于部分视觉效果，但对配置较弱的电脑比较吃 CPU', //Description
 			'shaders',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('GPU Caching', //Name
-			"如果选中，则允许GPU用于缓存纹理，从而减少RAM使用。如果你有一张糟糕的显卡，不要勾选它", //Description
+		var option:Option = new Option('GPU缓存', //Name
+			'开启后，使用 GPU 缓存纹理，可减少内存占用（显卡性能较差时建议关闭）', //Description
 			'cacheOnGPU',
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('提前渲染', //Name
+			'开启后，在加载曲目时预先渲染所有音符贴图，大幅优化高密度音符堆叠场景（会牺牲加载速度）', //Description
+			'preRenderNotes',
+			'bool');
+		addOption(option);
+
 		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
-		var option:Option = new Option('Framerate',
-			"更改你的游戏显示帧数",
+		var option:Option = new Option('帧率',
+			'调整游戏的帧率上限',
 			'framerate',
 			'int');
 		addOption(option);

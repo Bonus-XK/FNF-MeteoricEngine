@@ -6,6 +6,11 @@ import flixel.FlxState;
 
 class MusicBeatState extends FlxUIState
 {
+	#if LUA_ALLOWED
+	// 界面脚本系统：该界面上运行的自定义 Lua 脚本（menus/<界面名>.lua）
+	public var uiScripts:Array<psychlua.MenuScript> = [];
+	#end
+
 	private var curSection:Int = 0;
 	private var stepsToDo:Int = 0;
 
@@ -67,6 +72,41 @@ class MusicBeatState extends FlxUIState
 		});
 
 		super.update(elapsed);
+
+		#if LUA_ALLOWED
+		for(script in uiScripts)
+			script.update(elapsed);
+		#end
+	}
+
+	// 加载界面脚本：menus/<name>.lua（可被 mod 覆盖）
+	public function loadUIscripts(name:String)
+	{
+		#if LUA_ALLOWED
+		var scriptPath:String = psychlua.MenuScript.findScriptPath(name);
+		if(scriptPath != null)
+			uiScripts.push(new psychlua.MenuScript(this, scriptPath));
+		#end
+	}
+
+	// 向界面脚本广播事件（如 onChangeSelection、onConfirm）
+	public function callUIScripts(funcName:String, ?args:Array<Dynamic> = null)
+	{
+		#if LUA_ALLOWED
+		if(args == null) args = [];
+		for(script in uiScripts)
+			script.call(funcName, args);
+		#end
+	}
+
+	override function destroy()
+	{
+		#if LUA_ALLOWED
+		for(script in uiScripts)
+			script.destroy();
+		uiScripts = [];
+		#end
+		super.destroy();
 	}
 
 	private function updateSection():Void
@@ -108,9 +148,16 @@ class MusicBeatState extends FlxUIState
 		curDecBeat = curDecStep/4;
 	}
 
+	public function resetBPMChangeCache():Void
+	{
+		_lastBPMIndex = 0;
+	}
+
+	private var _lastBPMIndex:Int = 0;
 	private function updateCurStep():Void
 	{
-		var lastChange = Conductor.getBPMFromSeconds(Conductor.songPosition);
+		var lastChange = Conductor.getBPMFromSecondsCached(Conductor.songPosition, _lastBPMIndex);
+		_lastBPMIndex = lastChange.index;
 
 		var shit = ((Conductor.songPosition - ClientPrefs.data.noteOffset) - lastChange.songTime) / lastChange.stepCrochet;
 		curDecStep = lastChange.stepTime + shit;

@@ -55,6 +55,9 @@ class FunkinLua {
 	public var camTarget:FlxCamera;
 	public var scriptName:String = '';
 	public var closed:Bool = false;
+	// import 导入库系统：记录已导入/正在导入的库路径（防重复执行与循环导入）
+	public var importedScripts:Array<String> = [];
+	private var importingScripts:Array<String> = [];
 
 	#if (SScript >= "3.0.0")
 	public var hscript:HScript = null;
@@ -67,6 +70,9 @@ class FunkinLua {
 		#if LUA_ALLOWED
 		lua = LuaL.newstate();
 		LuaL.openlibs(lua);
+
+		// Lua class 系统（class + 继承）
+		LuaClass.register(lua);
 
 		//trace('Lua version: ' + Lua.version());
 		//trace("LuaJIT version: " + Lua.versionJIT());
@@ -425,10 +431,9 @@ class FunkinLua {
 				difficultyNum = PlayState.storyDifficulty;
 
 			var poop = Highscore.formatSong(name, difficultyNum);
-			PlayState.SONG = Song.loadFromJson(poop, name);
 			PlayState.storyDifficulty = difficultyNum;
 			game.persistentUpdate = false;
-			LoadingState.loadAndSwitchState(new PlayState());
+			LoadingState.loadSongAndSwitchState(new PlayState(), Paths.formatToSongPath(name), poop, Paths.formatToSongPath(name));
 
 			FlxG.sound.music.pause();
 			FlxG.sound.music.volume = 0;
@@ -500,7 +505,17 @@ class FunkinLua {
 		// gay ass tweens
 		Lua_helper.add_callback(lua, "startTween", function(tag:String, vars:String, values:Any = null, duration:Float, options:Any = null) {
 			var penisExam:Dynamic = LuaUtils.tweenPrepare(tag, vars);
-			if(penisExam != null) {
+			var props:Array<String> = values != null ? Reflect.fields(values) : [];
+			var canTween:Bool = penisExam != null && Reflect.isObject(penisExam) && props.length > 0;
+			if(canTween) {
+				for(prop in props) {
+					if(Reflect.getProperty(penisExam, prop) == null) {
+						canTween = false;
+						break;
+					}
+				}
+			}
+			if(canTween) {
 				if(values != null) {
 					var myOptions:LuaTweenOptions = LuaUtils.getLuaTween(options);
 					game.modchartTweens.set(tag, FlxTween.tween(penisExam, values, duration, {
@@ -545,7 +560,7 @@ class FunkinLua {
 		});
 		Lua_helper.add_callback(lua, "doTweenColor", function(tag:String, vars:String, targetColor:String, duration:Float, ease:String) {
 			var penisExam:Dynamic = LuaUtils.tweenPrepare(tag, vars);
-			if(penisExam != null) {
+			if(penisExam != null && Reflect.isObject(penisExam) && Reflect.getProperty(penisExam, 'color') != null && Reflect.getProperty(penisExam, 'alpha') != null) {
 				var curColor:FlxColor = penisExam.color;
 				curColor.alphaFloat = penisExam.alpha;
 				game.modchartTweens.set(tag, FlxTween.color(penisExam, duration, curColor, CoolUtil.colorFromString(targetColor), {ease: LuaUtils.getTweenEaseByString(ease),
@@ -1160,7 +1175,9 @@ class FunkinLua {
 		});
 
 		Lua_helper.add_callback(lua, "setHealthBarColors", function(left:String, right:String) {
-			game.healthBar.setColors(CoolUtil.colorFromString(left), CoolUtil.colorFromString(right));
+			// Psych 0.6.3 语义：left 为未填充侧（对手）颜色，right 为填充侧（玩家）颜色
+			game.healthBar.createFilledBar(CoolUtil.colorFromString(left), CoolUtil.colorFromString(right));
+			game.healthBar.updateBar();
 		});
 		Lua_helper.add_callback(lua, "setTimeBarColors", function(left:String, right:String) {
 			game.timeBar.setColors(CoolUtil.colorFromString(left), CoolUtil.colorFromString(right));
@@ -1423,6 +1440,10 @@ class FunkinLua {
 			return closed;
 		});
 
+		addLocalCallback("import", function(luaFile:String) {
+			return importLibrary(luaFile);
+		});
+
 		#if desktop DiscordClient.addLuaCallbacks(lua); #end
 		#if (SScript >= "3.0.0") HScript.implement(this); #end
 		ReflectionFunctions.implement(this);
@@ -1561,7 +1582,17 @@ class FunkinLua {
 	{
 		#if LUA_ALLOWED
 		var target:Dynamic = LuaUtils.tweenPrepare(tag, vars);
-		if(target != null) {
+		var props:Array<String> = Reflect.fields(tweenValue);
+		var canTween:Bool = target != null && Reflect.isObject(target) && props.length > 0;
+		if(canTween) {
+			for(prop in props) {
+				if(Reflect.getProperty(target, prop) == null) {
+					canTween = false;
+					break;
+				}
+			}
+		}
+		if(canTween) {
 			PlayState.instance.modchartTweens.set(tag, FlxTween.tween(target, tweenValue, duration, {ease: LuaUtils.getTweenEaseByString(ease),
 				onComplete: function(twn:FlxTween) {
 					PlayState.instance.modchartTweens.remove(tag);
@@ -1569,7 +1600,7 @@ class FunkinLua {
 				}
 			}));
 		} else {
-			luaTrace('$funcName: Couldnt find object: $vars', false, false, FlxColor.RED);
+			luaTrace('$funcName: Couldnt find object or property: $vars', false, false, FlxColor.RED);
 		}
 		#end
 	}
@@ -1624,6 +1655,34 @@ class FunkinLua {
 			return preloadPath;
 		}
 		return null;
+	}
+
+	// 解析 import 的路径：先相对当前导入基准（主脚本或正在导入的库）目录，再走 mods/preload 搜索
+	function findImportPath(luaFile:String):String
+	{
+		var baseScript:String = scriptName;
+		if(importingScripts.length > 0)
+			baseScript = importingScripts[importingScripts.length - 1];
+		return LuaImport.findImportPath(luaFile, baseScript);
+	}
+
+	// import 导入库：在当前 Lua 状态中执行一次目标文件，库内定义的全局函数/变量
+	// 直接对调用方脚本可用；重复导入与循环导入会自动跳过，不会重复执行
+	function importLibrary(luaFile:String):Bool
+	{
+		#if LUA_ALLOWED
+		if(lua == null || closed) return false;
+
+		var baseScript:String = scriptName;
+		if(importingScripts.length > 0)
+			baseScript = importingScripts[importingScripts.length - 1];
+
+		return LuaImport.importLibrary(lua, luaFile, baseScript, importedScripts, importingScripts,
+			function(msg) luaTrace(msg, true, false, FlxColor.RED),
+			function(msg) luaTrace(msg));
+		#else
+		return false;
+		#end
 	}
 
 	public function getErrorMessage(status:Int):String {

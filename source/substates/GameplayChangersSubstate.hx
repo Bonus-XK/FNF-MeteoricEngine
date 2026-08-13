@@ -1,17 +1,42 @@
 package substates;
 
-import objects.AttachedText;
-import objects.CheckboxThingie;
+import objects.BackButton;
+import flixel.math.FlxPoint;
+import flixel.util.FlxSpriteUtil;
 
 class GameplayChangersSubstate extends MusicBeatSubstate
 {
-	private var curOption:GameplayOption = null;
-	private var curSelected:Int = 0;
-	private var optionsArray:Array<Dynamic> = [];
+	// ===== 布局常量（磨砂圆角风格，与暂停/结算界面一致） =====
+	static final TITLE_Y:Float = 22;
+	static final PANEL_X:Float = 200;
+	static final PANEL_Y:Float = 100;
+	static final PANEL_W:Float = 880;
+	static final PANEL_H:Float = 470;
+	static final ROW_X:Float = 244;
+	static final ROW_START_Y:Float = 150;
+	static final MAX_ROW_GAP:Float = 48;
+	static final VALUE_RIGHT:Float = 1032;
+	static final HINT_Y:Float = 600;
 
-	private var grpOptions:FlxTypedGroup<Alphabet>;
-	private var checkboxGroup:FlxTypedGroup<CheckboxThingie>;
-	private var grpTexts:FlxTypedGroup<AttachedText>;
+	var curOption:GameplayOption = null;
+	var curSelected:Int = 0;
+	var optionsArray:Array<Dynamic> = [];
+
+	var grpLabels:Array<FlxText> = [];
+	var grpValues:Array<FlxText> = [];
+	var grpValueLast:Array<String> = [];
+	var selectorBar:FlxSprite;
+	var selectorTween:FlxTween;
+	var backBtn:BackButton;
+	var rowGap:Float = MAX_ROW_GAP; // 行距随选项数量自动收缩，保证最后一行不超出面板
+
+	var mouseActive:Bool = true;  // 鼠标跟随是否激活（键盘操作时冻结，鼠标移动/点击时恢复）
+	var mouseLockX:Float = 0;
+	var mouseLockY:Float = 0;
+
+	var nextAccept:Int = 5;
+	var holdTime:Float = 0;
+	var holdValue:Float = 0;
 
 	function getOptions()
 	{
@@ -65,10 +90,16 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		var option:GameplayOption = new GameplayOption('Instakill on Miss', 'instakill', 'bool', false);
 		optionsArray.push(option);
 
+		var option:GameplayOption = new GameplayOption('Opponent Push', 'opponentpush', 'bool', false);
+		optionsArray.push(option);
+
 		var option:GameplayOption = new GameplayOption('God Mode', 'practice', 'bool', false);
 		optionsArray.push(option);
 
 		var option:GameplayOption = new GameplayOption('AutoPlay', 'botplay', 'bool', false);
+		optionsArray.push(option);
+
+		var option:GameplayOption = new GameplayOption('Infinite Loop', 'infiniteloop', 'bool', false);
 		optionsArray.push(option);
 	}
 
@@ -86,186 +117,301 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	public function new()
 	{
 		super();
-		
+
+		// 固定渲染在专用相机上：zoom=1、scroll=(0,0)，暂停时不受游戏相机缩放影响
+		var settingsCam:FlxCamera = (PlayState.instance != null && PlayState.instance.camOther != null) ? PlayState.instance.camOther : FlxG.camera;
+		cameras = [settingsCam];
+
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		bg.alpha = 0.6;
 		add(bg);
 
-		// avoids lagspikes while scrolling through menus!
-		grpOptions = new FlxTypedGroup<Alphabet>();
-		add(grpOptions);
+		// ---- 标题 ----
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '游玩设置', 48);
+		titleText.scrollFactor.set();
+		titleText.setFormat(Paths.font('future.ttf'), 48, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		titleText.borderSize = 2.4;
+		titleText.antialiasing = ClientPrefs.data.antialiasing;
+		add(titleText);
 
-		grpTexts = new FlxTypedGroup<AttachedText>();
-		add(grpTexts);
+		// ---- 磨砂面板 ----
+		var panel:FlxSprite = makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 20);
+		add(panel);
 
-		checkboxGroup = new FlxTypedGroup<CheckboxThingie>();
-		add(checkboxGroup);
-		
+		// ---- 选中高亮条 ----
+		selectorBar = makePanel(PANEL_X + 16, rowYFor(0) - 4, PANEL_W - 32, 40, 12, 0x2EFFFFFF, null);
+		add(selectorBar);
+
 		getOptions();
 
+		// 自动适配行距：所有选项（含最后一行与选中条）都完整落在面板内
+		rowGap = Math.min(MAX_ROW_GAP, Math.max(30, (PANEL_H - 40 - (ROW_START_Y - PANEL_Y)) / Math.max(1, optionsArray.length - 1)));
+
+		// ---- 选项行（标签左对齐，数值右对齐） ----
 		for (i in 0...optionsArray.length)
 		{
-			var optionText:Alphabet = new Alphabet(200, 360, optionsArray[i].name, true);
-			optionText.isMenuItem = true;
-			optionText.setScale(0.8);
-			optionText.targetY = i;
-			grpOptions.add(optionText);
+			var opt:GameplayOption = optionsArray[i];
 
-			if(optionsArray[i].type == 'bool') {
-				optionText.x += 90;
-				optionText.startPosition.x += 90;
-				optionText.snapToPosition();
-				var checkbox:CheckboxThingie = new CheckboxThingie(optionText.x - 105, optionText.y, optionsArray[i].getValue() == true);
-				checkbox.sprTracker = optionText;
-				checkbox.offsetX -= 20;
-				checkbox.offsetY = -52;
-				checkbox.ID = i;
-				checkboxGroup.add(checkbox);
-			} else {
-				optionText.snapToPosition();
-				var valueText:AttachedText = new AttachedText(Std.string(optionsArray[i].getValue()), optionText.width + 40, 0, true, 0.8);
-				valueText.sprTracker = optionText;
-				valueText.copyAlpha = true;
-				valueText.ID = i;
-				grpTexts.add(valueText);
-				optionsArray[i].setChild(valueText);
-			}
-			updateTextFrom(optionsArray[i]);
+			var lbl:FlxText = new FlxText(ROW_X, rowYFor(i), 0, translateName(opt.name), 24);
+			lbl.scrollFactor.set();
+			lbl.setFormat(Paths.font('future.ttf'), 24, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			lbl.borderSize = 1.5;
+			lbl.antialiasing = ClientPrefs.data.antialiasing;
+			lbl.updateHitbox();
+			add(lbl);
+			grpLabels.push(lbl);
+
+			var val:FlxText = new FlxText(VALUE_RIGHT, rowYFor(i), 0, '', 24);
+			val.scrollFactor.set();
+			val.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			val.borderSize = 1.5;
+			val.antialiasing = ClientPrefs.data.antialiasing;
+			add(val);
+			grpValues.push(val);
+			grpValueLast.push('');
+			updateValue(i);
 		}
 
+		// ---- 返回按钮 + 操作提示 ----
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
+
+		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, '← → 调整数值 · 回车 开关 · R 重置 · ESC 返回', 18);
+		hintText.scrollFactor.set();
+		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		hintText.borderSize = 1.5;
+		hintText.antialiasing = ClientPrefs.data.antialiasing;
+		add(hintText);
+
 		changeSelection();
-		reloadCheckboxes();
+		FlxG.mouse.visible = true;
 	}
 
-	var nextAccept:Int = 5;
-	var holdTime:Float = 0;
-	var holdValue:Float = 0;
+	function rowYFor(i:Int):Float
+	{
+		return ROW_START_Y + (i * rowGap);
+	}
+
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
+		if(border != null)
+			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
+		spr.scrollFactor.set();
+		return spr;
+	}
+
+	function translateName(name:String):String
+	{
+		switch (name)
+		{
+			case 'Scroll Type': return '滚动方式';
+			case 'Scroll Speed': return '滚动速度';
+			case 'Playback Rate': return '播放速率';
+			case 'Health Gain Multiplier': return '血量回复倍率';
+			case 'Health Loss Multiplier': return '血量损失倍率';
+			case 'Instakill on Miss': return '失误即死';
+			case 'Opponent Push': return '对方推条';
+			case 'God Mode': return '上帝模式';
+			case 'AutoPlay': return '自动游玩';
+			case 'Infinite Loop': return '无限轮回';
+		}
+		return name;
+	}
+
+	// 数值文本只在内容变化时才重绘
+	function updateValue(i:Int):Void
+	{
+		var opt:GameplayOption = optionsArray[i];
+		var newText:String;
+		if (opt.type == 'bool')
+		{
+			newText = (opt.getValue() == true) ? '开' : '关';
+		}
+		else if (opt.type == 'string')
+		{
+			switch (Std.string(opt.getValue()))
+			{
+				case 'multiplicative': newText = '乘法';
+				case 'constant': newText = '恒定';
+				default: newText = Std.string(opt.getValue());
+			}
+		}
+		else
+		{
+			var text:String = opt.displayFormat;
+			var val:Dynamic = opt.getValue();
+			if(opt.type == 'percent') val *= 100;
+			var def:Dynamic = opt.defaultValue;
+			newText = text.replace('%v', val).replace('%d', def);
+		}
+
+		if (grpValueLast[i] != newText)
+		{
+			grpValueLast[i] = newText;
+			var txt:FlxText = grpValues[i];
+			txt.text = newText;
+			txt.updateHitbox();
+			txt.x = VALUE_RIGHT - txt.width;
+		}
+	}
+
+	// 改动即时同步到正在游玩的 PlayState（自动生效）
+	function applyChanges():Void
+	{
+		if (PlayState.instance != null)
+			PlayState.instance.syncGameplaySettings();
+	}
+
 	override function update(elapsed:Float)
 	{
+		if (cameras != null && cameras[0] != null)
+		{
+			cameras[0].zoom = 1;
+			cameras[0].scroll.set(0, 0);
+		}
+		super.update(elapsed);
+
+		var mousePos:FlxPoint = FlxG.mouse.getScreenPosition(cameras[0], FlxPoint.get());
+
 		if (controls.UI_UP_P)
 		{
+			mouseActive = false;
+			mouseLockX = mousePos.x;
+			mouseLockY = mousePos.y;
 			changeSelection(-1);
 		}
 		if (controls.UI_DOWN_P)
 		{
+			mouseActive = false;
+			mouseLockX = mousePos.x;
+			mouseLockY = mousePos.y;
 			changeSelection(1);
 		}
 
-		if (controls.BACK) {
+		if (!controls.controllerMode)
+		{
+			var hoveredID:Int = getHoveredOptionID(mousePos.x, mousePos.y);
+
+			// 悬停只高亮不切换
+			for (i in 0...grpLabels.length)
+			{
+				var hovered:Bool = (i == hoveredID);
+				grpLabels[i].color = hovered ? 0xFFD7D7E0 : (i == curSelected ? FlxColor.WHITE : 0xFF9A9AA8);
+			}
+
+			if (!mouseActive)
+			{
+				var dx:Float = mousePos.x - mouseLockX;
+				var dy:Float = mousePos.y - mouseLockY;
+				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
+			}
+
+			if (FlxG.mouse.wheel != 0)
+			{
+				mouseActive = true;
+				FlxG.sound.play(Paths.sound('scrollMenu'));
+				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			}
+
+			backBtn.setHovered(mousePos.x, mousePos.y);
+			if (FlxG.mouse.justPressed && backBtn.over(mousePos.x, mousePos.y))
+			{
+				mousePos.put();
+				close();
+				ClientPrefs.saveSettings();
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				return;
+			}
+
+			if (FlxG.mouse.justPressed && hoveredID >= 0)
+			{
+				mouseActive = true;
+				if (hoveredID != curSelected)
+				{
+					changeSelection(hoveredID - curSelected);
+				}
+				else if (curOption.type != 'key')
+				{
+					if (curOption.type == 'bool')
+					{
+						FlxG.sound.play(Paths.sound('scrollMenu'));
+						curOption.setValue((curOption.getValue() == true) ? false : true);
+						curOption.change();
+						updateValue(curSelected);
+						applyChanges();
+					}
+					else
+					{
+						changeOptionValue(1);
+					}
+				}
+			}
+		}
+		mousePos.put();
+
+		if (controls.BACK)
+		{
 			close();
 			ClientPrefs.saveSettings();
 			FlxG.sound.play(Paths.sound('cancelMenu'));
+			return;
 		}
 
-		if(nextAccept <= 0)
+		if (nextAccept <= 0)
 		{
-			var usesCheckbox = true;
-			if(curOption.type != 'bool')
+			if (curOption.type == 'bool')
 			{
-				usesCheckbox = false;
-			}
-
-			if(usesCheckbox)
-			{
-				if(controls.ACCEPT)
+				if (controls.ACCEPT)
 				{
 					FlxG.sound.play(Paths.sound('scrollMenu'));
 					curOption.setValue((curOption.getValue() == true) ? false : true);
 					curOption.change();
-					reloadCheckboxes();
-				}
-			} else {
-				if(controls.UI_LEFT || controls.UI_RIGHT) {
-					var pressed = (controls.UI_LEFT_P || controls.UI_RIGHT_P);
-					if(holdTime > 0.5 || pressed) {
-						if(pressed) {
-							var add:Dynamic = null;
-							if(curOption.type != 'string') {
-								add = controls.UI_LEFT ? -curOption.changeValue : curOption.changeValue;
-							}
-
-							switch(curOption.type)
-							{
-								case 'int' | 'float' | 'percent':
-									holdValue = curOption.getValue() + add;
-									if(holdValue < curOption.minValue) holdValue = curOption.minValue;
-									else if (holdValue > curOption.maxValue) holdValue = curOption.maxValue;
-
-									switch(curOption.type)
-									{
-										case 'int':
-											holdValue = Math.round(holdValue);
-											curOption.setValue(holdValue);
-
-										case 'float' | 'percent':
-											holdValue = FlxMath.roundDecimal(holdValue, curOption.decimals);
-											curOption.setValue(holdValue);
-									}
-
-								case 'string':
-									var num:Int = curOption.curOption; //lol
-									if(controls.UI_LEFT_P) --num;
-									else num++;
-
-									if(num < 0) {
-										num = curOption.options.length - 1;
-									} else if(num >= curOption.options.length) {
-										num = 0;
-									}
-
-									curOption.curOption = num;
-									curOption.setValue(curOption.options[num]); //lol
-									
-									if (curOption.name == "Scroll Type")
-									{
-										var oOption:GameplayOption = getOptionByName("Scroll Speed");
-										if (oOption != null)
-										{
-											if (curOption.getValue() == "constant")
-											{
-												oOption.displayFormat = "%v";
-												oOption.maxValue = 6;
-											}
-											else
-											{
-												oOption.displayFormat = "%vX";
-												oOption.maxValue = 3;
-												if(oOption.getValue() > 3) oOption.setValue(3);
-											}
-											updateTextFrom(oOption);
-										}
-									}
-									//trace(curOption.options[num]);
-							}
-							updateTextFrom(curOption);
-							curOption.change();
-							FlxG.sound.play(Paths.sound('scrollMenu'));
-						} else if(curOption.type != 'string') {
-							holdValue = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.scrollSpeed * elapsed * (controls.UI_LEFT ? -1 : 1)));
-
-							switch(curOption.type)
-							{
-								case 'int':
-									curOption.setValue(Math.round(holdValue));
-								
-								case 'float' | 'percent':
-									var blah:Float = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.changeValue - (holdValue % curOption.changeValue)));
-									curOption.setValue(FlxMath.roundDecimal(blah, curOption.decimals));
-							}
-							updateTextFrom(curOption);
-							curOption.change();
-						}
-					}
-
-					if(curOption.type != 'string') {
-						holdTime += elapsed;
-					}
-				} else if(controls.UI_LEFT_R || controls.UI_RIGHT_R) {
-					clearHold();
+					updateValue(curSelected);
+					applyChanges();
 				}
 			}
+			else if (controls.UI_LEFT || controls.UI_RIGHT)
+			{
+				var pressed = (controls.UI_LEFT_P || controls.UI_RIGHT_P);
+				if (holdTime > 0.5 || pressed)
+				{
+					if (pressed)
+					{
+						changeOptionValue(controls.UI_LEFT ? -1 : 1);
+					}
+					else if (curOption.type != 'string')
+					{
+						holdValue = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.scrollSpeed * elapsed * (controls.UI_LEFT ? -1 : 1)));
 
-			if(controls.RESET)
+						switch(curOption.type)
+						{
+							case 'int':
+								curOption.setValue(Math.round(holdValue));
+
+							case 'float' | 'percent':
+								var blah:Float = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.changeValue - (holdValue % curOption.changeValue)));
+								curOption.setValue(FlxMath.roundDecimal(blah, curOption.decimals));
+						}
+						updateValue(curSelected);
+						curOption.change();
+						applyChanges();
+					}
+				}
+
+				if(curOption.type != 'string') {
+					holdTime += elapsed;
+				}
+			}
+			else if(controls.UI_LEFT_R || controls.UI_RIGHT_R)
+			{
+				clearHold();
+			}
+
+			if (controls.RESET)
 			{
 				for (i in 0...optionsArray.length)
 				{
@@ -277,8 +423,9 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 						{
 							leOption.curOption = leOption.options.indexOf(leOption.getValue());
 						}
-						updateTextFrom(leOption);
+						updateValue(i);
 					}
+					else updateValue(i);
 
 					if(leOption.name == 'Scroll Speed')
 					{
@@ -288,27 +435,81 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 						{
 							leOption.setValue(3);
 						}
-						updateTextFrom(leOption);
+						updateValue(i);
 					}
 					leOption.change();
 				}
 				FlxG.sound.play(Paths.sound('cancelMenu'));
-				reloadCheckboxes();
+				applyChanges();
 			}
 		}
 
 		if(nextAccept > 0) {
 			nextAccept -= 1;
 		}
-		super.update(elapsed);
 	}
 
-	function updateTextFrom(option:GameplayOption) {
-		var text:String = option.displayFormat;
-		var val:Dynamic = option.getValue();
-		if(option.type == 'percent') val *= 100;
-		var def:Dynamic = option.defaultValue;
-		option.text = text.replace('%v', val).replace('%d', def);
+	function changeOptionValue(dir:Int = 1)
+	{
+		var add:Dynamic = null;
+		if(curOption.type != 'string') {
+			add = (dir < 0) ? -curOption.changeValue : curOption.changeValue;
+		}
+
+		switch(curOption.type)
+		{
+			case 'int' | 'float' | 'percent':
+				holdValue = curOption.getValue() + add;
+				if(holdValue < curOption.minValue) holdValue = curOption.minValue;
+				else if (holdValue > curOption.maxValue) holdValue = curOption.maxValue;
+
+				switch(curOption.type)
+				{
+					case 'int':
+						holdValue = Math.round(holdValue);
+						curOption.setValue(holdValue);
+
+					case 'float' | 'percent':
+						holdValue = FlxMath.roundDecimal(holdValue, curOption.decimals);
+						curOption.setValue(holdValue);
+				}
+
+			case 'string':
+				var num:Int = curOption.curOption;
+				num += dir;
+
+				if(num < 0) {
+					num = curOption.options.length - 1;
+				} else if(num >= curOption.options.length) {
+					num = 0;
+				}
+
+				curOption.curOption = num;
+				curOption.setValue(curOption.options[num]);
+		}
+		if (curOption.name == 'Scroll Type')
+		{
+			var speedOpt:GameplayOption = getOptionByName('Scroll Speed');
+			if (speedOpt != null)
+			{
+				if (curOption.getValue() == 'constant')
+				{
+					speedOpt.displayFormat = '%v';
+					speedOpt.maxValue = 6;
+				}
+				else
+				{
+					speedOpt.displayFormat = '%vX';
+					speedOpt.maxValue = 3;
+					if (speedOpt.getValue() > 3) speedOpt.setValue(3);
+				}
+				updateValue(optionsArray.indexOf(speedOpt));
+			}
+		}
+		updateValue(curSelected);
+		curOption.change();
+		applyChanges();
+		FlxG.sound.play(Paths.sound('scrollMenu'));
 	}
 
 	function clearHold()
@@ -318,7 +519,19 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		}
 		holdTime = 0;
 	}
-	
+
+	function getHoveredOptionID(mouseX:Float, mouseY:Float):Int
+	{
+		for (i in 0...grpLabels.length)
+		{
+			var rowY:Float = rowYFor(i);
+			if (mouseX >= PANEL_X + 24 && mouseX <= PANEL_X + PANEL_W - 24
+				&& mouseY >= rowY - 8 && mouseY <= rowY + 36)
+				return i;
+		}
+		return -1;
+	}
+
 	function changeSelection(change:Int = 0)
 	{
 		curSelected += change;
@@ -327,37 +540,40 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		if (curSelected >= optionsArray.length)
 			curSelected = 0;
 
-		var bullShit:Int = 0;
-
-		for (item in grpOptions.members) {
-			item.targetY = bullShit - curSelected;
-			bullShit++;
-
-			item.alpha = 0.6;
-			if (item.targetY == 0) {
-				item.alpha = 1;
-			}
+		for (i in 0...grpLabels.length)
+		{
+			var selected:Bool = (i == curSelected);
+			grpLabels[i].alpha = selected ? 1 : 0.6;
+			grpLabels[i].color = selected ? FlxColor.WHITE : 0xFF9A9AA8;
+			grpValues[i].alpha = grpLabels[i].alpha;
 		}
-		for (text in grpTexts) {
-			text.alpha = 0.6;
-			if(text.ID == curSelected) {
-				text.alpha = 1;
+
+		curOption = optionsArray[curSelected];
+
+		if (selectorBar != null)
+		{
+			if(selectorTween != null) {
+				selectorTween.cancel();
+				selectorTween = null;
 			}
+			var barY:Float = rowYFor(curSelected) - 4;
+			if(selectorBar.y != barY)
+				selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
 		}
-		curOption = optionsArray[curSelected]; //shorter lol
-		FlxG.sound.play(Paths.sound('scrollMenu'));
+
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 	}
 
-	function reloadCheckboxes() {
-		for (checkbox in checkboxGroup) {
-			checkbox.daValue = (optionsArray[checkbox.ID].getValue() == true);
-		}
+	override function destroy()
+	{
+		FlxG.mouse.visible = false;
+		super.destroy();
 	}
 }
 
 class GameplayOption
 {
-	private var child:Alphabet;
+	private var child:MenuText;
 	public var text(get, set):String;
 	public var onChange:Void->Void = null; //Pressed enter (on Bool type options) or pressed/held left/right (on other types)
 
@@ -446,7 +662,8 @@ class GameplayOption
 		ClientPrefs.data.gameplaySettings.set(variable, value);
 	}
 
-	public function setChild(child:Alphabet)
+	@:keep
+	public function setChild(child:MenuText)
 	{
 		this.child = child;
 	}

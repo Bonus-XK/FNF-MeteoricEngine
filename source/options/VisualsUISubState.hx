@@ -2,7 +2,6 @@ package options;
 
 import objects.Note;
 import objects.StrumNote;
-import objects.Alphabet;
 
 class VisualsUISubState extends BaseOptionsMenu
 {
@@ -12,14 +11,14 @@ class VisualsUISubState extends BaseOptionsMenu
 	var noteY:Float = 90;
 	public function new()
 	{
-		title = 'Visuals and UI';
-		rpcTitle = 'Visuals & UI Settings Menu'; //for Discord Rich Presence
+		title = '视觉与界面';
+		rpcTitle = '视觉与界面设置菜单'; //for Discord Rich Presence
 
 		// for note skins
 		notes = new FlxTypedGroup<StrumNote>();
 		for (i in 0...Note.colArray.length)
 		{
-			var note:StrumNote = new StrumNote(370 + (560 / Note.colArray.length) * i, -200, i, 0);
+			var note:StrumNote = new StrumNote(100 + (520 / Note.colArray.length) * i, -200, i, 0);
 			note.centerOffsets();
 			note.centerOrigin();
 			note.playAnim('static');
@@ -35,7 +34,7 @@ class VisualsUISubState extends BaseOptionsMenu
 				ClientPrefs.data.noteSkin = ClientPrefs.defaultData.noteSkin; //Reset to default if saved noteskin couldnt be found
 
 			noteSkins.insert(0, ClientPrefs.defaultData.noteSkin); //Default skin always comes first
-			var option:Option = new Option('Note Skins:',
+			var option:Option = new Option('音符皮肤:',
 				"选择你的箭头样式：",
 				'noteSkin',
 				'string',
@@ -52,16 +51,16 @@ class VisualsUISubState extends BaseOptionsMenu
 				ClientPrefs.data.splashSkin = ClientPrefs.defaultData.splashSkin; //Reset to default if saved splashskin couldnt be found
 
 			noteSplashes.insert(0, ClientPrefs.defaultData.splashSkin); //Default skin always comes first
-			var option:Option = new Option('Note Splashes:',
-				"选择你的箭头打击粒子样式：",
+			var option:Option = new Option('音符打击特效:',
+				'选择音符打击粒子的样式：',
 				'splashSkin',
 				'string',
 				noteSplashes);
 			addOption(option);
 		}
 
-		var option:Option = new Option('Note Splash Opacity',
-			'调整箭头打击粒子的透明度',
+		var option:Option = new Option('打击特效透明度',
+			'调整音符打击粒子的透明度',
 			'splashAlpha',
 			'percent');
 		option.scrollSpeed = 1.6;
@@ -71,59 +70,65 @@ class VisualsUISubState extends BaseOptionsMenu
 		option.decimals = 1;
 		addOption(option);
 
-		var option:Option = new Option('Hide HUD',
-			'如果你勾选了，那么血量条等东西将不会显示',
+		var option:Option = new Option('隐藏HUD',
+			'开启后，血量条等界面元素将不会显示',
 			'hideHud',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('Score Txt Font: ',
-		    "选择信息文字使用的字体：",
+		var option:Option = new Option('计分文字字体: ',
+		    '选择计分文字使用的字体：',
 			'scoreTxtFont',
 			'string',
-			['Original', 'Bahnschrift']);
+			['默认', 'Bahnschrift']);
 		addOption(option);
 
-		var option:Option = new Option('Hide Watermark',
-			'如果你勾选了，那么左下角水印将不会显示',
+		var option:Option = new Option('隐藏水印',
+			'开启后，左下角的水印将不会显示',
 			'hideWatermark',
 			'bool');
 		addOption(option);
 		
-		var option:Option = new Option('Time Bar:',
-			"你想让时间条怎么显示？",
+		var option:Option = new Option('时间条:',
+			'选择时间条的显示样式：',
 			'timeBarType',
 			'string',
-			['Time Left', 'Time Elapsed', 'Song Name', 'Disabled']);
+			['剩余时间', '已过时间', '歌曲名称', '禁用']);
 		addOption(option);
 
-		var option:Option = new Option('Flashing Lights',
-			"如果你不勾选，那么不会有频闪",
+		var option:Option = new Option('新时间条样式',
+			'开启后，时间条变为黑色圆角样式，已走过部分显示对手图标颜色（颜色过暗时自动使用青色）',
+			'newTimeBarStyle',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('频闪效果',
+			'关闭后，游戏将不会出现频闪效果',
 			'flashing',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('Custom Cutscene',
-		    "选择你的过场动画样式：",
+		var option:Option = new Option('自定义过场动画',
+		    '选择过场动画的样式：',
 			'CustomFade',
 			'string',
-			['Move', 'Alpha']);
+			['移动', '淡入淡出']);
 		addOption(option);
 
-		var option:Option = new Option('Cutscene Text',
-		    "如果你不勾选，将会关闭过场动画的引擎版本和事件指示器",
+		var option:Option = new Option('过场动画文字',
+		    '关闭后，将不再显示过场动画的引擎版本与事件指示器',
 			'CustomFadeText',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('Camera Zooms',
-			"如果你不勾选，那么镜头就不会缩放（我不知道）",
+		var option:Option = new Option('镜头缩放',
+			'关闭后，镜头将不会随节拍缩放',
 			'camZooms',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('Health Bar Opacity',
-			'你想让你的血量条透明吗？',
+		var option:Option = new Option('血条透明度',
+			'调整血量条的透明度',
 			'healthBarAlpha',
 			'percent');
 		option.scrollSpeed = 1.6;
@@ -134,51 +139,58 @@ class VisualsUISubState extends BaseOptionsMenu
 		addOption(option);
 		
 		#if !mobile
-		var option:Option = new Option('FPS Counter',
-			'如果你不勾选，那么帧数计数器（FPS）将不会显示',
+		var option:Option = new Option('FPS计数器',
+			'关闭后，帧数计数器（FPS）将不会显示',
 			'showFPS',
+			'bool');
+		addOption(option);
+		option.onChange = onChangeFPSCounter;
+
+		var option:Option = new Option('FPS显示到窗口标题',
+			'开启后，FPS/内存/峰值内存/CPU 显示在窗口标题栏，屏幕上的计数器隐藏',
+			'fpsInTitleBar',
 			'bool');
 		addOption(option);
 		option.onChange = onChangeFPSCounter;
 		#end
 		
-		var option:Option = new Option('FPS Engine Version',
-			'如果你不勾选，那么帧数计数器下的引擎版本将不会显示',
+		var option:Option = new Option('FPS引擎版本',
+			'关闭后，帧数计数器下方的引擎版本将不会显示',
 			'showVer',
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('FPS Display Color: ',
-		    "你想让你的FPS计数器显示什么颜色？",
+		var option:Option = new Option('FPS显示颜色: ',
+		    '选择 FPS 计数器显示的颜色：',
 			'fpsColor',
 			'string',
-			['White', 'Cyan', 'Blue', 'Red', 'Green', 'Yellow']);
+			['白色', '青色', '蓝色', '红色', '绿色', '黄色']);
 		addOption(option);
 		
-		var option:Option = new Option('Pause Screen Song:',
-			"你想让你停下来放什么音乐？",
+		var option:Option = new Option('暂停界面音乐:',
+			'选择进入暂停界面时播放的音乐：',
 			'pauseMusic',
 			'string',
-			['None', 'Breakfast', 'Tea Time']);
+			['无', 'Breakfast', 'Tea Time']);
 		addOption(option);
 		option.onChange = onChangePauseMusic;
 
-        var option:Option = new Option('Check for Updates',
-			'勾选此选项来检查你的ME引擎是不是最新的',
+        var option:Option = new Option('检查更新',
+			'开启后，自动检查引擎是否有新版本',
 			'checkForUpdates',
 			'bool');
 		addOption(option);
 
 		#if desktop
-		var option:Option = new Option('Discord Rich Presence',
-			"取消选中此项以防止意外泄漏，它将在Discord的“播放”框中隐藏应用程序",
+		var option:Option = new Option('Discord在线状态',
+			'关闭后，Discord 的“正在游玩”状态将不再显示本应用，避免意外泄露',
 			'discordRPC',
 			'bool');
 		addOption(option);
 		#end
 
-		var option:Option = new Option('Combo Stacking',
-			"如果未选中，Rank和Combo将不会堆叠，从而节省系统内存并使其更易于读铺",
+		var option:Option = new Option('Combo堆叠',
+			'关闭后，评级与 Combo 数字将不再堆叠，节省系统内存，读谱也更清晰',
 			'comboStacking',
 			'bool');
 		addOption(option);
@@ -207,7 +219,7 @@ class VisualsUISubState extends BaseOptionsMenu
 	var changedMusic:Bool = false;
 	function onChangePauseMusic()
 	{
-		if(ClientPrefs.data.pauseMusic == 'None')
+		if(ClientPrefs.data.pauseMusic == '无')
 			FlxG.sound.music.volume = 0;
 		else
 			FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)));
@@ -245,7 +257,7 @@ class VisualsUISubState extends BaseOptionsMenu
 	function onChangeFPSCounter()
 	{
 		if(Main.fpsVar != null)
-			Main.fpsVar.visible = ClientPrefs.data.showFPS;
+			Main.fpsVar.applyDisplayMode();
 	}
 	#end
 }

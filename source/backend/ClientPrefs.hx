@@ -8,29 +8,31 @@ import states.TitleState;
 
 // Add a variable here and it will get automatically saved
 class SaveVariables {
-	public var downScroll:Bool = false;
-	public var middleScroll:Bool = false;
-	public var opponentStrums:Bool = true;
-	public var showFPS:Bool = true;
-	public var showVer:Bool = true;
-	public var fpsColor:String = 'White';
-	public var flashing:Bool = true;
-	public var CustomFade:String = 'Move';
-	public var CustomFadeText:Bool = true;
-	public var autoPause:Bool = true;
-	public var antialiasing:Bool = true;
-	public var noteSkin:String = 'Default';
-	public var splashSkin:String = 'Psych';
-	public var splashAlpha:Float = 0.6;
-	public var lowQuality:Bool = false;
-	public var shaders:Bool = true;
-	public var cacheOnGPU:Bool = #if !switch false #else true #end; //From Stilic
-	public var framerate:Int = 120;
-	public var camZooms:Bool = true;
-	public var hideHud:Bool = false;
-	public var scoreTxtFont:String = 'Original';
-	public var hideWatermark:Bool = false;
-	public var healthBarOverlay:Bool = true;
+	@:keep public var downScroll:Bool = false;
+	@:keep public var middleScroll:Bool = false;
+	@:keep public var opponentStrums:Bool = true;
+	@:keep public var showFPS:Bool = true;
+	@:keep public var showVer:Bool = true;
+	@:keep public var fpsInTitleBar:Bool = false;
+	@:keep public var fpsColor:String = '白色';
+	@:keep public var flashing:Bool = true;
+	@:keep public var CustomFade:String = '移动';
+	@:keep public var CustomFadeText:Bool = true;
+	@:keep public var autoPause:Bool = true;
+	@:keep public var antialiasing:Bool = true;
+	@:keep public var noteSkin:String = 'Default';
+	@:keep public var splashSkin:String = 'Psych';
+	@:keep public var splashAlpha:Float = 0.6;
+	@:keep public var lowQuality:Bool = false;
+	@:keep public var shaders:Bool = true;
+	@:keep public var cacheOnGPU:Bool = #if !switch false #else true #end; //From Stilic
+	@:keep public var framerate:Int = 120;
+	@:keep public var camZooms:Bool = true;
+	@:keep public var hideHud:Bool = false;
+	@:keep public var scoreTxtFont:String = '默认';
+	@:keep public var hideWatermark:Bool = false;
+	@:keep public var healthBarOverlay:Bool = true;
+	@:keep public var oldHealthBar:Bool = false; // Psych 0.6.3 旧版血量条（兼容 0.6.3 及以下的旧模组）
 	public var noteOffset:Int = 0;
 	public var arrowRGB:Array<Array<FlxColor>> = [
 		[0xFFC24B99, 0xFFFFFFFF, 0xFF3C1F56],
@@ -43,16 +45,22 @@ class SaveVariables {
 		[0xFF71E300, 0xFFF6FFE6, 0xFF003100],
 		[0xFFFF884E, 0xFFFFFAF5, 0xFF6C0000]];
 
-	public var ghostTapping:Bool = true;
-	public var smoothHealth:Bool = true;
-	public var sbIconBop:Bool = true;
-	public var timeBarType:String = 'Time Left';
-	public var noReset:Bool = false;
-	public var healthBarAlpha:Float = 1;
-	public var hitsoundVolume:Float = 0;
-	public var pauseMusic:String = 'Tea Time';
-	public var checkForUpdates:Bool = true;
-	public var comboStacking:Bool = true;
+	@:keep public var ghostTapping:Bool = true;
+	@:keep public var smoothHealth:Bool = true;
+	@:keep public var sbIconBop:Bool = true;
+	@:keep public var keIconBop:Bool = false;
+	@:keep public var timeBarType:String = '剩余时间';
+	@:keep public var newTimeBarStyle:Bool = false;
+	@:keep public var noReset:Bool = false;
+	@:keep public var restartNoChartReload:Bool = false;
+	@:keep public var rewindOnRestart:Bool = true;
+	@:keep public var healthBarAlpha:Float = 1;
+	@:keep public var hitsoundVolume:Float = 0;
+	@:keep public var pauseMusic:String = 'Tea Time';
+	@:keep public var checkForUpdates:Bool = true;
+	@:keep public var comboStacking:Bool = false;
+	@:keep public var comboStackMigrated:Bool = false;
+	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
 	public var gameplaySettings:Map<String, Dynamic> = [
 		'scrollspeed' => 1.0,
 		'scrolltype' => 'multiplicative', 
@@ -70,18 +78,29 @@ class SaveVariables {
 		'healthgain' => 1.0,
 		'healthloss' => 1.0,
 		'instakill' => false,
+		'opponentpush' => false,
 		'practice' => false,
 		'botplay' => false,
-		'opponentplay' => false
+		'opponentplay' => false,
+		'infiniteloop' => false
 	];
 
-	public var comboOffset:Array<Int> = [0, 0, 0, 0];
-	public var ratingOffset:Int = 0;
-	public var sickWindow:Int = 45;
-	public var goodWindow:Int = 90;
-	public var badWindow:Int = 135;
-	public var safeFrames:Float = 10;
-	public var discordRPC:Bool = true;
+	@:keep public var comboOffset:Array<Int> = [0, 0, 0, 0];
+	@:keep public var ratingOffset:Int = 0;
+	@:keep @:keep public var sickWindow:Int = 45;
+	@:keep @:keep public var goodWindow:Int = 90;
+	@:keep @:keep public var badWindow:Int = 135;
+	@:keep public var safeFrames:Float = 10;
+	@:keep public var noteJudgment:String = 'PE 判定';
+	@:keep public var phigrosStyle:Bool = false; // Phigros 式判定线玩法
+	@:keep public var discordRPC:Bool = true;
+	@:keep public var hudLayout:Map<String, Array<Float>> = [ // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
+		'note' => [0, 0],
+		'timeBar' => [0, 0],
+		'healthBar' => [0, 0],
+		'score' => [0, 0],
+		'watermark' => [0, 0]
+	];
 
 	public function new()
 	{
@@ -197,9 +216,21 @@ class ClientPrefs {
 				Reflect.setField(data, key, Reflect.field(FlxG.save.data, key));
 			}
 		}
+
+		// 判定选项旧值迁移：'新版' -> 'KE 判定'，'旧判定' -> 'PE 判定'
+		if (data.noteJudgment == '新版' || data.noteJudgment == '旧判定')
+			data.noteJudgment = (data.noteJudgment == '新版') ? 'KE 判定' : 'PE 判定';
+
+		// 连击堆叠旧值迁移：新默认不堆叠（评级/连击数字图片不再叠成一片），只迁移一次，之后尊重用户手动选择
+		if (!data.comboStackMigrated)
+		{
+			data.comboStackMigrated = true;
+			if (data.comboStacking) data.comboStacking = false;
+			saveSettings();
+		}
 		
 		if(Main.fpsVar != null) {
-			Main.fpsVar.visible = data.showFPS;
+			Main.fpsVar.applyDisplayMode();
 		}
 
 		#if (!html5 && !switch)

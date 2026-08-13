@@ -50,7 +50,6 @@ class TitleState extends MusicBeatState
 
 	var blackScreen:FlxSprite;
 	var credGroup:FlxGroup;
-	var credTextShit:Alphabet;
 	var textGroup:FlxGroup;
 	var ngSpr:FlxSprite;
 	
@@ -102,27 +101,13 @@ class TitleState extends MusicBeatState
 		ClientPrefs.loadPrefs();
 
 		if(ClientPrefs.data.checkForUpdates && !closedState) {
+			//更新检查放到后台线程里跑，避免在网速差/被墙时阻塞主线程导致启动黑屏
 			trace('checking for update');
-			var http = new haxe.Http("https://raw.githubusercontent.com/Bonus-XK/FNF-MeteoricEngine/master/gitVersion.txt");
-
-			http.onData = function (data:String)
-			{
-				updateVersion = data.split('\n')[0].trim();
-				var curVersion:String = Main.meVersion.trim();
-				trace('version online: ' + updateVersion + ', your version: ' + curVersion);
-				mainNewVer = updateVersion;
-				if(updateVersion != curVersion) {
-					trace('versions arent matching!');
-					mustUpdate = true;
-					mainUpdateCheck = mustUpdate;
-				}
-			}
-
-			http.onError = function (error) {
-				trace('error: $error');
-			}
-
-			http.request();
+			#if sys
+			sys.thread.Thread.create(checkForUpdates);
+			#else
+			checkForUpdates();
+			#end
 		}
 
 		Highscore.load();
@@ -185,6 +170,31 @@ class TitleState extends MusicBeatState
 			}
 		}
 		#end
+	}
+
+	function checkForUpdates()
+	{
+		var http = new haxe.Http("https://api.gitproxy.dev/github.com/Bonus-XK/FNF-MeteoricEngine/raw/refs/heads/master/gitVersion.txt");
+		http.cnxTimeout = 4;
+
+		http.onData = function (data:String)
+		{
+			updateVersion = data.split('\n')[0].trim();
+			var curVersion:String = Main.meVersion.trim();
+			trace('version online: ' + updateVersion + ', your version: ' + curVersion);
+			mainNewVer = updateVersion;
+			if(updateVersion != curVersion) {
+				trace('versions arent matching!');
+				mustUpdate = true;
+				mainUpdateCheck = mustUpdate;
+			}
+		}
+
+		http.onError = function (error) {
+			trace('error: $error');
+		}
+
+		http.request();
 	}
 
 	var logoBl:FlxSprite;
@@ -315,29 +325,19 @@ class TitleState extends MusicBeatState
 		blackScreen = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		credGroup.add(blackScreen);
 
-		credTextShit = new Alphabet(0, 0, "", true);
-		credTextShit.screenCenter();
-
-		// credTextShit.alignment = CENTER;
-
-		credTextShit.visible = false;
-
-		ngSpr = new FlxSprite(0, FlxG.height * 0.52).loadGraphic(Paths.image('newgrounds_logo'));
+		ngSpr = new FlxSprite(0, FlxG.height * 0.50).loadGraphic(Paths.image('newgrounds_logo'));
 		add(ngSpr);
 		ngSpr.visible = false;
+		ngSpr.alpha = 0;
 		ngSpr.setGraphicSize(Std.int(ngSpr.width * 0.8));
 		ngSpr.updateHitbox();
 		ngSpr.screenCenter(X);
 		ngSpr.antialiasing = ClientPrefs.data.antialiasing;
 
-		FlxTween.tween(credTextShit, {y: credTextShit.y + 20}, 2.9, {ease: FlxEase.quadInOut, type: PINGPONG});
-
 		if (initialized)
 			skipIntro();
 		else
 			initialized = true;
-
-		// credGroup.add(credTextShit);
 	}
 
 	function getIntroTextShit():Array<Array<String>>
@@ -370,7 +370,7 @@ class TitleState extends MusicBeatState
 			Conductor.songPosition = FlxG.sound.music.time;
 		// FlxG.watch.addQuick('amp', FlxG.sound.music.amplitude);
 
-		var pressedEnter:Bool = FlxG.keys.justPressed.ENTER || controls.ACCEPT;
+		var pressedEnter:Bool = FlxG.keys.justPressed.ENTER || controls.ACCEPT || FlxG.mouse.justPressed;
 
 		#if mobile
 		for (touch in FlxG.touches.list)
@@ -504,37 +504,52 @@ class TitleState extends MusicBeatState
 		super.update(elapsed);
 	}
 
-	function createCoolText(textArray:Array<String>, ?offset:Float = 0)
+	// 开屏文字：逐行淡入上滑（大字标题用青色高亮，普通文字白色，信息行灰色）
+	function createCoolText(textArray:Array<String>, ?offset:Float = 0, ?size:Int = 30, ?color:Int = 0xFFFFFFFF)
 	{
 		for (i in 0...textArray.length)
 		{
-			var money:Alphabet = new Alphabet(0, 0, textArray[i], true);
+			var money:MenuText = new MenuText(0, 0, textArray[i], true, size);
+			money.setFormat(Paths.font('future.ttf'), size, color, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			money.screenCenter(X);
-			money.y += (i * 60) + 200 + offset;
+			money.y += (i * 66) + 180 + offset;
+			money.alpha = 0;
+			money.y += 30;
 			if(credGroup != null && textGroup != null) {
 				credGroup.add(money);
 				textGroup.add(money);
 			}
+			FlxTween.tween(money, {y: money.y - 30, alpha: 1}, 0.5, {ease: FlxEase.cubeOut, startDelay: i * 0.12});
 		}
 	}
 
-	function addMoreText(text:String, ?offset:Float = 0)
+	function addMoreText(text:String, ?offset:Float = 0, ?size:Int = 30, ?color:Int = 0xFFFFFFFF)
 	{
 		if(textGroup != null && credGroup != null) {
-			var coolText:Alphabet = new Alphabet(0, 0, text, true);
+			var coolText:MenuText = new MenuText(0, 0, text, true, size);
+			coolText.setFormat(Paths.font('future.ttf'), size, color, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			coolText.screenCenter(X);
-			coolText.y += (textGroup.length * 60) + 200 + offset;
+			coolText.y += (textGroup.length * 66) + 180 + offset;
+			coolText.alpha = 0;
+			coolText.y += 30;
 			credGroup.add(coolText);
 			textGroup.add(coolText);
+			FlxTween.tween(coolText, {y: coolText.y - 30, alpha: 1}, 0.5, {ease: FlxEase.cubeOut});
 		}
 	}
 
+	// 开屏文字：淡出上滑后销毁，避免下一段文字出现时堆叠
 	function deleteCoolText()
 	{
-		while (textGroup.members.length > 0)
+		var oldTexts:Array<Dynamic> = textGroup.members.copy();
+		textGroup.clear();
+		for (txt in oldTexts)
 		{
-			credGroup.remove(textGroup.members[0], true);
-			textGroup.remove(textGroup.members[0], true);
+			if(txt == null || txt.destroyed) continue;
+			credGroup.remove(txt, true);
+			FlxTween.tween(txt, {alpha: 0, y: txt.y - 15}, 0.35, {ease: FlxEase.cubeIn, onComplete: function(twn:FlxTween) {
+				if(txt != null && !txt.destroyed) txt.destroy();
+			}});
 		}
 	}
 
@@ -560,67 +575,38 @@ class TitleState extends MusicBeatState
 			switch (sickBeats)
 			{
 				case 1:
-					//FlxG.sound.music.stop();
 					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
 					FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
-					#if PSYCH_WATERMARKS
-					createCoolText(['Meteoric Engine by'], 40);
-					#else
-					createCoolText(['ninjamuffin99', 'phantomArcade', 'kawaisprite', 'evilsk8er']);
-					#end
-				// credTextShit.visible = true;
+					createCoolText(['Meteoric Engine'], 40, 64, 0xFF33FFFF);
+				case 3:
+					addMoreText('by Bonus-XK · Maple-Autumn', 40, 26, 0xFFFFFFFF);
 				case 4:
-					#if PSYCH_WATERMARKS
-					addMoreText('Bonus-XK', 40);
-					addMoreText('Maple-Autumn', 40);
-					#else
-					addMoreText('present');
-					#end
-				// credTextShit.text += '\npresent...';
-				// credTextShit.addText();
+					addMoreText('版本 ' + Main.meVersion, 40, 22, 0xFF9A9A9A);
 				case 5:
 					deleteCoolText();
-				// credTextShit.visible = false;
-				// credTextShit.text = 'In association \nwith';
-				// credTextShit.screenCenter();
 				case 6:
-					#if PSYCH_WATERMARKS
-					createCoolText(['Not associated', 'with'], -40);
-					#else
-					createCoolText(['In association', 'with'], -40);
-					#end
+					createCoolText(['基于 Psych Engine 0.7.1h'], 30, 24, 0xFFAAAAAA);
 				case 8:
-					addMoreText('newgrounds', -40);
+					addMoreText('特别鸣谢', 30, 24, 0xFFAAAAAA);
 					ngSpr.visible = true;
-				// credTextShit.text += '\nNewgrounds';
+					ngSpr.alpha = 0;
+					FlxTween.tween(ngSpr, {alpha: 1}, 0.4, {ease: FlxEase.cubeOut});
 				case 9:
 					deleteCoolText();
 					ngSpr.visible = false;
-				// credTextShit.visible = false;
-
-				// credTextShit.text = 'Shoutouts Tom Fulp';
-				// credTextShit.screenCenter();
 				case 10:
-					createCoolText([curWacky[0]]);
-				// credTextShit.visible = true;
+					createCoolText([curWacky[0]], 60, 34, 0xFFFFFFFF);
 				case 12:
-					addMoreText(curWacky[1]);
-				// credTextShit.text += '\nlmao';
+					addMoreText(curWacky[1], 60, 34, 0xFF33FFFF);
 				case 13:
 					deleteCoolText();
-				// credTextShit.visible = false;
-				// credTextShit.text = "Friday";
-				// credTextShit.screenCenter();
 				case 14:
-					addMoreText('Friday');
-				// credTextShit.visible = true;
+					createCoolText(['Friday'], 60, 44, 0xFFFFFFFF);
 				case 15:
-					addMoreText('Night');
-				// credTextShit.text += '\nNight';
+					addMoreText('Night', 60, 44, 0xFF33FFFF);
 				case 16:
-					addMoreText('Funkin'); // credTextShit.text += '\nFunkin';
-
+					addMoreText("Funkin'", 60, 44, 0xFFFFFFFF);
 				case 17:
 					skipIntro();
 			}

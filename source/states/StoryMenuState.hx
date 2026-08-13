@@ -10,6 +10,8 @@ import openfl.Lib;
 
 import objects.MenuItem;
 import objects.MenuCharacter;
+import objects.BackButton;
+import flixel.util.FlxSpriteUtil;
 
 import substates.GameplayChangersSubstate;
 import substates.ResetScoreSubState;
@@ -42,11 +44,25 @@ class StoryMenuState extends MusicBeatState
 
 	var loadedWeeks:Array<WeekData> = [];
 
+	// ===== 鼠标/键盘输入分离 =====
+	// 键盘永远可用；鼠标跟随只在“物理移动超过阈值”后生效（屏幕坐标，不受轮播移动影响）
+	var mouseActive:Bool = true;  // 默认鼠标活跃：悬停即可滚动，键盘操作后冻结
+	var mouseLockX:Float = 0;
+	var mouseLockY:Float = 0;
+	var mouseLastScreenX:Int = 0;
+	var mouseLastScreenY:Int = 0;
+
+	var backBtn:BackButton;
+	static final MOUSE_REACTIVATE_DIST:Float = 8;
+
 	override function create()
 	{
+		mouseLockX = FlxG.mouse.screenX;
+		mouseLockY = FlxG.mouse.screenY;
+
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		
+
 	    Lib.application.window.title = "FNF':Meteoric Engine - Select Week:";
 
 		PlayState.isStoryMode = true;
@@ -99,12 +115,11 @@ class StoryMenuState extends MusicBeatState
 				var weekThing:MenuItem = new MenuItem(0, bgSprite.y + 396, WeekData.weeksList[i]);
 				weekThing.y += ((weekThing.height + 20) * num);
 				weekThing.targetY = num;
+				weekThing.ID = num; // 固定周目序号，供鼠标命中判断使用（targetY 会被轮播逻辑改写，不能用作序号）
 				grpWeekText.add(weekThing);
 
 				weekThing.screenCenter(X);
-				// weekThing.updateHitbox();
 
-				// Needs an offset thingie
 				if (isLocked)
 				{
 					var lock:FlxSprite = new FlxSprite(weekThing.width + 10 + weekThing.x);
@@ -145,7 +160,7 @@ class StoryMenuState extends MusicBeatState
 			lastDifficultyName = Difficulty.getDefault();
 		}
 		curDifficulty = Math.round(Math.max(0, Difficulty.defaultList.indexOf(lastDifficultyName)));
-		
+
 		sprDifficulty = new FlxSprite(0, leftArrow.y);
 		sprDifficulty.antialiasing = ClientPrefs.data.antialiasing;
 		difficultySelectors.add(sprDifficulty);
@@ -175,13 +190,25 @@ class StoryMenuState extends MusicBeatState
 		add(scoreText);
 		add(txtWeekTitle);
 
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
+
 		changeWeek();
 		changeDifficulty();
+		FlxG.mouse.visible = true;
+
+		mouseLastScreenX = FlxG.mouse.screenX;
+		mouseLastScreenY = FlxG.mouse.screenY;
 
 		super.create();
+
+		loadUIscripts('story_menu');
 	}
 
 	override function closeSubState() {
+		FlxG.mouse.visible = true;
 		persistentUpdate = true;
 		changeWeek();
 		super.closeSubState();
@@ -189,13 +216,10 @@ class StoryMenuState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
-		// scoreText.setFormat(Paths.font("future.ttf"), 32);
 		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, FlxMath.bound(elapsed * 30, 0, 1)));
 		if(Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
 
 		scoreText.text = "本周分数：" + lerpScore;
-
-		// FlxG.watch.addQuick('font', scoreText.font);
 
 		if (!movedBack && !selectedWeek)
 		{
@@ -203,20 +227,23 @@ class StoryMenuState extends MusicBeatState
 			var downP = controls.UI_DOWN_P;
 			if (upP)
 			{
+				takeKeyboardControl();
 				changeWeek(-1);
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 
 			if (downP)
 			{
+				takeKeyboardControl();
 				changeWeek(1);
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 
 			if(FlxG.mouse.wheel != 0)
 			{
+				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
-				changeWeek(-FlxG.mouse.wheel);
+				changeWeek(FlxG.mouse.wheel > 0 ? -1 : 1);
 				changeDifficulty();
 			}
 
@@ -229,6 +256,9 @@ class StoryMenuState extends MusicBeatState
 				leftArrow.animation.play('press');
 			else
 				leftArrow.animation.play('idle');
+
+			if (!controls.controllerMode)
+				updateMouseControl();
 
 			if (controls.UI_RIGHT_P)
 				changeDifficulty(1);
@@ -246,7 +276,6 @@ class StoryMenuState extends MusicBeatState
 			{
 				persistentUpdate = false;
 				openSubState(new ResetScoreSubState('', curDifficulty, '', curWeek));
-				//FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 			else if (controls.ACCEPT)
 			{
@@ -270,6 +299,82 @@ class StoryMenuState extends MusicBeatState
 		});
 	}
 
+	// ===== 鼠标控制（全部基于屏幕坐标，不受轮播/镜头移动影响） =====
+	function updateMouseControl()
+	{
+		// 键盘接管后：鼠标必须物理移动超过阈值（屏幕坐标）才恢复跟随
+		if (!mouseActive)
+		{
+			var dx:Float = FlxG.mouse.screenX - mouseLockX;
+			var dy:Float = FlxG.mouse.screenY - mouseLockY;
+			if (dx * dx + dy * dy > MOUSE_REACTIVATE_DIST * MOUSE_REACTIVATE_DIST)
+				mouseActive = true;
+		}
+
+		// 返回按钮：悬停高亮，点击返回主菜单
+		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
+		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		{
+			mouseActive = true;
+			FlxG.sound.play(Paths.sound('cancelMenu'));
+			movedBack = true;
+			MusicBeatState.switchState(new MainMenuState());
+		}
+
+		// 难度箭头：悬停高亮（仅鼠标活跃时，点击不受限）
+		if (mouseActive && FlxG.mouse.overlaps(leftArrow))
+			leftArrow.animation.play('press');
+		else if (mouseActive && FlxG.mouse.overlaps(rightArrow))
+			rightArrow.animation.play('press');
+
+		// 点击周目：永远生效，先切到鼠标所在周目再确认
+		if (FlxG.mouse.justPressed)
+		{
+			var clickID:Int = getHoveredWeekID();
+			if (clickID >= 0)
+			{
+				mouseActive = true;
+				if (clickID != curWeek)
+				{
+					changeWeek(clickID - curWeek);
+					changeDifficulty();
+				}
+				selectWeek();
+			}
+		}
+
+		if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(leftArrow))
+		{
+			mouseActive = true;
+			changeDifficulty(-1);
+		}
+		else if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(rightArrow))
+		{
+			mouseActive = true;
+			changeDifficulty(1);
+		}
+	}
+
+	function takeKeyboardControl()
+	{
+		mouseActive = false;
+		mouseLockX = FlxG.mouse.screenX;
+		mouseLockY = FlxG.mouse.screenY;
+	}
+
+	function getHoveredWeekID():Int
+	{
+		var hoveredID:Int = -1;
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		for (item in grpWeekText.members)
+		{
+			if (mx >= item.x && mx <= item.x + item.width && my >= item.y && my <= item.y + item.height)
+				hoveredID = item.ID;
+		}
+		return hoveredID;
+	}
+
 	var movedBack:Bool = false;
 	var selectedWeek:Bool = false;
 	var stopspamming:Bool = false;
@@ -285,19 +390,23 @@ class StoryMenuState extends MusicBeatState
 				songArray.push(leWeek[i][0]);
 			}
 
-			// Nevermind that's stupid lmao
+			var diffic:String = Difficulty.getFilePath(curDifficulty);
+			if(diffic == null) diffic = '';
+			var firstSong:String = Paths.formatToSongPath(PlayState.storyPlaylist[0]);
+
 			try
 			{
 				PlayState.storyPlaylist = songArray;
 				PlayState.isStoryMode = true;
 				selectedWeek = true;
-	
-				var diffic = Difficulty.getFilePath(curDifficulty);
-				if(diffic == null) diffic = '';
-	
+
 				PlayState.storyDifficulty = curDifficulty;
-	
-				PlayState.SONG = Song.loadFromJson(PlayState.storyPlaylist[0].toLowerCase() + diffic, PlayState.storyPlaylist[0].toLowerCase());
+
+				if (Song.resolveChartPath(firstSong + diffic, firstSong) == null)
+				{
+					trace('ERROR! Missing chart: ' + firstSong + diffic);
+					return;
+				}
 				PlayState.campaignScore = 0;
 				PlayState.campaignMisses = 0;
 			}
@@ -306,7 +415,7 @@ class StoryMenuState extends MusicBeatState
 				trace('ERROR! $e');
 				return;
 			}
-			
+
 			if (stopspamming == false)
 			{
 				FlxG.sound.play(Paths.sound('confirmMenu'));
@@ -325,10 +434,10 @@ class StoryMenuState extends MusicBeatState
 
 			new FlxTimer().start(1, function(tmr:FlxTimer)
 			{
-				LoadingState.loadAndSwitchState(new PlayState(), true);
+				LoadingState.loadSongAndSwitchState(new PlayState(), firstSong, firstSong + diffic, firstSong, true, new StoryMenuState());
 				FreeplayState.destroyFreeplayVocals();
 			});
-			
+
 			#if MODS_ALLOWED
 			DiscordClient.loadModRPC();
 			#end
@@ -351,7 +460,6 @@ class StoryMenuState extends MusicBeatState
 
 		var diff:String = Difficulty.getString(curDifficulty);
 		var newImage:FlxGraphic = Paths.image('menudifficulties/' + Paths.formatToSongPath(diff));
-		//trace(Mods.currentModDirectory + ', menudifficulties/' + Paths.formatToSongPath(diff));
 
 		if(sprDifficulty.graphic != newImage)
 		{
@@ -424,12 +532,13 @@ class StoryMenuState extends MusicBeatState
 			curDifficulty = 0;
 
 		var newPos:Int = Difficulty.list.indexOf(lastDifficultyName);
-		//trace('Pos of ' + lastDifficultyName + ' is ' + newPos);
 		if(newPos > -1)
 		{
 			curDifficulty = newPos;
 		}
 		updateText();
+
+		callUIScripts('onChangeSelection', [curWeek, loadedWeeks[curWeek].storyName]);
 	}
 
 	function weekIsLocked(name:String):Bool {
@@ -464,5 +573,11 @@ class StoryMenuState extends MusicBeatState
 		#if !switch
 		intendedScore = Highscore.getWeekScore(loadedWeeks[curWeek].fileName, curDifficulty);
 		#end
+	}
+
+	override function destroy()
+	{
+		FlxG.mouse.visible = false;
+		super.destroy();
 	}
 }

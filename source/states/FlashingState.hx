@@ -14,6 +14,9 @@ class FlashingState extends MusicBeatState
 	var warnText:FlxText;
 	override function create()
 	{
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		super.create();
 
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);

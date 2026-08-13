@@ -2,6 +2,7 @@ package options;
 
 import flixel.math.FlxPoint;
 
+import objects.MenuText;
 import backend.StageData;
 import objects.Character;
 import objects.HealthBar;
@@ -29,7 +30,7 @@ class NoteOffsetState extends MusicBeatState
 	var delayMax:Int = 500;
 	var timeBar:HealthBar;
 	var timeTxt:FlxText;
-	var beatText:Alphabet;
+	var beatText:MenuText;
 	var beatTween:FlxTween;
 
 	var changeModeText:FlxText;
@@ -115,7 +116,7 @@ class NoteOffsetState extends MusicBeatState
 		repositionCombo();
 
 		// Note delay stuff
-		beatText = new Alphabet(0, 0, 'Beat Hit!', true);
+		beatText = new MenuText(0, 0, '节拍命中！', true, 32);
 		beatText.setScale(0.6, 0.6);
 		beatText.x += 260;
 		beatText.alpha = 0;
@@ -409,7 +410,7 @@ class NoteOffsetState extends MusicBeatState
 			MusicBeatState.switchState(new options.OptionsState());
 			if(OptionsState.onPlayState)
 			{
-				if(ClientPrefs.data.pauseMusic != 'None')
+				if(ClientPrefs.data.pauseMusic != '无')
 					FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)));
 				else
 					FlxG.sound.music.volume = 0;

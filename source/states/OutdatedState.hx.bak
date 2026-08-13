@@ -1,0 +1,238 @@
+package states;
+
+import flixel.util.FlxSpriteUtil;
+import openfl.Lib;
+
+class OutdatedState extends MusicBeatState
+{
+	public static var leftState:Bool = false;
+
+	static final PANEL_W:Float = 960;
+	static final PANEL_H:Float = 600;
+	static final BTN_W:Float = 340;
+	static final BTN_H:Float = 110;
+	static final MOUSE_REACTIVATE_DIST:Float = 8;
+
+	var content:FlxSpriteGroup;
+	var dlButton:OptionButton;
+	var skipButton:OptionButton;
+
+	// ===== 鼠标/键盘输入分离（同其他菜单：屏幕坐标 + 物理移动阈值 + 点击永远生效） =====
+	var mouseActive:Bool = false;
+	var mouseLockX:Float = 0;
+	var mouseLockY:Float = 0;
+	var mouseLastScreenX:Int = 0;
+	var mouseLastScreenY:Int = 0;
+
+	var fading:Bool = false;
+
+	override function create()
+	{
+		super.create();
+
+		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+		add(bg);
+
+		Lib.application.window.title = "FNF':Meteoric Engine - Outdated Version";
+
+		content = new FlxSpriteGroup();
+
+		var px:Float = (FlxG.width - PANEL_W) / 2;
+		var py:Float = (FlxG.height - PANEL_H) / 2;
+
+		var panel:FlxSprite = makePanel(px, py, PANEL_W, PANEL_H, 0xCC10131C, 0xFF8A9BB5);
+		content.add(panel);
+
+		var title:FlxText = new FlxText(px, py + 46, PANEL_W, "发现新版本！", 48);
+		title.setFormat(Paths.font("future.ttf"), 48, 0xFFFF4D5E, CENTER);
+		content.add(title);
+
+		var curVer:FlxText = new FlxText(px, py + 150, PANEL_W, "当前版本：" + Main.meVersion, 32);
+		curVer.setFormat(Paths.font("future.ttf"), 32, FlxColor.WHITE, CENTER);
+		content.add(curVer);
+
+		var newVer:FlxText = new FlxText(px, py + 210, PANEL_W, "最新版本：" + TitleState.updateVersion, 32);
+		newVer.setFormat(Paths.font("future.ttf"), 32, 0xFFFFD93D, CENTER);
+		content.add(newVer);
+
+		var warn:FlxText = new FlxText(px, py + 282, PANEL_W, "请尽快升级到最新的 ME 引擎！", 28);
+		warn.setFormat(Paths.font("future.ttf"), 28, 0xFFFF9A9A, CENTER);
+		content.add(warn);
+
+		var joke:FlxText = new FlxText(px, py + 338, PANEL_W, "不更新今晚上 Bonus-XK 会去你被窝里玩哦！", 24);
+		joke.setFormat(Paths.font("future.ttf"), 24, 0xFF9AA5B5, CENTER);
+		content.add(joke);
+
+		var btnY:Float = py + 404;
+		dlButton = new OptionButton(px + 120, btnY, BTN_W, BTN_H, "前往下载", 0xFF2F6FD8, 0xFF6FA8FF);
+		skipButton = new OptionButton(px + PANEL_W - 120 - BTN_W, btnY, BTN_W, BTN_H, "忽略更新", 0xFF3A4048, 0xFF8A9BB5);
+		content.add(dlButton);
+		content.add(skipButton);
+
+		var hint:FlxText = new FlxText(px, py + PANEL_H - 44, PANEL_W, "Enter 前往下载 · Esc 忽略", 22);
+		hint.setFormat(Paths.font("future.ttf"), 22, 0xFF6A7585, CENTER);
+		content.add(hint);
+
+		add(content);
+
+		FlxG.mouse.visible = true;
+		mouseLastScreenX = FlxG.mouse.screenX;
+		mouseLastScreenY = FlxG.mouse.screenY;
+
+		// 进场动画：淡入 + 轻微上浮
+		content.alpha = 0;
+		content.y += 24;
+		FlxTween.tween(content, {alpha: 1, y: content.y - 24}, 0.5, {ease: FlxEase.quadOut});
+	}
+
+	override function update(elapsed:Float)
+	{
+		if (!leftState && !fading)
+		{
+			var sx:Int = FlxG.mouse.screenX;
+			var sy:Int = FlxG.mouse.screenY;
+
+			// 键盘接管后：鼠标物理移动超过阈值（屏幕坐标）才恢复悬停跟随
+			if (!mouseActive)
+			{
+				var dx:Float = sx - mouseLockX;
+				var dy:Float = sy - mouseLockY;
+				if (dx * dx + dy * dy > MOUSE_REACTIVATE_DIST * MOUSE_REACTIVATE_DIST)
+					mouseActive = true;
+			}
+
+			// 悬停高亮：鼠标激活期间每帧按渲染坐标判定（overlaps），状态无变化时直接跳过
+			if (mouseActive)
+			{
+				dlButton.setHovered(dlButton.over());
+				skipButton.setHovered(skipButton.over());
+			}
+			mouseLastScreenX = sx;
+			mouseLastScreenY = sy;
+
+			// 鼠标点击：永远生效
+			if (FlxG.mouse.justPressed)
+			{
+				mouseActive = true;
+				if (dlButton.over())
+					goDownload();
+				else if (skipButton.over())
+					goNext();
+			}
+
+			// 键盘操作
+			if (controls.ACCEPT)
+			{
+				takeKeyboardControl();
+				goDownload();
+			}
+			else if (controls.BACK)
+			{
+				takeKeyboardControl();
+				goNext();
+			}
+		}
+		super.update(elapsed);
+	}
+
+
+	function makePanel(x:Float, y:Float, w:Float, h:Float, fill:FlxColor, border:FlxColor):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 22, 22, fill, {color: border, thickness: 1.5});
+		spr.scrollFactor.set();
+		return spr;
+	}
+
+	function takeKeyboardControl()
+	{
+		mouseActive = false;
+		mouseLockX = FlxG.mouse.screenX;
+		mouseLockY = FlxG.mouse.screenY;
+		dlButton.setHovered(false);
+		skipButton.setHovered(false);
+	}
+
+	function goDownload()
+	{
+		if (fading) return;
+		leftState = true;
+		fading = true;
+		FlxG.sound.play(Paths.sound('confirmMenu'));
+		fadeOut(function() {
+			CoolUtil.browserLoad("https://github.com/Bonus-XK/FNF-MeteoricEngine/releases");
+			MusicBeatState.switchState(new MainMenuState());
+		});
+	}
+
+	function goNext()
+	{
+		if (fading) return;
+		leftState = true;
+		fading = true;
+		FlxG.sound.play(Paths.sound('cancelMenu'));
+		fadeOut(function() {
+			MusicBeatState.switchState(new MainMenuState());
+		});
+	}
+
+	function fadeOut(onComplete:Void->Void)
+	{
+		FlxTween.tween(content, {alpha: 0}, 0.6, {ease: FlxEase.quadIn, onComplete: function(twn:FlxTween) onComplete()});
+	}
+
+	override function destroy()
+	{
+		FlxG.mouse.visible = false;
+		super.destroy();
+	}
+}
+
+class OptionButton extends FlxSpriteGroup
+{
+	public var bgBase:FlxSprite;
+	public var bgHover:FlxSprite;
+	public var label:FlxText;
+
+	var hovered:Bool = false;
+
+	public function new(x:Float, y:Float, w:Float, h:Float, text:String, fill:FlxColor, border:FlxColor)
+	{
+		super(x, y);
+
+		bgBase = makeButtonSprite(w, h, fill, border, 1.5);
+		bgHover = makeButtonSprite(w, h, fill.getLightened(0.4), border.getLightened(0.5), 3);
+		bgHover.visible = false;
+		add(bgBase);
+		add(bgHover);
+
+		label = new FlxText(0, 0, w, text, 40);
+		label.setFormat(Paths.font("future.ttf"), 40, FlxColor.WHITE, CENTER);
+		label.y = Math.max(0, (h - label.height) / 2);
+		add(label);
+	}
+
+	function makeButtonSprite(w:Float, h:Float, fill:FlxColor, border:FlxColor, thickness:Float):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite().makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		spr.antialiasing = true;
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 18, 18, fill, {color: border, thickness: thickness});
+		return spr;
+	}
+
+	public function over():Bool
+	{
+		// 纯屏幕坐标矩形判定：日志验证与渲染位置完全吻合（overlaps 对边界点用严格小于，会漏判）
+		return FlxG.mouse.screenX >= bgBase.x && FlxG.mouse.screenX <= bgBase.x + bgBase.width
+			&& FlxG.mouse.screenY >= bgBase.y && FlxG.mouse.screenY <= bgBase.y + bgBase.height;
+	}
+
+	public function setHovered(v:Bool)
+	{
+		if (hovered == v) return;
+		hovered = v;
+		bgHover.visible = v;
+		bgBase.visible = !v;
+		if (v) FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+	}
+}

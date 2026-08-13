@@ -45,9 +45,12 @@ class GameOverSubstate extends MusicBeatSubstate
 	override function create()
 	{
 		instance = this;
+		FlxG.mouse.visible = true;
 		PlayState.instance.callOnScripts('onGameOverStart', []);
 
 		super.create();
+
+		loadUIscripts('gameover');
 	}
 
 	public function new(x:Float, y:Float, camX:Float, camY:Float)
@@ -83,7 +86,7 @@ class GameOverSubstate extends MusicBeatSubstate
 
 		PlayState.instance.callOnScripts('onUpdate', [elapsed]);
 
-		if (controls.ACCEPT)
+		if (controls.ACCEPT || FlxG.mouse.justPressed)
 		{
 			endBullshit();
 		}
@@ -181,6 +184,7 @@ class GameOverSubstate extends MusicBeatSubstate
 
 	override function destroy()
 	{
+		FlxG.mouse.visible = false;
 		instance = null;
 		super.destroy();
 	}

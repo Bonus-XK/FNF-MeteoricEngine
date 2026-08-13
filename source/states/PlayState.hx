@@ -17,10 +17,12 @@ import backend.WeekData;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
+import backend.Replay;
 
 import flixel.FlxBasic;
 import flixel.FlxObject;
 import flixel.FlxSubState;
+import flixel.addons.display.FlxTiledSprite;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.math.FlxPoint;
 import flixel.util.FlxSort;
@@ -43,6 +45,7 @@ import states.editors.ChartingState;
 import states.editors.CharacterEditorState;
 
 import substates.PauseSubState;
+import substates.ResultsSubState;
 import substates.GameOverSubstate;
 
 #if !flash 
@@ -77,6 +80,13 @@ import psychlua.HScript;
 #if (SScript >= "3.0.0")
 import tea.SScript;
 #end
+
+typedef PreGenResult = {
+	notes:Array<Note>,
+	noteTypes:Array<String>,
+	totalNotes:Int,
+	botLaneCounts:Array<Int>
+}
 
 class PlayState extends MusicBeatState
 {
@@ -166,6 +176,8 @@ class PlayState extends MusicBeatState
 	public var notes:FlxTypedGroup<Note>;
 	public var unspawnNotes:Array<Note> = [];
 	public var eventNotes:Array<EventNote> = [];
+	public var cachedEventsData:Array<Dynamic> = null;   // 谱面 events 文件数据缓存（快速重开用，避免重复读盘）
+	public var cachedEventNotes:Array<EventNote> = [];   // 已修正偏移与提前触发的事件缓存（快速重开用）
 
 	public var camFollow:FlxObject;
 	private static var prevCamFollow:FlxObject;
@@ -173,6 +185,9 @@ class PlayState extends MusicBeatState
 	public var strumLineNotes:FlxTypedGroup<StrumNote>;
 	public var opponentStrums:FlxTypedGroup<StrumNote>;
 	public var playerStrums:FlxTypedGroup<StrumNote>;
+	public var phigrosJudgeLine:PhigrosJudgeLine; // Phigros 玩法判定线
+	public var hudLayout:Map<String, Array<Float>>; // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
+	public var isPhigrosStyle:Bool = false;
 	public var grpNoteSplashes:FlxTypedGroup<NoteSplash>;
 
 	public var camZooming:Bool = false;
@@ -186,8 +201,13 @@ class PlayState extends MusicBeatState
 	public var combo:Int = 0;
 
 	public var healthBar:HealthBar;
-	public var timeBar:HealthBar;
-	public var healthBarOverlay:FlxSprite;
+	public var healthBarBG:AttachedSprite;
+	public var timeBar:TimeBar;
+	public var timeBarBG:AttachedSprite;
+	public var healthBarOverlay:FlxTiledSprite;
+	var timeBarOverlay:FlxTiledSprite;
+	var healthOverlayDir:Int = -1; // 血量阴影滚动方向：-1 向左（回血） / +1 向右（掉血）
+	var lastHpPercent:Float = 50;
 	var songPercent:Float = 0;
 
 	public var ratingsData:Array<Rating> = Rating.loadDefault();
@@ -206,6 +226,18 @@ class PlayState extends MusicBeatState
 	public var instakillOnMiss:Bool = false;
 	public var cpuControlled:Bool = false;
 	public var practiceMode:Bool = false;
+	// 自动游玩预演：加载时预演生成的命中计划（每轨道命中时刻），null = 未预演（回退实时判定）
+	public var botplayPlan:Array<Array<Float>> = null;
+	var botLaneCounts:Array<Int> = [0, 0, 0, 0];
+	// 自动游玩批处理：同帧堆叠命中先收集再统一处理，副作用（音效/粒子/动画/评分）合并，避免一帧内爆发
+	var botHitQueue:Array<Note> = [];
+	var botHitBatch:Bool = false;
+	// 上一帧音频位置（毫秒）：用于实测自动游玩每帧前进量，精确计算命中提前量
+	var lastBotSongPos:Float = 0;
+	var botBatchAnimDone:Array<Bool> = [false, false, false, false];
+	var botBatchSplashDone:Array<Bool> = [false, false, false, false];
+	var botBatchHitsoundDone:Bool = false;
+	var botBatchScoreShown:Bool = false;
 
 	public var botplaySine:Float = 0;
 	public var botplayTxt:FlxText;
@@ -220,9 +252,20 @@ class PlayState extends MusicBeatState
 	public var songScore:Int = 0;
 	public var songHits:Int = 0;
 	public var songMisses:Int = 0;
+	public var usedAutoplay:Bool = false;   // 本局是否用过自动游玩（用于判断成绩是否有效）
+	public var usedGodMode:Bool = false;    // 本局是否用过上帝模式（用于判断成绩是否有效）
+
+	public var replayMode:Bool = false;             // 本局是否为回放
+	public static var queuedReplay:Replay = null;   // 待进入的回放数据（结算/选歌界面设置）
+	var recordingReplay:Bool = false;               // 本局是否在录制
+	var currentReplay:Replay = null;                // 本局录制数据
+	var replayHitSeqs:Map<Int, String> = null;      // 回放：应命中的音符（chartSeq -> 事件类型/评分）
+	var replayRatingSeqs:Map<Int, String> = null;   // 回放：评分查找（chartSeq -> 评分名）
+	var replayPressMisses:Array<ReplayEvent> = [];  // 回放：空按事件（按时间升序）
+	var replayPressPtr:Int = 0;                     // 回放：空按事件游标
 	public var scoreTxt:FlxText;
 	public var songTxt:FlxText;
-	var timeTxt:FlxText;
+	public var timeTxt:FlxText;
 	var scoreTxtTween:FlxTween;
 
 	public static var campaignScore:Int = 0;
@@ -276,6 +319,7 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		isPhigrosStyle = ClientPrefs.data.phigrosStyle;
 		//trace('Playback Rate: ' + playbackRate);
 		Paths.clearStoredMemory();
 
@@ -305,6 +349,38 @@ class PlayState extends MusicBeatState
 		instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
 		practiceMode = ClientPrefs.getGameplaySetting('practice');
 		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
+		usedAutoplay = cpuControlled;
+		usedGodMode = practiceMode;
+
+		// ---- 回放模式：存在待回放数据时本局按录制内容重放 ----
+		replayMode = queuedReplay != null;
+		if (replayMode)
+		{
+			currentReplay = queuedReplay;
+			queuedReplay = null;
+			if (currentReplay.fingerprint.length > 0 && currentReplay.fingerprint != Replay.chartFingerprint(SONG))
+			{
+				// 谱面与录制时不一致，回放作废，退回普通游玩
+				trace('[Replay] 谱面指纹不匹配，回放取消');
+				replayMode = false;
+				currentReplay = null;
+			}
+			if (replayMode)
+			{
+				currentReplay.buildDerived();
+				replayHitSeqs = currentReplay.hitSeqs;
+				replayRatingSeqs = currentReplay.ratingSeqs;
+				replayPressMisses = currentReplay.pressMisses;
+				replayPressPtr = 0;
+				usedAutoplay = true; // 回放成绩不计入排行
+				startOnTime = 0;     // 回放必须从头开始
+			}
+		}
+		recordingReplay = !replayMode && !chartingMode && !cpuControlled && startOnTime <= 0;
+		if (recordingReplay)
+			currentReplay = new Replay(SONG.song, Difficulty.getString(storyDifficulty));
+		else if (!replayMode)
+			currentReplay = null;
 
 		// var gameCam:FlxCamera = FlxG.camera;
 		camGame = new FlxCamera();
@@ -443,21 +519,24 @@ class PlayState extends MusicBeatState
 		if (!stageData.hide_girlfriend)
 		{
 			if(SONG.gfVersion == null || SONG.gfVersion.length < 1) SONG.gfVersion = 'gf'; //Fix for the Chart Editor
-			gf = new Character(0, 0, SONG.gfVersion);
+		gf = new Character(0, 0, SONG.gfVersion);
 			startCharacterPos(gf);
 			gf.scrollFactor.set(0.95, 0.95);
 			gfGroup.add(gf);
+			gfMap.set(SONG.gfVersion, gf); // 快速重开恢复默认角色用
 			startCharacterScripts(gf.curCharacter);
 		}
 
 		dad = new Character(0, 0, SONG.player2);
 		startCharacterPos(dad, true);
 		dadGroup.add(dad);
+		dadMap.set(SONG.player2, dad); // 快速重开恢复默认角色用
 		startCharacterScripts(dad.curCharacter);
 
 		boyfriend = new Character(0, 0, SONG.player1, true);
 		startCharacterPos(boyfriend);
 		boyfriendGroup.add(boyfriend);
+		boyfriendMap.set(SONG.player1, boyfriend); // 快速重开恢复默认角色用
 		startCharacterScripts(boyfriend.curCharacter);
 
 		var camPos:FlxPoint = FlxPoint.get(girlfriendCameraOffset[0], girlfriendCameraOffset[1]);
@@ -475,31 +554,82 @@ class PlayState extends MusicBeatState
 		stagesFunc(function(stage:BaseStage) stage.createPost());
 
 		Conductor.songPosition = -5000 / Conductor.songPosition;
-		var showTime:Bool = (ClientPrefs.data.timeBarType != 'Disabled');
-		timeTxt = new FlxText(STRUM_X + (FlxG.width / 2) - 248, 19, 400, "", 32);
+		var showTime:Bool = (ClientPrefs.data.timeBarType != '禁用');
+		hudLayout = ClientPrefs.data.hudLayout;
+		// 时间条在上，时间文字在下
+		var hudTimeOff:Array<Float> = hudGetOffset('timeBar');
+		var timeBarY:Float = 19;
+		if(ClientPrefs.data.downScroll && !isPhigrosStyle) timeBarY = FlxG.height - 44 - 25; // 底部给时间文字留出位置
+		timeBarY += hudTimeOff[1];
+
+		timeBar = new TimeBar(0, timeBarY, function() return songPercent, 0, 1, ClientPrefs.data.newTimeBarStyle);
+		timeBar.scrollFactor.set();
+		timeBar.screenCenter(X);
+		timeBar.x += hudTimeOff[0];
+		if (ClientPrefs.data.newTimeBarStyle)
+		{
+			// 新样式：已走过部分显示对手图标颜色，颜色过暗（接近黑色）时兜底使用青色
+			var fillColor:FlxColor = FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]);
+			if (fillColor.red + fillColor.green + fillColor.blue < 120)
+				fillColor = 0xFF00FFFF;
+			timeBar.leftBar.color = fillColor;
+			timeBar.rightBar.color = 0xFF000000;
+		}
+		else
+		{
+			timeBar.leftBar.color = FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]);
+			timeBar.rightBar.color = 0xFF1A1A1A;
+		}
+		timeBar.alpha = 0;
+		timeBar.visible = showTime;
+		add(timeBar);
+
+		// 时间条血量阴影：固定向右滚动（黑色普通混合：黑底上不可见，填充部分显示暗纹）
+		timeBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(timeBar.bg.width), Std.int(timeBar.bg.height));
+		timeBarOverlay.x = timeBar.x;
+		timeBarOverlay.y = timeBar.y;
+		timeBarOverlay.scrollFactor.set();
+		timeBarOverlay.color = FlxColor.BLACK;
+		timeBarOverlay.alpha = 0;
+		timeBarOverlay.visible = showTime && !ClientPrefs.data.hideHud;
+		timeBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
+		add(timeBarOverlay);
+
+		timeTxt = new FlxText(STRUM_X + (FlxG.width / 2) - 248 + hudTimeOff[0], timeBarY + 25, 400, "", 32);
 		timeTxt.setFormat(Paths.font("vcr.ttf"), 25, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		timeTxt.scrollFactor.set();
 		timeTxt.alpha = 0;
 		timeTxt.borderSize = 2;
 		timeTxt.visible = updateTime = showTime;
-		if(ClientPrefs.data.downScroll) timeTxt.y = FlxG.height - 44;
-		if(ClientPrefs.data.timeBarType == 'Song Name') timeTxt.text = SONG.song;
+		if(ClientPrefs.data.downScroll && !isPhigrosStyle) timeTxt.y = FlxG.height - 44 + hudTimeOff[1];
+		if(ClientPrefs.data.timeBarType == '歌曲名称') timeTxt.text = SONG.song;
 
-		timeBar = new HealthBar(0, timeTxt.y + (timeTxt.height / 4), 'timeBar', function() return songPercent, 0, 1);
-		timeBar.scrollFactor.set();
-		timeBar.screenCenter(X);
-		timeBar.leftBar.color = FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]);
-		timeBar.rightBar.color = 0xFF1A1A1A;
-		timeBar.alpha = 0;
-		timeBar.visible = showTime;
-		add(timeBar);
+		timeBarBG = new AttachedSprite('timeBar'); // 背景由 TimeBar 内部绘制，此对象仅保留供旧模组脚本引用
+		timeBarBG.x = timeBar.x;
+		timeBarBG.y = timeBar.y;
+		timeBarBG.scrollFactor.set();
+		timeBarBG.alpha = 0;
+		timeBarBG.visible = false;
+		timeBarBG.color = FlxColor.BLACK;
+		timeBarBG.xAdd = -4;
+		timeBarBG.yAdd = -4;
+		timeBarBG.sprTracker = timeBar;
+		add(timeBarBG);
 		add(timeTxt);
 
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
 		add(strumLineNotes);
 		add(grpNoteSplashes);
 
-		if(ClientPrefs.data.timeBarType == 'Song Name')
+		if (isPhigrosStyle)
+		{
+			phigrosJudgeLine = new PhigrosJudgeLine();
+			phigrosJudgeLine.layoutOffsetY = hudGetOffset('note')[1];
+			phigrosJudgeLine.cameras = [camHUD];
+			add(phigrosJudgeLine);
+		}
+
+		if(ClientPrefs.data.timeBarType == '歌曲名称')
 		{
 			timeTxt.size = 24;
 			timeTxt.y += 3;
@@ -532,18 +662,31 @@ class PlayState extends MusicBeatState
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 		moveCameraSection();
 
-		healthBar = new HealthBar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return (ClientPrefs.data.smoothHealth) ? smoothHealth : health, 0, 2);
+		var hudHpOff:Array<Float> = hudGetOffset('healthBar');
+		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11); // 血量条默认位置（计分/水印以此为基准，与血量条解耦）
+		healthBar = new HealthBar(0, defaultHpY + hudHpOff[1], 'healthBar', function() return (ClientPrefs.data.smoothHealth) ? smoothHealth : health, 0, 2, ClientPrefs.data.oldHealthBar);
 		healthBar.screenCenter(X);
+		healthBar.x += hudHpOff[0];
 		healthBar.leftToRight = false;
 		healthBar.scrollFactor.set();
 		healthBar.visible = !ClientPrefs.data.hideHud;
 		healthBar.alpha = ClientPrefs.data.healthBarAlpha;
 		reloadHealthBarColors();
+
+		healthBarBG = new AttachedSprite('healthBar');
+		healthBarBG.y = healthBar.y;
+		healthBarBG.screenCenter(X);
+		healthBarBG.scrollFactor.set();
+		healthBarBG.visible = false; // 背景由 HealthBar 内部绘制，此对象仅保留供旧模组脚本引用
+		healthBarBG.xAdd = -4;
+		healthBarBG.yAdd = -4;
+		healthBarBG.sprTracker = healthBar;
+		add(healthBarBG);
+
 		add(healthBar);
 		
-		healthBarOverlay = new FlxSprite().loadGraphic(Paths.image('healthBarOverlay'));
-		healthBarOverlay.y = FlxG.height * 0.89;
-		healthBarOverlay.screenCenter(X);
+		healthBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(healthBar.bg.width), Std.int(healthBar.bg.height));
+		healthBarOverlay.y = healthBar.y;
 		healthBarOverlay.scrollFactor.set();
 		if (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay) {
 			healthBarOverlay.visible = true;
@@ -555,27 +698,29 @@ class PlayState extends MusicBeatState
 		healthBarOverlay.x = healthBar.x;
 	    healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha;
 		healthBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
-		add(healthBarOverlay); healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha; if(ClientPrefs.data.downScroll) healthBarOverlay.y = 0.11 * FlxG.height;
+		add(healthBarOverlay); healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha; if(ClientPrefs.data.downScroll && !isPhigrosStyle) healthBarOverlay.y = healthBar.y;
+		if(ClientPrefs.data.oldHealthBar) healthBarOverlay.visible = false; // 旧版样式：不叠加阴影
 		
 		iconP1 = new HealthIcon(boyfriend.healthIcon, true);
-		iconP1.y = healthBar.y - 75;
+		iconP1.y = healthBar.y - 75; // 图标强绑定血量条
 		iconP1.visible = !ClientPrefs.data.hideHud;
 		iconP1.alpha = ClientPrefs.data.healthBarAlpha;
 		add(iconP1);
 
 		iconP2 = new HealthIcon(dad.healthIcon, false);
-		iconP2.y = healthBar.y - 75;
+		iconP2.y = healthBar.y - 75; // 图标强绑定血量条
 		iconP2.visible = !ClientPrefs.data.hideHud;
 		iconP2.alpha = ClientPrefs.data.healthBarAlpha;
 		add(iconP2);
 
-		scoreTxt = new FlxText(0, healthBar.y + 55, FlxG.width, "", 20);
+		var hudScoreOff:Array<Float> = hudGetOffset('score');
+		scoreTxt = new FlxText(hudScoreOff[0], defaultHpY + 55 + hudScoreOff[1], FlxG.width, "", 20);
 		if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
 			scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			scoreTxt.borderSize = 1.25;
 		}
 
-		if(ClientPrefs.data.scoreTxtFont == "Original"){
+		if(ClientPrefs.data.scoreTxtFont == "默认"){
 			scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			scoreTxt.borderSize = 1.25;
 		}
@@ -583,7 +728,8 @@ class PlayState extends MusicBeatState
 		scoreTxt.visible = !ClientPrefs.data.hideHud;
 		add(scoreTxt);
 
-		songTxt = new FlxText(12, healthBar.y + 55, 0, "", 12);
+		var hudWmOff:Array<Float> = hudGetOffset('watermark');
+		songTxt = new FlxText(12 + hudWmOff[0], defaultHpY + 55 + hudWmOff[1], 0, "", 12);
 		songTxt.setFormat(Paths.font("future.ttf"), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		songTxt.scrollFactor.set();
 		songTxt.borderSize = 1;
@@ -595,23 +741,32 @@ class PlayState extends MusicBeatState
 		add(songTxt);
 		songTxt.text = curSong + " (" + storyDifficultyText + ") " + "| 流星引擎 v" + Main.meVersion;
 
-		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong;
+		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong + (replayMode ? ' [回放]' : '');
 
-		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, "AutoPlay", 32);
+		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, replayMode ? "REPLAY" : "AutoPlay", 32);
 		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		botplayTxt.scrollFactor.set();
 		botplayTxt.borderSize = 1.25;
-		botplayTxt.visible = cpuControlled;
+		botplayTxt.visible = cpuControlled || replayMode;
 		add(botplayTxt);
-		if(ClientPrefs.data.downScroll) {
+		if(ClientPrefs.data.downScroll && !isPhigrosStyle) {
 			botplayTxt.y = timeBar.y - 78;
 		}
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];
 		notes.cameras = [camHUD];
 
+		if (isPhigrosStyle)
+		{
+			// 隐藏传统箭头与打击水花：strum 仅作为音符位置锚点（alpha 保持 1 供音符跟随）
+			strumLineNotes.visible = false;
+			grpNoteSplashes.visible = false;
+		}
+
 		healthBar.cameras = [camHUD];
+		healthBarBG.cameras = [camHUD];
 		healthBarOverlay.cameras = [camHUD];
+		timeBarOverlay.cameras = [camHUD];
 		iconP1.cameras = [camHUD];
 		iconP2.cameras = [camHUD];
 		scoreTxt.cameras = [camHUD];
@@ -619,6 +774,7 @@ class PlayState extends MusicBeatState
 
 		botplayTxt.cameras = [camHUD];
 		timeBar.cameras = [camHUD];
+		timeBarBG.cameras = [camHUD];
 		timeTxt.cameras = [camHUD];
 
 		startingSong = true;
@@ -646,6 +802,7 @@ class PlayState extends MusicBeatState
 			for (event in eventNotes) event.strumTime -= eventEarlyTrigger(event);
 			eventNotes.sort(sortByTime);
 		}
+		cachedEventNotes = eventNotes.copy();
 
 		// SONG SPECIFIC SCRIPTS
 		#if LUA_ALLOWED
@@ -671,7 +828,7 @@ class PlayState extends MusicBeatState
 
 		if (PauseSubState.songName != null) {
 			precacheList.set(PauseSubState.songName, 'music');
-		} else if(ClientPrefs.data.pauseMusic != 'None') {
+		} else if(ClientPrefs.data.pauseMusic != '无') {
 			precacheList.set(Paths.formatToSongPath(ClientPrefs.data.pauseMusic), 'music');
 		}
 
@@ -700,7 +857,10 @@ class PlayState extends MusicBeatState
 		}
 
 		super.create();
-		Paths.clearUnusedMemory();
+		// 大谱面下不做同步 GC（音符对象全部存活，GC 会阻塞主线程），交给后续帧自然回收
+		Paths.clearUnusedMemory(false);
+		// 预解码贴图里未被本局消费的（如未出场角色）在此释放，避免残留大图
+		Paths.clearPendingBitmaps();
 		
 		CustomFadeTransition.nextCamera = camOther;
 		if(eventNotes.length < 1) checkEventNote();
@@ -741,6 +901,42 @@ class PlayState extends MusicBeatState
 		Conductor.safeZoneOffset = (ClientPrefs.data.safeFrames / 60) * 1000 * value;
 		setOnScripts('playbackRate', playbackRate);
 		return value;
+	}
+
+	// 游玩设置改动后即时同步到当前局（暂停菜单里打开设置时调用）
+	public function syncGameplaySettings():Void
+	{
+		var oldPractice:Bool = practiceMode;
+		var oldBotplay:Bool = cpuControlled;
+
+		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
+		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
+		switch(songSpeedType)
+		{
+			case "multiplicative":
+				songSpeed = SONG.speed * ClientPrefs.getGameplaySetting('scrollspeed');
+			case "constant":
+				songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
+		}
+		healthGain = ClientPrefs.getGameplaySetting('healthgain');
+		healthLoss = ClientPrefs.getGameplaySetting('healthloss');
+		instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
+		practiceMode = ClientPrefs.getGameplaySetting('practice');
+		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
+
+		if (cpuControlled) usedAutoplay = true;
+		if (practiceMode) usedGodMode = true;
+
+		if (practiceMode != oldPractice || cpuControlled != oldBotplay)
+			changedDifficulty = true;
+
+		if (botplayTxt != null)
+		{
+			botplayTxt.visible = cpuControlled || replayMode;
+			botplayTxt.alpha = 1;
+			botplaySine = 0;
+		}
+
 	}
 
 	public function addTextToDebug(text:String, color:FlxColor) {
@@ -1009,8 +1205,12 @@ class PlayState extends MusicBeatState
 		if(ret != FunkinLua.Function_Stop) {
 			if (skipCountdown || startOnTime > 0) skipArrowStartTween = true;
 
-			generateStaticArrows(0);
-			generateStaticArrows(1);
+			if (!keepStrumsOnRestart)
+			{
+				generateStaticArrows(0);
+				generateStaticArrows(1);
+			}
+			keepStrumsOnRestart = false;
 			for (i in 0...playerStrums.length) {
 				setOnScripts('defaultPlayerStrumX' + i, playerStrums.members[i].x);
 				setOnScripts('defaultPlayerStrumY' + i, playerStrums.members[i].y);
@@ -1192,7 +1392,7 @@ class PlayState extends MusicBeatState
 			    scoreTxt.borderSize = 1.25;
 		    }
 
-		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+		    if(ClientPrefs.data.scoreTxtFont == "默认"){
 			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			    scoreTxt.borderSize = 1.25;
 		    }
@@ -1204,7 +1404,7 @@ class PlayState extends MusicBeatState
 			    scoreTxt.borderSize = 1.25;
 		    }
 
-		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+		    if(ClientPrefs.data.scoreTxtFont == "默认"){
 			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			    scoreTxt.borderSize = 1.25;
 		    }
@@ -1216,7 +1416,7 @@ class PlayState extends MusicBeatState
 			    scoreTxt.borderSize = 1.25;
 		    }
 
-		    if(ClientPrefs.data.scoreTxtFont == "Original"){
+		    if(ClientPrefs.data.scoreTxtFont == "默认"){
 			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			    scoreTxt.borderSize = 1.25;
 		    }
@@ -1257,15 +1457,13 @@ class PlayState extends MusicBeatState
 	{
 		startingSong = false;
 
-		@:privateAccess
-		FlxG.sound.playMusic(inst._sound, 1, false);
+		@:privateAccess FlxG.sound.playMusic(inst._sound, 1, false);
 		FlxG.sound.music.pitch = playbackRate;
 		FlxG.sound.music.onComplete = finishSong.bind();
 		vocals.play();
 
 		if(startOnTime > 0) setSongTime(startOnTime - 500);
 		startOnTime = 0;
-
 		if(paused) {
 			//trace('Oopsie doopsie! Paused sound');
 			FlxG.sound.music.pause();
@@ -1318,24 +1516,84 @@ class PlayState extends MusicBeatState
 		notes = new FlxTypedGroup<Note>();
 		add(notes);
 
-		var noteData:Array<SwagSection>;
+		generateChartNotes(true);
+	}
 
-		// NEW SHIT
-		noteData = songData.notes;
+	// 根据内存中的谱面数据生成音符与事件。
+	// loadPhase=true 为首次加载：读取 events 文件并触发事件预加载回调（与原来行为一致）；
+	// loadPhase=false 为快速重开：直接复用加载时缓存好的事件数据，不读盘、不重复触发脚本/舞台回调。
+	// ===== 提前生成（LoadingState 空闲期构建整张谱面，create 时直接消费，大谱面省去 500ms+） =====
+	public static var preGenNotes:Array<Note> = null;
+	static var preGenNoteTypes:Array<String> = null;
+	static var preGenTotalNotes:Int = 0;
+	static var preGenBotLaneCounts:Array<Int> = null;
+	static var preGenSong:String = null;
 
-		var file:String = Paths.json(songName + '/events');
-		#if MODS_ALLOWED
-		if (FileSystem.exists(Paths.modsJson(songName + '/events')) || FileSystem.exists(file)) {
-		#else
-		if (OpenFlAssets.exists(file)) {
-		#end
-			var eventsData:Array<Dynamic> = Song.loadFromJson('events', songName).events;
-			for (event in eventsData) //Event Notes
-				for (i in 0...event[1].length)
-					makeEvent(event, i);
+	// 加载界面空闲期调用：构建整张谱面的音符对象（含长条段），返回是否成功。
+	// 与 create 期生成完全同一套参数（stageUI / BPM / songSpeed / playbackRate），失败时回退创建期生成。
+	public static function preGenerateChart():Bool
+	{
+		if (SONG == null) return false;
+		var songPath:String = Paths.formatToSongPath(SONG.song);
+		// 每次加载都重建：上一轮预生成一定已被 create 消费；残留数据直接覆盖，防止跨曲/跨难度误用
+		preGenNotes = null;
+		preGenSong = null;
+
+		var oldUI:String = stageUI;
+		var stageName:String = SONG.stage;
+		if (stageName == null || stageName.length < 1) stageName = StageData.vanillaSongStage(songPath);
+		var stageData:StageFile = StageData.getStageFile(stageName);
+		if (stageData == null) stageData = StageData.dummy();
+		stageUI = "normal";
+		if (stageData.stageUI != null && stageData.stageUI.trim().length > 0)
+			stageUI = stageData.stageUI;
+		else if (stageData.isPixelStage)
+			stageUI = "pixel";
+
+		var oldBpm:Float = Conductor.bpm;
+		Conductor.bpm = SONG.bpm;
+		var ok:Bool = false;
+		try
+		{
+			var songSpeed:Float = SONG.speed;
+			switch(ClientPrefs.getGameplaySetting('scrolltype'))
+			{
+				case "multiplicative":
+					songSpeed = SONG.speed * ClientPrefs.getGameplaySetting('scrollspeed');
+				case "constant":
+					songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
+			}
+			var res:PreGenResult = buildChartNotes(SONG, Note.getBotplayPlan(), ClientPrefs.data.phigrosStyle,
+				{ songSpeed: songSpeed }, ClientPrefs.getGameplaySetting('songspeed'));
+			res.notes.sort(sortByTime);
+			preGenNotes = res.notes;
+			preGenNoteTypes = res.noteTypes;
+			preGenTotalNotes = res.totalNotes;
+			preGenBotLaneCounts = res.botLaneCounts;
+			preGenSong = songPath;
+			ok = true;
 		}
+		catch (e:Dynamic)
+		{
+			preGenNotes = null;
+			preGenSong = null;
+		}
+		stageUI = oldUI;
+		Conductor.bpm = oldBpm;
+		return ok;
+	}
 
-		for (section in noteData)
+	// 与 generateChartNotes 完全相同的音符遍历逻辑（不处理事件），供加载期预生成与创建期兜底共用
+	static function buildChartNotes(song:SwagSong, botplayPlan:Array<Array<Float>>, isPhigrosStyle:Bool,
+			createdFrom:Dynamic, playbackRate:Float):PreGenResult
+	{
+		var unspawnNotes:Array<Note> = [];
+		var noteTypes:Array<String> = [];
+		var totalNotes:Int = 0;
+		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
+		var chartSeqCounter:Int = 0;
+
+		for (section in song.notes)
 		{
 			for (songNotes in section.sectionNotes)
 			{
@@ -1344,9 +1602,7 @@ class PlayState extends MusicBeatState
 				var gottaHitNote:Bool = section.mustHitSection;
 
 				if (songNotes[1] > 3)
-				{
 					gottaHitNote = !section.mustHitSection;
-				}
 
 				var oldNote:Note;
 				if (unspawnNotes.length > 0)
@@ -1354,7 +1610,8 @@ class PlayState extends MusicBeatState
 				else
 					oldNote = null;
 
-				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote);
+				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, false, false, createdFrom);
+				swagNote.chartSeq = chartSeqCounter++;
 				swagNote.mustPress = gottaHitNote;
 				swagNote.sustainLength = songNotes[2];
 				swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
@@ -1364,17 +1621,24 @@ class PlayState extends MusicBeatState
 				swagNote.scrollFactor.set();
 
 				var susLength:Float = swagNote.sustainLength;
-
 				susLength = susLength / Conductor.stepCrochet;
 				unspawnNotes.push(swagNote);
 
 				var floorSus:Int = Math.floor(susLength);
+				if (botplayPlan != null && gottaHitNote)
+				{
+					botLaneCounts[daNoteData]++;
+					if (floorSus > 0) botLaneCounts[daNoteData] += floorSus + 1;
+				}
+				if (isPhigrosStyle && !swagNote.mustPress && floorSus > 0)
+					swagNote.repaintPhigrosPerform(true); // 带长条的表演块：主块重绘为青色
 				if(floorSus > 0) {
 					for (susNote in 0...floorSus+1)
 					{
 						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
 
-						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true);
+						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, false, createdFrom);
+						sustainNote.chartSeq = chartSeqCounter++;
 						sustainNote.mustPress = gottaHitNote;
 						sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
 						sustainNote.noteType = swagNote.noteType;
@@ -1382,7 +1646,7 @@ class PlayState extends MusicBeatState
 						swagNote.tail.push(sustainNote);
 						sustainNote.parent = swagNote;
 						unspawnNotes.push(sustainNote);
-						
+
 						sustainNote.correctionOffset = swagNote.height / 2;
 						if(!PlayState.isPixelStage)
 						{
@@ -1393,7 +1657,7 @@ class PlayState extends MusicBeatState
 								oldNote.updateHitbox();
 							}
 
-							if(ClientPrefs.data.downScroll)
+							if(ClientPrefs.data.downScroll && !isPhigrosStyle)
 								sustainNote.correctionOffset = 0;
 						}
 						else if(oldNote.isSustainNote)
@@ -1430,13 +1694,192 @@ class PlayState extends MusicBeatState
 				if(!noteTypes.contains(swagNote.noteType)) {
 					noteTypes.push(swagNote.noteType);
 				}
+				if (gottaHitNote) totalNotes++;
 			}
 		}
-		for (event in songData.events) //Event Notes
-			for (i in 0...event[1].length)
-				makeEvent(event, i);
+		return { notes: unspawnNotes, noteTypes: noteTypes, totalNotes: totalNotes, botLaneCounts: botLaneCounts };
+	}
 
-		unspawnNotes.sort(sortByTime);
+	private function generateChartNotes(loadPhase:Bool):Void
+	{
+		totalNotes = 0;
+		botplayPlan = Note.getBotplayPlan();
+		if (botplayPlan != null) botLaneCounts = [0, 0, 0, 0];
+		var songData = SONG;
+		noteTypes = [];
+		eventsPushed = [];
+		var chartSeqCounter:Int = 0;
+
+		var noteData:Array<SwagSection> = songData.notes;
+
+		if (loadPhase)
+		{
+			if (cachedEventsData == null)
+			{
+				var file:String = Paths.json(songName + '/events');
+				#if MODS_ALLOWED
+				if (FileSystem.exists(Paths.modsJson(songName + '/events')) || FileSystem.exists(file)) {
+				#else
+				if (OpenFlAssets.exists(file)) {
+				#end
+					cachedEventsData = Song.loadFromJson('events', songName).events;
+				}
+				else {
+					cachedEventsData = [];
+				}
+			}
+			for (event in cachedEventsData) //Event Notes
+				for (i in 0...event[1].length)
+					makeEvent(event, i);
+		}
+		else
+		{
+			for (event in cachedEventNotes)
+				eventNotes.push(event);
+		}
+
+		var consumedPreGen:Bool = loadPhase && preGenNotes != null && preGenSong == Paths.formatToSongPath(SONG.song);
+		if (consumedPreGen)
+		{
+			// 消费加载期预生成的音符（已排序、已含 prevNote/nextNote 链）
+			unspawnNotes = preGenNotes;
+			preGenNotes = null;
+			preGenSong = null;
+			noteTypes = preGenNoteTypes;
+			preGenNoteTypes = null;
+			totalNotes = preGenTotalNotes;
+			if (botplayPlan != null) botLaneCounts = preGenBotLaneCounts;
+			preGenBotLaneCounts = null;
+		}
+		else
+		{
+			// 兜底：预生成不可用（快速重开/预生成失败）时按原逻辑生成
+			for (section in noteData)
+			{
+				for (songNotes in section.sectionNotes)
+				{
+					var daStrumTime:Float = songNotes[0];
+					var daNoteData:Int = Std.int(songNotes[1] % 4);
+					var gottaHitNote:Bool = section.mustHitSection;
+
+					if (songNotes[1] > 3)
+					{
+						gottaHitNote = !section.mustHitSection;
+					}
+
+					var oldNote:Note;
+					if (unspawnNotes.length > 0)
+						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
+					else
+						oldNote = null;
+
+					var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote);
+					swagNote.chartSeq = chartSeqCounter++;
+					swagNote.mustPress = gottaHitNote;
+					swagNote.sustainLength = songNotes[2];
+					swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
+					swagNote.noteType = songNotes[3];
+					if(!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]]; //Backward compatibility + compatibility with Week 7 charts
+
+					swagNote.scrollFactor.set();
+
+					var susLength:Float = swagNote.sustainLength;
+
+					susLength = susLength / Conductor.stepCrochet;
+					unspawnNotes.push(swagNote);
+
+					var floorSus:Int = Math.floor(susLength);
+					if (botplayPlan != null && gottaHitNote)
+					{
+						botLaneCounts[daNoteData]++;
+						if (floorSus > 0) botLaneCounts[daNoteData] += floorSus + 1;
+					}
+					if (isPhigrosStyle && !swagNote.mustPress && floorSus > 0)
+						swagNote.repaintPhigrosPerform(true); // 带长条的表演块：主块重绘为青色
+					if(floorSus > 0) {
+						for (susNote in 0...floorSus+1)
+						{
+							oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
+
+							var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true);
+							sustainNote.chartSeq = chartSeqCounter++;
+							sustainNote.mustPress = gottaHitNote;
+							sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
+							sustainNote.noteType = swagNote.noteType;
+							sustainNote.scrollFactor.set();
+							swagNote.tail.push(sustainNote);
+							sustainNote.parent = swagNote;
+							unspawnNotes.push(sustainNote);
+
+							sustainNote.correctionOffset = swagNote.height / 2;
+							if(!PlayState.isPixelStage)
+							{
+								if(oldNote.isSustainNote)
+								{
+									oldNote.scale.y *= Note.SUSTAIN_SIZE / oldNote.frameHeight;
+									oldNote.scale.y /= playbackRate;
+									oldNote.updateHitbox();
+								}
+
+								if(ClientPrefs.data.downScroll && !isPhigrosStyle)
+									sustainNote.correctionOffset = 0;
+							}
+							else if(oldNote.isSustainNote)
+							{
+								oldNote.scale.y /= playbackRate;
+								oldNote.updateHitbox();
+							}
+
+							if (sustainNote.mustPress) sustainNote.x += FlxG.width / 2; // general offset
+							else if(ClientPrefs.data.middleScroll)
+							{
+								sustainNote.x += 310;
+								if(daNoteData > 1) //Up and Right
+								{
+									sustainNote.x += FlxG.width / 2 + 25;
+								}
+							}
+						}
+					}
+
+					if (swagNote.mustPress)
+					{
+						swagNote.x += FlxG.width / 2; // general offset
+					}
+					else if(ClientPrefs.data.middleScroll)
+					{
+						swagNote.x += 310;
+						if(daNoteData > 1) //Up and Right
+						{
+							swagNote.x += FlxG.width / 2 + 25;
+						}
+					}
+
+					if(!noteTypes.contains(swagNote.noteType)) {
+						noteTypes.push(swagNote.noteType);
+					}
+					if (gottaHitNote) totalNotes++;
+				}
+			}
+		}
+		if (loadPhase)
+		{
+			for (event in songData.events) //Event Notes
+				for (i in 0...event[1].length)
+					makeEvent(event, i);
+		}
+
+		if (botplayPlan != null)
+		{
+			// 校验预演与正式生成完全一致（同一遍历逻辑下必然一致；不一致时回退实时判定，防止错位）
+			for (lane in 0...4)
+				if (botLaneCounts[lane] != botplayPlan[lane].length)
+				{
+					botplayPlan = null;
+					break;
+				}
+		}
+		if (!consumedPreGen) unspawnNotes.sort(sortByTime);
 		generatedMusic = true;
 	}
 
@@ -1507,10 +1950,113 @@ class PlayState extends MusicBeatState
 	}
 
 	public var skipArrowStartTween:Bool = false; //for lua
+
+	// ---- 自定义界面：HUD 布局偏移 ----
+	public function hudGetOffset(id:String):Array<Float>
+	{
+		if (ClientPrefs.data.hudLayout.exists(id)) return ClientPrefs.data.hudLayout.get(id);
+		var arr:Array<Float> = [0, 0];
+		ClientPrefs.data.hudLayout.set(id, arr);
+		return arr;
+	}
+
+	// 重置某个 HUD 元素到默认位置（偏移清零并立即重排）
+	public function hudResetElement(id:String)
+	{
+		ClientPrefs.data.hudLayout.set(id, [0, 0]);
+		repositionHUD();
+	}
+
+	// 按保存的偏移重算所有 HUD 元素位置（默认位置 + 偏移），自定义界面拖动/重置时使用
+	public function repositionHUD()
+	{
+		if (strumLineNotes == null) return;
+
+		// 音符 / Phigros 判定线
+		var noteOff:Array<Float> = hudGetOffset('note');
+		var strumLineX:Float = (isPhigrosStyle || ClientPrefs.data.middleScroll) ? STRUM_X_MIDDLESCROLL : STRUM_X;
+		var strumLineY:Float = isPhigrosStyle ? 50 : (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		for (i in 0...strumLineNotes.members.length)
+		{
+			var strum:StrumNote = strumLineNotes.members[i];
+			var px:Float = strumLineX + (i * Note.swagWidth) + noteOff[0];
+			if (i < 4 && (isPhigrosStyle || ClientPrefs.data.middleScroll))
+			{
+				px += 310;
+				if (i > 1) px += FlxG.width / 2 + 25;
+			}
+			strum.x = px;
+			strum.y = strumLineY + noteOff[1];
+		}
+		if (phigrosJudgeLine != null)
+			phigrosJudgeLine.layoutOffsetY = noteOff[1];
+
+		// 时间条（含时间文字、Autoplay 提示）
+		if (timeBar != null)
+		{
+			var timeOff:Array<Float> = hudGetOffset('timeBar');
+			var tbY:Float = 19;
+			if (ClientPrefs.data.downScroll && !isPhigrosStyle) tbY = FlxG.height - 44 - 25;
+			timeBar.y = tbY + timeOff[1];
+			timeBar.screenCenter(X);
+			timeBar.x += timeOff[0];
+
+			if (timeBarOverlay != null) { timeBarOverlay.x = timeBar.x; timeBarOverlay.y = timeBar.y; }
+			if (timeTxt != null)
+			{
+				var txtBase:Float = 25 + (ClientPrefs.data.timeBarType == '歌曲名称' ? 3 : 0);
+				timeTxt.x = STRUM_X + (FlxG.width / 2) - 248 + timeOff[0];
+				timeTxt.y = timeBar.y + txtBase;
+				if (ClientPrefs.data.downScroll && !isPhigrosStyle) timeTxt.y = FlxG.height - 44 + timeOff[1];
+			}
+			if (botplayTxt != null)
+			{
+				botplayTxt.y = timeBar.y + 55;
+				if (ClientPrefs.data.downScroll && !isPhigrosStyle) botplayTxt.y = timeBar.y - 78;
+			}
+		}
+
+		// 血量条（含图标、阴影）
+		if (healthBar != null)
+		{
+			var hpOff:Array<Float> = hudGetOffset('healthBar');
+			var hbY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11) + hpOff[1];
+			healthBar.y = hbY;
+			healthBar.screenCenter(X);
+			healthBar.x += hpOff[0];
+
+			if (healthBarOverlay != null) { healthBarOverlay.x = healthBar.x; healthBarOverlay.y = healthBar.y; }
+			// 图标强绑定血量条（y 跟随，x 由 update 按 barCenter 计算）
+			if (iconP1 != null) iconP1.y = healthBar.y - 75;
+			if (iconP2 != null) iconP2.y = healthBar.y - 75;
+		}
+
+		// 计分文字：以默认血量条位置为基准，与血量条当前偏移解耦
+		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11);
+		var scoreOff:Array<Float> = hudGetOffset('score');
+		if (scoreTxt != null)
+		{
+			scoreTxt.x = scoreOff[0];
+			scoreTxt.y = defaultHpY + 55 + scoreOff[1];
+		}
+
+		// 左下角水印：独立定位
+		var wmOff:Array<Float> = hudGetOffset('watermark');
+		if (songTxt != null)
+		{
+			songTxt.x = 12 + wmOff[0];
+			songTxt.y = defaultHpY + 55 + wmOff[1];
+		}
+
+	}
+
 	private function generateStaticArrows(player:Int):Void
 	{
-		var strumLineX:Float = ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X;
-		var strumLineY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50;
+		var hudNoteOff:Array<Float> = hudGetOffset('note');
+		var strumLineX:Float = (isPhigrosStyle || ClientPrefs.data.middleScroll) ? STRUM_X_MIDDLESCROLL : STRUM_X;
+		var strumLineY:Float = isPhigrosStyle ? 50 : (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		strumLineX += hudNoteOff[0];
+		strumLineY += hudNoteOff[1];
 		for (i in 0...4)
 		{
 			// FlxG.log.add(i);
@@ -1522,7 +2068,7 @@ class PlayState extends MusicBeatState
 			}
 
 			var babyArrow:StrumNote = new StrumNote(strumLineX, strumLineY, i, player);
-			babyArrow.downScroll = ClientPrefs.data.downScroll;
+			babyArrow.downScroll = ClientPrefs.data.downScroll && !isPhigrosStyle;
 			if (!isStoryMode && !skipArrowStartTween)
 			{
 				//babyArrow.y -= 10;
@@ -1536,7 +2082,7 @@ class PlayState extends MusicBeatState
 				playerStrums.add(babyArrow);
 			else
 			{
-				if(ClientPrefs.data.middleScroll)
+				if(isPhigrosStyle || ClientPrefs.data.middleScroll)
 				{
 					babyArrow.x += 310;
 					if(i > 1) { //Up and Right
@@ -1681,10 +2227,64 @@ class PlayState extends MusicBeatState
 			}
 		}
 
-		var mult:Float = FlxMath.lerp(smoothHealth, health, ((health / smoothHealth) * (elapsed * 8)) * playbackRate);
-		smoothHealth = mult;
+		var healthLerp:Float = FlxMath.lerp(smoothHealth, health, FlxMath.bound(elapsed * 9 * playbackRate, 0, 1));
+		smoothHealth = healthLerp;
 
 		super.update(elapsed);
+
+		// 快速重开回溯：时间倒流（箭头随 songPosition 回退而飞回）
+		if (rewinding)
+		{
+			rewindElapsed += elapsed;
+			if (rewindElapsed >= rewindDuration)
+			{
+				rewinding = false;
+				Conductor.songPosition = 0;
+				trace('[Rewind] FINISH, elapsed=' + rewindElapsed);
+				finishRestart();
+			}
+			else
+			{
+				// 变速回溯：一开始快、越接近终点越慢（cubicOut）；
+				// 终点 = 场上清空的位置（最早音符飞出出生窗口后），收尾正好落在最后几个箭头上
+				var rewindProgress:Float = rewindElapsed / rewindDuration;
+				Conductor.songPosition = FlxMath.lerp(rewindFromPos, rewindEndPos, FlxEase.cubeOut(rewindProgress));
+
+				// 回溯中：箭头退回到“出生窗口”之外后回收，场上只保留正在倒流的箭头
+				var rewindWindow:Float = spawnTime * playbackRate;
+				if (songSpeed < 1) rewindWindow /= songSpeed;
+				var noteIdx:Int = notes.members.length - 1;
+				while (noteIdx >= 0)
+				{
+					var rewindNote:Note = notes.members[noteIdx];
+					if (rewindNote != null && rewindNote.alive)
+					{
+						var noteWindow:Float = rewindWindow;
+						if (rewindNote.multSpeed < 1) noteWindow /= rewindNote.multSpeed;
+						if (rewindNote.strumTime - Conductor.songPosition > noteWindow)
+						{
+							rewindNote.active = false;
+							rewindNote.visible = false;
+							rewindNote.kill();
+							notes.remove(rewindNote, true);
+							rewindNote.destroy();
+						}
+					}
+					noteIdx--;
+				}
+
+				// 场上已没有可见箭头时提前结束回溯，不再空转浪费等待时间
+				if (notes.length == 0)
+				{
+					rewinding = false;
+					Conductor.songPosition = 0;
+					trace('[Rewind] FINISH (field empty), elapsed=' + rewindElapsed);
+					finishRestart();
+				}
+				else if (Std.int(rewindElapsed * 10) != Std.int((rewindElapsed - elapsed) * 10))
+					trace('[Rewind] pos=' + Conductor.songPosition + ' (from ' + rewindFromPos + ')');
+			}
+		}
 
 		setOnScripts('curDecStep', curDecStep);
 		setOnScripts('curDecBeat', curDecBeat);
@@ -1728,25 +2328,58 @@ class PlayState extends MusicBeatState
 		if (controls.justPressed('debug_1') && !endingSong && !inCutscene)
 			openChartEditor();
 
-		var mult:Float = FlxMath.lerp(1, iconP1.scale.x, FlxMath.bound(1 - (elapsed * 9 * playbackRate), 0, 1));
-		iconP1.scale.set(mult, mult);
-		iconP1.updateHitbox();
-
-		var mult:Float = FlxMath.lerp(1, iconP2.scale.x, FlxMath.bound(1 - (elapsed * 9 * playbackRate), 0, 1));
-		iconP2.scale.set(mult, mult);
-		iconP2.updateHitbox();
+		if (ClientPrefs.data.keIconBop)
+		{
+			// KE 引擎图标跳动：指数衰减回基准大小（等效 Kade 引擎 60FPS 手感，且帧率无关）
+			var keDecay:Float = Math.pow(0.5, elapsed * 60 * playbackRate);
+			var keMultP1:Float = 1 + (iconP1.scale.x - 1) * keDecay;
+			iconP1.scale.set(keMultP1, keMultP1);
+			iconP1.updateHitbox();
+			iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
+			var keMultP2:Float = 1 + (iconP2.scale.x - 1) * keDecay;
+			iconP2.scale.set(keMultP2, keMultP2);
+			iconP2.updateHitbox();
+			iconP2.origin.set(0, 0);
+		}
+		else
+		{
+			var iconDecay:Float = FlxMath.bound(1 - (elapsed * 9 * playbackRate), 0, 1);
+			var multP1:Float = FlxMath.lerp(1, iconP1.scale.x, iconDecay);
+			iconP1.scale.set(multP1, multP1);
+			iconP1.updateHitbox();
+			var multP2:Float = FlxMath.lerp(1, iconP2.scale.x, iconDecay);
+			iconP2.scale.set(multP2, multP2);
+			iconP2.updateHitbox();
+		}
 
 		var iconOffset:Int = 26;
 		if (health > 2) health = 2;
+		// 图标强绑定血量条：x 跟随 barCenter（随血量增减在条上左右滑动，FNF 经典手感），y 跟随血量条，拖动血量条时整体跟随
 		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset;
 		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2;
 		iconP1.animation.curAnim.curFrame = (healthBar.percent < 20) ? 1 : 0;
 		iconP2.animation.curAnim.curFrame = (healthBar.percent > 80) ? 1 : 0;
 
+		// 血量阴影滚动：方向随推条方向（回血向左、掉血向右），UV 平铺滚动不会跑出条外
+		var hpDelta:Float = healthBar.percent - lastHpPercent;
+		if (hpDelta >= 0.01) healthOverlayDir = -1;
+		else if (hpDelta <= -0.01) healthOverlayDir = 1;
+		lastHpPercent = healthBar.percent;
+
+		if (healthBarOverlay.visible)
+			healthBarOverlay.scrollX += healthOverlayDir * 22 * elapsed;
+
+		// 时间条阴影：固定向右滚动，透明度跟随时间条淡入
+		if (timeBarOverlay != null && timeBarOverlay.visible)
+		{
+			timeBarOverlay.alpha = timeBar.alpha * 0.5;
+			timeBarOverlay.scrollX += 22 * elapsed;
+		}
+
 		if (controls.justPressed('debug_2') && !endingSong && !inCutscene)
 			openCharacterEditor();
 		
-		if (startedCountdown && !paused)
+		if (startedCountdown && !paused && !rewinding)
 			Conductor.songPosition += FlxG.elapsed * 1000 * playbackRate;
 
 		if (startingSong)
@@ -1762,12 +2395,12 @@ class PlayState extends MusicBeatState
 			songPercent = (curTime / songLength);
 
 			var songCalc:Float = (songLength - curTime);
-			if(ClientPrefs.data.timeBarType == 'Time Elapsed') songCalc = curTime;
+			if(ClientPrefs.data.timeBarType == '已过时间') songCalc = curTime;
 
 			var secondsTotal:Int = Math.floor(songCalc / 1000);
 			if(secondsTotal < 0) secondsTotal = 0;
 
-			if(ClientPrefs.data.timeBarType != 'Song Name')
+			if(ClientPrefs.data.timeBarType != '歌曲名称')
 				timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
 		}
 
@@ -1777,9 +2410,7 @@ class PlayState extends MusicBeatState
 			camHUD.zoom = FlxMath.lerp(1, camHUD.zoom, FlxMath.bound(1 - (elapsed * 3.125 * camZoomingDecay * playbackRate), 0, 1));
 		}
 
-		FlxG.watch.addQuick("secShit", curSection);
-		FlxG.watch.addQuick("beatShit", curBeat);
-		FlxG.watch.addQuick("stepShit", curStep);
+		// Watch calls removed for performance
 
 		// RESET = Quick Game Over Screen
 		if (!ClientPrefs.data.noReset && controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong)
@@ -1811,9 +2442,20 @@ class PlayState extends MusicBeatState
 
 		if (generatedMusic)
 		{
+			if (isPhigrosStyle && phigrosJudgeLine != null)
+			{
+				// 判定线上下浮动，strum 锚点（隐藏）同步跟随，音符即随之整体移动
+				phigrosJudgeLine.updateFloat(elapsed);
+				var jy:Float = phigrosJudgeLine.y;
+				for (i in 0...4)
+				{
+					if (playerStrums.members[i] != null) playerStrums.members[i].y = jy;
+					if (opponentStrums.members[i] != null) opponentStrums.members[i].y = jy;
+				}
+			}
 			if(!inCutscene)
 			{
-				if(!cpuControlled) {
+				if(!rewinding && !cpuControlled && !replayMode) {
 					keysCheck();
 				} else if(boyfriend.animation.curAnim != null && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration && boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.animation.curAnim.name.endsWith('miss')) {
 					boyfriend.dance();
@@ -1825,6 +2467,12 @@ class PlayState extends MusicBeatState
 					if(startedCountdown)
 					{
 						var fakeCrochet:Float = (60 / SONG.bpm) * 1000;
+						var songPos:Float = Conductor.songPosition;
+						// 自动游玩命中提前量：实测本帧音频前进量的一半（帧轮询下偏差最小），
+						// 上限 20ms×倍速，防止卡顿帧后提前量过大导致提前命中掉出 Sick 窗口（45ms）
+						var songDelta:Float = songPos - lastBotSongPos;
+						lastBotSongPos = songPos;
+						var botAdvance:Float = Math.min(Math.max(songDelta, 1000 / FlxG.drawFramerate) * 0.5, 20 * playbackRate);
 						notes.forEachAlive(function(daNote:Note)
 						{
 							var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
@@ -1835,18 +2483,39 @@ class PlayState extends MusicBeatState
 
 							if(daNote.mustPress)
 							{
-								if(cpuControlled && !daNote.blockHit && daNote.canBeHit && (daNote.isSustainNote || daNote.strumTime <= Conductor.songPosition))
-									goodNoteHit(daNote);
+								if(!rewinding && (cpuControlled || replayMode) && !daNote.blockHit && !daNote.wasGoodHit)
+								{
+									var shouldHit:Bool = false;
+									if (replayMode)
+									{
+										// 回放：只命中录制时打中的音符（按谱面序号精确匹配），
+										// 未记录的箭头自然滑过并触发 miss，与原局表现一致
+										if (replayHitSeqs != null && daNote.chartSeq >= 0 && replayHitSeqs.exists(daNote.chartSeq)
+											&& !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
+											shouldHit = true;
+									}
+									else if ((botplayPlan != null && !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
+										|| (botplayPlan == null && daNote.canBeHit && (daNote.isSustainNote || songPos + botAdvance >= daNote.strumTime)))
+										shouldHit = true;
+
+									if (shouldHit)
+									{
+										// 本帧命中的音符先收集，forEachAlive 结束后统一批处理
+										// （堆叠命中时合并音效/粒子/动画/评分等副作用，避免单帧爆发卡顿）
+										botHitQueue.push(daNote);
+									}
+								}
 							}
-							else if (daNote.wasGoodHit && !daNote.hitByOpponent && !daNote.ignoreNote)
+							else if (!rewinding && daNote.wasGoodHit && !daNote.hitByOpponent && !daNote.ignoreNote)
 								opponentNoteHit(daNote);
 
 							if(daNote.isSustainNote && strum.sustainReduce) daNote.clipToStrumNote(strum);
 
 							// Kill extremely late notes and cause misses
-							if (Conductor.songPosition - daNote.strumTime > noteKillOffset)
+							if (!rewinding && songPos - daNote.strumTime > noteKillOffset)
 							{
-								if (daNote.mustPress && !cpuControlled &&!daNote.ignoreNote && !endingSong && (daNote.tooLate || !daNote.wasGoodHit))
+								if (daNote.mustPress && !cpuControlled &&!daNote.ignoreNote && !endingSong && (daNote.tooLate || !daNote.wasGoodHit)
+								&& (ClientPrefs.data.noteJudgment != 'KE 判定' || !daNote.isSustainNote))
 									noteMiss(daNote);
 
 								daNote.active = false;
@@ -1865,6 +2534,17 @@ class PlayState extends MusicBeatState
 							daNote.canBeHit = false;
 							daNote.wasGoodHit = false;
 						});
+					}
+					processBotHits();
+				}
+
+				// 回放：按录制时间触发空按（无对应音符的按键），与原局按键时机一致
+				if (replayMode && !rewinding && !paused && !endingSong && startedCountdown)
+				{
+					while (replayPressPtr < replayPressMisses.length && Conductor.songPosition >= replayPressMisses[replayPressPtr].t)
+					{
+						var pm:ReplayEvent = replayPressMisses[replayPressPtr++];
+						noteMissPress(pm.d);
 					}
 				}
 			}
@@ -1992,6 +2672,7 @@ class PlayState extends MusicBeatState
 	}
 
 	public function checkEventNote() {
+		if (rewinding) return; // 回溯中不触发谱面事件
 		while(eventNotes.length > 0) {
 			var leStrumTime:Float = eventNotes[0].strumTime;
 			if(Conductor.songPosition < leStrumTime) {
@@ -2356,7 +3037,7 @@ class PlayState extends MusicBeatState
 		#if ACHIEVEMENTS_ALLOWED
 		if(achievementObj != null)
 			return false;
-		else
+		else if(!replayMode)
 		{
 			var noMissWeek:String = WeekData.getWeekFileName() + '_nomiss';
 			var achieve:String = checkForAchievement([noMissWeek, 'r_ubad', 'ur_good', 'hype', 'two_keys', 'toastie', 'debugger']);
@@ -2370,12 +3051,20 @@ class PlayState extends MusicBeatState
 		var ret:Dynamic = callOnScripts('onEndSong', null, true);
 		if(ret != FunkinLua.Function_Stop && !transitioning)
 		{
-			#if !switch
-			var percent:Float = ratingPercent;
-			if(Math.isNaN(percent)) percent = 0;
-			Highscore.saveScore(SONG.song, songScore, storyDifficulty, percent);
-			#end
 			playbackRate = 1;
+
+			// 本局完成：保存回放文件（自动游玩/回放/编谱不录制）
+			var replayForResults:Replay = null;
+			if (recordingReplay && currentReplay != null && !usedAutoplay)
+			{
+				currentReplay.fingerprint = Replay.chartFingerprint(SONG);
+				currentReplay.score = songScore;
+				currentReplay.misses = songMisses;
+				currentReplay.percent = Math.isNaN(ratingPercent) ? 0 : ratingPercent;
+				currentReplay.save();
+				replayForResults = currentReplay;
+				recordingReplay = false;
+			}
 
 			if (chartingMode)
 			{
@@ -2383,72 +3072,132 @@ class PlayState extends MusicBeatState
 				return false;
 			}
 
-			if (isStoryMode)
+			// 无限轮回：曲目完成后不进入结算，时间回溯后重新开始（不保存分数）
+			if (ClientPrefs.getGameplaySetting('infiniteloop', false))
 			{
-				campaignScore += songScore;
-				campaignMisses += songMisses;
+				restartSongWithoutReload(true);
+				return false;
+			}
 
-				storyPlaylist.remove(storyPlaylist[0]);
+			#if !switch
+			var percent:Float = ratingPercent;
+			if(Math.isNaN(percent)) percent = 0;
+			if(!usedAutoplay && !usedGodMode)
+				Highscore.saveScore(SONG.song, songScore, storyDifficulty, percent);
+			#end
 
-				if (storyPlaylist.length <= 0)
+			persistentUpdate = false;
+			var resultsSubState:ResultsSubState = new ResultsSubState(replayForResults != null);
+			resultsSubState.closeCallback = function() {
+				persistentUpdate = true;
+				if (resultsSubState.resultAction == 'retry')
 				{
-					Mods.loadTopMod();
-					FlxG.sound.playMusic(Paths.music('freakyMenu'));
-					#if desktop DiscordClient.resetClientID(); #end
-
-					cancelMusicFadeTween();
-					if(FlxTransitionableState.skipNextTransIn) {
-						CustomFadeTransition.nextCamera = null;
+					if (ClientPrefs.data.restartNoChartReload)
+						restartSongWithoutReload();
+					else
+					{
+						FlxTransitionableState.skipNextTransIn = true;
+						FlxTransitionableState.skipNextTransOut = true;
+						MusicBeatState.resetState();
 					}
-					MusicBeatState.switchState(new StoryMenuState());
-
-					// if ()
-					if(!ClientPrefs.getGameplaySetting('practice') && !ClientPrefs.getGameplaySetting('botplay')) {
-						StoryMenuState.weekCompleted.set(WeekData.weeksList[storyWeek], true);
-						Highscore.saveWeekScore(WeekData.getWeekFileName(), campaignScore, storyDifficulty);
-
-						FlxG.save.data.weekCompleted = StoryMenuState.weekCompleted;
-						FlxG.save.flush();
+				}
+				else if (resultsSubState.resultAction == 'replay')
+				{
+					if (replayForResults != null)
+					{
+						// 回放本局：原地重开并进入回放模式
+						PlayState.queuedReplay = replayForResults;
+						FlxTransitionableState.skipNextTransIn = true;
+						FlxTransitionableState.skipNextTransOut = true;
+						MusicBeatState.resetState();
+						return;
 					}
-					changedDifficulty = false;
+					proceedAfterEndSong();
 				}
 				else
 				{
-					var difficulty:String = Difficulty.getFilePath();
-
-					trace('LOADING NEXT SONG');
-					trace(Paths.formatToSongPath(PlayState.storyPlaylist[0]) + difficulty);
-
-					FlxTransitionableState.skipNextTransIn = true;
-					FlxTransitionableState.skipNextTransOut = true;
-					prevCamFollow = camFollow;
-
-					PlayState.SONG = Song.loadFromJson(PlayState.storyPlaylist[0] + difficulty, PlayState.storyPlaylist[0]);
-					FlxG.sound.music.stop();
-
-					cancelMusicFadeTween();
-					LoadingState.loadAndSwitchState(new PlayState());
+					proceedAfterEndSong();
 				}
-			}
-			else
+			};
+			openSubState(resultsSubState);
+			return false;
+		}
+		return true;
+	}
+
+	function proceedAfterEndSong():Void
+	{
+		if (transitioning) return;
+		transitioning = true;
+
+		if (isStoryMode)
+		{
+			campaignScore += songScore;
+			campaignMisses += songMisses;
+
+			storyPlaylist.remove(storyPlaylist[0]);
+
+			if (storyPlaylist.length <= 0)
 			{
-				trace('WENT BACK TO FREEPLAY??');
 				Mods.loadTopMod();
+				FlxG.sound.playMusic(Paths.music('freakyMenu'));
 				#if desktop DiscordClient.resetClientID(); #end
 
 				cancelMusicFadeTween();
 				if(FlxTransitionableState.skipNextTransIn) {
 					CustomFadeTransition.nextCamera = null;
 				}
-				MusicBeatState.switchState(new FreeplayState());
-				FlxG.sound.playMusic(Paths.music('freakyMenu'));
+				MusicBeatState.switchState(new StoryMenuState());
+
+				// if ()
+				if(!usedAutoplay && !usedGodMode) {
+					StoryMenuState.weekCompleted.set(WeekData.weeksList[storyWeek], true);
+					Highscore.saveWeekScore(WeekData.getWeekFileName(), campaignScore, storyDifficulty);
+
+					FlxG.save.data.weekCompleted = StoryMenuState.weekCompleted;
+					FlxG.save.flush();
+				}
 				changedDifficulty = false;
 			}
-			transitioning = true;
-		}
-		return true;
-	}
+			else
+			{
+				var difficulty:String = Difficulty.getFilePath();
+				var nextSong:String = Paths.formatToSongPath(PlayState.storyPlaylist[0]);
 
+				trace('LOADING NEXT SONG');
+				trace(nextSong + difficulty);
+
+				FlxTransitionableState.skipNextTransIn = true;
+				FlxTransitionableState.skipNextTransOut = true;
+				prevCamFollow = camFollow;
+
+				if (!LoadingState.loadSongAndSwitchState(new PlayState(), nextSong, nextSong + difficulty, nextSong, true, new StoryMenuState()))
+				{
+					Mods.loadTopMod();
+					MusicBeatState.switchState(new StoryMenuState());
+					return;
+				}
+
+				FlxG.sound.music.stop();
+
+				cancelMusicFadeTween();
+			}
+		}
+		else
+		{
+			trace('WENT BACK TO FREEPLAY??');
+			Mods.loadTopMod();
+			#if desktop DiscordClient.resetClientID(); #end
+
+			cancelMusicFadeTween();
+			if(FlxTransitionableState.skipNextTransIn) {
+				CustomFadeTransition.nextCamera = null;
+			}
+			MusicBeatState.switchState(new FreeplayState());
+			FlxG.sound.playMusic(Paths.music('freakyMenu'));
+			changedDifficulty = false;
+		}
+	}
 	#if ACHIEVEMENTS_ALLOWED
 	var achievementObj:AchievementPopup = null;
 	function startAchievement(achieve:String) {
@@ -2467,6 +3216,7 @@ class PlayState extends MusicBeatState
 	#end
 
 	public function KillNotes() {
+		botHitQueue.resize(0); // 丢弃待批处理的命中，避免引用已销毁音符
 		while(notes.length > 0) {
 			var daNote:Note = notes.members[0];
 			daNote.active = false;
@@ -2480,7 +3230,285 @@ class PlayState extends MusicBeatState
 		eventNotes = [];
 	}
 
+	// 快速重开：不重新加载谱面、不重建整个状态，直接在当前状态上重置并从头开始本曲
+	public function restartSongWithoutReload(?forceRewind:Bool = false):Void
+	{
+		if (rewinding) return; // 回溯中禁止重复重开
+
+		// 取消进行中的计时器与补间
+		if (startTimer != null) { startTimer.cancel(); startTimer = null; }
+		if (finishTimer != null) { finishTimer.cancel(); finishTimer = null; }
+		if (songSpeedTween != null) { songSpeedTween.cancel(); songSpeedTween = null; }
+		if (cameraTwn != null) { cameraTwn.cancel(); cameraTwn = null; }
+
+		// 清掉残留的倒计时贴图
+		if (countdownReady != null) { remove(countdownReady); countdownReady.destroy(); countdownReady = null; }
+		if (countdownSet != null) { remove(countdownSet); countdownSet.destroy(); countdownSet = null; }
+		if (countdownGo != null) { remove(countdownGo); countdownGo.destroy(); countdownGo = null; }
+
+		// 停止音频（音符/谱面数据保留在内存中）
+		if (FlxG.sound.music != null) FlxG.sound.music.stop();
+		if (vocals != null) vocals.stop();
+
+		// 重置本局数据
+		health = 1;
+		smoothHealth = 1;
+		songScore = 0;
+		songHits = 0;
+		songMisses = 0;
+		totalPlayed = 0;
+		totalNotesHit = 0;
+		combo = 0;
+		songPercent = 0;
+		usedAutoplay = cpuControlled || replayMode;
+		usedGodMode = practiceMode;
+		for (rating in ratingsData) rating.hits = 0;
+		ratingName = '?';
+		ratingPercent = 0;
+		ratingFC = '';
+		keysPressed = [];
+		strumsBlocked = [];
+		boyfriendIdleTime = 0;
+		boyfriendIdled = false;
+
+		// 重开：录制从头开始（回放数据保持，空按游标复位）
+		replayPressPtr = 0;
+		if (recordingReplay && !replayMode)
+			currentReplay = new Replay(SONG.song, Difficulty.getString(storyDifficulty));
+
+		// 快速重开回溯：屏幕上的箭头像时间倒流一样飞回起点，再重新开始
+		if ((ClientPrefs.data.rewindOnRestart || forceRewind) && Conductor.songPosition > rewindMinPosition)
+		{
+			trace('[Rewind] START from ' + Conductor.songPosition + 'ms, pref=' + ClientPrefs.data.rewindOnRestart);
+			rewinding = true;
+			rewindFromPos = Conductor.songPosition;
+			rewindElapsed = 0;
+			canPause = false;
+			canReset = false;
+			keepStrumsOnRestart = true; // 判定线全程在场，回溯结束后不重新绘制
+
+			// 回溯视觉：把整张谱面的箭头全部重新生成并“复活”，
+			// 随着 songPosition 倒流，这些箭头（包括已经打过的）会像录像倒带一样飞回去
+			KillNotes();
+			generateChartNotes(false);
+			while (unspawnNotes.length > 0)
+			{
+				var rewindNote:Note = unspawnNotes[0];
+				unspawnNotes.shift();
+				rewindNote.spawned = true;
+				rewindNote.visible = true;
+				rewindNote.active = true;
+				rewindNote.canBeHit = false;
+				rewindNote.wasGoodHit = false;
+				rewindNote.tooLate = false;
+				rewindNote.ignoreNote = false;
+				rewindNote.alpha = 1;
+				notes.insert(0, rewindNote);
+			}
+
+			// 回溯终点：最早音符飞出“出生窗口”的位置（保证场上清空），不低于 -rewindOvershoot
+			rewindEndPos = -rewindOvershoot;
+			var earliestStrum:Float = 99999999;
+			for (rewindNote in notes.members)
+				if (rewindNote != null && rewindNote.strumTime < earliestStrum)
+					earliestStrum = rewindNote.strumTime;
+			if (earliestStrum < 99999999)
+			{
+				var endWindow:Float = spawnTime * playbackRate;
+				if (songSpeed < 1) endWindow /= songSpeed;
+				rewindEndPos = earliestStrum - endWindow - 50;
+				if (rewindEndPos < -rewindOvershoot) rewindEndPos = -rewindOvershoot;
+			}
+			// 回溯时长按距离自动计算：距离越远回溯越久
+			rewindDuration = FlxMath.bound((rewindFromPos - rewindEndPos) / rewindSpeedMs, rewindMinDuration, rewindMaxDuration);
+			return; // update() 中的回溯逻辑会驱动倒流，结束后调用 finishRestart()
+		}
+		trace('[Rewind] SKIP (pref=' + ClientPrefs.data.rewindOnRestart + ', pos=' + Conductor.songPosition + ')');
+		finishRestart();
+	}
+
+	private function finishRestart():Void
+	{
+		// 清空旧的音符、事件与判定条
+		KillNotes();
+		if (keepStrumsOnRestart)
+		{
+			// 回溯重开：判定线箭头全程在场，直接复位为静态，不重新绘制
+			for (strum in strumLineNotes.members)
+				if (strum != null) strum.playAnim('static', true);
+		}
+		else
+		{
+			while (strumLineNotes.length > 0)
+			{
+				var strum:StrumNote = strumLineNotes.members[0];
+				strumLineNotes.remove(strum, true);
+				strum.destroy();
+			}
+			playerStrums.clear();
+			opponentStrums.clear();
+		}
+
+		// 重置流程标志
+		startingSong = true;
+		startedCountdown = false;
+		endingSong = false;
+		canPause = true;
+		canReset = true;
+		inCutscene = false;
+		skipCountdown = false;
+		skipArrowStartTween = false;
+		generatedMusic = false;
+		updateTime = (ClientPrefs.data.timeBarType != '禁用');
+		startOnTime = 0;
+		Conductor.songPosition = 0;
+		Conductor.mapBPMChanges(SONG);
+		Conductor.bpm = SONG.bpm;
+
+		// 回溯/重开完成后，时间条与时间文字立即归零，避免残留回溯结束瞬间的旧进度
+		songPercent = 0;
+		if (timeTxt != null && ClientPrefs.data.timeBarType != '歌曲名称')
+		{
+			var restartSeconds:Int = 0;
+			if (ClientPrefs.data.timeBarType == '剩余时间')
+				restartSeconds = Std.int(Math.max(0, songLength) / 1000);
+			timeTxt.text = FlxStringUtil.formatTime(restartSeconds, false);
+		}
+
+		// 重置拍点/步点缓存，避免重开后 beatHit 被旧值跳过（角色因此不动）
+		lastStepHit = -1;
+		lastBeatHit = -1;
+		resetBPMChangeCache();
+
+		// 时间条重新渐入
+		timeBar.visible = updateTime;
+		timeTxt.visible = updateTime;
+		timeBar.alpha = 0;
+		timeTxt.alpha = 0;
+
+		// 根据内存中的谱面重新生成音符（不重新读盘）
+		generateChartNotes(false);
+
+		// 重新加载谱面默认角色（参照不开启快速重开时的完整重开逻辑）
+		reloadDefaultCharacters();
+
+		// 角色回到待机
+		if (boyfriend != null) { boyfriend.specialAnim = false; boyfriend.stunned = false; boyfriend.holdTimer = 0; boyfriend.dance(); }
+		if (dad != null) { dad.specialAnim = false; dad.stunned = false; dad.holdTimer = 0; dad.dance(); }
+		if (gf != null) { gf.specialAnim = false; gf.stunned = false; gf.holdTimer = 0; gf.dance(); }
+
+		// 相机复位
+		camZooming = false;
+		FlxG.camera.zoom = defaultCamZoom;
+		camHUD.zoom = 1;
+		moveCameraSection(0);
+
+		RecalculateRating();
+		#if desktop
+		resetRPC();
+		#end
+
+		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong;
+		startCountdown();
+	}
+
+	// 快速重开：参照完整重开（resetState → create）重新加载默认角色
+	private function reloadDefaultCharacters():Void
+	{
+		// 销毁旧角色实例并清空缓存（角色脚本通过 PlayState 动态访问角色，不受影响）
+		destroyAllCharacters();
+
+		// 重新创建默认角色（与 create() 逻辑一致：全新对象、正确位置与状态）
+		var stageData:StageFile = StageData.getStageFile(curStage);
+		if (stageData == null) stageData = StageData.dummy();
+		if (!stageData.hide_girlfriend)
+		{
+			if (SONG.gfVersion == null || SONG.gfVersion.length < 1) SONG.gfVersion = 'gf';
+			gf = new Character(0, 0, SONG.gfVersion);
+			startCharacterPos(gf);
+			gf.scrollFactor.set(0.95, 0.95);
+			gfGroup.add(gf);
+			gfMap.set(SONG.gfVersion, gf);
+			startCharacterScripts(gf.curCharacter);
+		}
+
+		dad = new Character(0, 0, SONG.player2);
+		startCharacterPos(dad, true);
+		dadGroup.add(dad);
+		dadMap.set(SONG.player2, dad);
+		startCharacterScripts(dad.curCharacter);
+
+		boyfriend = new Character(0, 0, SONG.player1, true);
+		startCharacterPos(boyfriend);
+		boyfriendGroup.add(boyfriend);
+		boyfriendMap.set(SONG.player1, boyfriend);
+		startCharacterScripts(boyfriend.curCharacter);
+
+		if (dad.curCharacter.startsWith('gf'))
+		{
+			dad.setPosition(GF_X, GF_Y);
+			if (gf != null) gf.visible = false;
+		}
+
+		// 重新预加载 Event 会切换到的角色（与完整重开的 eventPushed 预加载一致）
+		if (cachedEventNotes != null)
+		{
+			for (event in cachedEventNotes)
+			{
+				if (event.event != 'Change Character' || event.value1 == null) continue;
+				var charType:Int = 0;
+				switch(event.value1.toLowerCase().trim())
+				{
+					case 'gf' | 'girlfriend': charType = 2;
+					case 'dad' | 'opponent': charType = 1;
+					default:
+						charType = Std.parseInt(event.value1);
+						if (Math.isNaN(charType)) charType = 0;
+				}
+				addCharacterToList(event.value2, charType);
+			}
+		}
+
+		iconP1.changeIcon(boyfriend.healthIcon);
+		iconP2.changeIcon(dad.healthIcon);
+		setOnScripts('boyfriendName', boyfriend.curCharacter);
+		setOnScripts('dadName', dad.curCharacter);
+		if (gf != null) setOnScripts('gfName', gf.curCharacter);
+		reloadHealthBarColors();
+	}
+
+	private function destroyAllCharacters():Void
+	{
+		for (group in [boyfriendGroup, dadGroup, gfGroup])
+		{
+			if (group == null) continue;
+			for (member in group.members.copy())
+			{
+				if (member == null || !Std.isOfType(member, Character)) continue;
+				group.remove(member, true);
+				cast(member, Character).destroy();
+			}
+		}
+		boyfriendMap.clear();
+		dadMap.clear();
+		gfMap.clear();
+	}
+
+	// 快速重开回溯：当前是否处于时间倒流阶段
+	public var rewinding:Bool = false;
+	public var keepStrumsOnRestart:Bool = false; // 回溯重开后保留现有判定线，不重新绘制
+	public var rewindFromPos:Float = 0;
+	public var rewindElapsed:Float = 0;
+	public var rewindDuration:Float = 1.0;   // 回溯动画时长（秒），重开时按回溯距离自动计算
+	public var rewindMinPosition:Float = 1000; // 歌曲位置低于该毫秒数时不回溯，直接重开
+	public var rewindOvershoot:Float = 5000;   // 回溯终点下探上限：最远回溯到 -5000 毫秒（安全兜底）
+	public var rewindEndPos:Float = 0;         // 回溯终点（毫秒），由最早音符飞出“出生窗口”的位置自动计算
+	public var rewindSpeedMs:Float = 6000;     // 回溯平均速度（毫秒歌曲时间/秒），越小越慢、越有倒带感
+	public var rewindMinDuration:Float = 1.5;  // 回溯时长下限（秒）
+	public var rewindMaxDuration:Float = 9.0;  // 回溯时长上限（秒）
+
 	public var totalPlayed:Int = 0;
+	public var totalNotes:Int = 0;
 	public var totalNotesHit:Float = 0.0;
 
 	public var showCombo:Bool = false;
@@ -2510,6 +3538,21 @@ class PlayState extends MusicBeatState
 			Paths.image(uiPrefix + 'num' + i + uiSuffix);
 	}
 
+	// KE 判定评级（Kade Engine）：45/90/135ms 窗口，提前/晚到分开判断，随安全帧缩放
+	private function judgeRatingKE(note:Note):Rating
+	{
+		var signedDiff:Float = note.strumTime - Conductor.songPosition;
+		var timeScale:Float = Conductor.safeZoneOffset / 166;
+
+		if (signedDiff > 135 * timeScale) return ratingsData[3]; // way early
+		if (signedDiff > 90 * timeScale) return ratingsData[2]; // early
+		if (signedDiff > 45 * timeScale) return ratingsData[1]; // kinda there
+		if (signedDiff < -45 * timeScale) return ratingsData[1]; // little late
+		if (signedDiff < -90 * timeScale) return ratingsData[2]; // late
+		if (signedDiff < -135 * timeScale) return ratingsData[3]; // late as fuck
+		return ratingsData[0]; // sick
+	}
+
 	private function popUpScore(note:Note = null):Void
 	{
 		var noteDiff:Float = Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
@@ -2520,7 +3563,16 @@ class PlayState extends MusicBeatState
 		var score:Int = 350;
 
 		//tryna do MS based judgment due to popular demand
-		var daRating:Rating = Conductor.judgeNote(ratingsData, noteDiff / playbackRate);
+		var daRating:Rating = null;
+		if (replayMode && replayRatingSeqs != null && note.chartSeq >= 0 && replayRatingSeqs.exists(note.chartSeq))
+		{
+			// 回放：评分直接取录制时本局的真实判定，完整复刻原局准确率
+			var replayRating:String = replayRatingSeqs.get(note.chartSeq);
+			for (r in ratingsData)
+				if (r.name == replayRating) { daRating = r; break; }
+		}
+		if (daRating == null)
+			daRating = (ClientPrefs.data.noteJudgment == 'KE 判定') ? judgeRatingKE(note) : Conductor.judgeNote(ratingsData, noteDiff / playbackRate);
 
 		totalNotesHit += daRating.ratingMod;
 		note.ratingMod = daRating.ratingMod;
@@ -2528,10 +3580,13 @@ class PlayState extends MusicBeatState
 		note.rating = daRating.name;
 		score = daRating.score;
 
-		if(daRating.noteSplash && !note.noteSplashData.disabled)
+		if(daRating.noteSplash && !note.noteSplashData.disabled && !(cpuControlled && botHitBatch && botBatchSplashDone[note.noteData]))
+		{
 			spawnNoteSplashOnNote(note);
+			if (cpuControlled && botHitBatch) botBatchSplashDone[note.noteData] = true;
+		}
 
-		if(!practiceMode && !cpuControlled) {
+		if(!practiceMode) {
 			songScore += score;
 			if(!note.ratingDisabled)
 			{
@@ -2539,6 +3594,13 @@ class PlayState extends MusicBeatState
 				totalPlayed++;
 				RecalculateRating(false);
 			}
+		}
+
+		// 自动游玩批处理：堆叠命中只显示一次评分（其余仅计分），避免一帧内创建大量评分/连击精灵
+		if (cpuControlled && botHitBatch)
+		{
+			if (botBatchScoreShown) return;
+			botBatchScoreShown = true;
 		}
 
 		var uiPrefix:String = "";
@@ -2602,12 +3664,16 @@ class PlayState extends MusicBeatState
 
 		var seperatedScore:Array<Int> = [];
 
-		if(combo >= 1000) {
-			seperatedScore.push(Math.floor(combo / 1000) % 10);
+		// 任意位数分解：原逻辑千位封顶，连击超过 9999 会显示错乱（10000 显示成 0000）
+		var tempCombo:Int = combo;
+		while (tempCombo > 0)
+		{
+			seperatedScore.push(tempCombo % 10);
+			tempCombo = Std.int(tempCombo / 10);
 		}
-		seperatedScore.push(Math.floor(combo / 100) % 10);
-		seperatedScore.push(Math.floor(combo / 10) % 10);
-		seperatedScore.push(combo % 10);
+		if (seperatedScore.length == 0) seperatedScore.push(0);
+		while (seperatedScore.length < 3) seperatedScore.push(0); // 不足 3 位补零，保持原布局
+		seperatedScore.reverse();
 
 		var daLoop:Int = 0;
 		var xThing:Float = 0;
@@ -2689,8 +3755,10 @@ class PlayState extends MusicBeatState
 
 	private function keyPressed(key:Int)
 	{
-		if (!cpuControlled && startedCountdown && !paused && key > -1)
+		if (!cpuControlled && !replayMode && startedCountdown && !paused && !rewinding && key > -1)
 		{
+			var mashPenalty:Bool = false;
+
 			if(notes.length > 0 && !boyfriend.stunned && generatedMusic && !endingSong)
 			{
 				//more accurate hit time for the ratings?
@@ -2699,59 +3767,117 @@ class PlayState extends MusicBeatState
 
 				var canMiss:Bool = !ClientPrefs.data.ghostTapping;
 
-				// heavily based on my own code LOL if it aint broke dont fix it
-				var pressNotes:Array<Note> = [];
-				var notesStopped:Bool = false;
-				var sortedNotesList:Array<Note> = [];
-				notes.forEachAlive(function(daNote:Note)
+				// KE 判定：防乱按（Kade Engine 规则）——按下按键数超过可命中音符数时直接扣分
+				if (ClientPrefs.data.noteJudgment == 'KE 判定')
 				{
-					if (strumsBlocked[daNote.noteData] != true && daNote.canBeHit && daNote.mustPress &&
-						!daNote.tooLate && !daNote.wasGoodHit && !daNote.isSustainNote && !daNote.blockHit)
+					var hasHittable:Bool = false;
+					notes.forEachAlive(function(daNote:Note)
 					{
-						if(daNote.noteData == key) sortedNotesList.push(daNote);
-						canMiss = true;
-					}
-				});
-				sortedNotesList.sort(sortHitNotes);
+						if (daNote.noteData == key && daNote.canBeHit && daNote.mustPress && !daNote.tooLate &&
+							!daNote.wasGoodHit && !daNote.isSustainNote && !daNote.blockHit)
+							hasHittable = true;
+					});
 
-				if (sortedNotesList.length > 0) {
-					for (epicNote in sortedNotesList)
+					if (hasHittable)
 					{
-						for (doubleNote in pressNotes) {
-							if (Math.abs(doubleNote.strumTime - epicNote.strumTime) < 1) {
-								doubleNote.kill();
-								notes.remove(doubleNote, true);
-								doubleNote.destroy();
-							} else
-								notesStopped = true;
-						}
+						var hittableCount:Int = 0;
+						notes.forEachAlive(function(daNote:Note)
+						{
+							if (daNote.canBeHit && daNote.mustPress && !daNote.tooLate)
+								hittableCount++;
+						});
 
-						// eee jack detection before was not super good
-						if (!notesStopped) {
-							goodNoteHit(epicNote);
-							pressNotes.push(epicNote);
-						}
+						var pressedCount:Int = 0;
+						for (i in 0...keysArray.length)
+							if (strumsBlocked[i] != true && controls.pressed(keysArray[i]))
+								pressedCount++;
 
+						// 只有一个音符时可多容忍一个按键，其余情况不能超过可命中音符数
+						var allowedPresses:Int = (hittableCount == 1) ? hittableCount + 1 : hittableCount;
+						if (pressedCount > allowedPresses)
+						{
+							mashPenalty = true;
+							if (!practiceMode) songScore -= 25;
+							FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
+							playerStrums.forEach(function(spr:StrumNote)
+							{
+								if (spr != null && spr.animation.curAnim.name != 'static')
+								{
+									spr.playAnim('static');
+									spr.resetAnim = 0;
+								}
+							});
+						}
 					}
 				}
-				else {
-					callOnScripts('onGhostTap', [key]);
-					if (canMiss && !boyfriend.stunned) noteMissPress(key);
+
+				if (!mashPenalty)
+				{
+					// heavily based on my own code LOL if it aint broke dont fix it
+					var pressNotes:Array<Note> = [];
+					var notesStopped:Bool = false;
+					var sortedNotesList:Array<Note> = [];
+					notes.forEachAlive(function(daNote:Note)
+					{
+						if (strumsBlocked[daNote.noteData] != true && daNote.canBeHit && daNote.mustPress &&
+							!daNote.tooLate && !daNote.wasGoodHit && !daNote.isSustainNote && !daNote.blockHit)
+						{
+							if(daNote.noteData == key) sortedNotesList.push(daNote);
+							canMiss = true;
+						}
+					});
+					sortedNotesList.sort(sortHitNotes);
+
+					if (sortedNotesList.length > 0) {
+						for (epicNote in sortedNotesList)
+						{
+							for (doubleNote in pressNotes) {
+								if (Math.abs(doubleNote.strumTime - epicNote.strumTime) < 1) {
+									doubleNote.kill();
+									notes.remove(doubleNote, true);
+									doubleNote.destroy();
+								} else
+									notesStopped = true;
+							}
+
+							// eee jack detection before was not super good
+							if (!notesStopped) {
+								goodNoteHit(epicNote);
+								pressNotes.push(epicNote);
+							}
+
+						}
+					}
+					else {
+						callOnScripts('onGhostTap', [key]);
+						if (canMiss && !boyfriend.stunned)
+						{
+							// 回放录制：记录这次会真正触发 Miss 的空按（幽灵点击开启且非 KE 时不记）
+							if (recordingReplay && currentReplay != null
+								&& (ClientPrefs.data.noteJudgment == 'KE 判定' || !ClientPrefs.data.ghostTapping))
+								recordReplayEvent(-1, Conductor.songPosition, key, 'mp');
+							// KE 判定防乱按：旁边有可命中音符时，按到没有音符的列也强制 Miss（等同关闭幽灵点击）
+							if (ClientPrefs.data.noteJudgment == 'KE 判定')
+								noteMissPress(key, true);
+							else
+								noteMissPress(key);
+						}
+					}
+
+					// I dunno what you need this for but here you go
+					//									- Shubs
+
+					// Shubs, this is for the "Just the Two of Us" achievement lol
+					//									- Shadow Mario
+					if(!keysPressed.contains(key)) keysPressed.push(key);
 				}
-
-				// I dunno what you need this for but here you go
-				//									- Shubs
-
-				// Shubs, this is for the "Just the Two of Us" achievement lol
-				//									- Shadow Mario
-				if(!keysPressed.contains(key)) keysPressed.push(key);
 
 				//more accurate hit time for the ratings? part 2 (Now that the calculations are done, go back to the time it was before for not causing a note stutter)
 				Conductor.songPosition = lastTime;
 			}
 
 			var spr:StrumNote = playerStrums.members[key];
-			if(strumsBlocked[key] != true && spr != null && spr.animation.curAnim.name != 'confirm')
+			if(strumsBlocked[key] != true && spr != null && !mashPenalty && spr.animation.curAnim.name != 'confirm')
 			{
 				spr.playAnim('pressed');
 				spr.resetAnim = 0;
@@ -2781,7 +3907,7 @@ class PlayState extends MusicBeatState
 
 	private function keyReleased(key:Int)
 	{
-		if(!cpuControlled && startedCountdown && !paused)
+		if(!cpuControlled && !replayMode && startedCountdown && !paused)
 		{
 			var spr:StrumNote = playerStrums.members[key];
 			if(spr != null)
@@ -2838,7 +3964,19 @@ class PlayState extends MusicBeatState
 					// hold note functions
 					if (strumsBlocked[daNote.noteData] != true && daNote.isSustainNote && holdArray[daNote.noteData] && daNote.canBeHit
 					&& daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit && !daNote.blockHit) {
-						goodNoteHit(daNote);
+						if (ClientPrefs.data.noteJudgment == 'KE 判定')
+						{
+							// KE 判定：长条不参与判定，按住时子段仅做视觉消除
+							daNote.wasGoodHit = true;
+							if (recordingReplay && currentReplay != null)
+								currentReplay.addEvent(daNote.chartSeq, daNote.strumTime, daNote.noteData, 'sus');
+							daNote.active = false;
+							daNote.visible = false;
+							daNote.kill();
+							notes.remove(daNote, true);
+							daNote.destroy();
+						}
+						else goodNoteHit(daNote);
 					}
 				});
 			}
@@ -2880,9 +4018,9 @@ class PlayState extends MusicBeatState
 		if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) callOnHScript('noteMiss', [daNote]);
 	}
 
-	function noteMissPress(direction:Int = 1):Void //You pressed a key when there was no notes to press for this key
+	function noteMissPress(direction:Int = 1, force:Bool = false):Void //You pressed a key when there was no notes to press for this key
 	{
-		if(ClientPrefs.data.ghostTapping) return; //fuck it
+		if(ClientPrefs.data.ghostTapping && !force) return; //fuck it
 
 		noteMissCommon(direction);
 		FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
@@ -2972,10 +4110,50 @@ class PlayState extends MusicBeatState
 
 		if (!note.isSustainNote)
 		{
+			// 对方推条：开启后对手命中箭头会像玩家一样加血（推条向对方侧移动），但最低保留一点血量，不会被推死
+			if (ClientPrefs.getGameplaySetting('opponentpush') == true)
+				health -= Math.min(note.hitHealth * healthLoss, Math.max(0, health - 0.01));
 			note.kill();
 			notes.remove(note, true);
 			note.destroy();
 		}
+	}
+
+	// 自动游玩批处理：统一命中本帧收集的音符，堆叠时合并副作用
+	function recordReplayEvent(seq:Int, t:Float, d:Int, r:String):Void
+	{
+		if (recordingReplay && currentReplay != null && !cpuControlled && !replayMode)
+			currentReplay.addEvent(seq, t, d, r);
+	}
+
+	function processBotHits():Void
+	{
+		if (botHitQueue.length == 0) return;
+		if (rewinding) { botHitQueue.resize(0); return; }
+		botHitBatch = true;
+		for (note in botHitQueue)
+		{
+			if (note == null || !note.alive || note.blockHit) continue;
+			if (ClientPrefs.data.noteJudgment == 'KE 判定' && note.isSustainNote)
+			{
+				// KE 判定：长条不参与判定，子段仅做视觉消除
+				note.wasGoodHit = true;
+				note.active = false;
+				note.visible = false;
+				note.kill();
+				notes.remove(note, true);
+				note.destroy();
+				continue;
+			}
+			goodNoteHit(note);
+			if (!note.wasGoodHit) note.wasGoodHit = true; // ignore/伤害音符：只消费一次，避免下帧重复收集
+		}
+		botHitBatch = false;
+		botHitQueue.resize(0);
+		botBatchAnimDone = [false, false, false, false];
+		botBatchSplashDone = [false, false, false, false];
+		botBatchHitsoundDone = false;
+		botBatchScoreShown = false;
 	}
 
 	function goodNoteHit(note:Note):Void
@@ -2985,10 +4163,19 @@ class PlayState extends MusicBeatState
 			if(cpuControlled && (note.ignoreNote || note.hitCausesMiss)) return;
 
 			note.wasGoodHit = true;
-			if (ClientPrefs.data.hitsoundVolume > 0 && !note.hitsoundDisabled)
+			// 回放录制：长条子段命中（Psych 判定按住时的子段逐个记录）
+			if (recordingReplay && !cpuControlled && currentReplay != null && note.isSustainNote)
+				currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, 'sus');
+			if (ClientPrefs.data.hitsoundVolume > 0 && !note.hitsoundDisabled && !(botHitBatch && botBatchHitsoundDone))
+			{
 				FlxG.sound.play(Paths.sound(note.hitsound), ClientPrefs.data.hitsoundVolume);
+				if (botHitBatch) botBatchHitsoundDone = true;
+			}
 
 			if(note.hitCausesMiss) {
+				// 回放录制：伤害音符的命中（回放时同样走命中→受伤流程）
+				if (recordingReplay && !cpuControlled && currentReplay != null && !note.isSustainNote)
+					currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, 'hurt');
 				noteMiss(note);
 				if(!note.noteSplashData.disabled && !note.isSustainNote)
 					spawnNoteSplashOnNote(note);
@@ -3016,12 +4203,19 @@ class PlayState extends MusicBeatState
 			if (!note.isSustainNote)
 			{
 				combo++;
-				if(combo > 9999) combo = 9999;
 				popUpScore(note);
+				// 回放录制：主音符命中（评分取本局真实判定结果）
+				if (recordingReplay && !cpuControlled && currentReplay != null)
+					currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
+				if (isPhigrosStyle && phigrosJudgeLine != null)
+					phigrosJudgeLine.flash(); // Phigros 命中反馈：判定线闪白
 			}
 			health += note.hitHealth * healthGain;
+			// Bad 及以下评分扣一点点血
+			if (!note.isSustainNote && (note.rating == 'bad' || note.rating == 'shit'))
+				health -= 0.02 * healthLoss;
 
-			if(!note.noAnimation) {
+			if(!note.noAnimation && !(botHitBatch && botBatchAnimDone[note.noteData])) {
 				var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, note.noteData)))];
 
 				var char:Character = boyfriend;
@@ -3045,14 +4239,18 @@ class PlayState extends MusicBeatState
 						}
 					}
 				}
+				if (botHitBatch) botBatchAnimDone[note.noteData] = true;
 			}
 
-			if(!cpuControlled)
+			if(!cpuControlled && !replayMode)
 			{
+				// 手动命中：strum 高亮由松键（keyReleased -> static）熄灭
 				var spr = playerStrums.members[note.noteData];
 				if(spr != null) spr.playAnim('confirm', true);
 			}
-			else strumPlayAnim(false, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / playbackRate);
+			else if (!(botHitBatch && botBatchAnimDone[note.noteData]))
+				// 自动游玩/回放：confirm 高亮带复位计时，避免判定后常亮
+				strumPlayAnim(false, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / playbackRate);
 			vocals.volume = 1;
 
 			var isSus:Bool = note.isSustainNote; //GET OUT OF MY HEAD, GET OUT OF MY HEAD, GET OUT OF MY HEAD
@@ -3116,6 +4314,11 @@ class PlayState extends MusicBeatState
 		backend.NoteTypesConfig.clearNoteTypesData();
 		instance = null;
 		super.destroy();
+
+		// 完成或退出曲目后自动清理 RAM
+		// （快速重开 restartSongWithoutReload 不销毁本 State，不受影响）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 	}
 
 	public static function cancelMusicFadeTween() {
@@ -3128,6 +4331,8 @@ class PlayState extends MusicBeatState
 	var lastStepHit:Int = -1;
 	override function stepHit()
 	{
+		if (rewinding) return; // 回溯期间不触发步点回调，避免重开音频
+
 		if(FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
 		{
 			if (Math.abs(FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)
@@ -3152,13 +4357,15 @@ class PlayState extends MusicBeatState
 
 	override function beatHit()
 	{
+		if (rewinding) return; // 回溯期间不触发拍点回调（角色/图标保持静止）
+
 		if(lastBeatHit >= curBeat) {
 			//trace('BEAT HIT: ' + curBeat + ', LAST HIT: ' + lastBeatHit);
 			return;
 		}
 
 		if (generatedMusic)
-			notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
+			notes.sort(FlxSort.byY, (ClientPrefs.data.downScroll && !isPhigrosStyle) ? FlxSort.ASCENDING : FlxSort.DESCENDING);
 
 	if(ClientPrefs.data.sbIconBop){
 		if (curBeat % gfSpeed == 0) {
@@ -3178,11 +4385,26 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-		iconP1.scale.set(1.2, 1.2);
-		iconP2.scale.set(1.2, 1.2);
+		if (ClientPrefs.data.keIconBop)
+		{
+			// KE 引擎图标跳动：每拍放大 30px（相当于 scale + 30/frameWidth），随后在 update 中按时间缩回
+			iconP1.scale.x += 30 / iconP1.frameWidth;
+			iconP1.scale.y = iconP1.scale.x;
+			iconP1.updateHitbox();
+			iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
+			iconP2.scale.x += 30 / iconP2.frameWidth;
+			iconP2.scale.y = iconP2.scale.x;
+			iconP2.updateHitbox();
+			iconP2.origin.set(0, 0);
+		}
+		else
+		{
+			iconP1.scale.set(1.2, 1.2);
+			iconP2.scale.set(1.2, 1.2);
 
-		iconP1.updateHitbox();
-		iconP2.updateHitbox();
+			iconP1.updateHitbox();
+			iconP2.updateHitbox();
+		}
 
 		if (gf != null && curBeat % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && gf.animation.curAnim != null && !gf.animation.curAnim.name.startsWith("sing") && !gf.stunned)
 			gf.dance();
@@ -3200,6 +4422,7 @@ class PlayState extends MusicBeatState
 
 	override function sectionHit()
 	{
+		if (rewinding) return; // 回溯中不移动镜头、不改 BPM
 		if (SONG.notes[curSection] != null)
 		{
 			if (generatedMusic && !endingSong && !isCameraOnForcedPos)

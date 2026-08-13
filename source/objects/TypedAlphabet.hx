@@ -1,6 +1,6 @@
 package objects;
 
-class TypedAlphabet extends Alphabet
+class TypedAlphabet extends MenuText
 {
 	public var onFinish:Void->Void = null;
 	public var finishedText:Bool = false;
@@ -8,40 +8,48 @@ class TypedAlphabet extends Alphabet
 	public var sound:String = 'dialogue';
 	public var volume:Float = 1;
 
+	private var _fullText:String = '';
+	private var _curLetter:Int = -1;
+	private var _timeToUpdate:Float = 0;
+
 	public function new(x:Float, y:Float, text:String = "", ?delay:Float = 0.05, ?bold:Bool = false)
 	{
 		super(x, y, text, bold);
 
 		this.delay = delay;
-	}
-
-	override private function set_text(newText:String)
-	{
-		super.set_text(newText);
-
+		_fullText = text == null ? '' : text;
 		resetDialogue();
-		return newText;
 	}
 
-	private var _curLetter:Int = -1;
-	private var _timeToUpdate:Float = 0;
+	public var rows(get, never):Int;
+	function get_rows():Int
+	{
+		return text.split('\n').length;
+	}
+
+	public function startText(newText:String)
+	{
+		_fullText = newText == null ? '' : newText;
+		resetDialogue();
+	}
+
 	override function update(elapsed:Float)
 	{
-		if(!finishedText)
+		if(!finishedText && _fullText.length > 0)
 		{
-			var playedSound:Bool = false;
 			_timeToUpdate += elapsed;
+			var playedSound:Bool = false;
 			while(_timeToUpdate >= delay)
 			{
-				showCharacterUpTo(_curLetter + 1);
+				_curLetter++;
+				text = _fullText.substr(0, _curLetter + 1);
 				if(!playedSound && sound != '' && (delay > 0.025 || _curLetter % 2 == 0))
 				{
 					FlxG.sound.play(Paths.sound(sound), volume);
 				}
 				playedSound = true;
 
-				_curLetter++;
-				if(_curLetter >= letters.length - 1)
+				if(_curLetter >= _fullText.length - 1)
 				{
 					finishedText = true;
 					if(onFinish != null) onFinish();
@@ -55,16 +63,16 @@ class TypedAlphabet extends Alphabet
 		super.update(elapsed);
 	}
 
-	public function showCharacterUpTo(upTo:Int)
+	public function finishText()
 	{
-		var start:Int = _curLetter;
-		if(start < 0) start = 0;
+		if(finishedText) return;
 
-		for (i in start...(upTo+1))
-		{
-			if(letters[i] != null) letters[i].visible = true;
-			//trace('test, showing: $i');
-		}
+		text = _fullText;
+		if(sound != '') FlxG.sound.play(Paths.sound(sound), volume);
+		finishedText = true;
+
+		if(onFinish != null) onFinish();
+		_timeToUpdate = 0;
 	}
 
 	public function resetDialogue()
@@ -72,21 +80,6 @@ class TypedAlphabet extends Alphabet
 		_curLetter = -1;
 		finishedText = false;
 		_timeToUpdate = 0;
-		for (letter in letters)
-		{
-			letter.visible = false;
-		}
-	}
-
-	public function finishText()
-	{
-		if(finishedText) return;
-
-		showCharacterUpTo(letters.length - 1);
-		if(sound != '') FlxG.sound.play(Paths.sound(sound), volume);
-		finishedText = true;
-		
-		if(onFinish != null) onFinish();
-		_timeToUpdate = 0;
+		text = '';
 	}
 }

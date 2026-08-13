@@ -45,8 +45,24 @@ class Paths
 		'assets/shared/music/breakfast.$SOUND_EXT',
 		'assets/shared/music/tea-time.$SOUND_EXT',
 	];
+
+	// 内存清理回调：全局清缓存时通知各模块丢弃引用了已销毁图形的缓存（如音符贴图缓存）
+	// 用函数惰性初始化，避免跨模块静态初始化顺序问题（Note.__init__ 可能先于本字段初始化执行）
+	static var memoryCleanCallbacks:Array<Void->Void> = null;
+	public static function addMemoryCleanCallback(cb:Void->Void)
+	{
+		if (memoryCleanCallbacks == null) memoryCleanCallbacks = [];
+		memoryCleanCallbacks.push(cb);
+	}
+	static function dispatchMemoryClean()
+	{
+		if (memoryCleanCallbacks == null) return;
+		for (cb in memoryCleanCallbacks)
+			cb();
+	}
+
 	/// haya I love you for the base cache dump I took to the max
-	public static function clearUnusedMemory() {
+	public static function clearUnusedMemory(?doGC:Bool = true) {
 		// clear non local assets in the tracked assets list
 		for (key in currentTrackedAssets.keys()) {
 			// if it is not currently contained within the used local assets
@@ -68,7 +84,8 @@ class Paths
 		}
 
 		// run the garbage collector for good measure lmfao
-		System.gc();
+		if (doGC) System.gc();
+		dispatchMemoryClean();
 	}
 
 	// define the locally tracked assets
@@ -98,6 +115,7 @@ class Paths
 		// flags everything to be cleared out next unused memory clear
 		localTrackedAssets = [];
 		#if !html5 openfl.Assets.cache.clear("songs"); #end
+		dispatchMemoryClean();
 	}
 
 	static public var currentLevel:String;
@@ -232,6 +250,17 @@ class Paths
 	}
 
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
+	// 后台线程预解码完成的贴图（LoadingState 并行解码人物等大图），主线程 image() 消费并转入正式缓存
+	public static var pendingBitmaps:Map<String, BitmapData> = [];
+
+	// 清空未消费的预解码贴图（防止大图残留内存）
+	public static function clearPendingBitmaps()
+	{
+		for (bmp in pendingBitmaps)
+			if (bmp != null) bmp.dispose();
+		pendingBitmaps = [];
+	}
+
 	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
 		var bitmap:BitmapData = null;
@@ -244,6 +273,11 @@ class Paths
 			localTrackedAssets.push(file);
 			return currentTrackedAssets.get(file);
 		}
+		else if (pendingBitmaps.exists(file))
+		{
+			bitmap = pendingBitmaps.get(file);
+			pendingBitmaps.remove(file);
+		}
 		else if (FileSystem.exists(file))
 			bitmap = BitmapData.fromFile(file);
 		else
@@ -254,6 +288,11 @@ class Paths
 			{
 				localTrackedAssets.push(file);
 				return currentTrackedAssets.get(file);
+			}
+			else if (pendingBitmaps.exists(file))
+			{
+				bitmap = pendingBitmaps.get(file);
+				pendingBitmaps.remove(file);
 			}
 			else if (OpenFlAssets.exists(file, IMAGE))
 				bitmap = OpenFlAssets.getBitmapData(file);

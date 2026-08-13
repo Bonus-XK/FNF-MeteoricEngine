@@ -4,6 +4,11 @@ import flixel.FlxSubState;
 
 class MusicBeatSubstate extends FlxSubState
 {
+	#if LUA_ALLOWED
+	// 界面脚本系统：该界面上运行的自定义 Lua 脚本（menus/<界面名>.lua）
+	public var uiScripts:Array<psychlua.MenuScript> = [];
+	#end
+
 	public function new()
 	{
 		super();
@@ -49,6 +54,41 @@ class MusicBeatSubstate extends FlxSubState
 		}
 
 		super.update(elapsed);
+
+		#if LUA_ALLOWED
+		for(script in uiScripts)
+			script.update(elapsed);
+		#end
+	}
+
+	// 加载界面脚本：menus/<name>.lua（可被 mod 覆盖）
+	public function loadUIscripts(name:String)
+	{
+		#if LUA_ALLOWED
+		var scriptPath:String = psychlua.MenuScript.findScriptPath(name);
+		if(scriptPath != null)
+			uiScripts.push(new psychlua.MenuScript(this, scriptPath));
+		#end
+	}
+
+	// 向界面脚本广播事件（如 onChangeSelection、onConfirm）
+	public function callUIScripts(funcName:String, ?args:Array<Dynamic> = null)
+	{
+		#if LUA_ALLOWED
+		if(args == null) args = [];
+		for(script in uiScripts)
+			script.call(funcName, args);
+		#end
+	}
+
+	override function destroy()
+	{
+		#if LUA_ALLOWED
+		for(script in uiScripts)
+			script.destroy();
+		uiScripts = [];
+		#end
+		super.destroy();
 	}
 
 	private function updateSection():Void

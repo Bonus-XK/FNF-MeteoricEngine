@@ -29,6 +29,9 @@ class NoteSplashDebugState extends MusicBeatState
 
 	override function create()
 	{
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		FlxG.camera.bgColor = FlxColor.fromHSL(0, 0, 0.5);
 		selection = new FlxSprite(0, 270).makeGraphic(150, 150, FlxColor.BLACK);
 		selection.alpha = 0.4;
@@ -60,10 +63,12 @@ class NoteSplashDebugState extends MusicBeatState
 		//
 		var txtx = 60;
 		var txty = 640;
-		var animName:FlxText = new FlxText(txtx, txty, 'Animation name:', 16);
+		var animName:FlxText = new FlxText(txtx, txty, '动画名称：', 16);
+		animName.setFormat(Paths.font('future.ttf'), 16);
 		add(animName);
 
 		nameInputText = new FlxInputText(txtx, txty + 20, 360, '', 16);
+		nameInputText.setFormat(Paths.font('future.ttf'), 16);
 		nameInputText.callback = function(text:String, action:String)
 		{
 			switch(action)
@@ -81,43 +86,49 @@ class NoteSplashDebugState extends MusicBeatState
 		};
 		add(nameInputText);
 		
-		add(new FlxText(txtx, txty - 84, 0, 'Min/Max Framerate:', 16));
+		var fpsTxt:FlxText = new FlxText(txtx, txty - 84, 0, '最小/最大帧率：', 16);
+		fpsTxt.setFormat(Paths.font('future.ttf'), 16);
+		add(fpsTxt);
 		stepperMinFps = new FlxUINumericStepper(txtx, txty - 60, 1, 22, 1, 60, 0);
+		@:privateAccess
+		stepperMinFps.text_field.setFormat(Paths.font('future.ttf'), 8);
 		stepperMinFps.name = 'min_fps';
 		add(stepperMinFps);
 
 		stepperMaxFps = new FlxUINumericStepper(txtx + 60, txty - 60, 1, 26, 1, 60, 0);
+		@:privateAccess
+		stepperMaxFps.text_field.setFormat(Paths.font('future.ttf'), 8);
 		stepperMaxFps.name = 'max_fps';
 		add(stepperMaxFps);
 
 
 		//
 		offsetsText = new FlxText(300, 150, 680, '', 16);
-		offsetsText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		offsetsText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		offsetsText.scrollFactor.set();
 		add(offsetsText);
 
 		curFrameText = new FlxText(300, 100, 680, '', 16);
-		curFrameText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		curFrameText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		curFrameText.scrollFactor.set();
 		add(curFrameText);
 
 		curAnimText = new FlxText(300, 50, 680, '', 16);
-		curAnimText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		curAnimText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		curAnimText.scrollFactor.set();
 		add(curAnimText);
 
 		var text:FlxText = new FlxText(0, 520, FlxG.width,
-			"Press SPACE to Reset animation\n
-			Press ENTER twice to save to the loaded Note Splash PNG's folder\n
-			A/D change selected note - Arrow Keys to change offset (Hold shift for 10x)\n
-			Ctrl + C/V - Copy & Paste", 16);
-		text.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			"按 空格 重置动画\n
+			按两次 Enter 保存到已加载音符溅射 PNG 的文件夹\n
+			A/D 切换音符 - 方向键调整偏移（按住 Shift 加速 10 倍）\n
+			Ctrl + C/V - 复制与粘贴", 16);
+		text.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		text.scrollFactor.set();
 		add(text);
 
 		savedText = new FlxText(0, 340, FlxG.width, '', 24);
-		savedText.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		savedText.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		savedText.scrollFactor.set();
 		add(savedText);
 
@@ -207,7 +218,7 @@ class NoteSplashDebugState extends MusicBeatState
 
 		if(FlxG.keys.justPressed.ENTER)
 		{
-			savedText.text = 'Press ENTER again to save.';
+			savedText.text = '再次按 Enter 保存。';
 			if(pressEnterToSave > 0) //save
 			{
 				saveFile();
@@ -240,7 +251,7 @@ class NoteSplashDebugState extends MusicBeatState
 			else if(forceFrame >= maxFrame) forceFrame = maxFrame - 1;
 			//trace('curFrame: $forceFrame');
 			
-			curFrameText.text = 'Force Frame: ${forceFrame+1} / $maxFrame\n(Press Q/E to change)';
+			curFrameText.text = '强制帧: ${forceFrame+1} / $maxFrame\n(按 Q/E 切换)';
 			splashes.forEachAlive(function(spr:FlxSprite) {
 				spr.animation.curAnim.paused = true;
 				spr.animation.curAnim.curFrame = forceFrame;
@@ -292,12 +303,12 @@ class NoteSplashDebugState extends MusicBeatState
 
 		var pathSplit:Array<String> = (Paths.getPath('images/$texturePath.png', IMAGE, true).split('.png')[0] + '.txt').split(':');
 		var path:String = pathSplit[pathSplit.length-1].trim();
-		savedText.text = 'Saved to: $path';
+		savedText.text = '已保存到: $path';
 		sys.io.File.saveContent(path, strToSave);
 
 		//trace(strToSave);
 		#else
-		savedText.text = 'Can\'t save on this platform, too bad.';
+		savedText.text = '无法在此平台保存。';
 		#end
 	}
 	
@@ -362,8 +373,8 @@ class NoteSplashDebugState extends MusicBeatState
 			if(curAnim > maxAnims) curAnim = 1;
 			else if(curAnim < 1) curAnim = maxAnims;
 
-			curAnimText.text = 'Current Animation: $curAnim / $maxAnims\n(Press W/S to change)';
-			curFrameText.text = 'Force Frame Disabled\n(Press Q/E to change)';
+			curAnimText.text = '当前动画: $curAnim / $maxAnims\n(按 W/S 切换)';
+			curFrameText.text = '强制帧已关闭\n(按 Q/E 切换)';
 
 			for (i in 0...maxNotes)
 			{
@@ -380,7 +391,7 @@ class NoteSplashDebugState extends MusicBeatState
 		}
 		else
 		{
-			curAnimText.text = 'INVALID ANIMATION NAME';
+			curAnimText.text = '无效的动画名称';
 			curFrameText.text = '';
 		}
 		updateOffsetText();

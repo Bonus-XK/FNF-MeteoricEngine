@@ -56,6 +56,14 @@ class Mods
 		var list:Array<String> = [];
 		#if MODS_ALLOWED
 		var modsFolder:String = Paths.mods();
+		// mods 目录不存在时自动创建，否则 Mod 无法加载/安装
+		if(!FileSystem.exists(modsFolder)) {
+			try {
+				FileSystem.createDirectory(modsFolder);
+			} catch(e:Dynamic) {
+				trace('Could not create mods folder: $e');
+			}
+		}
 		if(FileSystem.exists(modsFolder)) {
 			for (folder in FileSystem.readDirectory(modsFolder))
 			{
@@ -217,7 +225,11 @@ class Mods
 			fileStr += values[0] + '|' + (values[1] ? '1' : '0');
 		}
 
-		File.saveContent('modsList.txt', fileStr);
+		try {
+			File.saveContent('modsList.txt', fileStr);
+		} catch(e:Dynamic) {
+			trace('Could not save modsList.txt: $e');
+		}
 		updatedOnState = true;
 		//trace('Saved modsList.txt');
 		#end

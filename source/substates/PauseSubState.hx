@@ -5,7 +5,10 @@ import backend.Highscore;
 import backend.Song;
 
 import flixel.addons.transition.FlxTransitionableState;
-
+import flixel.math.FlxPoint;
+import objects.BackButton;
+import flixel.util.FlxSpriteUtil;
+import flixel.util.FlxSpriteUtil;
 import flixel.util.FlxStringUtil;
 
 import states.StoryMenuState;
@@ -15,54 +18,91 @@ import openfl.Lib;
 
 class PauseSubState extends MusicBeatSubstate
 {
-	var grpMenuShit:FlxTypedGroup<Alphabet>;
+	// ===== 安全布局常量 =====
+	// 所有文本一律左侧排版，右缘不依赖缩放/窗口计算，彻底避开右侧截断问题
+	static final SAFE_MARGIN:Float = 72;      // 面板内文本左边距
+	static final SAFE_RIGHT:Float = 1100;     // 任何文本右缘不得超过此值（画布 1280 内留 180px 余量）
+	static final INFO_Y_START:Float = 100;    // 信息文本起始 Y
+	static final INFO_LINE_GAP:Float = 34;    // 信息文本行距
+	static final MENU_X:Float = 72;           // 菜单 X
+	static final MENU_Y:Float = 302;          // 菜单起始 Y
+	static final MENU_LINE_GAP:Float = 34;    // 菜单行距（MenuText 内部会再乘 1.3，实际约 44px）
+
+	// 圆角磨砂面板
+	static final PANEL_X:Float = 40;          // 面板 X
+	static final PANEL_W:Float = 600;         // 面板宽度
+	static final INFO_PANEL_Y:Float = 70;     // 信息面板 Y
+	static final INFO_PANEL_H:Float = 200;    // 信息面板高度
+	static final MENU_PANEL_Y:Float = 290;    // 菜单面板 Y
+
+	// 右侧统计面板
+	static final STATS_X:Float = 680;         // 面板 X
+	static final STATS_W:Float = 560;         // 面板宽度
+	static final STATS_Y:Float = 70;          // 面板 Y
+	static final STATS_TEXT_X:Float = 716;    // 面板内文本左边距
+	static final STATS_TITLE_Y:Float = 96;    // 标题 Y
+	static final STATS_ROW_START:Float = 158; // 数据行起始 Y
+	static final STATS_ROW_GAP:Float = 48;    // 数据行距
+
+	var grpMenuShit:FlxTypedGroup<MenuText>;
 
 	var menuItems:Array<String> = [];
-	var menuItemsOG:Array<String> = ['Back to Game', 'Restart Song', 'Change Difficulty', 'AutoPlay', 'Options', 'Exit to menu'];
+	var menuItemsOG:Array<String> = ['返回游戏', '重新开始', '跳过时间', '更换难度', '脚本管理', '游玩设置', '设置', '返回主菜单'];
 	var difficultyChoices = [];
 	var curSelected:Int = 0;
 
 	var pauseMusic:FlxSound;
 	var practiceText:FlxText;
 	var skipTimeText:FlxText;
-	var skipTimeTracker:Alphabet;
+	var skipTimeTracker:MenuText;
 	var curTime:Float = Math.max(0, Conductor.songPosition);
 
 	var missingTextBG:FlxSprite;
 	var missingText:FlxText;
+	var menuSelector:FlxSprite;
+	var menuSelectorTween:FlxTween;
+	var backBtn:BackButton;
+	var statPanel:FlxSprite;
+	var statLabels:Array<FlxText> = [];
+	var statTexts:Array<FlxText> = [];
+	var statLast:Array<String> = [];
+
+	var mouseActive:Bool = true;  // 鼠标跟随是否激活（键盘操作时冻结，鼠标移动/点击时恢复）
+	var mouseLockX:Float = 0;      // 键盘接管时记录的鼠标位置
+	var mouseLockY:Float = 0;
 
 	public static var songName:String = '';
 
 	public function new(x:Float, y:Float)
 	{
 		super();
-		if(Difficulty.list.length < 2) menuItemsOG.remove('Change Difficulty'); //No need to change difficulty if there is only one!
+
+		// 固定渲染在专用相机上：zoom=1、scroll=(0,0)，不受游戏相机缩放影响
+		var pauseCam:FlxCamera = (PlayState.instance != null && PlayState.instance.camOther != null) ? PlayState.instance.camOther : FlxG.camera;
+		cameras = [pauseCam];
+		cameras[0].zoom = 1;
+		cameras[0].scroll.set(0, 0);
+
+		if(Difficulty.list.length < 2) menuItemsOG.remove('更换难度'); //No need to change difficulty if there is only one!
+		if(PlayState.instance.startingSong) menuItemsOG.remove('跳过时间'); //歌曲还没开始时无需跳转
 
 		if(PlayState.chartingMode)
 		{
-			menuItemsOG.insert(2, 'Leave Charting Mode');
-			
-			var num:Int = 0;
-			if(!PlayState.instance.startingSong)
-			{
-				num = 1;
-				menuItemsOG.insert(3, 'Skip Time');
-			}
-			menuItemsOG.insert(3 + num, 'End Song');
+			menuItemsOG.insert(2, '退出编铺模式');
+			menuItemsOG.insert(3, '结束歌曲');
 		}
 		menuItems = menuItemsOG;
 
 		for (i in 0...Difficulty.list.length) {
 			var diff:String = Difficulty.getString(i);
-			difficultyChoices.push(diff);
+			difficultyChoices.push(translateDifficulty(diff));
 		}
-		difficultyChoices.push('BACK');
-
+		difficultyChoices.push('返回');
 
 		pauseMusic = new FlxSound();
 		if(songName != null) {
 			pauseMusic.loadEmbedded(Paths.music(songName), true, true);
-		} else if (songName != 'None') {
+		} else if (songName != '无') {
 			pauseMusic.loadEmbedded(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), true, true);
 		}
 		pauseMusic.volume = 0;
@@ -70,88 +110,185 @@ class PauseSubState extends MusicBeatSubstate
 
 		FlxG.sound.list.add(pauseMusic);
 
+		// ---- 背景 ----
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		bg.alpha = 0;
 		bg.scrollFactor.set();
 		add(bg);
+		FlxTween.tween(bg, {alpha: 0.6}, 0.4, {ease: FlxEase.quartInOut});
 
-		var levelInfo:FlxText = new FlxText(20, 15, 0, "游玩曲目：" + PlayState.SONG.song, 32);
-		levelInfo.scrollFactor.set();
-		levelInfo.setFormat(Paths.font("future.ttf"), 32);
-		levelInfo.updateHitbox();
-		add(levelInfo);
+		// ---- 标题（水平居中，不贴任何边缘） ----
+		var titleText:FlxText = new FlxText(0, 22, FlxG.width, '已暂停', 54);
+		titleText.scrollFactor.set();
+		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		titleText.borderSize = 2.4;
+		titleText.antialiasing = ClientPrefs.data.antialiasing;
+		titleText.alpha = 0;
+		add(titleText);
 
-		var levelDifficulty:FlxText = new FlxText(20, 15 + 32, 0, "游玩难度：" + Difficulty.getString().toUpperCase(), 32);
-		levelDifficulty.scrollFactor.set();
-		levelDifficulty.setFormat(Paths.font('future.ttf'), 32);
-		levelDifficulty.updateHitbox();
-		add(levelDifficulty);
+		// ---- 编铺模式徽章（左上角圆角磨砂小面板） ----
+		var chartingPanel:FlxSprite = makePanel(40, 16, 130, 36, 12);
+		chartingPanel.alpha = 0;
+		chartingPanel.visible = PlayState.chartingMode;
+		add(chartingPanel);
 
-		var blueballedTxt:FlxText = new FlxText(20, 15 + 64, 0, "死亡次数：" + PlayState.deathCounter, 32);
-		blueballedTxt.scrollFactor.set();
-		blueballedTxt.setFormat(Paths.font('future.ttf'), 32);
-		blueballedTxt.updateHitbox();
-		add(blueballedTxt);
-
-		practiceText = new FlxText(20, 15 + 101, 0, "上帝模式已激活！", 32);
-		practiceText.scrollFactor.set();
-		practiceText.setFormat(Paths.font('future.ttf'), 32);
-		practiceText.x = FlxG.width - (practiceText.width + 20);
-		practiceText.updateHitbox();
-		practiceText.visible = PlayState.instance.practiceMode;
-		add(practiceText);
-
-		var chartingText:FlxText = new FlxText(20, 15 + 101, 0, "编铺模式", 32);
+		var chartingText:FlxText = new FlxText(40, 20, 130, '编铺模式', 18);
 		chartingText.scrollFactor.set();
-		chartingText.setFormat(Paths.font('future.ttf'), 32);
-		chartingText.x = FlxG.width - (chartingText.width + 20);
-		chartingText.y = FlxG.height - (chartingText.height + 20);
-		chartingText.updateHitbox();
+		chartingText.setFormat(Paths.font('future.ttf'), 18, FlxColor.fromString('0xFFFFD966'), CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		chartingText.borderSize = 2;
+		chartingText.antialiasing = ClientPrefs.data.antialiasing;
 		chartingText.visible = PlayState.chartingMode;
 		add(chartingText);
+		if(PlayState.chartingMode)
+		{
+			FlxTween.tween(chartingPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3});
+			FlxTween.tween(chartingText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3});
+		}
 
-		blueballedTxt.alpha = 0;
-		levelDifficulty.alpha = 0;
-		levelInfo.alpha = 0;
+		// ---- 信息面板（圆角磨砂） ----
+		var infoPanel:FlxSprite = makePanel(PANEL_X, INFO_PANEL_Y, PANEL_W, INFO_PANEL_H, 20);
+		infoPanel.alpha = 0;
+		add(infoPanel);
+		FlxTween.tween(infoPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.15});
 
-		levelInfo.x = FlxG.width - (levelInfo.width + 20);
-		levelDifficulty.x = FlxG.width - (levelDifficulty.width + 20);
-		blueballedTxt.x = FlxG.width - (blueballedTxt.width + 20);
+		// ---- 信息文本（一律左对齐，右侧永不越界） ----
+		var levelInfo:FlxText = makeInfoText('游玩曲目：' + PlayState.SONG.song, INFO_Y_START);
+		var levelDifficulty:FlxText = makeInfoText('游玩难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
+		var blueballedTxt:FlxText = makeInfoText('死亡次数：' + PlayState.deathCounter, INFO_Y_START + INFO_LINE_GAP * 2);
 
-		FlxTween.tween(bg, {alpha: 0.6}, 0.4, {ease: FlxEase.quartInOut});
-		FlxTween.tween(levelInfo, {alpha: 1, y: 20}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3});
-		FlxTween.tween(levelDifficulty, {alpha: 1, y: levelDifficulty.y + 5}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.5});
-		FlxTween.tween(blueballedTxt, {alpha: 1, y: blueballedTxt.y + 5}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.7});
+		practiceText = makeInfoText('上帝模式已激活！', INFO_Y_START + INFO_LINE_GAP * 3, 0xFFFFE066);
+		practiceText.visible = PlayState.instance.practiceMode;
+		if(PlayState.instance.practiceMode) FlxTween.tween(practiceText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.75});
 
-		grpMenuShit = new FlxTypedGroup<Alphabet>();
+		FlxTween.tween(levelInfo, {alpha: 1, y: levelInfo.y + 4}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3});
+		FlxTween.tween(levelDifficulty, {alpha: 1, y: levelDifficulty.y + 4}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.45});
+		FlxTween.tween(blueballedTxt, {alpha: 1, y: blueballedTxt.y + 4}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.6});
+
+		// ---- 菜单面板（圆角磨砂，高度随菜单项数量自适应） ----
+		var panelHeight:Float = 16 + (menuItems.length * MENU_LINE_GAP * 1.3);
+		var menuPanel:FlxSprite = makePanel(PANEL_X, MENU_PANEL_Y, PANEL_W, Std.int(panelHeight), 20);
+		menuPanel.alpha = 0;
+		add(menuPanel);
+		FlxTween.tween(menuPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.2});
+
+		// ---- 右侧统计面板（圆角磨砂，显示本局数据） ----
+		var statsPanelH:Float = (MENU_PANEL_Y + panelHeight) - STATS_Y;
+		statPanel = makePanel(STATS_X, STATS_Y, STATS_W, Std.int(statsPanelH), 20);
+		statPanel.alpha = 0;
+		add(statPanel);
+		FlxTween.tween(statPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.25});
+
+		var statTitle:FlxText = new FlxText(STATS_TEXT_X, STATS_TITLE_Y, 0, '本局数据', 26);
+		statTitle.scrollFactor.set();
+		statTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		statTitle.borderSize = 2;
+		statTitle.antialiasing = ClientPrefs.data.antialiasing;
+		statTitle.alpha = 0;
+		add(statTitle);
+		FlxTween.tween(statTitle, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.35});
+
+		var statDefs:Array<String> = ['当前分数', '失误数', '当前连击', '评分', '准确度', '命中 / 总音符', '歌曲进度'];
+		for (i in 0...statDefs.length)
+		{
+			var rowY:Float = STATS_ROW_START + (i * STATS_ROW_GAP);
+
+			var lbl:FlxText = new FlxText(STATS_TEXT_X, rowY, 0, statDefs[i] + '：', 24);
+			lbl.scrollFactor.set();
+			lbl.setFormat(Paths.font('future.ttf'), 24, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			lbl.borderSize = 1.5;
+			lbl.antialiasing = ClientPrefs.data.antialiasing;
+			lbl.alpha = 0;
+			add(lbl);
+			FlxTween.tween(lbl, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
+			statLabels.push(lbl);
+
+			var val:FlxText = new FlxText(STATS_TEXT_X + 210, rowY, 0, '', 24);
+			val.scrollFactor.set();
+			val.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			val.borderSize = 1.5;
+			val.antialiasing = ClientPrefs.data.antialiasing;
+			val.alpha = 0;
+			add(val);
+			FlxTween.tween(val, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
+			statTexts.push(val);
+			statLast.push('');
+		}
+		updateStats();
+
+		// ---- 选中高亮条（跟随当前菜单项） ----
+		menuSelector = makePanel(PANEL_X + 16, MENU_Y - 3, PANEL_W - 32, 44, 12, 0x2EFFFFFF, null);
+		add(menuSelector);
+
+		grpMenuShit = new FlxTypedGroup<MenuText>();
 		add(grpMenuShit);
 
 		missingTextBG = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		missingTextBG.alpha = 0.6;
 		missingTextBG.visible = false;
 		add(missingTextBG);
-		
+
 		missingText = new FlxText(50, 0, FlxG.width - 100, '', 24);
 		missingText.setFormat(Paths.font("future.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		missingText.scrollFactor.set();
 		missingText.visible = false;
 		add(missingText);
 
-		regenMenu();
-		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
+		// 悬停高亮条（跟随鼠标，不改变选中）+ 返回按钮
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
 
-	    Lib.application.window.title = "FNF':Meteoric Engine - Pause";
+		regenMenu();
+		FlxG.mouse.visible = true;
+		Lib.application.window.title = "FNF':Meteoric Engine - 暂停";
+
+		trace('[PAUSE] 新暂停界面已加载 | 画布=' + FlxG.width + 'x' + FlxG.height + ' | 菜单项=' + menuItems.length);
+		trace('[PAUSE] 信息文本最右缘=' + (blueballedTxt.x + blueballedTxt.width) + ' | 安全上限=' + SAFE_RIGHT);
+
+		loadUIscripts('pause');
+	}
+
+	function makeInfoText(content:String, yPos:Float, ?textColor:FlxColor = FlxColor.WHITE, ?size:Int = 26):FlxText
+	{
+		var txt:FlxText = new FlxText(SAFE_MARGIN, yPos, 0, content, size);
+		txt.scrollFactor.set();
+		txt.setFormat(Paths.font('future.ttf'), size, textColor, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		txt.borderSize = 2;
+		txt.antialiasing = ClientPrefs.data.antialiasing;
+		txt.alpha = 0;
+		txt.updateHitbox();
+		add(txt);
+		return txt;
+	}
+
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
+		if(border != null)
+			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
+		spr.scrollFactor.set();
+		return spr;
 	}
 
 	var holdTime:Float = 0;
 	var cantUnpause:Float = 0.1;
 	override function update(elapsed:Float)
 	{
+		// 每帧固定暂停相机缩放/滚动，防止暂停期间任何运行期改动导致文本截断
+		if (cameras != null && cameras[0] != null)
+		{
+			cameras[0].zoom = 1;
+			cameras[0].scroll.set(0, 0);
+		}
+		FlxG.mouse.visible = true;
 		cantUnpause -= elapsed;
 		if (pauseMusic.volume < 0.5)
 			pauseMusic.volume += 0.01 * elapsed;
 
 		super.update(elapsed);
+		updateStats();
 		updateSkipTextStuff();
 
 		var upP = controls.UI_UP_P;
@@ -160,17 +297,69 @@ class PauseSubState extends MusicBeatSubstate
 
 		if (upP)
 		{
+			mouseActive = false;
+			mouseLockX = FlxG.mouse.x;
+			mouseLockY = FlxG.mouse.y;
 			changeSelection(-1);
 		}
 		if (downP)
 		{
+			mouseActive = false;
+			mouseLockX = FlxG.mouse.x;
+			mouseLockY = FlxG.mouse.y;
 			changeSelection(1);
+		}
+
+		if (!controls.controllerMode)
+		{
+			var hoveredID:Int = -1;
+			// 用暂停专用相机计算鼠标坐标（游戏相机在暂停时 scroll/zoom 均不为 0，直接用会偏移）
+			var mousePos:FlxPoint = FlxG.mouse.getScreenPosition(cameras[0], FlxPoint.get());
+			for (item in grpMenuShit.members)
+			{
+				if (mousePos.x >= item.x && mousePos.x <= item.x + item.width
+					&& mousePos.y >= item.y && mousePos.y <= item.y + item.height)
+					hoveredID = item.ID;
+			}
+
+			// 返回按钮：悬停高亮，点击返回游戏
+			backBtn.setHovered(mousePos.x, mousePos.y);
+			if (FlxG.mouse.justPressed && backBtn.over(mousePos.x, mousePos.y))
+			{
+				mouseActive = true;
+				close();
+				Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+				return;
+			}
+			mousePos.put();
+
+			// 鼠标离开键盘接管位置超过阈值 → 恢复鼠标跟随（防轻微抖动误触发）
+			if (!mouseActive)
+			{
+				var dx:Float = FlxG.mouse.x - mouseLockX;
+				var dy:Float = FlxG.mouse.y - mouseLockY;
+				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
+			}
+
+			if (FlxG.mouse.wheel != 0)
+			{
+				mouseActive = true;
+				FlxG.sound.play(Paths.sound('scrollMenu'));
+				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			}
+
+			if (hoveredID >= 0 && FlxG.mouse.justPressed)
+			{
+				mouseActive = true;
+				if (hoveredID != curSelected) changeSelection(hoveredID - curSelected);
+				accepted = true;
+			}
 		}
 
 		var daSelected:String = menuItems[curSelected];
 		switch (daSelected)
 		{
-			case 'Skip Time':
+			case '跳过时间':
 				if (controls.UI_LEFT_P)
 				{
 					FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
@@ -214,7 +403,7 @@ class PauseSubState extends MusicBeatSubstate
 						PlayState.changedDifficulty = true;
 						PlayState.chartingMode = false;
 						return;
-					}					
+					}
 				}catch(e:Dynamic){
 					trace('错误！$e');
 
@@ -237,23 +426,23 @@ class PauseSubState extends MusicBeatSubstate
 
 			switch (daSelected)
 			{
-				case "Back to Game":
+				case "返回游戏":
 					close();
 					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
-				case 'Change Difficulty':
+				case '更换难度':
 					menuItems = difficultyChoices;
 					deleteSkipTimeText();
 					regenMenu();
-				case "Restart Song":
+				case "重新开始":
 					restartSong();
-				case "Leave Charting Mode":
+				case "退出编铺模式":
 					restartSong();
 					PlayState.chartingMode = false;
-				case 'Skip Time':
+				case '跳过时间':
 					if(curTime < Conductor.songPosition)
 					{
 						PlayState.startOnTime = curTime;
-						restartSong(true);
+						restartSong(true, false);
 					}
 					else
 					{
@@ -264,29 +453,39 @@ class PauseSubState extends MusicBeatSubstate
 						}
 						close();
 					}
-				case 'End Song':
+				case '结束歌曲':
 					close();
 					PlayState.instance.notes.clear();
 					PlayState.instance.unspawnNotes = [];
 					PlayState.instance.finishSong(true);
-				case 'AutoPlay':
-					PlayState.instance.cpuControlled = !PlayState.instance.cpuControlled;
-					PlayState.changedDifficulty = true;
-					PlayState.instance.botplayTxt.visible = PlayState.instance.cpuControlled;
-					PlayState.instance.botplayTxt.alpha = 1;
-					PlayState.instance.botplaySine = 0;
-				case 'Options':
+				case '游玩设置':
+					persistentUpdate = false;
+					var gameplaySettingsSubState:GameplayChangersSubstate = new GameplayChangersSubstate();
+					gameplaySettingsSubState.closeCallback = function() {
+						persistentUpdate = true;
+						if (practiceText != null)
+							practiceText.visible = PlayState.instance.practiceMode;
+					};
+					openSubState(gameplaySettingsSubState);
+				case '脚本管理':
+					persistentUpdate = false;
+					var scriptManagerSubState:ScriptManagerSubstate = new ScriptManagerSubstate();
+					scriptManagerSubState.closeCallback = function() {
+						persistentUpdate = true;
+					};
+					openSubState(scriptManagerSubState);
+				case '设置':
 					PlayState.instance.paused = true; // For lua
 					PlayState.instance.vocals.volume = 0;
 					MusicBeatState.switchState(new OptionsState());
-					if(ClientPrefs.data.pauseMusic != 'None')
+					if(ClientPrefs.data.pauseMusic != '无')
 					{
 						FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), pauseMusic.volume);
 						FlxTween.tween(FlxG.sound.music, {volume: 1}, 0.8);
 						FlxG.sound.music.time = pauseMusic.time;
 					}
 					OptionsState.onPlayState = true;
-				case "Exit to menu":
+				case "返回主菜单":
 					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;
 					PlayState.seenCutscene = false;
@@ -318,11 +517,21 @@ class PauseSubState extends MusicBeatSubstate
 		skipTimeTracker = null;
 	}
 
-	public static function restartSong(noTrans:Bool = false)
+	public static function restartSong(noTrans:Bool = false, skipChartReload:Null<Bool> = null)
 	{
 		PlayState.instance.paused = true; // For lua
 		FlxG.sound.music.volume = 0;
 		PlayState.instance.vocals.volume = 0;
+
+		if(skipChartReload == null) skipChartReload = ClientPrefs.data.restartNoChartReload;
+		if(skipChartReload)
+		{
+			// 快速重开：关闭暂停菜单并原地重开，不重新加载谱面
+			PlayState.instance.closeSubState();
+			PlayState.instance.resetSubState();
+			PlayState.instance.restartSongWithoutReload();
+			return;
+		}
 
 		if(noTrans)
 		{
@@ -334,6 +543,7 @@ class PauseSubState extends MusicBeatSubstate
 
 	override function destroy()
 	{
+		FlxG.mouse.visible = false;
 		pauseMusic.destroy();
 
 		super.destroy();
@@ -350,20 +560,15 @@ class PauseSubState extends MusicBeatSubstate
 		if (curSelected >= menuItems.length)
 			curSelected = 0;
 
-		var bullShit:Int = 0;
-
 		for (item in grpMenuShit.members)
 		{
-			item.targetY = bullShit - curSelected;
-			bullShit++;
-
 			item.alpha = 0.6;
-			// item.setGraphicSize(Std.int(item.width * 0.8));
+			item.color = 0xFF9A9AA8;
 
-			if (item.targetY == 0)
+			if (item.ID == curSelected)
 			{
 				item.alpha = 1;
-				// item.setGraphicSize(Std.int(item.width));
+				item.color = FlxColor.WHITE;
 
 				if(item == skipTimeTracker)
 				{
@@ -372,8 +577,73 @@ class PauseSubState extends MusicBeatSubstate
 				}
 			}
 		}
+
+		// 高亮条跟随当前选项
+		if (menuSelector != null)
+		{
+			if(menuSelectorTween != null) {
+				menuSelectorTween.cancel();
+				menuSelectorTween = null;
+			}
+			var barY:Float = MENU_Y - 3 + (curSelected * MENU_LINE_GAP * 1.3);
+			if(menuSelector.y != barY)
+				menuSelectorTween = FlxTween.tween(menuSelector, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
+		}
+
 		missingText.visible = false;
 		missingTextBG.visible = false;
+
+		callUIScripts('onChangeSelection', [curSelected, menuItems[curSelected]]);
+	}
+
+	// ===== 本局数据（右侧面板，内容变化才重绘） =====
+	function updateStats()
+	{
+		if (PlayState.instance == null || statTexts.length < 1) return;
+
+		var st:PlayState = PlayState.instance;
+		var totalT:String = (FlxG.sound.music != null) ? FlxStringUtil.formatTime(Math.max(0, Math.floor(FlxG.sound.music.length / 1000)), false) : '--:--';
+		var vals:Array<String> = [
+			FlxStringUtil.formatMoney(st.songScore),
+			Std.string(st.songMisses),
+			Std.string(st.combo),
+			st.ratingName + fcText(st.ratingFC),
+			CoolUtil.floorDecimal(st.ratingPercent * 100, 2) + '%',
+			Std.string(st.songHits) + ' / ' + Std.string(st.totalNotes),
+			FlxStringUtil.formatTime(Math.max(0, Math.floor(Conductor.songPosition / 1000)), false) + ' / ' + totalT
+		];
+
+		for (i in 0...statTexts.length)
+		{
+			if (statLast[i] != vals[i])
+			{
+				statLast[i] = vals[i];
+				statTexts[i].text = vals[i];
+				statTexts[i].updateHitbox();
+			}
+		}
+	}
+
+	function fcText(fc:String):String
+	{
+		switch (fc)
+		{
+			case 'FC': return '（全连）';
+			case 'SDCB': return '（单断）';
+			case 'Clear': return '（通过）';
+		}
+		return (fc == null || fc == '') ? '' : fc;
+	}
+
+	function translateDifficulty(d:String):String
+	{
+		switch (d)
+		{
+			case 'Easy': return '简单';
+			case 'Normal': return '普通';
+			case 'Hard': return '困难';
+		}
+		return d;
 	}
 
 	function regenMenu():Void {
@@ -385,15 +655,16 @@ class PauseSubState extends MusicBeatSubstate
 		}
 
 		for (i in 0...menuItems.length) {
-			var item = new Alphabet(90, 320, menuItems[i], true);
-			item.isMenuItem = true;
-			item.targetY = i;
+			// 静态列表：选项固定在各自位置，切换时只改变高亮，不做整列滚动
+			var item = new MenuText(MENU_X, MENU_Y + (i * MENU_LINE_GAP * 1.3), menuItems[i], true, 34);
+			item.isMenuItem = false;
+			item.ID = i;
 			grpMenuShit.add(item);
 
-			if(menuItems[i] == 'Skip Time')
+			if(menuItems[i] == '跳过时间')
 			{
-				skipTimeText = new FlxText(0, 0, 0, '', 64);
-				skipTimeText.setFormat(Paths.font("future.ttf"), 64, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+				skipTimeText = new FlxText(0, 0, 0, '', 44);
+				skipTimeText.setFormat(Paths.font("future.ttf"), 44, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 				skipTimeText.scrollFactor.set();
 				skipTimeText.borderSize = 2;
 				skipTimeTracker = item;
@@ -406,14 +677,18 @@ class PauseSubState extends MusicBeatSubstate
 		curSelected = 0;
 		changeSelection();
 	}
-	
+
 	function updateSkipTextStuff()
 	{
 		if(skipTimeText == null || skipTimeTracker == null) return;
 
-		skipTimeText.x = skipTimeTracker.x + skipTimeTracker.width + 60;
+		skipTimeText.x = skipTimeTracker.x + skipTimeTracker.width + 40;
 		skipTimeText.y = skipTimeTracker.y;
 		skipTimeText.visible = (skipTimeTracker.alpha >= 1);
+
+		// 双保险：即使菜单项变宽，也绝不超出安全右缘
+		if(skipTimeText.x + skipTimeText.width > SAFE_RIGHT)
+			skipTimeText.x = SAFE_RIGHT - skipTimeText.width;
 	}
 
 	function updateSkipTimeText()

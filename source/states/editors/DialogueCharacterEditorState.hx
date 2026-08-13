@@ -28,20 +28,20 @@ class DialogueCharacterEditorState extends MusicBeatState
 	var daText:TypedAlphabet = null;
 
 	private static var TIP_TEXT_MAIN:String =
-	'JKLI - Move camera (Hold Shift to move 4x faster)
-	\nQ/E - Zoom out/in
-	\nR - Reset Camera
-	\nH - Toggle Speech Bubble
-	\nSpace - Reset text';
+	'JKLI - 移动镜头（按住 Shift 加速 4 倍）
+	\nQ/E - 缩小/放大
+	\nR - 重置镜头
+	\nH - 切换对话气泡
+	\n空格 - 重置文本';
 
 	private static var TIP_TEXT_OFFSET:String =
-	'JKLI - Move camera (Hold Shift to move 4x faster)
-	\nQ/E - Zoom out/in
-	\nR - Reset Camera
-	\nH - Toggle Ghosts
-	\nWASD - Move Looping animation offset (Red)
-	\nArrow Keys - Move Idle/Finished animation offset (Blue)
-	\nHold Shift to move offsets 10x faster';
+	'JKLI - 移动镜头（按住 Shift 加速 4 倍）
+	\nQ/E - 缩小/放大
+	\nR - 重置镜头
+	\nH - 切换幽灵预览
+	\nWASD - 移动循环动画偏移（红色）
+	\n方向键 - 移动待机/结束动画偏移（蓝色）
+	\n按住 Shift 加速偏移 10 倍';
 
 	var tipText:FlxText;
 	var offsetLoopText:FlxText;
@@ -61,6 +61,9 @@ class DialogueCharacterEditorState extends MusicBeatState
 	var curAnim:Int = 0;
 
 	override function create() {
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		persistentUpdate = persistentDraw = true;
 		camGame = new FlxCamera();
 		camHUD = new FlxCamera();
@@ -110,27 +113,27 @@ class DialogueCharacterEditorState extends MusicBeatState
 		hudGroup.add(box);
 
 		tipText = new FlxText(10, 10, FlxG.width - 20, TIP_TEXT_MAIN, 8);
-		tipText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, RIGHT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		tipText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, RIGHT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tipText.cameras = [camHUD];
 		tipText.scrollFactor.set();
 		add(tipText);
 
 		offsetLoopText = new FlxText(10, 10, 0, '', 32);
-		offsetLoopText.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		offsetLoopText.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		offsetLoopText.cameras = [camHUD];
 		offsetLoopText.scrollFactor.set();
 		add(offsetLoopText);
 		offsetLoopText.visible = false;
 
 		offsetIdleText = new FlxText(10, 46, 0, '', 32);
-		offsetIdleText.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		offsetIdleText.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		offsetIdleText.cameras = [camHUD];
 		offsetIdleText.scrollFactor.set();
 		add(offsetIdleText);
 		offsetIdleText.visible = false;
 
 		animText = new FlxText(10, 22, FlxG.width - 20, '', 8);
-		animText.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		animText.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		animText.scrollFactor.set();
 		animText.cameras = [camHUD];
 		add(animText);
@@ -140,7 +143,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 		daText = new TypedAlphabet(DialogueBoxPsych.DEFAULT_TEXT_X, DialogueBoxPsych.DEFAULT_TEXT_Y, '', 0.05, false);
 		daText.setScale(0.7);
-		daText.text = DEFAULT_TEXT;
+		daText.startText(DEFAULT_TEXT);
 		hudGroup.add(daText);
 
 		addEditorBox();
@@ -152,9 +155,15 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	var UI_typebox:FlxUITabMenu;
 	var UI_mainbox:FlxUITabMenu;
+	function uiFont(t:FlxText):Void
+	{
+		if (t == null) return;
+		t.setFormat(Paths.font('future.ttf'), t.size, t.color, t.alignment, t.borderStyle, t.borderColor);
+	}
+
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Character Type', label: 'Character Type'},
+			{name: 'Character Type', label: '角色类型'},
 		];
 		UI_typebox = new FlxUITabMenu(null, tabs, true);
 		UI_typebox.resize(120, 180);
@@ -166,8 +175,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 		add(UI_typebox);
 
 		var tabs = [
-			{name: 'Animations', label: 'Animations'},
-			{name: 'Character', label: 'Character'},
+			{name: 'Animations', label: '动画'},
+			{name: 'Character', label: '角色'},
 		];
 		UI_mainbox = new FlxUITabMenu(null, tabs, true);
 		UI_mainbox.resize(200, 250);
@@ -189,21 +198,24 @@ class DialogueCharacterEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_typebox);
 		tab_group.name = "Character Type";
 
-		leftCheckbox = new FlxUICheckBox(10, 20, null, null, "Left", 100);
+		leftCheckbox = new FlxUICheckBox(10, 20, null, null, "左侧", 100);
+		uiFont(leftCheckbox.button.label);
 		leftCheckbox.callback = function()
 		{
 			character.jsonFile.dialogue_pos = 'left';
 			updateCharTypeBox();
 		};
 
-		centerCheckbox = new FlxUICheckBox(leftCheckbox.x, leftCheckbox.y + 40, null, null, "Center", 100);
+		centerCheckbox = new FlxUICheckBox(leftCheckbox.x, leftCheckbox.y + 40, null, null, "居中", 100);
+		uiFont(centerCheckbox.button.label);
 		centerCheckbox.callback = function()
 		{
 			character.jsonFile.dialogue_pos = 'center';
 			updateCharTypeBox();
 		};
 
-		rightCheckbox = new FlxUICheckBox(centerCheckbox.x, centerCheckbox.y + 40, null, null, "Right", 100);
+		rightCheckbox = new FlxUICheckBox(centerCheckbox.x, centerCheckbox.y + 40, null, null, "右侧", 100);
+		uiFont(rightCheckbox.button.label);
 		rightCheckbox.callback = function()
 		{
 			character.jsonFile.dialogue_pos = 'right';
@@ -234,23 +246,27 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 				curSelectedAnim = anim;
 				var animShit:DialogueAnimArray = character.dialogueAnimations.get(curSelectedAnim);
-				offsetLoopText.text = 'Loop: ' + animShit.loop_offsets;
-				offsetIdleText.text = 'Idle: ' + animShit.idle_offsets;
+				offsetLoopText.text = '循环: ' + animShit.loop_offsets;
+				offsetIdleText.text = '待机: ' + animShit.idle_offsets;
 
 				animationInputText.text = animShit.anim;
 				loopInputText.text = animShit.loop_name;
 				idleInputText.text = animShit.idle_name;
 			}
 		});
+		uiFont(animationDropDown.header.text);
 		
 		animationInputText = new FlxUIInputText(15, 85, 80, '', 8);
+		uiFont(animationInputText);
 		blockPressWhileTypingOn.push(animationInputText);
 		loopInputText = new FlxUIInputText(animationInputText.x, animationInputText.y + 35, 150, '', 8);
+		uiFont(loopInputText);
 		blockPressWhileTypingOn.push(loopInputText);
 		idleInputText = new FlxUIInputText(loopInputText.x, loopInputText.y + 40, 150, '', 8);
+		uiFont(idleInputText);
 		blockPressWhileTypingOn.push(idleInputText);
 		
-		var addUpdateButton:FlxButton = new FlxButton(10, idleInputText.y + 30, "Add/Update", function() {
+		var addUpdateButton:FlxButton = new FlxButton(10, idleInputText.y + 30, "添加/更新", function() {
 			var theAnim:String = animationInputText.text.trim();
 			if(character.dialogueAnimations.exists(theAnim)) //Update
 			{
@@ -290,8 +306,9 @@ class DialogueCharacterEditorState extends MusicBeatState
 				animationDropDown.selectedLabel = lastSelected;
 			}
 		});
+		uiFont(addUpdateButton.label);
 		
-		var removeUpdateButton:FlxButton = new FlxButton(100, addUpdateButton.y, "Remove", function() {
+		var removeUpdateButton:FlxButton = new FlxButton(100, addUpdateButton.y, "删除", function() {
 			for (i in 0...character.jsonFile.animations.length) {
 				var animArray:DialogueAnimArray = character.jsonFile.animations[i];
 				if(animArray != null && animArray.anim.trim() == animationInputText.text.trim()) {
@@ -314,11 +331,20 @@ class DialogueCharacterEditorState extends MusicBeatState
 				}
 			}
 		});
+		uiFont(removeUpdateButton.label);
 		
-		tab_group.add(new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, 'Animations:'));
-		tab_group.add(new FlxText(animationInputText.x, animationInputText.y - 18, 0, 'Animation name:'));
-		tab_group.add(new FlxText(loopInputText.x, loopInputText.y - 18, 0, 'Loop name on .XML file:'));
-		tab_group.add(new FlxText(idleInputText.x, idleInputText.y - 18, 0, 'Idle/Finished name on .XML file:'));
+		var animsTxt:FlxText = new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, '动画：');
+		var animNameTxt:FlxText = new FlxText(animationInputText.x, animationInputText.y - 18, 0, '动画名称：');
+		var loopNameTxt:FlxText = new FlxText(loopInputText.x, loopInputText.y - 18, 0, 'XML 中的循环动画名：');
+		var idleNameTxt:FlxText = new FlxText(idleInputText.x, idleInputText.y - 18, 0, 'XML 中的待机/结束动画名：');
+		uiFont(animsTxt);
+		uiFont(animNameTxt);
+		uiFont(loopNameTxt);
+		uiFont(idleNameTxt);
+		tab_group.add(animsTxt);
+		tab_group.add(animNameTxt);
+		tab_group.add(loopNameTxt);
+		tab_group.add(idleNameTxt);
 		tab_group.add(animationInputText);
 		tab_group.add(loopInputText);
 		tab_group.add(idleInputText);
@@ -349,12 +375,20 @@ class DialogueCharacterEditorState extends MusicBeatState
 		tab_group.name = "Character";
 
 		imageInputText = new FlxUIInputText(10, 30, 80, character.jsonFile.image, 8);
+		uiFont(imageInputText);
 		blockPressWhileTypingOn.push(imageInputText);
 		xStepper = new FlxUINumericStepper(imageInputText.x, imageInputText.y + 50, 10, character.jsonFile.position[0], -2000, 2000, 0);
+		@:privateAccess
+		uiFont(xStepper.text_field);
 		yStepper = new FlxUINumericStepper(imageInputText.x + 80, xStepper.y, 10, character.jsonFile.position[1], -2000, 2000, 0);
+		@:privateAccess
+		uiFont(yStepper.text_field);
 		scaleStepper = new FlxUINumericStepper(imageInputText.x, xStepper.y + 50, 0.05, character.jsonFile.scale, 0.1, 10, 2);
+		@:privateAccess
+		uiFont(scaleStepper.text_field);
 
-		var noAntialiasingCheckbox:FlxUICheckBox = new FlxUICheckBox(scaleStepper.x + 80, scaleStepper.y, null, null, "No Antialiasing", 100);
+		var noAntialiasingCheckbox:FlxUICheckBox = new FlxUICheckBox(scaleStepper.x + 80, scaleStepper.y, null, null, "关闭抗锯齿", 100);
+		uiFont(noAntialiasingCheckbox.button.label);
 		noAntialiasingCheckbox.checked = (character.jsonFile.no_antialiasing == true);
 		noAntialiasingCheckbox.callback = function()
 		{
@@ -362,25 +396,34 @@ class DialogueCharacterEditorState extends MusicBeatState
 			character.antialiasing = !character.jsonFile.no_antialiasing;
 		};
 		
-		tab_group.add(new FlxText(10, imageInputText.y - 18, 0, 'Image file name:'));
-		tab_group.add(new FlxText(10, xStepper.y - 18, 0, 'Position Offset:'));
-		tab_group.add(new FlxText(10, scaleStepper.y - 18, 0, 'Scale:'));
+		var imageTxt:FlxText = new FlxText(10, imageInputText.y - 18, 0, '图片文件名：');
+		var posTxt:FlxText = new FlxText(10, xStepper.y - 18, 0, '位置偏移：');
+		var scaleTxt:FlxText = new FlxText(10, scaleStepper.y - 18, 0, '缩放：');
+		uiFont(imageTxt);
+		uiFont(posTxt);
+		uiFont(scaleTxt);
+		tab_group.add(imageTxt);
+		tab_group.add(posTxt);
+		tab_group.add(scaleTxt);
 		tab_group.add(imageInputText);
 		tab_group.add(xStepper);
 		tab_group.add(yStepper);
 		tab_group.add(scaleStepper);
 		tab_group.add(noAntialiasingCheckbox);
 
-		var reloadImageButton:FlxButton = new FlxButton(10, scaleStepper.y + 60, "Reload Image", function() {
+		var reloadImageButton:FlxButton = new FlxButton(10, scaleStepper.y + 60, "重新加载图片", function() {
 			reloadCharacter();
 		});
+		uiFont(reloadImageButton.label);
 		
-		var loadButton:FlxButton = new FlxButton(reloadImageButton.x + 100, reloadImageButton.y, "Load Character", function() {
+		var loadButton:FlxButton = new FlxButton(reloadImageButton.x + 100, reloadImageButton.y, "加载角色", function() {
 			loadCharacter();
 		});
-		var saveButton:FlxButton = new FlxButton(loadButton.x, reloadImageButton.y - 25, "Save Character", function() {
+		uiFont(loadButton.label);
+		var saveButton:FlxButton = new FlxButton(loadButton.x, reloadImageButton.y - 25, "保存角色", function() {
 			saveCharacter();
 		});
+		uiFont(saveButton.label);
 		tab_group.add(reloadImageButton);
 		tab_group.add(loadButton);
 		tab_group.add(saveButton);
@@ -434,12 +477,12 @@ class DialogueCharacterEditorState extends MusicBeatState
 			var animShit:DialogueAnimArray = character.dialogueAnimations.get(curSelectedAnim);
 			ghostLoop.playAnim(animShit.anim);
 			ghostIdle.playAnim(animShit.anim, true);
-			offsetLoopText.text = 'Loop: ' + animShit.loop_offsets;
-			offsetIdleText.text = 'Idle: ' + animShit.idle_offsets;
+			offsetLoopText.text = '循环: ' + animShit.loop_offsets;
+			offsetIdleText.text = '待机: ' + animShit.idle_offsets;
 		}
 
 		curAnim = 0;
-		animText.text = 'Animation: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - Press W or S to scroll';
+		animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
 
 		#if desktop
 		// Updating Discord Rich Presence
@@ -563,8 +606,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 				}
 
 				if(moved) {
-					offsetLoopText.text = 'Loop: ' + animShit.loop_offsets;
-					offsetIdleText.text = 'Idle: ' + animShit.idle_offsets;
+					offsetLoopText.text = '循环: ' + animShit.loop_offsets;
+					offsetIdleText.text = '待机: ' + animShit.idle_offsets;
 					ghostLoop.offset.set(animShit.loop_offsets[0], animShit.loop_offsets[1]);
 					ghostIdle.offset.set(animShit.idle_offsets[0], animShit.idle_offsets[1]);
 				}
@@ -624,7 +667,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 					else if(curAnim >= character.jsonFile.animations.length) curAnim = 0;
 					
 					character.playAnim(character.jsonFile.animations[curAnim].anim);
-					animText.text = 'Animation: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - Press W or S to scroll';
+					animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
 				}
 				lastTab = UI_mainbox.selected_tab_id;
 				currentGhosts = 0;
@@ -649,7 +692,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 							}
 						}
 					}
-					animText.text = 'Animation: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - Press W or S to scroll';
+					animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
 				}
 			}
 

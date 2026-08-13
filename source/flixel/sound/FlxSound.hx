@@ -87,33 +87,39 @@ class FlxSound extends FlxBasic
 	/**
 	 * Pan amount. -1 = full left, 1 = full right. Proximity based panning overrides this.
 	 */
+	@:keep
 	public var pan(get, set):Float;
 
 	/**
 	 * Whether or not the sound is currently playing.
 	 */
+	@:keep
 	public var playing(get, never):Bool;
 
 	/**
 	 * Set volume to a value between 0 and 1 to change how this sound is.
 	 */
+	@:keep
 	public var volume(get, set):Float;
 
 	/**
 	 * Set pitch, which also alters the playback speed. Default is 1.
 	 */
+	@:keep
 	public var pitch(get, set):Float;
 
 	/**
 	 * The position in runtime of the music playback in milliseconds.
 	 * If set while paused, changes only come into effect after a `resume()` call.
 	 */
+	@:keep
 	public var time(get, set):Float;
 
 	/**
 	 * The length of the sound in milliseconds.
 	 * @since 4.2.0
 	 */
+	@:keep
 	public var length(get, never):Float;
 
 	/**
@@ -733,11 +739,13 @@ class FlxSound extends FlxBasic
 		return group;
 	}
 
+	@:keep
 	inline function get_playing():Bool
 	{
 		return _channel != null;
 	}
 
+	@:keep
 	inline function get_volume():Float
 	{
 		return _volume;
@@ -750,6 +758,7 @@ class FlxSound extends FlxBasic
 		return Volume;
 	}
 
+	@:keep
 	inline function get_pitch():Float
 	{
 		return _pitch;
@@ -760,16 +769,19 @@ class FlxSound extends FlxBasic
 		return _pitch = v;
 	}
 
+	@:keep
 	inline function get_pan():Float
 	{
 		return _transform.pan;
 	}
 
+	@:keep
 	inline function set_pan(pan:Float):Float
 	{
 		return _transform.pan = pan;
 	}
 
+	@:keep
 	inline function get_time():Float
 	{
 		return _time;
@@ -785,6 +797,7 @@ class FlxSound extends FlxBasic
 		return _time = time;
 	}
 
+	@:keep
 	inline function get_length():Float
 	{
 		return _length;

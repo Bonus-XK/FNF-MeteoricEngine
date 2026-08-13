@@ -4,42 +4,70 @@ import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
 
-import lime.utils.Assets;
-import openfl.utils.Assets as OpenFlAssets;
+import flixel.util.FlxSpriteUtil;
+
 import openfl.Lib;
 
 import objects.HealthIcon;
-import states.editors.ChartingState;
+import objects.BackButton;
+import flixel.util.FlxSpriteUtil;
 
 import substates.GameplayChangersSubstate;
 import substates.ResetScoreSubState;
-
-#if MODS_ALLOWED
-import sys.FileSystem;
-#end
+import substates.ScriptManagerSubstate;
+import substates.ReplaySubState;
 
 class FreeplayState extends MusicBeatState
 {
+	// ===== 布局常量 =====
+	// 所有文本一律左侧排版，右缘留足余量，不再做“靠右计算”，杜绝字符截断
+	static final PANEL_L_X:Float = 40;
+	static final PANEL_L_Y:Float = 70;
+	static final PANEL_L_W:Float = 680;
+	static final PANEL_L_H:Float = 570;
+
+	static final PANEL_R_X:Float = 740;
+	static final PANEL_R_Y:Float = 70;
+	static final PANEL_R_W:Float = 460;
+	static final PANEL_R_H:Float = 570;
+
+	static final LIST_X:Float = 88;      // 歌曲名 X
+	static final LIST_Y:Float = 152;     // 第一行 Y
+	static final ROW_GAP:Float = 62;     // 行距
+	static final ROWS_VISIBLE:Int = 7;   // 可见行数
+
+	static final INFO_X:Float = 772;     // 右侧信息 X
+	static final INFO_W:Float = 400;     // 右侧信息最大宽度
+
 	var songs:Array<SongMetadata> = [];
 
-	var selector:FlxText;
 	private static var curSelected:Int = 0;
-	var lerpSelected:Float = 0;
 	var curDifficulty:Int = -1;
 	private static var lastDifficultyName:String = Difficulty.getDefault();
 
-	var scoreBG:FlxSprite;
+	var songTitleText:FlxText;
 	var scoreText:FlxText;
+	var ratingText:FlxText;
 	var diffText:FlxText;
 	var lerpScore:Int = 0;
 	var lerpRating:Float = 0;
 	var intendedScore:Int = 0;
 	var intendedRating:Float = 0;
 
-	private var grpSongs:FlxTypedGroup<Alphabet>;
-	private var curPlaying:Bool = false;
+	var songRows:Array<MenuText> = [];
+	var songIcon:HealthIcon;
+	var selectorBar:FlxSprite;
+	var selectorTween:FlxTween;
+	var scrollIndex:Int = 0;
+	var mouseActive:Bool = true;  // 鼠标跟随是否激活（键盘操作时冻结，鼠标移动/点击时恢复）
+	var mouseLockX:Float = 0;      // 键盘接管时记录的鼠标位置
+	var mouseLockY:Float = 0;
 
-	private var iconArray:Array<HealthIcon> = [];
+	var backBtn:BackButton;
+	var scriptBtn:FlxSprite;
+	var scriptBtnText:FlxText;
+	var replayBtn:FlxSprite;
+	var replayBtnText:FlxText;
 
 	var bg:FlxSprite;
 	var intendedColor:Int;
@@ -50,11 +78,12 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		Lib.application.window.title = "FNF':Meteoric Engine - Select Song";
-		
-		//Paths.clearStoredMemory();
-		//Paths.clearUnusedMemory();
-		
+		PlayState.queuedReplay = null; // 清除可能残留的回放请求
+
 		persistentUpdate = true;
 		PlayState.isStoryMode = false;
 		WeekData.reloadWeekFiles(false);
@@ -95,55 +124,84 @@ class FreeplayState extends MusicBeatState
 		add(bg);
 		bg.screenCenter();
 
-		grpSongs = new FlxTypedGroup<Alphabet>();
-		add(grpSongs);
+		// ---- 圆角磨砂面板 ----
+		add(makePanel(PANEL_L_X, PANEL_L_Y, PANEL_L_W, PANEL_L_H, 22));
+		add(makePanel(PANEL_R_X, PANEL_R_Y, PANEL_R_W, PANEL_R_H, 22));
+		add(makePanel(40, 662, 1160, 48, 14));
 
-		for (i in 0...songs.length)
+		// ---- 面板标题 ----
+		var leftTitle:FlxText = new FlxText(LIST_X, 100, 0, '选择歌曲', 26);
+		leftTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		leftTitle.scrollFactor.set();
+		leftTitle.antialiasing = ClientPrefs.data.antialiasing;
+		add(leftTitle);
+
+		var rightTitle:FlxText = new FlxText(INFO_X, 100, 0, '歌曲信息', 26);
+		rightTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		rightTitle.scrollFactor.set();
+		rightTitle.antialiasing = ClientPrefs.data.antialiasing;
+		add(rightTitle);
+
+		// ---- 歌曲行（静态行：切换时只移动高亮条，行本身不整列滑动） ----
+		for (r in 0...ROWS_VISIBLE)
 		{
-			var songText:Alphabet = new Alphabet(320, 320, songs[i].songName, true);
-			songText.targetY = i;
-			grpSongs.add(songText);
-
-			songText.scaleX = Math.min(1, 980 / songText.width);
-			songText.snapToPosition();
-
-			Mods.currentModDirectory = songs[i].folder;
-			var icon:HealthIcon = new HealthIcon(songs[i].songCharacter);
-			icon.sprTracker = songText;
-
-			
-			// too laggy with a lot of songs, so i had to recode the logic for it
-			songText.visible = songText.active = songText.isMenuItem = false;
-			icon.visible = icon.active = false;
-
-			// using a FlxGroup is too much fuss!
-			iconArray.push(icon);
-			add(icon);
-
-			// songText.x += 40;
-			// DONT PUT X IN THE FIRST PARAMETER OF new ALPHABET() !!
-			// songText.screenCenter(X);
+			var row:MenuText = new MenuText(LIST_X, LIST_Y + (r * ROW_GAP), '', true, 30);
+			row.isMenuItem = false;
+			row.ID = r;
+			row.visible = false;
+			add(row);
+			songRows.push(row);
 		}
-		WeekData.setDirectoryFromWeek();
 
-		scoreText = new FlxText(FlxG.width * 0.7, 5, 0, "", 32);
-		scoreText.setFormat(Paths.font("future.ttf"), 32, FlxColor.WHITE, RIGHT);
+		// 悬停高亮条（只做视觉，不切换选中/滚动）+ 返回按钮
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
 
-		scoreBG = new FlxSprite(scoreText.x - 6, 0).makeGraphic(1, 66, 0xFF000000);
-		scoreBG.alpha = 0.6;
-		add(scoreBG);
+		// ---- 当前选中歌曲的大图标（显示在右侧曲目信息面板空白处） ----
+		songIcon = new HealthIcon('face');
+		songIcon.x = PANEL_R_X + (PANEL_R_W / 2) - 75;
+		songIcon.y = 425;
+		songIcon.visible = false;
+		add(songIcon);
 
-		diffText = new FlxText(scoreText.x, scoreText.y + 36, 0, "", 24);
-		diffText.font = scoreText.font;
-		add(diffText);
+		// ---- 选中高亮条 ----
+		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, 0x2EFFFFFF, null);
+		selectorBar.visible = false;
+		add(selectorBar);
 
-		add(scoreText);
+		// ---- 脚本管理按钮（管理当前选中歌曲的谱面脚本） ----
+		scriptBtn = makePanel(INFO_X, 566, 210, 46, 14, 0xCC161622, 0x45FFFFFF);
+		add(scriptBtn);
+		scriptBtnText = new FlxText(INFO_X, 576, 210, '脚本管理', 20);
+		scriptBtnText.setFormat(Paths.font('future.ttf'), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		scriptBtnText.borderSize = 1.5;
+		scriptBtnText.scrollFactor.set();
+		scriptBtnText.antialiasing = ClientPrefs.data.antialiasing;
+		add(scriptBtnText);
+
+		// ---- 回放按钮（播放当前歌曲/难度保存的回放） ----
+		replayBtn = makePanel(990, 566, 210, 46, 14, 0xCC161622, 0x45FFFFFF);
+		add(replayBtn);
+		replayBtnText = new FlxText(990, 576, 210, '回放', 20);
+		replayBtnText.setFormat(Paths.font('future.ttf'), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		replayBtnText.borderSize = 1.5;
+		replayBtnText.scrollFactor.set();
+		replayBtnText.antialiasing = ClientPrefs.data.antialiasing;
+		add(replayBtnText);
+
+		// ---- 右侧信息（固定位置，左对齐） ----
+		songTitleText = makeInfoText('', 140, 40);
+		scoreText = makeInfoText('最佳成绩：', 240, 28);
+		ratingText = makeInfoText('准确率：', 296, 28);
+		diffText = makeInfoText('', 360, 28);
 
 		missingTextBG = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		missingTextBG.alpha = 0.6;
 		missingTextBG.visible = false;
 		add(missingTextBG);
-		
+
 		missingText = new FlxText(50, 0, FlxG.width - 100, '', 24);
 		missingText.setFormat(Paths.font("future.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		missingText.scrollFactor.set();
@@ -153,38 +211,71 @@ class FreeplayState extends MusicBeatState
 		if(curSelected >= songs.length) curSelected = 0;
 		bg.color = songs[curSelected].color;
 		intendedColor = bg.color;
-		lerpSelected = curSelected;
 
 		curDifficulty = Math.round(Math.max(0, Difficulty.defaultList.indexOf(lastDifficultyName)));
-		
+
+		WeekData.setDirectoryFromWeek();
 		changeSelection();
 
-		var swag:Alphabet = new Alphabet(1, 0, "swag");
-
-		var textBG:FlxSprite = new FlxSprite(0, FlxG.height - 26).makeGraphic(FlxG.width, 26, 0xFF000000);
-		textBG.alpha = 0.6;
-		add(textBG);
-
 		#if PRELOAD_ALL
-		var leText:String = "按下 空格 试听曲目；按下 CTRL 打开游玩设置；按下 R 重置本曲目的分数";
+		var leText:String = "空格 试听 · CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
 		var size:Int = 16;
 		#else
-		var leText:String = "<!>未完全加载文件！按下 CTRL 打开游玩设置；按下 R 重置本曲目的分数";
+		var leText:String = "<!>未完全加载文件！CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
 		var size:Int = 16;
 		#end
-		var text:FlxText = new FlxText(textBG.x, textBG.y + 4, FlxG.width, leText, size);
+		var text:FlxText = new FlxText(40, 672, 1160, leText, size);
 		text.setFormat(Paths.font("future.ttf"), size, FlxColor.WHITE, CENTER);
 		text.scrollFactor.set();
 		add(text);
-		
-		updateTexts();
+
+		FlxG.mouse.visible = true;
 		super.create();
+
+		loadUIscripts('freeplay');
+	}
+
+	function makeInfoText(content:String, yPos:Float, ?size:Int = 28, ?textColor:FlxColor = FlxColor.WHITE):FlxText
+	{
+		var txt:FlxText = new FlxText(INFO_X, yPos, INFO_W, content, size);
+		txt.setFormat(Paths.font('future.ttf'), size, textColor, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		txt.borderSize = 2;
+		txt.scrollFactor.set();
+		txt.antialiasing = ClientPrefs.data.antialiasing;
+		add(txt);
+		return txt;
+	}
+
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	{
+		// unique：面板独立位图，避免与其他界面同尺寸面板（如回放列表）共享位图而被重复绘制叠加变黑
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
+		if(border != null)
+			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
+		spr.scrollFactor.set();
+		return spr;
 	}
 
 	override function closeSubState() {
+		FlxG.mouse.visible = true;
 		changeSelection(0, false);
 		persistentUpdate = true;
 		super.closeSubState();
+	}
+
+	function openScriptManager()
+	{
+		persistentUpdate = false;
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+		openSubState(new ScriptManagerSubstate(Paths.formatToSongPath(songs[curSelected].songName)));
+	}
+
+	function openReplayList()
+	{
+		persistentUpdate = false;
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+		openSubState(new ReplaySubState(songs[curSelected].songName, curDifficulty));
 	}
 
 	public function addSong(songName:String, weekNum:Int, songCharacter:String, color:Int)
@@ -196,22 +287,6 @@ class FreeplayState extends MusicBeatState
 		var leWeek:WeekData = WeekData.weeksLoaded.get(name);
 		return (!leWeek.startUnlocked && leWeek.weekBefore.length > 0 && (!StoryMenuState.weekCompleted.exists(leWeek.weekBefore) || !StoryMenuState.weekCompleted.get(leWeek.weekBefore)));
 	}
-
-	/*public function addWeek(songs:Array<String>, weekNum:Int, weekColor:Int, ?songCharacters:Array<String>)
-	{
-		if (songCharacters == null)
-			songCharacters = ['bf'];
-
-		var num:Int = 0;
-		for (song in songs)
-		{
-			addSong(song, weekNum, songCharacters[num]);
-			this.songs[this.songs.length-1].color = weekColor;
-
-			if (songCharacters.length != 1)
-				num++;
-		}
-	}*/
 
 	var instPlaying:Int = -1;
 	public static var vocals:FlxSound = null;
@@ -234,44 +309,61 @@ class FreeplayState extends MusicBeatState
 		if(ratingSplit.length < 2) { //No decimals, add an empty space
 			ratingSplit.push('');
 		}
-		
+
 		while(ratingSplit[1].length < 2) { //Less than 2 decimals in it, add decimals then
 			ratingSplit[1] += '0';
 		}
 
-		scoreText.text = '最佳成绩：' + lerpScore + ' | 准确率：' + ratingSplit.join('.') + '%';
-		positionHighscore();
+		scoreText.text = '最佳成绩：' + lerpScore;
+		ratingText.text = '准确率：' + ratingSplit.join('.') + '%';
 
 		var shiftMult:Int = 1;
 		if(FlxG.keys.pressed.SHIFT) shiftMult = 3;
+
+		var accepted:Bool = controls.ACCEPT;
 
 		if(songs.length > 1)
 		{
 			if(FlxG.keys.justPressed.HOME)
 			{
+				mouseActive = false;
+				mouseLockX = FlxG.mouse.x;
+				mouseLockY = FlxG.mouse.y;
 				curSelected = 0;
 				changeSelection();
-				holdTime = 0;	
+				holdTime = 0;
 			}
 			else if(FlxG.keys.justPressed.END)
 			{
+				mouseActive = false;
+				mouseLockX = FlxG.mouse.x;
+				mouseLockY = FlxG.mouse.y;
 				curSelected = songs.length - 1;
 				changeSelection();
-				holdTime = 0;	
+				holdTime = 0;
 			}
 			if (controls.UI_UP_P)
 			{
+				mouseActive = false;
+				mouseLockX = FlxG.mouse.x;
+				mouseLockY = FlxG.mouse.y;
 				changeSelection(-shiftMult);
 				holdTime = 0;
 			}
 			if (controls.UI_DOWN_P)
 			{
+				mouseActive = false;
+				mouseLockX = FlxG.mouse.x;
+				mouseLockY = FlxG.mouse.y;
 				changeSelection(shiftMult);
 				holdTime = 0;
 			}
 
 			if(controls.UI_DOWN || controls.UI_UP)
 			{
+				mouseActive = false; // 按住方向键期间键盘优先
+				mouseLockX = FlxG.mouse.x;
+				mouseLockY = FlxG.mouse.y;
 				var checkLastHold:Int = Math.floor((holdTime - 0.5) * 10);
 				holdTime += elapsed;
 				var checkNewHold:Int = Math.floor((holdTime - 0.5) * 10);
@@ -282,8 +374,53 @@ class FreeplayState extends MusicBeatState
 
 			if(FlxG.mouse.wheel != 0)
 			{
+				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
-				changeSelection(-shiftMult * FlxG.mouse.wheel, false);
+				changeSelection(shiftMult * (FlxG.mouse.wheel > 0 ? -1 : 1), false);
+			}
+
+			if (!controls.controllerMode)
+			{
+				var hoveredID:Int = getHoveredSongID();
+
+				// 鼠标离开键盘接管位置超过阈值 → 恢复鼠标跟随（防轻微抖动误触发）
+				if (!mouseActive)
+				{
+					var dx:Float = FlxG.mouse.x - mouseLockX;
+					var dy:Float = FlxG.mouse.y - mouseLockY;
+					if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
+				}
+
+				// 返回按钮：悬停高亮，点击返回主菜单
+				backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
+				if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+				{
+					mouseActive = true;
+					persistentUpdate = false;
+					if (colorTween != null) colorTween.cancel();
+					FlxG.sound.play(Paths.sound('cancelMenu'));
+					MusicBeatState.switchState(new MainMenuState());
+				}
+
+				if (hoveredID >= 0 && FlxG.mouse.justPressed)
+				{
+					mouseActive = true;
+					if (hoveredID != curSelected)
+					{
+						changeSelection(hoveredID - curSelected);
+						holdTime = 0;
+					}
+					accepted = true;
+				}
+				if (FlxG.mouse.overlaps(diffText) && FlxG.mouse.justPressed)
+				{
+					mouseActive = true;
+					if (FlxG.mouse.x < diffText.x + (diffText.width / 2))
+						changeDiff(-1);
+					else
+						changeDiff(1);
+					_updateSongLastDifficulty();
+				}
 			}
 		}
 
@@ -308,10 +445,36 @@ class FreeplayState extends MusicBeatState
 			MusicBeatState.switchState(new MainMenuState());
 		}
 
+		// 脚本管理按钮：悬停高亮 + 点击打开（管理当前选中歌曲的谱面脚本）
+		if (!controls.controllerMode)
+		{
+			var btnHovered:Bool = FlxG.mouse.x >= scriptBtn.x && FlxG.mouse.x <= scriptBtn.x + scriptBtn.width
+				&& FlxG.mouse.y >= scriptBtn.y && FlxG.mouse.y <= scriptBtn.y + scriptBtn.height;
+			scriptBtn.color = btnHovered ? 0xFF9FD8FF : 0xFFFFFFFF;
+			scriptBtnText.color = btnHovered ? 0xFF54C8FF : FlxColor.WHITE;
+			if (btnHovered && FlxG.mouse.justPressed)
+				openScriptManager();
+
+			// 回放按钮：悬停高亮 + 点击打开回放列表
+			var replayHovered:Bool = FlxG.mouse.x >= replayBtn.x && FlxG.mouse.x <= replayBtn.x + replayBtn.width
+				&& FlxG.mouse.y >= replayBtn.y && FlxG.mouse.y <= replayBtn.y + replayBtn.height;
+			replayBtn.color = replayHovered ? 0xFF9FD8FF : 0xFFFFFFFF;
+			replayBtnText.color = replayHovered ? 0xFF54C8FF : FlxColor.WHITE;
+			if (replayHovered && FlxG.mouse.justPressed)
+				openReplayList();
+		}
+
+		if (FlxG.keys.justPressed.P)
+			openReplayList();
+
 		if(FlxG.keys.justPressed.CONTROL)
 		{
 			persistentUpdate = false;
 			openSubState(new GameplayChangersSubstate());
+		}
+		else if(FlxG.keys.justPressed.L)
+		{
+			openScriptManager();
 		}
 		else if(FlxG.keys.justPressed.SPACE)
 		{
@@ -322,15 +485,15 @@ class FreeplayState extends MusicBeatState
 				destroyFreeplayVocals();
 				FlxG.sound.music.volume = 0;
 				Mods.currentModDirectory = songs[curSelected].folder;
-				var poop:String = Highscore.formatSong(songs[curSelected].songName.toLowerCase(), curDifficulty);
-				PlayState.SONG = Song.loadFromJson(poop, songs[curSelected].songName.toLowerCase());
-				if (PlayState.SONG.needsVoices)
-					vocals = new FlxSound().loadEmbedded(Paths.voices(PlayState.SONG.song));
+				var previewSong:String = Paths.formatToSongPath(songs[curSelected].songName);
+				// 试听不解析谱面（避免大谱面卡顿），直接用歌名播放音频
+				if (Song.voicesFileExists(previewSong))
+					vocals = new FlxSound().loadEmbedded(Paths.voices(previewSong));
 				else
 					vocals = new FlxSound();
 
 				FlxG.sound.list.add(vocals);
-				FlxG.sound.playMusic(Paths.inst(PlayState.SONG.song), 0.7);
+				FlxG.sound.playMusic(Paths.inst(previewSong), 0.7);
 				vocals.play();
 				vocals.persist = true;
 				vocals.looped = true;
@@ -340,53 +503,35 @@ class FreeplayState extends MusicBeatState
 			}
 		}
 
-		else if (controls.ACCEPT)
+		else if (accepted)
 		{
 			persistentUpdate = false;
 			var songLowercase:String = Paths.formatToSongPath(songs[curSelected].songName);
 			var poop:String = Highscore.formatSong(songLowercase, curDifficulty);
-			/*#if MODS_ALLOWED
-			if(!sys.FileSystem.exists(Paths.modsJson(songLowercase + '/' + poop)) && !sys.FileSystem.exists(Paths.json(songLowercase + '/' + poop))) {
-			#else
-			if(!OpenFlAssets.exists(Paths.json(songLowercase + '/' + poop))) {
-			#end
-				poop = songLowercase;
-				curDifficulty = 1;
-				trace('Couldnt find file');
-			}*/
 			trace(poop);
 
-			try
-			{
-				PlayState.SONG = Song.loadFromJson(poop, songLowercase);
-				PlayState.isStoryMode = false;
-				PlayState.storyDifficulty = curDifficulty;
+			PlayState.isStoryMode = false;
+			PlayState.storyDifficulty = curDifficulty;
 
-				trace('CURRENT WEEK: ' + WeekData.getWeekFileName());
-				if(colorTween != null) {
-					colorTween.cancel();
-				}
-			}
-			catch(e:Dynamic)
+			if(!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
 			{
-				trace('ERROR! $e');
-
-				var errorStr:String = e.toString();
-				if(errorStr.startsWith('[file_contents,assets/data/')) errorStr = '缺失的文件：' + errorStr.substring(27, errorStr.length-1); //Missing chart
-				missingText.text = '在加载铺面文件时出错：\n$errorStr';
+				missingText.text = '在加载铺面文件时出错：\n缺失的文件：data/' + songLowercase + '/' + poop;
 				missingText.screenCenter(Y);
 				missingText.visible = true;
 				missingTextBG.visible = true;
 				FlxG.sound.play(Paths.sound('cancelMenu'));
 
-				updateTexts(elapsed);
 				super.update(elapsed);
 				return;
 			}
-			LoadingState.loadAndSwitchState(new PlayState());
+
+			trace('CURRENT WEEK: ' + WeekData.getWeekFileName());
+			if(colorTween != null) {
+				colorTween.cancel();
+			}
 
 			FlxG.sound.music.volume = 0;
-					
+
 			destroyFreeplayVocals();
 			#if MODS_ALLOWED
 			DiscordClient.loadModRPC();
@@ -399,8 +544,13 @@ class FreeplayState extends MusicBeatState
 			FlxG.sound.play(Paths.sound('scrollMenu'));
 		}
 
-		updateTexts(elapsed);
 		super.update(elapsed);
+	}
+
+	override function destroy()
+	{
+		FlxG.mouse.visible = false;
+		super.destroy();
 	}
 
 	public static function destroyFreeplayVocals() {
@@ -409,6 +559,19 @@ class FreeplayState extends MusicBeatState
 			vocals.destroy();
 		}
 		vocals = null;
+	}
+
+	function getHoveredSongID():Int
+	{
+		var hoveredID:Int = -1;
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		for (row in songRows)
+		{
+			if (row.visible && mx >= row.x && mx <= row.x + row.width && my >= row.y && my <= row.y + row.height)
+				hoveredID = scrollIndex + row.ID;
+		}
+		return hoveredID;
 	}
 
 	function changeDiff(change:Int = 0)
@@ -431,7 +594,6 @@ class FreeplayState extends MusicBeatState
 		else
 			diffText.text = '难度：' + lastDifficultyName.toUpperCase();
 
-		positionHighscore();
 		missingText.visible = false;
 		missingTextBG.visible = false;
 	}
@@ -448,7 +610,13 @@ class FreeplayState extends MusicBeatState
 			curSelected = songs.length - 1;
 		if (curSelected >= songs.length)
 			curSelected = 0;
-			
+
+		// 滚动窗口：只有越过可见区时才整页滚动，平时只移动高亮条
+		if (curSelected < scrollIndex)
+			scrollIndex = curSelected;
+		else if (curSelected > scrollIndex + ROWS_VISIBLE - 1)
+			scrollIndex = curSelected - ROWS_VISIBLE + 1;
+
 		var newColor:Int = songs[curSelected].color;
 		if(newColor != intendedColor) {
 			if(colorTween != null) {
@@ -462,29 +630,12 @@ class FreeplayState extends MusicBeatState
 			});
 		}
 
-		// selector.y = (70 * curSelected) + 30;
+		refreshRows();
 
-		var bullShit:Int = 0;
-
-		for (i in 0...iconArray.length)
-		{
-			iconArray[i].alpha = 0.6;
-		}
-
-		iconArray[curSelected].alpha = 1;
-
-		for (item in grpSongs.members)
-		{
-			bullShit++;
-			item.alpha = 0.6;
-			if (item.targetY == curSelected)
-				item.alpha = 1;
-		}
-		
 		Mods.currentModDirectory = songs[curSelected].folder;
 		PlayState.storyWeek = songs[curSelected].week;
 		Difficulty.loadFromWeek();
-		
+
 		var savedDiff:String = songs[curSelected].lastDifficulty;
 		var lastDiff:Int = Difficulty.list.indexOf(lastDifficultyName);
 		if(savedDiff != null && !lastList.contains(savedDiff) && Difficulty.list.contains(savedDiff))
@@ -498,46 +649,59 @@ class FreeplayState extends MusicBeatState
 
 		changeDiff();
 		_updateSongLastDifficulty();
+
+		callUIScripts('onChangeSelection', [curSelected, songs[curSelected].songName]);
+	}
+
+	function refreshRows()
+	{
+		for (r in 0...ROWS_VISIBLE)
+		{
+			var idx:Int = scrollIndex + r;
+			var row:MenuText = songRows[r];
+
+			if (idx >= songs.length)
+			{
+				row.visible = false;
+				continue;
+			}
+
+			var meta:SongMetadata = songs[idx];
+			var isSel:Bool = (idx == curSelected);
+
+			row.visible = true;
+			row.text = meta.songName;
+			row.updateHitbox();
+			row.alpha = isSel ? 1 : 0.55;
+			row.color = isSel ? FlxColor.WHITE : 0xFFB8B8C8;
+		}
+
+		// ---- 大图标跟随选中曲目 ----
+		if (songs.length > 0)
+		{
+			Mods.currentModDirectory = songs[curSelected].folder;
+			songIcon.scale.set(1, 1);
+			songIcon.changeIcon(songs[curSelected].songCharacter);
+			songIcon.offset.set(0, 0);
+			songIcon.visible = true;
+		}
+
+		songTitleText.text = songs[curSelected].songName;
+		songTitleText.updateHitbox();
+
+		var barY:Float = LIST_Y - 3 + ((curSelected - scrollIndex) * ROW_GAP);
+		selectorBar.visible = (songs.length > 0);
+		if(selectorTween != null) {
+			selectorTween.cancel();
+			selectorTween = null;
+		}
+		if(selectorBar.y != barY)
+			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
 	}
 
 	inline private function _updateSongLastDifficulty()
 	{
 		songs[curSelected].lastDifficulty = Difficulty.getString(curDifficulty);
-	}
-
-	private function positionHighscore() {
-		scoreText.x = FlxG.width - scoreText.width - 6;
-		scoreBG.scale.x = FlxG.width - scoreText.x + 6;
-		scoreBG.x = FlxG.width - (scoreBG.scale.x / 2);
-		diffText.x = Std.int(scoreBG.x + (scoreBG.width / 2));
-		diffText.x -= diffText.width / 2;
-	}
-
-	var _drawDistance:Int = 4;
-	var _lastVisibles:Array<Int> = [];
-	public function updateTexts(elapsed:Float = 0.0)
-	{
-		lerpSelected = FlxMath.lerp(lerpSelected, curSelected, FlxMath.bound(elapsed * 9.6, 0, 1));
-		for (i in _lastVisibles)
-		{
-			grpSongs.members[i].visible = grpSongs.members[i].active = false;
-			iconArray[i].visible = iconArray[i].active = false;
-		}
-		_lastVisibles = [];
-
-		var min:Int = Math.round(Math.max(0, Math.min(songs.length, lerpSelected - _drawDistance)));
-		var max:Int = Math.round(Math.max(0, Math.min(songs.length, lerpSelected + _drawDistance)));
-		for (i in min...max)
-		{
-			var item:Alphabet = grpSongs.members[i];
-			item.visible = item.active = true;
-			item.x = ((item.targetY - lerpSelected) * item.distancePerItem.x) + item.startPosition.x;
-			item.y = ((item.targetY - lerpSelected) * 1.3 * item.distancePerItem.y) + item.startPosition.y;
-
-			var icon:HealthIcon = iconArray[i];
-			icon.visible = icon.active = true;
-			_lastVisibles.push(i);
-		}
 	}
 }
 

@@ -1,52 +1,102 @@
 package states;
 
-import backend.WeekData;
+import objects.BackButton;
+import objects.AchievementPopup;
 import backend.Achievements;
 
-import flixel.FlxObject;
-import flixel.addons.transition.FlxTransitionableState;
-import flixel.effects.FlxFlicker;
-
-import flixel.input.keyboard.FlxKey;
-import lime.app.Application;
-
-import objects.AchievementPopup;
 import states.editors.MasterEditorMenu;
 import options.OptionsState;
+
+import flixel.addons.transition.FlxTransitionableState;
+import flixel.util.FlxSpriteUtil;
+
 import openfl.Lib;
 
 class MainMenuState extends MusicBeatState
 {
-	public static var curSelected:Int = 0;
+	// ===== 布局常量 =====
+	static final PANEL_L_X:Float = 40;
+	static final PANEL_L_Y:Float = 70;
+	static final PANEL_L_W:Float = 680;
+	static final PANEL_L_H:Float = 570;
 
-	var menuItems:FlxTypedGroup<FlxSprite>;
-	private var camGame:FlxCamera;
-	private var camAchievement:FlxCamera;
-	
-	var optionShit:Array<String> = [
-		'story_mode',
-		'freeplay',
-		#if MODS_ALLOWED 'mods', #end
-		#if ACHIEVEMENTS_ALLOWED 'awards', #end
-		'credits',
-		#if !switch 'donate', #end
-		'options'
+	static final PANEL_R_X:Float = 740;
+	static final PANEL_R_Y:Float = 70;
+	static final PANEL_R_W:Float = 460;
+	static final PANEL_R_H:Float = 570;
+
+	static final LIST_X:Float = 88;
+	static final LIST_Y:Float = 152;
+	static final ROW_GAP:Float = 56;
+	static final ROWS_VISIBLE:Int = 8;
+
+	static final INFO_X:Float = 772;
+	static final INFO_W:Float = 400;
+
+	// 菜单项：ID / 名称 / 描述 / 背景色
+	var optionShit:Array<Array<Dynamic>> = [
+		['story_mode', '故事模式', '按章节顺序挑战官方曲目，一路打到周日晚上的对决。', 0xFFDD88FF],
+		['freeplay', '自由游玩', '从全部已解锁曲目中任选一首挑战，还能查看最佳成绩与准确率。', 0xFF66DDFF],
+		#if MODS_ALLOWED
+		['mods', 'MOD', '管理已安装的模组：启用、停用或浏览模组内容。', 0xFF88E58A],
+		#end
+		#if ACHIEVEMENTS_ALLOWED
+		['awards', '成就', '查看已解锁的成就与游戏内的挑战进度。', 0xFFFFD166],
+		#end
+		['credits', '制作人员', '查看 Meteoric Engine 与 Friday Night Funkin 的制作人员名单。', 0xFFFF8A8A],
+		#if !switch
+		['donate', '赞助', '打开赞助页面，支持游戏的开发与后续更新。', 0xFFFF9E5E],
+		#end
+		['options', '设置', '调整图像、视觉、游戏玩法与按键绑定等全部设置。', 0xFFB0B6FF],
+		['old_menu', '旧版界面', '切换到 1.0.4 的经典主界面，重温 Alphabet 字母菜单。', 0xFF9E8AFF],
+		['crash_test', '崩溃测试', '故意触发一个异常，用来测试游戏内报错系统。测试完按 Enter 即可返回主菜单。', 0xFF555555]
 	];
 
-	var magenta:FlxSprite;
-	var camFollow:FlxObject;
+	public static var curSelected:Int = 0;
+
+	var rows:Array<MenuText> = [];
+	var titleText:FlxText;    // 左侧主标题（界面脚本可 setText）
+	var subtitleText:FlxText; // 右侧副标题（界面脚本可 setText）
+	var itemNameText:FlxText;
+	var descText:FlxText;
+	var actionText:FlxText;
+	var selectorBar:FlxSprite;
+	var selectorTween:FlxTween;
+	var scrollOffset:Int = 0;
+	var lastItemName:String = '';
+	var lastDesc:String = '';
+	var lastAction:String = '';
+
+	var bg:FlxSprite;
+	var colorTween:FlxTween;
+
+	var backBtn:BackButton;
+	var selectedSomethin:Bool = false;
+
+	// ===== 鼠标/键盘输入分离 =====
+	var mouseActive:Bool = true;  // 键盘操作后冻结，鼠标明显移动/滚轮/点击恢复
+	var mouseLockX:Float = 0;
+	var mouseLockY:Float = 0;
+	static final MOUSE_REACTIVATE_DIST:Float = 10;
+
+	var camGame:FlxCamera;
+	var camAchievement:FlxCamera;
 
 	override function create()
 	{
+		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
+		Paths.clearStoredMemory();
+		Paths.clearUnusedMemory();
 		Lib.application.window.title = "FNF':Meteoric Engine - Main Menu";
-		
+
+		if (curSelected >= optionShit.length) curSelected = 0;
+
 		#if MODS_ALLOWED
 		Mods.pushGlobalMods();
 		#end
 		Mods.loadTopMod();
 
 		#if desktop
-		// Updating Discord Rich Presence
 		DiscordClient.changePresence("In the Menus", null);
 		#end
 
@@ -57,82 +107,111 @@ class MainMenuState extends MusicBeatState
 		FlxG.cameras.reset(camGame);
 		FlxG.cameras.add(camAchievement, false);
 		FlxG.cameras.setDefaultDrawTarget(camGame, true);
+		FlxG.mouse.visible = true;
 
 		transIn = FlxTransitionableState.defaultTransIn;
 		transOut = FlxTransitionableState.defaultTransOut;
 
 		persistentUpdate = persistentDraw = true;
 
-		var yScroll:Float = Math.max(0.25 - (0.05 * (optionShit.length - 4)), 0.1);
-		var bg:FlxSprite = new FlxSprite(-80).loadGraphic(Paths.image('menuBG'));
+		// ---- 背景 ----
+		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
-		bg.scrollFactor.set(0, yScroll);
-		bg.setGraphicSize(Std.int(bg.width * 1.175));
-		bg.updateHitbox();
 		bg.screenCenter();
 		add(bg);
+		bg.color = optionShit[curSelected][3];
 
-		camFollow = new FlxObject(0, 0, 1, 1);
-		add(camFollow);
+		// ---- 圆角磨砂面板 ----
+		add(makePanel(PANEL_L_X, PANEL_L_Y, PANEL_L_W, PANEL_L_H, 22));
+		add(makePanel(PANEL_R_X, PANEL_R_Y, PANEL_R_W, PANEL_R_H, 22));
+		add(makePanel(40, 662, 1160, 48, 14));
 
-		magenta = new FlxSprite(-80).loadGraphic(Paths.image('menuDesat'));
-		magenta.antialiasing = ClientPrefs.data.antialiasing;
-		magenta.scrollFactor.set(0, yScroll);
-		magenta.setGraphicSize(Std.int(magenta.width * 1.175));
-		magenta.updateHitbox();
-		magenta.screenCenter();
-		magenta.visible = false;
-		magenta.color = 0xFFfd719b;
-		add(magenta);
-		
-		// magenta.scrollFactor.set();
+		// ---- 标题 ----
+		titleText = new FlxText(LIST_X, 100, 0, '主菜单', 26);
+		titleText.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		titleText.borderSize = 2;
+		titleText.scrollFactor.set();
+		add(titleText);
 
-		menuItems = new FlxTypedGroup<FlxSprite>();
-		add(menuItems);
+		subtitleText = new FlxText(INFO_X, 100, 0, '选项说明', 26);
+		subtitleText.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		subtitleText.borderSize = 2;
+		subtitleText.scrollFactor.set();
+		add(subtitleText);
 
-		var scale:Float = 1;
-		/*if(optionShit.length > 6) {
-			scale = 6 / optionShit.length;
-		}*/
-
-		for (i in 0...optionShit.length)
+		// ---- 版本信息 ----
+		if (TitleState.mainUpdateCheck)
 		{
-			var offset:Float = 108 - (Math.max(optionShit.length, 4) - 4) * 80;
-			var menuItem:FlxSprite = new FlxSprite(0, (i * 140)  + offset);
-			menuItem.antialiasing = ClientPrefs.data.antialiasing;
-			menuItem.scale.x = scale;
-			menuItem.scale.y = scale;
-			menuItem.frames = Paths.getSparrowAtlas('mainmenu/menu_' + optionShit[i]);
-			menuItem.animation.addByPrefix('idle', optionShit[i] + " basic", 24);
-			menuItem.animation.addByPrefix('selected', optionShit[i] + " white", 24);
-			menuItem.animation.play('idle');
-			menuItem.ID = i;
-			menuItem.screenCenter(X);
-			menuItems.add(menuItem);
-			var scr:Float = (optionShit.length - 4) * 0.135;
-			if(optionShit.length < 6) scr = 0;
-			menuItem.scrollFactor.set(0, scr);
-			//menuItem.setGraphicSize(Std.int(menuItem.width * 0.58));
-			menuItem.updateHitbox();
+			var verText:FlxText = new FlxText(40, 18, 0, 'Meteoric Engine v' + Main.meVersion + '（旧版本）', 16);
+			verText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			verText.borderSize = 2;
+			verText.scrollFactor.set();
+			add(verText);
+
+			var updText:FlxText = new FlxText(40, 40, 0, '新版本：' + TitleState.updateVersion, 16);
+			updText.setFormat(Paths.font('future.ttf'), 16, 0xFFFFD166, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			updText.borderSize = 2;
+			updText.scrollFactor.set();
+			add(updText);
+		}
+		else
+		{
+			var verText:FlxText = new FlxText(40, 18, 0, 'Meteoric Engine v' + Main.meVersion, 16);
+			verText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			verText.borderSize = 2;
+			verText.scrollFactor.set();
+			add(verText);
 		}
 
-		FlxG.camera.follow(camFollow, null, 0);
-
-		if (TitleState.mainUpdateCheck){
-		    var versionShit:FlxText = new FlxText(12, FlxG.height - 45, 0, "Meteoric Engine v" + Main.meVersion + "（旧版本）\n新版本：" + TitleState.updateVersion, 12);
-			versionShit.scrollFactor.set();
-		    versionShit.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			add(versionShit);
-		}else{
-			var versionShit:FlxText = new FlxText(12, FlxG.height - 25, 0, "Meteoric Engine v" + Main.meVersion, 12);
-			versionShit.scrollFactor.set();
-			versionShit.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			add(versionShit);
+		// ---- 菜单行（静态行：切换时只移动高亮条） ----
+		for (r in 0...ROWS_VISIBLE)
+		{
+			var row:MenuText = new MenuText(LIST_X, LIST_Y + (r * ROW_GAP), '', true, 30);
+			row.isMenuItem = false;
+			row.ID = r;
+			row.visible = false;
+			row.scrollFactor.set();
+			add(row);
+			rows.push(row);
 		}
 
-		// NG.core.calls.event.logEvent('swag').send();
+		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, 0x2EFFFFFF, null);
+		selectorBar.visible = false;
+		add(selectorBar);
 
-		changeItem();
+		// ---- 右侧信息 ----
+		itemNameText = new FlxText(INFO_X, 165, INFO_W, '', 40);
+		itemNameText.setFormat(Paths.font('future.ttf'), 40, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		itemNameText.borderSize = 2;
+		itemNameText.scrollFactor.set();
+		add(itemNameText);
+
+		descText = new FlxText(INFO_X, 240, INFO_W, '', 24);
+		descText.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		descText.borderSize = 2;
+		descText.scrollFactor.set();
+		add(descText);
+
+		actionText = new FlxText(INFO_X, 555, INFO_W, '', 20);
+		actionText.setFormat(Paths.font('future.ttf'), 20, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		actionText.borderSize = 2;
+		actionText.scrollFactor.set();
+		add(actionText);
+
+		// ---- 底部提示 ----
+		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter 确认 · 点击 < 返回标题', 16);
+		hint.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		hint.borderSize = 2;
+		hint.scrollFactor.set();
+		add(hint);
+
+		// ---- 返回按钮 ----
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
+
+		changeSelection();
 
 		#if ACHIEVEMENTS_ALLOWED
 		Achievements.loadAchievements();
@@ -148,6 +227,8 @@ class MainMenuState extends MusicBeatState
 		#end
 
 		super.create();
+
+		loadUIscripts('main_menu');
 	}
 
 	#if ACHIEVEMENTS_ALLOWED
@@ -159,8 +240,6 @@ class MainMenuState extends MusicBeatState
 	}
 	#end
 
-	var selectedSomethin:Bool = false;
-
 	override function update(elapsed:Float)
 	{
 		if (FlxG.sound.music.volume < 0.8)
@@ -168,20 +247,24 @@ class MainMenuState extends MusicBeatState
 			FlxG.sound.music.volume += 0.5 * elapsed;
 			if(FreeplayState.vocals != null) FreeplayState.vocals.volume += 0.5 * elapsed;
 		}
-		FlxG.camera.followLerp = FlxMath.bound(elapsed * 9 / (FlxG.updateFramerate / 60), 0, 1);
 
 		if (!selectedSomethin)
 		{
+			FlxG.mouse.visible = true;
+			updateMouseControl();
+
 			if (controls.UI_UP_P)
 			{
+				takeKeyboardControl();
 				FlxG.sound.play(Paths.sound('scrollMenu'));
-				changeItem(-1);
+				changeSelection(-1);
 			}
 
 			if (controls.UI_DOWN_P)
 			{
+				takeKeyboardControl();
 				FlxG.sound.play(Paths.sound('scrollMenu'));
-				changeItem(1);
+				changeSelection(1);
 			}
 
 			if (controls.BACK)
@@ -193,62 +276,7 @@ class MainMenuState extends MusicBeatState
 
 			if (controls.ACCEPT)
 			{
-				if (optionShit[curSelected] == 'donate')
-				{
-					CoolUtil.browserLoad('https://ninja-muffin24.itch.io/funkin');
-				}
-				else
-				{
-					selectedSomethin = true;
-					FlxG.sound.play(Paths.sound('confirmMenu'));
-
-					if(ClientPrefs.data.flashing) FlxFlicker.flicker(magenta, 1.1, 0.15, false);
-
-					menuItems.forEach(function(spr:FlxSprite)
-					{
-						if (curSelected != spr.ID)
-						{
-							FlxTween.tween(spr, {alpha: 0}, 0.4, {
-								ease: FlxEase.quadOut,
-								onComplete: function(twn:FlxTween)
-								{
-									spr.kill();
-								}
-							});
-						}
-						else
-						{
-							FlxFlicker.flicker(spr, 1, 0.06, false, false, function(flick:FlxFlicker)
-							{
-								var daChoice:String = optionShit[curSelected];
-
-								switch (daChoice)
-								{
-									case 'story_mode':
-										MusicBeatState.switchState(new StoryMenuState());
-									case 'freeplay':
-										MusicBeatState.switchState(new FreeplayState());
-									#if MODS_ALLOWED
-									case 'mods':
-										MusicBeatState.switchState(new ModsMenuState());
-									#end
-									case 'awards':
-										MusicBeatState.switchState(new AchievementsMenuState());
-									case 'credits':
-										MusicBeatState.switchState(new CreditsState());
-									case 'options':
-										LoadingState.loadAndSwitchState(new OptionsState());
-										OptionsState.onPlayState = false;
-										if (PlayState.SONG != null)
-										{
-											PlayState.SONG.arrowSkin = null;
-											PlayState.SONG.splashSkin = null;
-										}
-								}
-							});
-						}
-					});
-				}
+				selectItem();
 			}
 			#if desktop
 			else if (controls.justPressed('debug_1'))
@@ -260,37 +288,193 @@ class MainMenuState extends MusicBeatState
 		}
 
 		super.update(elapsed);
-
-		menuItems.forEach(function(spr:FlxSprite)
-		{
-			spr.screenCenter(X);
-		});
 	}
 
-	function changeItem(huh:Int = 0)
+	// ===== 鼠标控制（全部基于屏幕坐标） =====
+	function updateMouseControl()
+	{
+		// 键盘接管后：鼠标必须物理移动超过阈值才恢复跟随
+		if (!mouseActive)
+		{
+			var dx:Float = FlxG.mouse.screenX - mouseLockX;
+			var dy:Float = FlxG.mouse.screenY - mouseLockY;
+			if (dx * dx + dy * dy > MOUSE_REACTIVATE_DIST * MOUSE_REACTIVATE_DIST)
+				mouseActive = true;
+		}
+
+		// 滚轮控制：上滚上一个、下滚下一个
+		if (FlxG.mouse.wheel != 0)
+		{
+			mouseActive = true;
+			FlxG.sound.play(Paths.sound('scrollMenu'));
+			changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+		}
+
+		// 返回按钮：悬停高亮，点击返回标题界面
+		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
+		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		{
+			mouseActive = true;
+			selectedSomethin = true;
+			FlxG.sound.play(Paths.sound('cancelMenu'));
+			MusicBeatState.switchState(new TitleState());
+		}
+
+		// 点击永远生效：先切到鼠标所在项，再确认
+		if (FlxG.mouse.justPressed)
+		{
+			var clickID:Int = getHoveredRowID();
+			if (clickID >= 0)
+			{
+				mouseActive = true;
+				if (clickID != curSelected)
+				{
+					changeSelection(clickID - curSelected);
+					FlxG.sound.play(Paths.sound('scrollMenu'));
+				}
+				selectItem();
+			}
+		}
+	}
+
+	function takeKeyboardControl()
+	{
+		mouseActive = false;
+		mouseLockX = FlxG.mouse.screenX;
+		mouseLockY = FlxG.mouse.screenY;
+	}
+
+	function getHoveredRowID():Int
+	{
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		for (r in 0...rows.length)
+		{
+			var row:MenuText = rows[r];
+			if (!row.visible) continue;
+			if (mx >= LIST_X - 12 && mx <= LIST_X + PANEL_L_W - 40 && my >= row.y - 8 && my <= row.y + 46)
+				return r + scrollOffset;
+		}
+		return -1;
+	}
+
+	function changeSelection(huh:Int = 0)
 	{
 		curSelected += huh;
 
-		if (curSelected >= menuItems.length)
+		if (curSelected >= optionShit.length)
 			curSelected = 0;
 		if (curSelected < 0)
-			curSelected = menuItems.length - 1;
+			curSelected = optionShit.length - 1;
 
-		menuItems.forEach(function(spr:FlxSprite)
+		var leItem:Array<Dynamic> = optionShit[curSelected];
+		var nameStr:String = leItem[1];
+		var descStr:String = leItem[2];
+		var actionStr:String = leItem[0] == 'donate' ? '点击打开赞助页面' : '按 Enter / 点击进入';
+
+		// 列表滚动：超出可视行数时整体上移
+		scrollOffset = (curSelected >= ROWS_VISIBLE) ? curSelected - ROWS_VISIBLE + 1 : 0;
+
+		// 防文字跳舞：内容未变化时不重绘
+		if (lastItemName != nameStr) { lastItemName = nameStr; itemNameText.text = nameStr; itemNameText.updateHitbox(); }
+		if (lastDesc != descStr) { lastDesc = descStr; descText.text = descStr; descText.updateHitbox(); }
+		if (lastAction != actionStr) { lastAction = actionStr; actionText.text = actionStr; actionText.updateHitbox(); }
+
+		// 行状态
+		for (r in 0...rows.length)
 		{
-			spr.animation.play('idle');
-			spr.updateHitbox();
-
-			if (spr.ID == curSelected)
+			var row:MenuText = rows[r];
+			var idx:Int = r + scrollOffset;
+			if (idx >= optionShit.length)
 			{
-				spr.animation.play('selected');
-				var add:Float = 0;
-				if(menuItems.length > 4) {
-					add = menuItems.length * 8;
-				}
-				camFollow.setPosition(spr.getGraphicMidpoint().x, spr.getGraphicMidpoint().y - add);
-				spr.centerOffsets();
+				row.visible = false;
+				continue;
 			}
-		});
+			row.visible = true;
+			row.text = optionShit[idx][1];
+			row.updateHitbox();
+			var isSel:Bool = (idx == curSelected);
+			row.alpha = isSel ? 1 : 0.78;
+			row.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+		}
+
+		// 高亮条移动
+		var barY:Float = LIST_Y - 3 + ((curSelected - scrollOffset) * ROW_GAP);
+		selectorBar.visible = true;
+		if (selectorTween != null) { selectorTween.cancel(); selectorTween = null; }
+		if (selectorBar.y != barY)
+			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
+
+		// 背景色过渡
+		var newColor:Int = leItem[3];
+		if (bg.color != newColor)
+		{
+			if (colorTween != null) { colorTween.cancel(); colorTween = null; }
+			colorTween = FlxTween.color(bg, 0.4, bg.color, newColor, {ease: FlxEase.quadOut});
+		}
+
+		callUIScripts('onChangeSelection', [curSelected, leItem[0]]);
+	}
+
+	function selectItem()
+	{
+		var daChoice:String = optionShit[curSelected][0];
+		callUIScripts('onConfirm', [daChoice]);
+
+		if (daChoice == 'donate')
+		{
+			CoolUtil.browserLoad('https://ninja-muffin24.itch.io/funkin');
+			return;
+		}
+
+		selectedSomethin = true;
+		FlxG.sound.play(Paths.sound('confirmMenu'));
+
+		switch (daChoice)
+		{
+			case 'story_mode':
+				MusicBeatState.switchState(new StoryMenuState());
+			case 'freeplay':
+				MusicBeatState.switchState(new FreeplayState());
+			#if MODS_ALLOWED
+			case 'mods':
+				MusicBeatState.switchState(new ModsMenuState());
+			#end
+			#if ACHIEVEMENTS_ALLOWED
+			case 'awards':
+				MusicBeatState.switchState(new AchievementsMenuState());
+			#end
+			case 'credits':
+				MusicBeatState.switchState(new CreditsState());
+			case 'options':
+				LoadingState.loadAndSwitchState(new OptionsState());
+				OptionsState.onPlayState = false;
+				if (PlayState.SONG != null)
+				{
+					PlayState.SONG.arrowSkin = null;
+					PlayState.SONG.splashSkin = null;
+				}
+			case 'old_menu':
+				MusicBeatState.switchState(new OldMenuState());
+			case 'crash_test':
+				throw '崩溃测试：这是故意触发的异常，用来验证游戏内报错系统。';
+		}
+	}
+
+	// ===== 工具 =====
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
+		if (border != null)
+			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
+		spr.scrollFactor.set();
+		return spr;
+	}
+
+	override function destroy()
+	{
+		FlxG.mouse.visible = false;
+		super.destroy();
 	}
 }
