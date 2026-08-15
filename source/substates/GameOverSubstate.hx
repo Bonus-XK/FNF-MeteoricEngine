@@ -16,6 +16,10 @@ class GameOverSubstate extends MusicBeatSubstate
 	var camFollow:FlxObject;
 	var updateCamera:Bool = false;
 	var playingDeathSound:Bool = false;
+	var btnA:FlxSprite;
+	var btnB:FlxSprite;
+	var btnAText:FlxText;
+	var btnBText:FlxText;
 
 	var stageSuffix:String = "";
 
@@ -49,6 +53,25 @@ class GameOverSubstate extends MusicBeatSubstate
 		PlayState.instance.callOnScripts('onGameOverStart', []);
 
 		super.create();
+
+		// A/B 触控键：A=复活重试，B=返回选歌界面
+		var btnW:Int = 230;
+		var btnH:Int = 64;
+		var btnY:Float = FlxG.height - 130;
+		btnA = new FlxSprite(FlxG.width / 2 - btnW - 20, btnY).makeGraphic(btnW, btnH, 0xFF2A6B2A);
+		btnB = new FlxSprite(FlxG.width / 2 + 20, btnY).makeGraphic(btnW, btnH, 0xFF6B2A2A);
+		add(btnA);
+		add(btnB);
+
+		btnAText = new FlxText(btnA.x, btnA.y, btnW, 'A = 复活', 22);
+		btnAText.alignment = CENTER;
+		btnAText.color = FlxColor.WHITE;
+		add(btnAText);
+
+		btnBText = new FlxText(btnB.x, btnB.y, btnW, 'B = 返回选歌', 22);
+		btnBText.alignment = CENTER;
+		btnBText.color = FlxColor.WHITE;
+		add(btnBText);
 
 		loadUIscripts('gameover');
 	}
@@ -86,7 +109,71 @@ class GameOverSubstate extends MusicBeatSubstate
 
 		PlayState.instance.callOnScripts('onUpdate', [elapsed]);
 
-		if (controls.ACCEPT || FlxG.mouse.justPressed)
+		if (FlxG.mouse.justPressed)
+		{
+			var mx:Float = FlxG.mouse.screenX;
+			var my:Float = FlxG.mouse.screenY;
+			if (btnA != null && mx >= btnA.x && mx <= btnA.x + btnA.width && my >= btnA.y && my <= btnA.y + btnA.height)
+			{
+				endBullshit();
+				return;
+			}
+			if (btnB != null && mx >= btnB.x && mx <= btnB.x + btnB.width && my >= btnB.y && my <= btnB.y + btnB.height)
+			{
+				#if desktop DiscordClient.resetClientID(); #end
+				FlxG.sound.music.stop();
+				PlayState.deathCounter = 0;
+				PlayState.seenCutscene = false;
+				PlayState.chartingMode = false;
+
+				Mods.loadTopMod();
+				if (PlayState.isStoryMode)
+					MusicBeatState.switchState(new StoryMenuState());
+				else
+					MusicBeatState.switchState(new FreeplayState());
+
+				FlxG.sound.playMusic(Paths.music('freakyMenu'));
+				PlayState.instance.callOnScripts('onGameOverConfirm', [false]);
+				return;
+			}
+		}
+
+		#if mobile
+		// 触屏点按 A/B 按钮（不依赖鼠标模拟）
+		for (touch in FlxG.touches.list)
+		{
+			if (!touch.justPressed) continue;
+			var tp:FlxPoint = touch.getPositionInCameraView(FlxG.camera, FlxPoint.get());
+			if (btnA != null && tp.x >= btnA.x && tp.x <= btnA.x + btnA.width && tp.y >= btnA.y && tp.y <= btnA.y + btnA.height)
+			{
+				tp.put();
+				endBullshit();
+				return;
+			}
+			if (btnB != null && tp.x >= btnB.x && tp.x <= btnB.x + btnB.width && tp.y >= btnB.y && tp.y <= btnB.y + btnB.height)
+			{
+				tp.put();
+				#if desktop DiscordClient.resetClientID(); #end
+				FlxG.sound.music.stop();
+				PlayState.deathCounter = 0;
+				PlayState.seenCutscene = false;
+				PlayState.chartingMode = false;
+
+				Mods.loadTopMod();
+				if (PlayState.isStoryMode)
+					MusicBeatState.switchState(new StoryMenuState());
+				else
+					MusicBeatState.switchState(new FreeplayState());
+
+				FlxG.sound.playMusic(Paths.music('freakyMenu'));
+				PlayState.instance.callOnScripts('onGameOverConfirm', [false]);
+				return;
+			}
+			tp.put();
+		}
+		#end
+
+		if (controls.ACCEPT)
 		{
 			endBullshit();
 		}
@@ -173,6 +260,9 @@ class GameOverSubstate extends MusicBeatSubstate
 			FlxG.sound.play(Paths.music(endSoundName));
 			new FlxTimer().start(0.7, function(tmr:FlxTimer)
 			{
+				// 回放中死亡重试：保留回放数据，重开后继续回放
+				if (PlayState.instance.replayMode && PlayState.carryReplay != null)
+					PlayState.queuedReplay = PlayState.carryReplay;
 				FlxG.camera.fade(FlxColor.BLACK, 2, false, function()
 				{
 					MusicBeatState.resetState();

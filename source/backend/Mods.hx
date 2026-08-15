@@ -81,7 +81,7 @@ class Mods
 		if(defaultDirectory == null) defaultDirectory = Paths.getPreloadPath();
 		defaultDirectory = defaultDirectory.trim();
 		if(!defaultDirectory.endsWith('/')) defaultDirectory += '/';
-		if(!defaultDirectory.startsWith('assets/')) defaultDirectory = 'assets/$defaultDirectory';
+		if(!defaultDirectory.startsWith('assets/') && !haxe.io.Path.isAbsolute(defaultDirectory)) defaultDirectory = 'assets/$defaultDirectory';
 
 		var mergedList:Array<String> = [];
 		var paths:Array<String> = directoriesWithFile(defaultDirectory, path);
@@ -159,13 +159,24 @@ class Mods
 	}
 
 	public static var updatedOnState:Bool = false;
+
+	// modsList.txt 在安卓上写到外部存储（/sdcard/meteoric），桌面保持原样
+	inline static function modsListPath():String
+	{
+		#if android
+		return backend.AndroidStorage.root() + '/modsList.txt';
+		#else
+		return 'modsList.txt';
+		#end
+	}
+
 	inline public static function parseList():ModsList {
 		if(!updatedOnState) updateModList();
 		var list:ModsList = {enabled: [], disabled: [], all: []};
 
 		#if MODS_ALLOWED
 		try {
-			for (mod in CoolUtil.coolTextFile('modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(modsListPath()))
 			{
 				//trace('Mod: $mod');
 				if(mod.trim().length < 1) continue;
@@ -191,7 +202,7 @@ class Mods
 		var list:Array<Array<Dynamic>> = [];
 		var added:Array<String> = [];
 		try {
-			for (mod in CoolUtil.coolTextFile('modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(modsListPath()))
 			{
 				var dat:Array<String> = mod.split("|");
 				var folder:String = dat[0];
@@ -226,7 +237,7 @@ class Mods
 		}
 
 		try {
-			File.saveContent('modsList.txt', fileStr);
+			File.saveContent(modsListPath(), fileStr);
 		} catch(e:Dynamic) {
 			trace('Could not save modsList.txt: $e');
 		}

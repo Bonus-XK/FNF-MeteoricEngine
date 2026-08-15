@@ -61,6 +61,8 @@ class SaveVariables {
 	@:keep public var comboStacking:Bool = false;
 	@:keep public var comboStackMigrated:Bool = false;
 	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
+	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
+	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
 	public var gameplaySettings:Map<String, Dynamic> = [
 		'scrollspeed' => 1.0,
 		'scrolltype' => 'multiplicative', 
@@ -111,6 +113,8 @@ class SaveVariables {
 class ClientPrefs {
 	public static var data:SaveVariables = null;
 	public static var defaultData:SaveVariables = null;
+	// 记录用户真实的 hideHud 设置，防止 Mod 脚本临时修改后污染后续对局
+	public static var savedHideHud:Bool = false;
 
 	//Every key has two binds, add your key bind down here and then add your control on options/ControlsSubState.hx and Controls.hx
 	public static var keyBinds:Map<String, Array<FlxKey>> = [
@@ -193,6 +197,8 @@ class ClientPrefs {
 			//trace('saved variable: $key');
 			Reflect.setField(FlxG.save.data, key, Reflect.field(data, key));
 		}
+		// 设置保存视为用户真实意图：同步 hideHud 基准值，避免进入对局后被 resetHideHud/enforceHUD 撤销
+		savedHideHud = data.hideHud;
 		FlxG.save.data.achievementsMap = Achievements.achievementsMap;
 		FlxG.save.data.henchmenDeath = Achievements.henchmenDeath;
 		FlxG.save.flush();
@@ -206,6 +212,10 @@ class ClientPrefs {
 		FlxG.log.add("Settings saved!");
 	}
 
+	public static function resetHideHud() {
+		if (data != null) data.hideHud = savedHideHud;
+	}
+
 	public static function loadPrefs() {
 		if(data == null) data = new SaveVariables();
 		if(defaultData == null) defaultData = new SaveVariables();
@@ -216,6 +226,7 @@ class ClientPrefs {
 				Reflect.setField(data, key, Reflect.field(FlxG.save.data, key));
 			}
 		}
+		savedHideHud = data.hideHud;
 
 		// 判定选项旧值迁移：'新版' -> 'KE 判定'，'旧判定' -> 'PE 判定'
 		if (data.noteJudgment == '新版' || data.noteJudgment == '旧判定')

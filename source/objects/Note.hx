@@ -129,6 +129,8 @@ class Note extends FlxSprite
 		phigrosGraphicCache = [];
 		bakeBitmapCache = [];
 		bakeAtlasCache = [];
+		bakedNoteGraphics = [];
+		bakedArrowRenderWidth = [];
 	}
 
 	// 获取/构建共享的 Phigros 表演图形（圆角矩形，绘制一次，全部音符复用）
@@ -349,7 +351,9 @@ class Note extends FlxSprite
 			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			if(ClientPrefs.data.phigrosStyle) rgbShader.enabled = false; // Phigros 方块颜色直接绘制，不受 RGB 着色
 			else if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) rgbShader.enabled = false; // 0.6.3 兼容/关着色器时避免 RGB 渲染成黑
 			else if (bakedKind >= 0) rgbShader.enabled = false; // 提前渲染：颜色已烘焙进贴图，不再叠加 RGB 着色器（叠加会钳制成白色）
+			trace('NoteInit col=' + noteData + ' baked=' + bakedKind + ' rgbOn=' + (rgbShader != null ? rgbShader.enabled : false));
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
@@ -442,6 +446,7 @@ class Note extends FlxSprite
 				newRGB.r = arr[0];
 				newRGB.g = arr[1];
 				newRGB.b = arr[2];
+				trace('NoteRGB: pixel=' + PlayState.isPixelStage + ' col=' + noteData + ' r=' + arr[0] + ' g=' + arr[1] + ' b=' + arr[2]);
 			}
 		}
 		return globalRgbShaders[noteData];
@@ -471,7 +476,12 @@ class Note extends FlxSprite
 		var lastScaleY:Float = scale.y;
 
 		// 提前渲染：命中加载阶段烘焙好的静态贴图 → 跳过图集解析/动画/RGB 着色器（大谱面堆叠下渲染开销最低）
-		if (ClientPrefs.data.preRenderNotes && !inEditor && noteData > -1)
+		// 安卓：RGB 着色器在部分 GPU/GLES 驱动上输出全黑，强制走 CPU 烘焙保证箭头颜色
+		var bakeNotes:Bool = ClientPrefs.data.preRenderNotes && !ClientPrefs.data.psych063Mode;
+		#if mobile
+		if (!ClientPrefs.data.psych063Mode) bakeNotes = true;
+		#end
+		if (bakeNotes && !inEditor && noteData > -1)
 		{
 			var useRGB:Bool = !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
 			var arr:Array<FlxColor> = (loadPath.startsWith('pixelUI/') ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB)[noteData];
@@ -481,6 +491,17 @@ class Note extends FlxSprite
 			bakedB = arr[2];
 			bakedKey = getBakedNoteKey(loadPath, noteData, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE, bakedR, bakedG, bakedB, useRGB);
 			var baked:FlxGraphic = bakedNoteGraphics.get(bakedKey);
+			#if mobile
+			if (baked == null)
+			{
+				// 移动端懒烘焙：首次遇到该外观时现算（每种外观只算一次，此后全部复用）
+				var pixelStage:Bool = PlayState.isPixelStage;
+				bakeNoteAppearance(loadPath, pixelStage, noteData, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE, bakedR, bakedG, bakedB, useRGB);
+				bakeNoteAppearance(loadPath, pixelStage, noteData, isSustainNote ? BAKE_NOTE : BAKE_HOLDEND, bakedR, bakedG, bakedB, useRGB);
+				bakeNoteAppearance(loadPath, pixelStage, noteData, BAKE_HOLD, bakedR, bakedG, bakedB, useRGB);
+				baked = bakedNoteGraphics.get(bakedKey);
+			}
+			#end
 			if (baked != null)
 			{
 				useBakedGraphic(baked, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE);
@@ -634,6 +655,12 @@ class Note extends FlxSprite
 				skin = defaultNoteSkin + postfix;
 		}
 
+		// Psych 0.6.3 兼容：旧模组常用 "NOTE_assets" 这种不带 noteSkins/ 前缀的路径，
+		// 如果根目录不存在但 noteSkins/ 下存在，就自动补上前缀，避免加载失败变成 Haxe 图标
+		if (skin.indexOf('/') < 0 && !Paths.fileExists('images/' + skin + '.png', IMAGE)
+			&& Paths.fileExists('images/noteSkins/' + skin + '.png', IMAGE))
+			skin = 'noteSkins/' + skin;
+
 		var skinPostfix:String = getNoteSkinPostfix();
 		var customSkin:String = skin + skinPostfix;
 		var pathPrefix:String = pixelStage ? 'pixelUI/' : '';
@@ -681,7 +708,11 @@ class Note extends FlxSprite
 	// 自定义音符类型设置完贴图/颜色后调用：把当前音符换成对应烘焙贴图
 	public function tryUseBakedGraphic():Void
 	{
-		if (!ClientPrefs.data.preRenderNotes || inEditor || rgbShader == null || noteData < 0) return;
+		var bakeNotes:Bool = ClientPrefs.data.preRenderNotes && !ClientPrefs.data.psych063Mode;
+		#if mobile
+		if (!ClientPrefs.data.psych063Mode) bakeNotes = true;
+		#end
+		if (!bakeNotes || inEditor || rgbShader == null || noteData < 0) return;
 		var pixelStage:Bool = PlayState.isPixelStage;
 		var loadPath:String = bakedLoadPath != null ? bakedLoadPath : getNoteSkinLoadPathCached(texture, '', pixelStage, isSustainNote);
 		var kind:Int = bakedKind >= 0 ? bakedKind : (isSustainNote ? BAKE_HOLDEND : BAKE_NOTE);
@@ -690,6 +721,15 @@ class Note extends FlxSprite
 			? bakedKey
 			: getBakedNoteKey(loadPath, noteData, kind, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
 		var baked:FlxGraphic = bakedNoteGraphics.get(key);
+		#if mobile
+		if (baked == null)
+		{
+			bakeNoteAppearance(loadPath, pixelStage, noteData, kind, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
+			bakeNoteAppearance(loadPath, pixelStage, noteData, kind == BAKE_NOTE ? BAKE_HOLDEND : BAKE_NOTE, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
+			bakeNoteAppearance(loadPath, pixelStage, noteData, BAKE_HOLD, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
+			baked = bakedNoteGraphics.get(key);
+		}
+		#end
 		if (baked == null) return;
 		// 构造函数里 reloadNote 已加载同一张烘焙贴图（默认颜色键一致）→ 直接跳过重复加载
 		if (graphic == baked)
@@ -709,7 +749,15 @@ class Note extends FlxSprite
 		if (bakedKind != BAKE_HOLDEND || rgbShader == null) return;
 		var loadPath:String = getNoteSkinLoadPath(texture, '', PlayState.isPixelStage, true);
 		var useRGB:Bool = !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
-		var baked:FlxGraphic = bakedNoteGraphics.get(getBakedNoteKey(loadPath, noteData, BAKE_HOLD, rgbShader.r, rgbShader.g, rgbShader.b, useRGB));
+		var key:String = getBakedNoteKey(loadPath, noteData, BAKE_HOLD, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
+		var baked:FlxGraphic = bakedNoteGraphics.get(key);
+		#if mobile
+		if (baked == null)
+		{
+			bakeNoteAppearance(loadPath, PlayState.isPixelStage, noteData, BAKE_HOLD, rgbShader.r, rgbShader.g, rgbShader.b, useRGB);
+			baked = bakedNoteGraphics.get(key);
+		}
+		#end
 		if (baked == null) return;
 		useBakedGraphic(baked, BAKE_HOLD);
 		rgbShader.enabled = false; // 颜色已烘焙进贴图，关闭 RGB 着色器防叠加变白
@@ -884,7 +932,7 @@ class Note extends FlxSprite
 		if (pixelStage)
 		{
 			var sheet:BitmapData = getBakeBitmapData(loadPath);
-			if (sheet == null) return null;
+			if (sheet == null) { trace('BAKE FAIL pixel: ' + loadPath); return null; }
 			var fw:Int = Math.floor(sheet.width / 4);
 			var rows:Int = (kind == BAKE_HOLD || kind == BAKE_HOLDEND) ? 2 : 5;
 			var fh:Int = Math.floor(sheet.height / rows);
@@ -907,7 +955,7 @@ class Note extends FlxSprite
 			// copyPixels 对不可读位图会静默失败 → 重新从资产库读取 CPU 位图构建烘焙用图集
 			if (atlas == null || atlas.parent == null || atlas.parent.bitmap == null || !atlas.parent.bitmap.readable)
 				atlas = getBakeAtlas(loadPath);
-			if (atlas == null) return null;
+			if (atlas == null) { trace('BAKE FAIL atlas: ' + loadPath); return null; }
 			var prefix:String = kind == BAKE_NOTE ? colArray[col] + '0'
 				: colArray[col] + (kind == BAKE_HOLD ? ' hold piece' : ' hold end');
 			var frame:FlxFrame = null;
@@ -915,7 +963,7 @@ class Note extends FlxSprite
 			{
 				if (f.name != null && f.name.startsWith(prefix)) { frame = f; break; }
 			}
-			if (frame == null) return null;
+			if (frame == null) { trace('BAKE FAIL frame: ' + loadPath); return null; }
 			bitmap = bakeAtlasFrame(frame);
 			if (kind == BAKE_NOTE && col == 0)
 				bakedArrowRenderWidth.set(loadPath, Std.int(bitmap.width * 0.7));
@@ -932,7 +980,7 @@ class Note extends FlxSprite
 	}
 
 	// 烘焙专用 CPU 位图：优先复用 Paths.image 缓存；若已是 GPU 纹理（不可读），从资产库重新读取
-	static function getBakeBitmapData(loadPath:String):BitmapData
+	public static function getBakeBitmapData(loadPath:String):BitmapData
 	{
 		var cached:BitmapData = bakeBitmapCache.get(loadPath);
 		if (cached != null) return cached;
@@ -1004,7 +1052,7 @@ class Note extends FlxSprite
 	}
 
 	// 与 Paths.modFolders 相同的查找顺序（当前 mod → 全局 mod → 根目录），带大小写兜底
-	static function findModFile(relPath:String):String
+	public static function findModFile(relPath:String):String
 	{
 		var candidates:Array<String> = [];
 		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
@@ -1022,8 +1070,29 @@ class Note extends FlxSprite
 	#end
 
 	// 把图集帧复制成独立位图：保持 sourceSize 尺寸与 offset，与原渲染完全一致
-	static function bakeAtlasFrame(frame:FlxFrame):BitmapData
+	public static function bakeAtlasFrame(frame:FlxFrame):BitmapData
 	{
+		var src:BitmapData = (frame.parent != null) ? frame.parent.bitmap : null;
+		return bakeAtlasFrameFromBitmap(frame, src);
+	}
+
+	// 把图集帧按目标色 CPU 烘焙染色（安卓 tile 渲染下 GL shader 不生效时的通用方案）
+	public static function bakeFrameWithRGB(cf:FlxFrame, fallbackPath:String, r:FlxColor, g:FlxColor, b:FlxColor):BitmapData
+	{
+		var bmp:BitmapData = null;
+		if (cf.parent != null && cf.parent.bitmap != null && cf.parent.bitmap.readable)
+			bmp = bakeAtlasFrame(cf);
+		else
+			bmp = bakeAtlasFrameFromBitmap(cf, getBakeBitmapData(fallbackPath));
+		if (bmp == null) return null;
+		applyRGBToBitmap(bmp, r, g, b);
+		return bmp;
+	}
+
+	// 与 bakeAtlasFrame 相同，但允许指定 CPU 位图来源（GPU 纹理不可读时从磁盘/资产库重读）
+	public static function bakeAtlasFrameFromBitmap(frame:FlxFrame, src:BitmapData):BitmapData
+	{
+		if (src == null) return null;
 		var sw:Int = Std.int(frame.sourceSize.x);
 		var sh:Int = Std.int(frame.sourceSize.y);
 		var out:BitmapData = new BitmapData(sw, sh, true, FlxColor.TRANSPARENT);
@@ -1036,7 +1105,7 @@ class Note extends FlxSprite
 		{
 			// 图集内旋转帧：先水平拷出，再顺时针转回显示方向
 			var tmp:BitmapData = new BitmapData(fw, fh, true, FlxColor.TRANSPARENT);
-			tmp.copyPixels(frame.parent.bitmap, srcRect, new Point(0, 0));
+			tmp.copyPixels(src, srcRect, new Point(0, 0));
 			var rotated:BitmapData = rotateBitmapClockwise(tmp);
 			tmp.dispose();
 			out.copyPixels(rotated, new Rectangle(0, 0, rotated.width, rotated.height), new Point(frame.offset.x, frame.offset.y));
@@ -1044,7 +1113,7 @@ class Note extends FlxSprite
 		}
 		else
 		{
-			out.copyPixels(frame.parent.bitmap, srcRect, new Point(frame.offset.x, frame.offset.y));
+			out.copyPixels(src, srcRect, new Point(frame.offset.x, frame.offset.y));
 		}
 		return out;
 	}
@@ -1062,7 +1131,7 @@ class Note extends FlxSprite
 
 	// CPU 端复刻 RGBPalette 着色器：newColor.rgb = color.r * r + color.g * g + color.b * b
 	//（r/g/b 为 vec3 颜色矩阵，按输出通道组织：newR = srcR*rR + srcG*gR + srcB*bR）
-	static function applyRGBToBitmap(bmp:BitmapData, r:FlxColor, g:FlxColor, b:FlxColor):Void
+	public static function applyRGBToBitmap(bmp:BitmapData, r:FlxColor, g:FlxColor, b:FlxColor):Void
 	{
 		var pixels:ByteArray = bmp.getPixels(bmp.rect);
 		pixels.position = 0;

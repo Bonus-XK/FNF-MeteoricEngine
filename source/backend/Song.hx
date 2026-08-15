@@ -206,17 +206,19 @@ class Song
 		#end
 
 		var baseFile:String = Paths.json(formattedFolder + '/' + formattedSong);
-		#if sys
+		#if (sys && !android)
 		if(FileSystem.exists(baseFile)) return baseFile;
-		#else
-		if(Assets.exists(baseFile, TEXT)) return baseFile;
 		#end
+		// 安卓：Paths.json 可能返回外部存储的绝对路径（/sdcard/meteoric/assets/...），
+		// 必须用 FileSystem 检查，否则外部谱面永远判为缺失
+		if(FileSystem.exists(baseFile)) return baseFile;
+		if(Assets.exists(baseFile, TEXT)) return baseFile;
 		return null;
 	}
 
 	static function chartCacheKey(filePath:String):String
 	{
-		#if sys
+		#if (sys && !android)
 		// 用文件路径 + 修改时间做缓存键：外部改文件或保存新谱面后会自动失效
 		return filePath + '|' + FileSystem.stat(filePath).mtime.getTime();
 		#else
@@ -241,9 +243,15 @@ class Song
 	public static function loadFromFile(filePath:String, isEvents:Bool):SwagSong
 	{
 		var rawJson = null;
-		#if sys
+		#if (sys && !android)
 		rawJson = File.getContent(filePath).trim();
 		#else
+		#if sys
+		// 安卓：外置存储上的谱面是绝对路径，lime 资源表不认，直接读磁盘
+		if (FileSystem.exists(filePath))
+			rawJson = File.getContent(filePath).trim();
+		else
+		#end
 		rawJson = Assets.getText(filePath).trim();
 		#end
 
@@ -268,7 +276,7 @@ class Song
 		#if MODS_ALLOWED
 		if(FileSystem.exists(Paths.modsSounds('songs', songPath + '/Voices'))) return true;
 		#end
-		#if sys
+		#if (sys && !android)
 		return FileSystem.exists('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT);
 		#else
 		return Assets.exists('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT, SOUND);

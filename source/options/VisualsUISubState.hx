@@ -43,6 +43,12 @@ class VisualsUISubState extends BaseOptionsMenu
 			option.onChange = onChangeNoteSkin;
 			noteOptionID = optionsArray.length - 1;
 		}
+
+		var option:Option = new Option('Psych 0.6.3 兼容模式',
+			'开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）',
+			'psych063Mode',
+			'bool');
+		addOption(option);
 		
 		var noteSplashes:Array<String> = Mods.mergeAllTextsNamed('images/noteSplashes/list.txt', 'shared');
 		if(noteSplashes.length > 0)

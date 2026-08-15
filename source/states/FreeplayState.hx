@@ -64,10 +64,6 @@ class FreeplayState extends MusicBeatState
 	var mouseLockY:Float = 0;
 
 	var backBtn:BackButton;
-	var scriptBtn:FlxSprite;
-	var scriptBtnText:FlxText;
-	var replayBtn:FlxSprite;
-	var replayBtnText:FlxText;
 
 	var bg:FlxSprite;
 	var intendedColor:Int;
@@ -75,6 +71,7 @@ class FreeplayState extends MusicBeatState
 
 	var missingTextBG:FlxSprite;
 	var missingText:FlxText;
+	var justClosedSubState:Float = -9999;
 
 	override function create()
 	{
@@ -171,26 +168,6 @@ class FreeplayState extends MusicBeatState
 		selectorBar.visible = false;
 		add(selectorBar);
 
-		// ---- 脚本管理按钮（管理当前选中歌曲的谱面脚本） ----
-		scriptBtn = makePanel(INFO_X, 566, 210, 46, 14, 0xCC161622, 0x45FFFFFF);
-		add(scriptBtn);
-		scriptBtnText = new FlxText(INFO_X, 576, 210, '脚本管理', 20);
-		scriptBtnText.setFormat(Paths.font('future.ttf'), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		scriptBtnText.borderSize = 1.5;
-		scriptBtnText.scrollFactor.set();
-		scriptBtnText.antialiasing = ClientPrefs.data.antialiasing;
-		add(scriptBtnText);
-
-		// ---- 回放按钮（播放当前歌曲/难度保存的回放） ----
-		replayBtn = makePanel(990, 566, 210, 46, 14, 0xCC161622, 0x45FFFFFF);
-		add(replayBtn);
-		replayBtnText = new FlxText(990, 576, 210, '回放', 20);
-		replayBtnText.setFormat(Paths.font('future.ttf'), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		replayBtnText.borderSize = 1.5;
-		replayBtnText.scrollFactor.set();
-		replayBtnText.antialiasing = ClientPrefs.data.antialiasing;
-		add(replayBtnText);
-
 		// ---- 右侧信息（固定位置，左对齐） ----
 		songTitleText = makeInfoText('', 140, 40);
 		scoreText = makeInfoText('最佳成绩：', 240, 28);
@@ -209,6 +186,7 @@ class FreeplayState extends MusicBeatState
 		add(missingText);
 
 		if(curSelected >= songs.length) curSelected = 0;
+		trace('FREEPLAY ENTER songs=' + songs.length + ' cur=' + curSelected + ' name=' + (curSelected < songs.length ? songs[curSelected].songName : '?'));
 		bg.color = songs[curSelected].color;
 		intendedColor = bg.color;
 
@@ -231,6 +209,17 @@ class FreeplayState extends MusicBeatState
 
 		FlxG.mouse.visible = true;
 		super.create();
+
+		#if mobile
+		// 用 virtualpad 的 C / L / P 键替代原来的按钮：C=游玩设置，L=脚本管理，P=回放
+		if (objects.MobileControls.instance != null)
+		{
+			var pad:objects.MobileControls = objects.MobileControls.instance;
+			pad.addMenuButton('replay', 'P', FlxG.width - objects.MobileControls.BTN_W * 2 - 20 - 12, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
+			pad.addMenuButton('script', 'L', FlxG.width - objects.MobileControls.BTN_W * 3 - 20 - 24, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
+			pad.addMenuButton('gameplay', 'C', FlxG.width - objects.MobileControls.BTN_W * 4 - 20 - 36, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
+		}
+		#end
 
 		loadUIscripts('freeplay');
 	}
@@ -257,10 +246,28 @@ class FreeplayState extends MusicBeatState
 		return spr;
 	}
 
+	override function openSubState(SubState:flixel.FlxSubState) {
+		// 打开二级界面时隐藏父级返回键，避免半透明背景透出两个返回键
+		if (backBtn != null)
+		{
+			backBtn.glow.visible = false;
+			backBtn.spr.visible = false;
+			backBtn.label.visible = false;
+		}
+		super.openSubState(SubState);
+	}
+
 	override function closeSubState() {
 		FlxG.mouse.visible = true;
 		changeSelection(0, false);
 		persistentUpdate = true;
+		justClosedSubState = Lib.getTimer(); // 关闭后短时间内忽略父界面点击，防止松手穿透
+		if (backBtn != null)
+		{
+			backBtn.glow.visible = true;
+			backBtn.spr.visible = true;
+			backBtn.label.visible = true;
+		}
 		super.closeSubState();
 	}
 
@@ -284,8 +291,8 @@ class FreeplayState extends MusicBeatState
 	}
 
 	function weekIsLocked(name:String):Bool {
-		var leWeek:WeekData = WeekData.weeksLoaded.get(name);
-		return (!leWeek.startUnlocked && leWeek.weekBefore.length > 0 && (!StoryMenuState.weekCompleted.exists(leWeek.weekBefore) || !StoryMenuState.weekCompleted.get(leWeek.weekBefore)));
+		// 临时调试：解锁全部周目（复现 Senpai 箭头颜色）
+		return false;
 	}
 
 	var instPlaying:Int = -1;
@@ -381,7 +388,26 @@ class FreeplayState extends MusicBeatState
 
 			if (!controls.controllerMode)
 			{
+				var clickPressed:Bool = FlxG.mouse.justPressed;
+				#if mobile
+				// 触屏：手指抬起且未滑动才算点击，拖动滚动列表时不误选歌曲
+				clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+				#end
+				if (Lib.getTimer() - justClosedSubState < 300)
+				{
+					clickPressed = false;
+				}
+
 				var hoveredID:Int = getHoveredSongID();
+				#if mobile
+				var dragging:Bool = Main.touchWasDragging();
+				#else
+				var dragging:Bool = false;
+				#end
+				if (clickPressed)
+					trace('FreeplayState: click at ' + FlxG.mouse.screenX + ',' + FlxG.mouse.screenY + ' -> song ' + hoveredID + ' drag=' + dragging);
+				else if (FlxG.mouse.justReleased)
+					trace('FREEPLAY RELEASE no click: drag=' + dragging + ' hover=' + hoveredID);
 
 				// 鼠标离开键盘接管位置超过阈值 → 恢复鼠标跟随（防轻微抖动误触发）
 				if (!mouseActive)
@@ -393,7 +419,7 @@ class FreeplayState extends MusicBeatState
 
 				// 返回按钮：悬停高亮，点击返回主菜单
 				backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-				if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+				if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 				{
 					mouseActive = true;
 					persistentUpdate = false;
@@ -402,7 +428,7 @@ class FreeplayState extends MusicBeatState
 					MusicBeatState.switchState(new MainMenuState());
 				}
 
-				if (hoveredID >= 0 && FlxG.mouse.justPressed)
+				if (hoveredID >= 0 && clickPressed)
 				{
 					mouseActive = true;
 					if (hoveredID != curSelected)
@@ -410,9 +436,8 @@ class FreeplayState extends MusicBeatState
 						changeSelection(hoveredID - curSelected);
 						holdTime = 0;
 					}
-					accepted = true;
 				}
-				if (FlxG.mouse.overlaps(diffText) && FlxG.mouse.justPressed)
+				if (FlxG.mouse.overlaps(diffText) && clickPressed)
 				{
 					mouseActive = true;
 					if (FlxG.mouse.x < diffText.x + (diffText.width / 2))
@@ -445,24 +470,19 @@ class FreeplayState extends MusicBeatState
 			MusicBeatState.switchState(new MainMenuState());
 		}
 
-		// 脚本管理按钮：悬停高亮 + 点击打开（管理当前选中歌曲的谱面脚本）
-		if (!controls.controllerMode)
+		// 脚本管理/回放/游玩设置改为 virtualpad 的 L / P / C 键触发
+		#if mobile
+		if (objects.MobileControls.instance != null)
 		{
-			var btnHovered:Bool = FlxG.mouse.x >= scriptBtn.x && FlxG.mouse.x <= scriptBtn.x + scriptBtn.width
-				&& FlxG.mouse.y >= scriptBtn.y && FlxG.mouse.y <= scriptBtn.y + scriptBtn.height;
-			scriptBtn.color = btnHovered ? 0xFF9FD8FF : 0xFFFFFFFF;
-			scriptBtnText.color = btnHovered ? 0xFF54C8FF : FlxColor.WHITE;
-			if (btnHovered && FlxG.mouse.justPressed)
-				openScriptManager();
-
-			// 回放按钮：悬停高亮 + 点击打开回放列表
-			var replayHovered:Bool = FlxG.mouse.x >= replayBtn.x && FlxG.mouse.x <= replayBtn.x + replayBtn.width
-				&& FlxG.mouse.y >= replayBtn.y && FlxG.mouse.y <= replayBtn.y + replayBtn.height;
-			replayBtn.color = replayHovered ? 0xFF9FD8FF : 0xFFFFFFFF;
-			replayBtnText.color = replayHovered ? 0xFF54C8FF : FlxColor.WHITE;
-			if (replayHovered && FlxG.mouse.justPressed)
-				openReplayList();
+			if (objects.MobileControls.instance.justPressed('script')) openScriptManager();
+			if (objects.MobileControls.instance.justPressed('replay')) openReplayList();
+			if (objects.MobileControls.instance.justPressed('gameplay'))
+			{
+				persistentUpdate = false;
+				openSubState(new GameplayChangersSubstate());
+			}
 		}
+		#end
 
 		if (FlxG.keys.justPressed.P)
 			openReplayList();
@@ -508,7 +528,6 @@ class FreeplayState extends MusicBeatState
 			persistentUpdate = false;
 			var songLowercase:String = Paths.formatToSongPath(songs[curSelected].songName);
 			var poop:String = Highscore.formatSong(songLowercase, curDifficulty);
-			trace(poop);
 
 			PlayState.isStoryMode = false;
 			PlayState.storyDifficulty = curDifficulty;
@@ -525,7 +544,6 @@ class FreeplayState extends MusicBeatState
 				return;
 			}
 
-			trace('CURRENT WEEK: ' + WeekData.getWeekFileName());
 			if(colorTween != null) {
 				colorTween.cancel();
 			}
@@ -534,7 +552,9 @@ class FreeplayState extends MusicBeatState
 
 			destroyFreeplayVocals();
 			#if MODS_ALLOWED
+			#if desktop
 			DiscordClient.loadModRPC();
+			#end
 			#end
 		}
 		else if(controls.RESET)

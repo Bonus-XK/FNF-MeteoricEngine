@@ -302,6 +302,12 @@ class StoryMenuState extends MusicBeatState
 	// ===== 鼠标控制（全部基于屏幕坐标，不受轮播/镜头移动影响） =====
 	function updateMouseControl()
 	{
+		var clickPressed:Bool = FlxG.mouse.justPressed;
+		#if mobile
+		// 触屏：手指抬起且未滑动才算点击，拖动滚动时不误选
+		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+		#end
+
 		// 键盘接管后：鼠标必须物理移动超过阈值（屏幕坐标）才恢复跟随
 		if (!mouseActive)
 		{
@@ -313,7 +319,7 @@ class StoryMenuState extends MusicBeatState
 
 		// 返回按钮：悬停高亮，点击返回主菜单
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 		{
 			mouseActive = true;
 			FlxG.sound.play(Paths.sound('cancelMenu'));
@@ -327,8 +333,8 @@ class StoryMenuState extends MusicBeatState
 		else if (mouseActive && FlxG.mouse.overlaps(rightArrow))
 			rightArrow.animation.play('press');
 
-		// 点击周目：永远生效，先切到鼠标所在周目再确认
-		if (FlxG.mouse.justPressed)
+		// 触控/点击只负责选中周目，真正进入由 A 键触发
+		if (clickPressed)
 		{
 			var clickID:Int = getHoveredWeekID();
 			if (clickID >= 0)
@@ -339,16 +345,15 @@ class StoryMenuState extends MusicBeatState
 					changeWeek(clickID - curWeek);
 					changeDifficulty();
 				}
-				selectWeek();
 			}
 		}
 
-		if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(leftArrow))
+		if (clickPressed && FlxG.mouse.overlaps(leftArrow))
 		{
 			mouseActive = true;
 			changeDifficulty(-1);
 		}
-		else if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(rightArrow))
+		else if (clickPressed && FlxG.mouse.overlaps(rightArrow))
 		{
 			mouseActive = true;
 			changeDifficulty(1);
@@ -392,7 +397,7 @@ class StoryMenuState extends MusicBeatState
 
 			var diffic:String = Difficulty.getFilePath(curDifficulty);
 			if(diffic == null) diffic = '';
-			var firstSong:String = Paths.formatToSongPath(PlayState.storyPlaylist[0]);
+			var firstSong:String = Paths.formatToSongPath(songArray[0]);
 
 			try
 			{
@@ -439,7 +444,9 @@ class StoryMenuState extends MusicBeatState
 			});
 
 			#if MODS_ALLOWED
+			#if desktop
 			DiscordClient.loadModRPC();
+			#end
 			#end
 		} else {
 			FlxG.sound.play(Paths.sound('cancelMenu'));

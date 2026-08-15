@@ -32,6 +32,34 @@ class MusicBeatSubstate extends FlxSubState
 
 	override function update(elapsed:Float)
 	{
+		#if mobile
+		// 安卓返回键 / 虚拟返回键（左上角 X）：默认退出游戏回到桌面；
+		// 子类可重写 onAndroidBack 拦截（如暂停菜单：返回=继续游戏）
+		// （虚拟按键布局设置界面用自己的返回键保存并退出，这里跳过系统返回键和虚拟 X）
+		var isControlsSubstate:Bool = Std.isOfType(this, objects.MobileControlsSubState);
+		var androidBack:Bool = false;
+		#if android
+		androidBack = (FlxG.android.justPressed.BACK || FlxG.keys.justPressed.ESCAPE) && !isControlsSubstate;
+		#end
+		if (androidBack
+			|| (!isControlsSubstate && objects.MobileControls.instance != null && objects.MobileControls.instance.justPressed('exit')))
+		{
+			if (!onAndroidBack())
+			{
+				// 如果当前子状态已经用 controls.BACK 处理了返回键（例如选项子菜单返回上一级），
+				// 就不要在这里强制退出，避免“刚返回上一级又立刻退出游戏”。
+				#if android
+				if (!controls.BACK)
+				#end
+				{
+					FlxG.sound.play(Paths.sound('cancelMenu'));
+					Sys.exit(0);
+					return;
+				}
+			}
+		}
+		#end
+
 		//everyStep();
 		if(!persistentUpdate) MusicBeatState.timePassedOnState += elapsed;
 		var oldStep:Int = curStep;
@@ -60,6 +88,17 @@ class MusicBeatSubstate extends FlxSubState
 			script.update(elapsed);
 		#end
 	}
+
+	/**
+	 * 安卓返回键 / 虚拟返回键（左上角 X）按下时的回调。
+	 * 返回 true 表示该按键已被本子状态处理（不再退出游戏）；默认返回 false（退出到桌面）。
+	 */
+	#if mobile
+	public function onAndroidBack():Bool
+	{
+		return false;
+	}
+	#end
 
 	// 加载界面脚本：menus/<name>.lua（可被 mod 覆盖）
 	public function loadUIscripts(name:String)

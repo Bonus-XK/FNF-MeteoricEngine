@@ -135,13 +135,9 @@ class CreditsState extends MusicBeatState
 		add(linkText);
 
 		// ---- 数据 ----
-		#if MODS_ALLOWED
-		for (mod in Mods.parseList().enabled) pushModCreditsToList(mod);
-		#end
-
 		var defaultList:Array<Array<String>> = [ //Name - Icon name - Description - Link - BG Color
 			["Meteoric Engine Credits"],
-			['Bonus-XK',		'bxk',		'Meteoric Engine的主创作者，\n是个小学生awa',								'https://space.bilibili.com/3461572190013717',	'FCFBFC'],
+			['Real-bonuX',		'bxk',		'Meteoric Engine的主创作者，\n是个12岁的初中生awa',								'https://space.bilibili.com/3461572190013717',	'FCFBFC'],
 			['Maple_autumn',	'maple',		'负责Meteoric Engine的代码，为ME引擎做出巨大贡献！',								'',	'FFFFFF'],
 			['Fu Hefei',		'fhf',			'是我，复合肥！\n早期版本Meteoric Engine测试成员',								'https://space.bilibili.com/1311432244',			'80FCC6'],
 			['Rs-Drfeaoer',		'Rs',			'Rs-Drfeaoer\n早期版本Meteoric Engine测试成员',								'https://space.bilibili.com/1817033215',			'FF9B9B'],
@@ -154,6 +150,10 @@ class CreditsState extends MusicBeatState
 		];
 
 		for (i in defaultList) creditsStuff.push(i);
+
+		#if MODS_ALLOWED
+		for (mod in Mods.parseList().enabled) pushModCreditsToList(mod);
+		#end
 
 		for (i in 0...creditsStuff.length)
 		{
@@ -277,7 +277,7 @@ class CreditsState extends MusicBeatState
 						return;
 					}
 
-					// 点击列表行：选中；点击已选中的行则打开主页
+					// 触控/点击只负责选中，打开链接由 A 键触发
 					if (FlxG.mouse.justPressed)
 					{
 						var hoveredID:Int = getHoveredOptionID();
@@ -288,10 +288,6 @@ class CreditsState extends MusicBeatState
 							{
 								changeSelection(hoveredID - curSelected);
 								holdTime = 0;
-							}
-							else if (hasLink(curSelected))
-							{
-								CoolUtil.browserLoad(creditsStuff[curSelected][3]);
 							}
 						}
 					}

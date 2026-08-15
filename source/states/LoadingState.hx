@@ -391,8 +391,12 @@ class LoadingState extends MusicBeatState
 	{
 		var charName:String = Std.string(state);
 		var characterPath:String = 'characters/' + charName + '.json';
+		#if MODS_ALLOWED
 		var path:String = Paths.modFolders(characterPath);
 		if (!FileSystem.exists(path)) path = Paths.getPreloadPath(characterPath);
+		#else
+		var path:String = Paths.getPreloadPath(characterPath);
+		#end
 		if (!FileSystem.exists(path))
 		{
 			output.sendComplete({name: charName, file: null, bmp: null});
@@ -409,9 +413,13 @@ class LoadingState extends MusicBeatState
 				return;
 			}
 
+			#if MODS_ALLOWED
 			var file:String = Paths.modsImages(imgKey);
 			if (!FileSystem.exists(file))
 				file = Paths.getPath('images/' + imgKey + '.png', IMAGE);
+			#else
+			var file:String = Paths.getPath('images/' + imgKey + '.png', IMAGE);
+			#end
 			if (FileSystem.exists(file))
 			{
 				var bmp:BitmapData = BitmapData.fromFile(file);
@@ -826,6 +834,13 @@ class LoadingState extends MusicBeatState
 		#if sys
 		// 丢弃等待回调：解码仍在后台进行，完成后只缓存音频，不再触发已销毁的界面
 		audioPreloadCallbacks = [];
+		// 重置静态预载状态，避免第二次加载同一首歌时复用旧线程/旧缓存导致崩溃
+		preloadChartThread = null;
+		preloadThreadJson = null;
+		chartMainThread = null;
+		audioPreloads = [];
+		charPreloads = [];
+		charPreloadCallbacks = [];
 		#end
 		super.destroy();
 		

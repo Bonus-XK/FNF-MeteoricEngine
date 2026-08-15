@@ -102,9 +102,15 @@ class TitleState extends MusicBeatState
 
 		if(ClientPrefs.data.checkForUpdates && !closedState) {
 			//更新检查放到后台线程里跑，避免在网速差/被墙时阻塞主线程导致启动黑屏
-			trace('checking for update');
 			#if sys
-			sys.thread.Thread.create(checkForUpdates);
+			// 安卓等平台：haxe.Http 在子线程可能抛异常（网络不可用等），必须兜住，否则整个进程 abort
+			sys.thread.Thread.create(function() {
+				try {
+					checkForUpdates();
+				} catch (e:Dynamic) {
+					trace('update check crashed: $e');
+				}
+			});
 			#else
 			checkForUpdates();
 			#end
@@ -179,11 +185,12 @@ class TitleState extends MusicBeatState
 
 		http.onData = function (data:String)
 		{
-			updateVersion = data.split('\n')[0].trim();
-			var curVersion:String = Main.meVersion.trim();
-			trace('version online: ' + updateVersion + ', your version: ' + curVersion);
+			var lines:Array<String> = data.split('\n');
+			updateVersion = lines.length > 0 ? lines[0].trim() : '';
+			var onlineIndex:Null<Int> = lines.length > 1 ? Std.parseInt(lines[1].trim()) : null;
+			trace('version online: ' + updateVersion + ', online index: ' + onlineIndex + ', your index: ' + Main.meVersionIndex);
 			mainNewVer = updateVersion;
-			if(updateVersion != curVersion) {
+			if(onlineIndex != Main.meVersionIndex) {
 				trace('versions arent matching!');
 				mustUpdate = true;
 				mainUpdateCheck = mustUpdate;
@@ -191,7 +198,14 @@ class TitleState extends MusicBeatState
 		}
 
 		http.onError = function (error) {
-			trace('error: $error');
+			trace('update check failed (gitproxy): $error, retrying direct...');
+			var http2 = new haxe.Http("https://raw.githubusercontent.com/Bonus-XK/FNF-MeteoricEngine/master/gitVersion.txt");
+			http2.cnxTimeout = 4;
+			http2.onData = http.onData;
+			http2.onError = function (error2) {
+				trace('update check failed (direct): $error2');
+			};
+			http2.request();
 		}
 
 		http.request();
@@ -580,7 +594,7 @@ class TitleState extends MusicBeatState
 				case 2:
 					createCoolText(['Meteoric Engine'], 40, 64, 0xFF33FFFF);
 				case 3:
-					addMoreText('by Bonus-XK · Maple-Autumn', 40, 26, 0xFFFFFFFF);
+					addMoreText('by Real-bonuX', 40, 26, 0xFFFFFFFF);
 				case 4:
 					addMoreText('版本 ' + Main.meVersion, 40, 22, 0xFF9A9A9A);
 				case 5:

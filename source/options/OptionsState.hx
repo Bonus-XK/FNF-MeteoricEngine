@@ -15,10 +15,15 @@ class OptionsState extends MusicBeatState
 	static final PANEL_H:Float = 500;
 
 	static final LIST_Y:Float = 200;
-	static final ROW_GAP:Float = 56;
-	static final ROWS_VISIBLE:Int = 7;
+	static final ROW_GAP:Float = #if mobile 50 #else 56 #end;
+	static final ROWS_VISIBLE:Int = #if mobile 8 #else 7 #end;
 
-	var options:Array<String> = ['箭头配色', '按键设置', '调整延迟与Combo', '图像设置', '视觉与界面', '游戏设置', '自定义界面'];
+	var options:Array<String> = [
+		'箭头配色', '按键设置', '调整延迟与Combo', '图像设置', '视觉与界面', '游戏设置', '自定义界面'
+		#if mobile
+		, '移动触控'
+		#end
+	];
 	private static var curSelected:Int = 0;
 	public static var onPlayState:Bool = false;
 
@@ -50,6 +55,10 @@ class OptionsState extends MusicBeatState
 				MusicBeatState.switchState(new options.HUDCustomizeState());
 			case '调整延迟与Combo':
 				MusicBeatState.switchState(new options.NoteOffsetState());
+			#if mobile
+			case '移动触控':
+				openSubState(new objects.MobileControlsSubState());
+			#end
 		}
 	}
 
@@ -182,10 +191,6 @@ class OptionsState extends MusicBeatState
 					{
 						changeSelection(clickID - curSelected);
 						holdTime = 0;
-					}
-					else
-					{
-						openSelectedSubstate(options[curSelected]);
 					}
 				}
 			}

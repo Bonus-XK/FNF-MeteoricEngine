@@ -313,6 +313,12 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		}
 
 		// 鼠标
+		var clickPressed:Bool = FlxG.mouse.justPressed;
+		#if mobile
+		// 触屏：手指抬起且未滑动才算点击，拖动滚动列表时不误选
+		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+		#end
+
 		if (!mouseActive)
 		{
 			var dx:Float = FlxG.mouse.screenX - mouseLockX;
@@ -327,7 +333,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		}
 
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 		{
 			mouseActive = true;
 			FlxG.sound.play(Paths.sound('cancelMenu'));
@@ -336,7 +342,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			return;
 		}
 
-		if (FlxG.mouse.justPressed)
+		if (clickPressed)
 		{
 			var checkboxHit:Int = getHoveredCheckbox();
 			if (checkboxHit >= 0)

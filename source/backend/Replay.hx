@@ -16,7 +16,16 @@ typedef ReplayEvent =
 	r:String // sick/good/bad/shit/sus/hurt/mp
 }
 
-// 回放：录制一次手动游玩的所有按键命中（含长条子段与空按），按谱面序号精确重放
+typedef ReplayInput =
+{
+	t:Float, // 时间（ms）：按下/抬起瞬间的 Conductor.songPosition
+	d:Int,   // 轨道 0-3
+	u:Bool   // true = 抬起（keyup），false = 按下（keydown）
+}
+
+// 回放 v2：录制一次手动游玩的完整按键流（按下/抬起事件），
+// 重放时按时间注入正常输入路径（keyPressed/keyReleased），手感与实玩一致；
+// 同时保留逐音符评分事件，用于精确复刻准确率/分数。
 class Replay
 {
 	public var song:String = '';
@@ -26,6 +35,7 @@ class Replay
 	public var misses:Int = 0;
 	public var percent:Float = 0;
 	public var events:Array<ReplayEvent> = [];
+	public var inputs:Array<ReplayInput> = [];
 
 	public var filePath:String = ''; // 已保存文件的完整路径（列表/删除用）
 	public var saveTime:Float = 0;   // 保存时间戳（ms）
@@ -44,6 +54,18 @@ class Replay
 	public function addEvent(seq:Int, t:Float, d:Int, r:String):Void
 	{
 		events.push({s: seq, t: t, d: d, r: r});
+	}
+
+	public function recordInput(t:Float, d:Int, up:Bool):Void
+	{
+		inputs.push({t: t, d: d, u: up});
+	}
+
+	/** 是否为输入级回放（v2：含按键事件流）；旧版文件（仅 events）走兼容回放路径 */
+	public var isInputReplay(get, never):Bool;
+	function get_isInputReplay():Bool
+	{
+		return inputs.length > 0;
 	}
 
 	public function buildDerived():Void
@@ -96,7 +118,8 @@ class Replay
 			score: score,
 			misses: misses,
 			percent: percent,
-			events: events
+			events: events,
+			inputs: inputs
 		});
 	}
 
@@ -112,6 +135,9 @@ class Replay
 		if (raw.events != null)
 			for (e in (raw.events:Array<Dynamic>))
 				replay.addEvent(e.s, e.t, e.d, e.r);
+		if (raw.inputs != null)
+			for (e in (raw.inputs:Array<Dynamic>))
+				replay.recordInput(e.t, e.d, e.u);
 		replay.buildDerived();
 		return replay;
 	}

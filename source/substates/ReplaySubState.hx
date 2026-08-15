@@ -37,6 +37,11 @@ class ReplaySubState extends MusicBeatSubstate
 	var missingTextBG:FlxSprite;
 	var missingText:FlxText;
 
+	#if mobile
+	var touchDownRow:Int = -1;   // 触屏点选：按下时所在的行（含 scrollIndex 偏移）
+	var touchDownID:Int = -1;    // 触屏点选：触摸点 ID
+	#end
+
 	public function new(song:String, diff:Int)
 	{
 		super();
@@ -241,6 +246,66 @@ class ReplaySubState extends MusicBeatSubstate
 				mousePos.put();
 				return;
 			}
+
+			#if mobile
+			// ---- 触屏直接点选（不依赖鼠标模拟）：按下所在行即选中，抬起仍在同一行则确认 ----
+			for (touch in FlxG.touches.list)
+			{
+				if (touch.justPressed)
+				{
+					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+					if (backBtn.over(tp.x, tp.y))
+					{
+						FlxG.sound.play(Paths.sound('cancelMenu'));
+						close();
+						tp.put();
+						return;
+					}
+					if (replays.length > 0)
+					{
+						for (row in rows)
+						{
+							if (row.visible && tp.x >= row.x && tp.x <= row.x + row.width
+								&& tp.y >= row.y && tp.y <= row.y + row.height)
+							{
+								touchDownRow = scrollIndex + row.ID;
+								touchDownID = touch.touchPointID;
+								if (touchDownRow != curSelected) changeSelection(touchDownRow - curSelected);
+								break;
+							}
+						}
+					}
+					tp.put();
+				}
+				else if (touch.justReleased && touch.touchPointID == touchDownID)
+				{
+					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+					var onRow:Bool = false;
+					if (replays.length > 0)
+					{
+						for (row in rows)
+						{
+							if (row.visible && scrollIndex + row.ID == touchDownRow
+								&& tp.x >= row.x && tp.x <= row.x + row.width
+								&& tp.y >= row.y && tp.y <= row.y + row.height)
+							{
+								onRow = true;
+								break;
+							}
+						}
+					}
+					tp.put();
+					if (onRow)
+					{
+						FlxG.sound.play(Paths.sound('confirmMenu'));
+						startReplay();
+						return;
+					}
+					touchDownRow = -1;
+					touchDownID = -1;
+				}
+			}
+			#end
 
 			if (replays.length > 0)
 			{

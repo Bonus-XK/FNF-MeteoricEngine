@@ -126,12 +126,8 @@ class RGBPaletteShader extends FlxShader {
 		uniform float mult;
 
 		vec4 flixel_texture2DCustom(sampler2D bitmap, vec2 coord) {
-			vec4 color = flixel_texture2D(bitmap, coord);
-			if (!hasTransform) {
-				return color;
-			}
-
-			if(color.a == 0.0 || mult == 0.0) {
+			vec4 color = texture2D(bitmap, coord);
+			if (color.a == 0.0 || mult == 0.0) {
 				return color * openfl_Alphav;
 			}
 
@@ -140,11 +136,7 @@ class RGBPaletteShader extends FlxShader {
 			newColor.a = color.a;
 			
 			color = mix(color, newColor, mult);
-			
-			if(color.a > 0.0) {
-				return vec4(color.rgb, color.a);
-			}
-			return vec4(0.0, 0.0, 0.0, 0.0);
+			return vec4(color.rgb * color.a * openfl_Alphav, color.a * openfl_Alphav);
 		}')
 
 	@:glFragmentSource('

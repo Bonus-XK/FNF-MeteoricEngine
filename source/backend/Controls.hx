@@ -90,6 +90,14 @@ class Controls
 		var result:Bool = (FlxG.keys.anyJustPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
+		#if mobile
+		if (!result && objects.MobileControls.instance != null)
+		{
+			result = objects.MobileControls.instance.justPressed(key);
+			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+		}
+		#end
+
 		return result || _myGamepadJustPressed(gamepadBinds[key]) == true;
 	}
 
@@ -98,6 +106,14 @@ class Controls
 		var result:Bool = (FlxG.keys.anyPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
+		#if mobile
+		if (!result && objects.MobileControls.instance != null)
+		{
+			result = objects.MobileControls.instance.pressed(key);
+			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+		}
+		#end
+
 		return result || _myGamepadPressed(gamepadBinds[key]) == true;
 	}
 
@@ -105,6 +121,14 @@ class Controls
 	{
 		var result:Bool = (FlxG.keys.anyJustReleased(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
+
+		#if mobile
+		if (!result && objects.MobileControls.instance != null)
+		{
+			result = objects.MobileControls.instance.justReleased(key);
+			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+		}
+		#end
 
 		return result || _myGamepadJustReleased(gamepadBinds[key]) == true;
 	}

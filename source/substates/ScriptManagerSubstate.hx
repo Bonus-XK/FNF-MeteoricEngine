@@ -392,4 +392,14 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 			toggleSelected();
 		if (nextAccept > 0) nextAccept -= 1;
 	}
+
+	#if mobile
+	/** 脚本管理（暂停菜单里打开）：按返回键 = 关闭并回到暂停菜单，不退出游戏 */
+	override public function onAndroidBack():Bool
+	{
+		close();
+		FlxG.sound.play(Paths.sound('cancelMenu'));
+		return true;
+	}
+	#end
 }

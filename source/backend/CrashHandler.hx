@@ -23,7 +23,8 @@ class CrashHandler
 
 	public static function init():Void
 	{
-		#if !mobile
+		#if !html5
+		// 安卓/桌面都启用游戏内崩溃界面；HTML5 不支持这个事件
 		openfl.Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 		#end
 	}
@@ -37,6 +38,13 @@ class CrashHandler
 	public static function handleError(source:String, error:String, stack:Array<StackItem>):Void
 	{
 		errorCount++;
+
+		#if android
+		// 安卓端：直接使用原生弹窗，不进入游戏内崩溃界面
+		writeCrashLog(source, error, stack);
+		fallbackDialog(source, error);
+		return;
+		#end
 
 		// 报错界面本身出错，或连续多次出错：写日志后用原生弹窗兜底退出，避免死循环
 		if (inErrorState || errorCount >= 3)

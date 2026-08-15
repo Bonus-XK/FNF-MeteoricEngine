@@ -5,15 +5,29 @@ import openfl.text.TextFormat;
 import lime.ui.Window;
 
 #if cpp
+#if windows
+@:cppFileCode('
+#include <windows.h>
+static double meteoric_cpu_time() {
+	FILETIME create, exit, kernel, user;
+	if (!GetProcessTimes(GetCurrentProcess(), &create, &exit, &kernel, &user)) return -1.0;
+	ULARGE_INTEGER k, u;
+	k.LowPart = kernel.dwLowDateTime; k.HighPart = kernel.dwHighDateTime;
+	u.LowPart = user.dwLowDateTime; u.HighPart = user.dwHighDateTime;
+	return (double)(k.QuadPart + u.QuadPart) / 10000000.0;
+}
+')
+#else
 @:cppFileCode('
 #include <sys/resource.h>
 static double meteoric_cpu_time() {
 	struct rusage ru;
 	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1.0;
 	return (double)ru.ru_utime.tv_sec + (double)ru.ru_utime.tv_usec / 1e6
-		+ (double)ru.ru_stime.tv_sec + (double)ru.ru_stime.tv_usec / 1e6;
+	+ (double)ru.ru_stime.tv_sec + (double)ru.ru_stime.tv_usec / 1e6;
 }
 ')
+#end
 #end
 class FPS extends TextField
 {

@@ -70,6 +70,11 @@ class Paths
 				var obj = currentTrackedAssets.get(key);
 				@:privateAccess
 				if (obj != null) {
+					// 安全守卫：仍在被场上精灵引用的贴图绝不销毁（销毁后这些精灵会直接变透明/空白）
+					if (obj.useCount > 0) {
+						localTrackedAssets.push(key); // 视为本局仍在用，跳过本次清理
+						continue;
+					}
 					// remove the key from all cache maps
 					FlxG.bitmap._cache.remove(key);
 					openfl.Assets.cache.removeBitmapData(key);
@@ -97,6 +102,9 @@ class Paths
 		{
 			var obj = FlxG.bitmap._cache.get(key);
 			if (obj != null && !currentTrackedAssets.exists(key)) {
+				// 安全守卫：仍在被精灵引用的贴图绝不销毁（如 HealthBar 的 makeGraphic 填充、
+				// FlxText 字体字形、虚拟按键贴图等非 Paths 追踪资源）
+				if (obj.useCount > 0) continue;
 				openfl.Assets.cache.removeBitmapData(key);
 				FlxG.bitmap._cache.remove(key);
 				obj.destroy();
@@ -168,6 +176,12 @@ class Paths
 
 	inline public static function getPreloadPath(file:String = '')
 	{
+		#if android
+		// 外部存储存在同名文件时优先使用（用户可替换/追加资源，无需重打包）
+		var ext = backend.AndroidStorage.root() + '/assets/' + file;
+		if (FileSystem.exists(ext))
+			return ext;
+		#end
 		return 'assets/$file';
 	}
 
@@ -207,6 +221,8 @@ class Paths
 			return file;
 		}
 		#end
+		var external:String = getPreloadPath('videos/$key.$VIDEO_EXT');
+		if(FileSystem.exists(external)) return external;
 		return 'assets/videos/$key.$VIDEO_EXT';
 	}
 
@@ -296,6 +312,8 @@ class Paths
 			}
 			else if (OpenFlAssets.exists(file, IMAGE))
 				bitmap = OpenFlAssets.getBitmapData(file);
+			else if (FileSystem.exists(file))
+				bitmap = BitmapData.fromFile(file);
 		}
 
 		if (bitmap != null)
@@ -376,7 +394,7 @@ class Paths
 		}
 		#end
 
-		if(OpenFlAssets.exists(getPath(key, type, library, false))) {
+		if(FileSystem.exists(getPath(key, type, library, false)) || OpenFlAssets.exists(getPath(key, type, library, false))) {
 			return true;
 		}
 		return false;
@@ -386,14 +404,20 @@ class Paths
 	static public function getAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		#if MODS_ALLOWED
-		if(FileSystem.exists(modsXml(key)) || OpenFlAssets.exists(getPath('images/$key.xml', library), TEXT))
+		if(FileSystem.exists(modsXml(key)) || FileSystem.exists(getPath('images/$key.xml', library)) || OpenFlAssets.exists(getPath('images/$key.xml', library), TEXT))
 		#else
-		if(OpenFlAssets.exists(getPath('images/$key.xml', library)))
+		if(FileSystem.exists(getPath('images/$key.xml', library)) || OpenFlAssets.exists(getPath('images/$key.xml', library)))
 		#end
 		{
 			return getSparrowAtlas(key, library);
 		}
 		return getPackerAtlas(key, library);
+	}
+
+	// 返回图集描述内容：文件系统里存在的路径直接读内容，内部资源路径原样交给 openfl Assets
+	inline static function atlasData(path:String):String
+	{
+		return FileSystem.exists(path) ? File.getContent(path) : path;
 	}
 
 	inline static public function getSparrowAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
@@ -407,9 +431,9 @@ class Paths
 			xmlExists = true;
 		}
 
-		return FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (xmlExists ? File.getContent(xml) : getPath('images/$key.xml', library)));
+		return FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (xmlExists ? File.getContent(xml) : atlasData(getPath('images/$key.xml', library))));
 		#else
-		return FlxAtlasFrames.fromSparrow(image(key, library, allowGPU), getPath('images/$key.xml', library));
+		return FlxAtlasFrames.fromSparrow(image(key, library, allowGPU), atlasData(getPath('images/$key.xml', library)));
 		#end
 	}
 
@@ -424,9 +448,9 @@ class Paths
 			txtExists = true;
 		}
 
-		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (txtExists ? File.getContent(txt) : getPath('images/$key.txt', library)));
+		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (txtExists ? File.getContent(txt) : atlasData(getPath('images/$key.txt', library))));
 		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU), getPath('images/$key.txt', library));
+		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU), atlasData(getPath('images/$key.txt', library)));
 		#end
 	}
 
@@ -455,23 +479,42 @@ class Paths
 		gottenPath = gottenPath.substring(gottenPath.indexOf(':') + 1, gottenPath.length);
 		// trace(gottenPath);
 		if(!currentTrackedSounds.exists(gottenPath))
-		#if MODS_ALLOWED
-			currentTrackedSounds.set(gottenPath, Sound.fromFile('./' + gottenPath));
-		#else
 		{
+			var fileToLoad:String = gottenPath;
+			if(!haxe.io.Path.isAbsolute(fileToLoad)) fileToLoad = './' + fileToLoad;
+			if(FileSystem.exists(fileToLoad))
+			{
+				currentTrackedSounds.set(gottenPath, Sound.fromFile(fileToLoad));
+			}
+			else
+			{
 			var folder:String = '';
 			if(path == 'songs') folder = 'songs:';
 
-			currentTrackedSounds.set(gottenPath, OpenFlAssets.getSound(folder + getPath('$path/$key.$SOUND_EXT', SOUND, library)));
+			var assetId:String = folder + getPath('$path/$key.$SOUND_EXT', SOUND, library);
+			if(OpenFlAssets.exists(assetId, SOUND))
+				currentTrackedSounds.set(gottenPath, OpenFlAssets.getSound(assetId));
+			else
+			{
+				// 文件与资源都不存在（模组缺人声等）：返回空声音，避免播放阶段崩溃
+				trace('MISSING SOUND: $assetId');
+				currentTrackedSounds.set(gottenPath, new Sound());
+			}
+			}
 		}
-		#end
 		localTrackedAssets.push(gottenPath);
 		return currentTrackedSounds.get(gottenPath);
 	}
 
 	#if MODS_ALLOWED
-	inline static public function mods(key:String = '') {
-		return 'mods/' + key;
+	static public function mods(key:String = '') {
+		var p:String = #if android backend.AndroidStorage.root() + '/mods/' + key #else 'mods/' + key #end;
+		// 兼容模组大小写命名（icon-Oswald.png 等）：原样找不到时尝试全小写
+		if(!FileSystem.exists(p)) {
+			var lower:String = #if android backend.AndroidStorage.root() + '/mods/' + key.toLowerCase() #else 'mods/' + key.toLowerCase() #end;
+			if(FileSystem.exists(lower)) return lower;
+		}
+		return p;
 	}
 
 	inline static public function modsFont(key:String) {
@@ -486,8 +529,14 @@ class Paths
 		return modFolders('videos/' + key + '.' + VIDEO_EXT);
 	}
 
-	inline static public function modsSounds(path:String, key:String) {
-		return modFolders(path + '/' + key + '.' + SOUND_EXT);
+	static public function modsSounds(path:String, key:String) {
+		var p:String = modFolders(path + '/' + key + '.' + SOUND_EXT);
+		if(!FileSystem.exists(p)) {
+			// 兼容模组小写命名（inst.ogg / voices.ogg）
+			var p2:String = modFolders(path + '/' + key.toLowerCase() + '.' + SOUND_EXT);
+			if(FileSystem.exists(p2)) return p2;
+		}
+		return p;
 	}
 
 	inline static public function modsImages(key:String) {
@@ -529,7 +578,7 @@ class Paths
 			if(FileSystem.exists(fileToCheck))
 				return fileToCheck;
 		}
-		return 'mods/' + key;
+		return mods(key);
 	}
 	#end
 }

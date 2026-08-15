@@ -16,7 +16,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	static final ROW_START_Y:Float = 150;
 	static final MAX_ROW_GAP:Float = 48;
 	static final VALUE_RIGHT:Float = 1032;
-	static final HINT_Y:Float = 600;
+	static final HINT_Y:Float = 545;
 
 	var curOption:GameplayOption = null;
 	var curSelected:Int = 0;
@@ -37,6 +37,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	var nextAccept:Int = 5;
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
+
+	#if mobile
+	var settingsPad:objects.MobileControls;
+	#end
 
 	function getOptions()
 	{
@@ -185,6 +189,14 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		hintText.antialiasing = ClientPrefs.data.antialiasing;
 		add(hintText);
 
+		#if mobile
+		// 游玩设置里加入 virtualpad 左右箭头
+		settingsPad = new objects.MobileControls(false, cameras[0], objects.MobileControls.MODE_KEYBOARD, false);
+		add(settingsPad);
+		settingsPad.addPadArrow('ui_left', 'left', FlxG.width / 2 - objects.MobileControls.BTN_W - 30, FlxG.height - objects.MobileControls.BTN_H - 20);
+		settingsPad.addPadArrow('ui_right', 'right', FlxG.width / 2 + 30, FlxG.height - objects.MobileControls.BTN_H - 20);
+		#end
+
 		changeSelection();
 		FlxG.mouse.visible = true;
 	}
@@ -266,6 +278,15 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			PlayState.instance.syncGameplaySettings();
 	}
 
+	#if mobile
+	/** 游玩设置（暂停菜单里打开）：按返回键 = 关闭并回到暂停菜单，不退出游戏 */
+	override public function onAndroidBack():Bool
+	{
+		close();
+		return true;
+	}
+	#end
+
 	override function update(elapsed:Float)
 	{
 		if (cameras != null && cameras[0] != null)
@@ -274,6 +295,24 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			cameras[0].scroll.set(0, 0);
 		}
 		super.update(elapsed);
+
+		var uiLeft:Bool = controls.UI_LEFT;
+		var uiRight:Bool = controls.UI_RIGHT;
+		var uiLeftP:Bool = controls.UI_LEFT_P;
+		var uiRightP:Bool = controls.UI_RIGHT_P;
+		var uiLeftR:Bool = controls.UI_LEFT_R;
+		var uiRightR:Bool = controls.UI_RIGHT_R;
+		#if mobile
+		if (settingsPad != null)
+		{
+			uiLeft = uiLeft || settingsPad.pressed('ui_left');
+			uiRight = uiRight || settingsPad.pressed('ui_right');
+			uiLeftP = uiLeftP || settingsPad.justPressed('ui_left');
+			uiRightP = uiRightP || settingsPad.justPressed('ui_right');
+			uiLeftR = uiLeftR || settingsPad.justReleased('ui_left');
+			uiRightR = uiRightR || settingsPad.justReleased('ui_right');
+		}
+		#end
 
 		var mousePos:FlxPoint = FlxG.mouse.getScreenPosition(cameras[0], FlxPoint.get());
 
@@ -294,6 +333,12 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 
 		if (!controls.controllerMode)
 		{
+			var clickPressed:Bool = FlxG.mouse.justPressed;
+			#if mobile
+			// 触屏：手指抬起且未滑动才算点击，拖动滚动列表时不误选
+			clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+			#end
+
 			var hoveredID:Int = getHoveredOptionID(mousePos.x, mousePos.y);
 
 			// 悬停只高亮不切换
@@ -318,7 +363,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			}
 
 			backBtn.setHovered(mousePos.x, mousePos.y);
-			if (FlxG.mouse.justPressed && backBtn.over(mousePos.x, mousePos.y))
+			if (clickPressed && backBtn.over(mousePos.x, mousePos.y))
 			{
 				mousePos.put();
 				close();
@@ -327,7 +372,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 				return;
 			}
 
-			if (FlxG.mouse.justPressed && hoveredID >= 0)
+			if (clickPressed && hoveredID >= 0)
 			{
 				mouseActive = true;
 				if (hoveredID != curSelected)
@@ -374,18 +419,18 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 					applyChanges();
 				}
 			}
-			else if (controls.UI_LEFT || controls.UI_RIGHT)
+			else if (uiLeft || uiRight)
 			{
-				var pressed = (controls.UI_LEFT_P || controls.UI_RIGHT_P);
+				var pressed = (uiLeftP || uiRightP);
 				if (holdTime > 0.5 || pressed)
 				{
 					if (pressed)
 					{
-						changeOptionValue(controls.UI_LEFT ? -1 : 1);
+						changeOptionValue(uiLeft ? -1 : 1);
 					}
 					else if (curOption.type != 'string')
 					{
-						holdValue = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.scrollSpeed * elapsed * (controls.UI_LEFT ? -1 : 1)));
+						holdValue = Math.max(curOption.minValue, Math.min(curOption.maxValue, holdValue + curOption.scrollSpeed * elapsed * (uiLeft ? -1 : 1)));
 
 						switch(curOption.type)
 						{
@@ -406,7 +451,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 					holdTime += elapsed;
 				}
 			}
-			else if(controls.UI_LEFT_R || controls.UI_RIGHT_R)
+			else if(uiLeftR || uiRightR)
 			{
 				clearHold();
 			}

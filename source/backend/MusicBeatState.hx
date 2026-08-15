@@ -34,6 +34,17 @@ class MusicBeatState extends FlxUIState
 
 		super.create();
 
+		#if mobile
+		// 菜单/界面统一挂载 virtualpad A 键：触控选择，按 A 确认
+		// Mods 界面与 HUD 自定义界面按需求不显示 A 键
+		if (!Std.isOfType(this, PlayState)
+			&& !Std.isOfType(this, states.ModsMenuState)
+			&& !Std.isOfType(this, options.HUDCustomizeState))
+		{
+			add(new objects.MobileControls(true, FlxG.camera, -1, true));
+		}
+		#end
+
 		if(!skip) {
 			openSubState(new CustomFadeTransition(0.7, true));
 		}
@@ -44,6 +55,33 @@ class MusicBeatState extends FlxUIState
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		backend.Diag.log();
+		#if mobile
+		// 安卓返回键 / 虚拟返回键（左上角 X）：默认退出游戏回到桌面；
+		// 子类可重写 onAndroidBack 拦截（例如 PlayState 游玩中改为打开暂停菜单）
+		var androidBack:Bool = false;
+		#if android
+		androidBack = FlxG.android.justPressed.BACK || FlxG.keys.justPressed.ESCAPE;
+		#end
+		if (androidBack
+			|| (objects.MobileControls.instance != null && objects.MobileControls.instance.justPressed('exit')))
+		{
+			if (!onAndroidBack())
+			{
+				// 如果当前界面已经用 controls.BACK 处理了返回键（例如菜单返回上一级），
+				// 就不要在这里强制退出，避免“刚返回上一级又立刻退出游戏”。
+				#if android
+				if (!controls.BACK)
+				#end
+				{
+					FlxG.sound.play(Paths.sound('cancelMenu'));
+					Sys.exit(0);
+					return;
+				}
+			}
+		}
+		#end
+
 		//everyStep();
 		var oldStep:Int = curStep;
 		timePassedOnState += elapsed;
@@ -78,6 +116,17 @@ class MusicBeatState extends FlxUIState
 			script.update(elapsed);
 		#end
 	}
+
+	/**
+	 * 安卓返回键 / 虚拟返回键（左上角 X）按下时的回调。
+	 * 返回 true 表示该按键已被本状态处理（不再退出游戏）；默认返回 false（退出到桌面）。
+	 */
+	#if mobile
+	public function onAndroidBack():Bool
+	{
+		return false;
+	}
+	#end
 
 	// 加载界面脚本：menus/<name>.lua（可被 mod 覆盖）
 	public function loadUIscripts(name:String)

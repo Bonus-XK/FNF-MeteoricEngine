@@ -3,6 +3,7 @@ package options;
 import flixel.math.FlxPoint;
 
 import objects.MenuText;
+import objects.BackButton;
 import backend.StageData;
 import objects.Character;
 import objects.HealthBar;
@@ -34,6 +35,8 @@ class NoteOffsetState extends MusicBeatState
 	var beatTween:FlxTween;
 
 	var changeModeText:FlxText;
+
+	var backBtn:BackButton;
 
 	var controllerPointer:FlxSprite;
 	var _lastControllerMode:Bool = false;
@@ -164,7 +167,16 @@ class NoteOffsetState extends MusicBeatState
 		controllerPointer.alpha = 0.6;
 		controllerPointer.cameras = [camHUD];
 		add(controllerPointer);
-		
+
+		// 右上角返回键（与主菜单一致）
+		backBtn = new BackButton(FlxG.width - 72, 12);
+		backBtn.glow.cameras = [camHUD];
+		backBtn.spr.cameras = [camHUD];
+		backBtn.label.cameras = [camHUD];
+		add(backBtn.glow);
+		add(backBtn.spr);
+		add(backBtn.label);
+
 		updateMode();
 		_lastControllerMode = true;
 
@@ -172,6 +184,18 @@ class NoteOffsetState extends MusicBeatState
 		FlxG.sound.playMusic(Paths.music('offsetSong'), 1, true);
 
 		super.create();
+
+		#if mobile
+		// 节拍延迟模式用 virtualpad 左右箭头贴图
+		if (objects.MobileControls.instance != null)
+		{
+			var pad:objects.MobileControls = objects.MobileControls.instance;
+			pad.addPadArrow('ui_left', 'left', FlxG.width / 2 - objects.MobileControls.BTN_W - 30, FlxG.height - objects.MobileControls.BTN_H - 20);
+			pad.addPadArrow('ui_right', 'right', FlxG.width / 2 + 30, FlxG.height - objects.MobileControls.BTN_H - 20);
+		}
+		#end
+
+		updateMode();
 	}
 
 	var holdTime:Float = 0;
@@ -210,6 +234,28 @@ class NoteOffsetState extends MusicBeatState
 			}
 			updateMode();
 			_lastControllerMode = controls.controllerMode;
+		}
+
+		// 右上角返回键
+		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
+		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		{
+			if(zoomTween != null) zoomTween.cancel();
+			if(beatTween != null) beatTween.cancel();
+
+			persistentUpdate = false;
+			CustomFadeTransition.nextCamera = camOther;
+			MusicBeatState.switchState(new options.OptionsState());
+			if(OptionsState.onPlayState)
+			{
+				if(ClientPrefs.data.pauseMusic != '无')
+					FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)));
+				else
+					FlxG.sound.music.volume = 0;
+			}
+			else FlxG.sound.playMusic(Paths.music('freakyMenu'));
+			FlxG.mouse.visible = false;
+			return;
 		}
 
 		if(onComboMenu)
@@ -393,8 +439,13 @@ class NoteOffsetState extends MusicBeatState
 			}
 		}
 
+		#if android
+		if((!controls.controllerMode && objects.MobileControls.instance != null && objects.MobileControls.instance.justPressed('accept')) ||
+		(controls.controllerMode && FlxG.gamepads.anyJustPressed(START)))
+		#else
 		if((!controls.controllerMode && controls.ACCEPT) ||
 		(controls.controllerMode && FlxG.gamepads.anyJustPressed(START)))
+		#end
 		{
 			onComboMenu = !onComboMenu;
 			updateMode();
@@ -525,6 +576,20 @@ class NoteOffsetState extends MusicBeatState
 		timeTxt.visible = !onComboMenu;
 		beatText.visible = !onComboMenu;
 
+		#if mobile
+		// 节拍延迟模式才显示 virtualpad 左右箭头
+		if (objects.MobileControls.instance != null)
+		{
+			var pad:objects.MobileControls = objects.MobileControls.instance;
+			var leftArrows:Array<FlxSprite> = pad.padButtons.get('note_left');
+			var rightArrows:Array<FlxSprite> = pad.padButtons.get('note_right');
+			if (leftArrows != null)
+				for (spr in leftArrows) spr.visible = !onComboMenu;
+			if (rightArrows != null)
+				for (spr in rightArrows) spr.visible = !onComboMenu;
+		}
+		#end
+
 		controllerPointer.visible = false;
 		FlxG.mouse.visible = false;
 		if(onComboMenu)
@@ -541,7 +606,13 @@ class NoteOffsetState extends MusicBeatState
 			str = '箭头/节拍延迟';
 
 		if(!controls.controllerMode)
+		{
+			#if android
+			str2 = '(按 A 切换)';
+			#else
 			str2 = '(按 空格 切换)';
+			#end
+		}
 		else
 			str2 = '(按手柄的 Start 切换)';
 

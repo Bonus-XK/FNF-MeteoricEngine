@@ -82,7 +82,8 @@ class Limo extends BaseStage
 		addBehindGF(fastCar);
 		
 		var limo:BGSprite = new BGSprite('limo/limoDrive', -120, 550, 1, 1, ['Limo stage'], true);
-		addBehindGF(limo); //Shitty layering but whatev it works LOL
+		// GF 图层下调一层：limo 插到 GF 正后方绘制（即盖在 GF 上方），但不遮住 Dad/BF
+		insert(members.indexOf(game.gfGroup) + 1, limo);
 	}
 
 	var limoSpeed:Float = 0;

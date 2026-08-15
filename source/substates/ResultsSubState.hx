@@ -46,6 +46,11 @@ class ResultsSubState extends MusicBeatSubstate
 	var mouseLockX:Float = 0;
 	var mouseLockY:Float = 0;
 
+	#if mobile
+	var touchDownRow:Int = -1;   // 触屏点选：按下时所在的行
+	var touchDownID:Int = -1;    // 触屏点选：触摸点 ID
+	#end
+
 	public function new(?hasReplay:Bool = false)
 	{
 		super();
@@ -256,6 +261,48 @@ class ResultsSubState extends MusicBeatSubstate
 		{
 			var mousePos:FlxPoint = FlxG.mouse.getScreenPosition(cameras[0], FlxPoint.get());
 			var hoveredID:Int = -1;
+
+			#if mobile
+			// ---- 触屏直接点选（不依赖鼠标模拟）：按下所在行即选中，抬起仍在同一行则确认 ----
+			for (touch in FlxG.touches.list)
+			{
+				if (touch.justPressed)
+				{
+					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+					for (item in grpMenuShit.members)
+					{
+						if (tp.x >= item.x && tp.x <= item.x + item.width
+							&& tp.y >= item.y && tp.y <= item.y + item.height)
+						{
+							touchDownRow = item.ID;
+							touchDownID = touch.touchPointID;
+							if (touchDownRow != curSelected) changeSelection(touchDownRow - curSelected);
+							break;
+						}
+					}
+					tp.put();
+				}
+				else if (touch.justReleased && touch.touchPointID == touchDownID)
+				{
+					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+					var onRow:Bool = false;
+					for (item in grpMenuShit.members)
+					{
+						if (item.ID == touchDownRow && tp.x >= item.x && tp.x <= item.x + item.width
+							&& tp.y >= item.y && tp.y <= item.y + item.height)
+						{
+							onRow = true;
+							break;
+						}
+					}
+					tp.put();
+					if (onRow) accepted = true;
+					touchDownRow = -1;
+					touchDownID = -1;
+				}
+			}
+			#end
+
 			for (item in grpMenuShit.members)
 			{
 				if (mousePos.x >= item.x && mousePos.x <= item.x + item.width

@@ -9,7 +9,6 @@ import options.OptionsState;
 
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.util.FlxSpriteUtil;
-
 import openfl.Lib;
 
 class MainMenuState extends MusicBeatState
@@ -37,6 +36,7 @@ class MainMenuState extends MusicBeatState
 	var optionShit:Array<Array<Dynamic>> = [
 		['story_mode', '故事模式', '按章节顺序挑战官方曲目，一路打到周日晚上的对决。', 0xFFDD88FF],
 		['freeplay', '自由游玩', '从全部已解锁曲目中任选一首挑战，还能查看最佳成绩与准确率。', 0xFF66DDFF],
+		['online', '联机', '创建或加入房间，房主直连进行联机。', 0xFF66FF88],
 		#if MODS_ALLOWED
 		['mods', 'MOD', '管理已安装的模组：启用、停用或浏览模组内容。', 0xFF88E58A],
 		#end
@@ -60,6 +60,7 @@ class MainMenuState extends MusicBeatState
 	var itemNameText:FlxText;
 	var descText:FlxText;
 	var actionText:FlxText;
+	var updateLinkText:FlxText;
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween;
 	var scrollOffset:Int = 0;
@@ -72,6 +73,20 @@ class MainMenuState extends MusicBeatState
 
 	var backBtn:BackButton;
 	var selectedSomethin:Bool = false;
+
+	// ===== 彩蛋：输入 meforever =====
+	var keyBuffer:String = '';
+	var eggActive:Bool = false;
+	var eggLetters:Array<FlxText> = [];
+	var eggItems:Array<FlxSprite> = [];
+	var eggVX:Array<Float> = [];
+	var eggVY:Array<Float> = [];
+	var eggVR:Array<Float> = [];
+	var eggHue:Array<Float> = [];
+	var baseWindowTitle:String = '';
+	var titleScrollTimer:Float = 0;
+	var windowVX:Float = 0;
+	var windowVY:Float = 0;
 
 	// ===== 鼠标/键盘输入分离 =====
 	var mouseActive:Bool = true;  // 键盘操作后冻结，鼠标明显移动/滚轮/点击恢复
@@ -87,7 +102,8 @@ class MainMenuState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - Main Menu";
+		baseWindowTitle = "FNF':Meteoric Engine - Main Menu";
+		Lib.application.window.title = baseWindowTitle;
 
 		if (curSelected >= optionShit.length) curSelected = 0;
 
@@ -148,11 +164,12 @@ class MainMenuState extends MusicBeatState
 			verText.scrollFactor.set();
 			add(verText);
 
-			var updText:FlxText = new FlxText(40, 40, 0, '新版本：' + TitleState.updateVersion, 16);
-			updText.setFormat(Paths.font('future.ttf'), 16, 0xFFFFD166, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			updText.borderSize = 2;
-			updText.scrollFactor.set();
-			add(updText);
+			updateLinkText = new FlxText(40, 40, 0, '新版本：' + TitleState.updateVersion + '（点击查看）', 16);
+			updateLinkText.setFormat(Paths.font('future.ttf'), 16, 0xFFFFD166, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			updateLinkText.borderSize = 2;
+			updateLinkText.scrollFactor.set();
+			updateLinkText.updateHitbox();
+			add(updateLinkText);
 		}
 		else
 		{
@@ -161,6 +178,19 @@ class MainMenuState extends MusicBeatState
 			verText.borderSize = 2;
 			verText.scrollFactor.set();
 			add(verText);
+		}
+
+		// ---- 彩蛋字母（输入 meforever 触发，逐字母乱飞变色） ----
+		var eggStr:String = 'Meteoric Forever!';
+		for (i in 0...eggStr.length)
+		{
+			var ltr:FlxText = new FlxText(0, 0, 0, eggStr.charAt(i), 40);
+			ltr.setFormat(Paths.font('future.ttf'), 40, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			ltr.borderSize = 3;
+			ltr.scrollFactor.set();
+			ltr.visible = false;
+			add(ltr);
+			eggLetters.push(ltr);
 		}
 
 		// ---- 菜单行（静态行：切换时只移动高亮条） ----
@@ -199,7 +229,7 @@ class MainMenuState extends MusicBeatState
 		add(actionText);
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter 确认 · 点击 < 返回标题', 16);
+		var hint:FlxText = new FlxText(40, 672, 1160, '触控/滚轮 选择 · A / Enter 确认 · Esc 返回', 16);
 		hint.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hint.borderSize = 2;
 		hint.scrollFactor.set();
@@ -285,6 +315,100 @@ class MainMenuState extends MusicBeatState
 				MusicBeatState.switchState(new MasterEditorMenu());
 			}
 			#end
+
+			// ---- 彩蛋：键盘输入 meforever ----
+			var pressedKey:Int = FlxG.keys.firstJustPressed();
+			if (pressedKey >= 65 && pressedKey <= 90)
+			{
+				keyBuffer += String.fromCharCode(pressedKey);
+				if (keyBuffer.length > 9) keyBuffer = keyBuffer.substring(keyBuffer.length - 9);
+				if (keyBuffer.toLowerCase() == 'meforever')
+				{
+					keyBuffer = '';
+					eggActive = true;
+					eggItems = [];
+					eggVX = [];
+					eggVY = [];
+					eggVR = [];
+					eggHue = [];
+					titleScrollTimer = 0;
+					for (m in members)
+					{
+						if (Std.isOfType(m, FlxSprite))
+						{
+							var spr:FlxSprite = cast m;
+							eggItems.push(spr);
+							var li:Int = -1;
+							for (j in 0...eggLetters.length)
+								if (eggLetters[j] == spr) { li = j; break; }
+							if (li >= 0)
+							{
+								spr.visible = true;
+								spr.alpha = 1;
+								spr.x = FlxG.width * 0.5 - 90 + li * 12 + FlxG.random.float(-40, 40);
+								spr.y = FlxG.height * 0.78 + FlxG.random.float(-30, 30);
+								eggVX.push(FlxG.random.float(-300, 300));
+								eggVY.push(FlxG.random.float(-720, -260));
+								eggVR.push(FlxG.random.float(-360, 360));
+							}
+							else
+							{
+								eggVX.push(FlxG.random.float(-260, 260));
+								eggVY.push(FlxG.random.float(-260, 260));
+								eggVR.push(FlxG.random.float(-240, 240));
+							}
+							eggHue.push(FlxG.random.float(0, 360));
+						}
+					}
+					FlxG.sound.play(Paths.sound('confirmMenu'));
+					#if desktop
+					windowVX = FlxG.random.float(-520, 520);
+					windowVY = FlxG.random.float(-320, 320);
+					if (windowVX > -250 && windowVX < 250) windowVX = 320 * (FlxG.random.bool(50) ? 1 : -1);
+					if (windowVY > -40 && windowVY < 40) windowVY = 200;
+					#end
+				}
+			}
+			if (eggActive)
+			{
+				for (i in 0...eggItems.length)
+				{
+					var spr:FlxSprite = eggItems[i];
+					eggVX[i] += FlxG.random.float(-160, 160) * elapsed;
+					eggVY[i] += FlxG.random.float(-160, 160) * elapsed;
+					eggVR[i] += FlxG.random.float(-120, 120) * elapsed;
+					spr.x += eggVX[i] * elapsed;
+					spr.y += eggVY[i] * elapsed;
+					var halfDiag:Float = Math.sqrt(spr.width * spr.width + spr.height * spr.height) * 0.5;
+					if (spr.x < halfDiag) { spr.x = halfDiag; eggVX[i] = Math.abs(eggVX[i]); }
+					if (spr.x > FlxG.width - halfDiag) { spr.x = FlxG.width - halfDiag; eggVX[i] = -Math.abs(eggVX[i]); }
+					if (spr.y < halfDiag) { spr.y = halfDiag; eggVY[i] = Math.abs(eggVY[i]); }
+					if (spr.y > FlxG.height - halfDiag) { spr.y = FlxG.height - halfDiag; eggVY[i] = -Math.abs(eggVY[i]); }
+					spr.angle += eggVR[i] * elapsed;
+					eggHue[i] = (eggHue[i] + 600 * elapsed) % 360;
+					spr.color = FlxColor.fromHSB(eggHue[i], 0.85, 1);
+				}
+				titleScrollTimer += elapsed;
+				if (titleScrollTimer >= 0.03)
+				{
+					titleScrollTimer -= 0.03;
+					baseWindowTitle = baseWindowTitle.charAt(baseWindowTitle.length - 1)
+						+ baseWindowTitle.substring(0, baseWindowTitle.length - 1);
+					Lib.application.window.title = baseWindowTitle;
+				}
+				#if desktop
+				windowVX += FlxG.random.float(-40, 40) * elapsed;
+				windowVY += FlxG.random.float(-40, 40) * elapsed;
+				var win = Lib.application.window;
+				win.x = Std.int(win.x + windowVX * elapsed);
+				win.y = Std.int(win.y + windowVY * elapsed);
+				var db = win.display.bounds;
+				if (win.x < db.x) { win.x = Std.int(db.x); windowVX = Math.abs(windowVX); }
+				if (win.x + win.width > db.x + db.width) { win.x = Std.int(db.x + db.width - win.width); windowVX = -Math.abs(windowVX); }
+				if (win.y < db.y) { win.y = Std.int(db.y); windowVY = Math.abs(windowVY); }
+				if (win.y + win.height > db.y + db.height) { win.y = Std.int(db.y + db.height - win.height); windowVY = -Math.abs(windowVY); }
+				#end
+			}
 		}
 
 		super.update(elapsed);
@@ -293,6 +417,12 @@ class MainMenuState extends MusicBeatState
 	// ===== 鼠标控制（全部基于屏幕坐标） =====
 	function updateMouseControl()
 	{
+		var clickPressed:Bool = FlxG.mouse.justPressed;
+		#if mobile
+		// 触屏：手指抬起且未滑动才算点击，拖动滚动菜单时不误选
+		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+		#end
+
 		// 键盘接管后：鼠标必须物理移动超过阈值才恢复跟随
 		if (!mouseActive)
 		{
@@ -312,7 +442,7 @@ class MainMenuState extends MusicBeatState
 
 		// 返回按钮：悬停高亮，点击返回标题界面
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 		{
 			mouseActive = true;
 			selectedSomethin = true;
@@ -320,8 +450,23 @@ class MainMenuState extends MusicBeatState
 			MusicBeatState.switchState(new TitleState());
 		}
 
-		// 点击永远生效：先切到鼠标所在项，再确认
-		if (FlxG.mouse.justPressed)
+		// 新版本文字：悬停高亮，点击打开 GitHub Releases 页
+		if (updateLinkText != null)
+		{
+			var mx:Float = FlxG.mouse.screenX;
+			var my:Float = FlxG.mouse.screenY;
+			var overLink:Bool = mx >= updateLinkText.x && mx <= updateLinkText.x + updateLinkText.width
+				&& my >= updateLinkText.y && my <= updateLinkText.y + updateLinkText.height;
+			updateLinkText.color = overLink ? FlxColor.WHITE : 0xFFFFD166;
+			if (clickPressed && overLink)
+			{
+				mouseActive = true;
+				CoolUtil.browserLoad('https://github.com/Bonus-XK/FNF-MeteoricEngine/releases');
+			}
+		}
+
+		// 触控/点击只负责选中，真正进入由 A 键（virtualpad A / Enter / 手柄 A）触发
+		if (clickPressed)
 		{
 			var clickID:Int = getHoveredRowID();
 			if (clickID >= 0)
@@ -332,7 +477,6 @@ class MainMenuState extends MusicBeatState
 					changeSelection(clickID - curSelected);
 					FlxG.sound.play(Paths.sound('scrollMenu'));
 				}
-				selectItem();
 			}
 		}
 	}
@@ -370,7 +514,7 @@ class MainMenuState extends MusicBeatState
 		var leItem:Array<Dynamic> = optionShit[curSelected];
 		var nameStr:String = leItem[1];
 		var descStr:String = leItem[2];
-		var actionStr:String = leItem[0] == 'donate' ? '点击打开赞助页面' : '按 Enter / 点击进入';
+		var actionStr:String = leItem[0] == 'donate' ? '按 A 打开赞助页面' : '按 A / Enter 进入';
 
 		// 列表滚动：超出可视行数时整体上移
 		scrollOffset = (curSelected >= ROWS_VISIBLE) ? curSelected - ROWS_VISIBLE + 1 : 0;
@@ -436,6 +580,8 @@ class MainMenuState extends MusicBeatState
 				MusicBeatState.switchState(new StoryMenuState());
 			case 'freeplay':
 				MusicBeatState.switchState(new FreeplayState());
+			case 'online':
+				MusicBeatState.switchState(new OnlineMenuState());
 			#if MODS_ALLOWED
 			case 'mods':
 				MusicBeatState.switchState(new ModsMenuState());

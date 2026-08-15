@@ -91,6 +91,7 @@ class ModsMenuState extends MusicBeatState
 
 	override function create()
 	{
+		trace('ModsMenuState: create');
 		Lib.application.window.title = "FNF':Meteoric Engine - Mods List";
 
 		Paths.clearStoredMemory();
@@ -343,6 +344,12 @@ class ModsMenuState extends MusicBeatState
 	// ===== 鼠标控制 =====
 	function updateMouseControl(elapsed:Float)
 	{
+		var clickPressed:Bool = FlxG.mouse.justPressed;
+		#if mobile
+		// 触屏：手指抬起且未滑动才算点击，拖动滚动列表时不误选
+		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+		#end
+
 		if (!mouseActive)
 		{
 			var dx:Float = FlxG.mouse.screenX - mouseLockX;
@@ -362,14 +369,14 @@ class ModsMenuState extends MusicBeatState
 		}
 
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-		if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 		{
 			mouseActive = true;
 			exitMods();
 			return;
 		}
 
-		if (FlxG.mouse.justPressed)
+		if (clickPressed)
 		{
 			// 操作按钮
 			for (btn in buttons)
@@ -383,7 +390,7 @@ class ModsMenuState extends MusicBeatState
 				}
 			}
 
-			// 复选框
+			// 复选框/行点击：只负责选中，启用/停用由 A 键触发
 			var checkID:Int = getHoveredCheckbox();
 			if (checkID >= 0)
 			{
@@ -392,12 +399,12 @@ class ModsMenuState extends MusicBeatState
 				{
 					changeSelection(checkID - curSelected);
 					updateRows();
+					updateInfo();
+					updateButtons();
 				}
-				toggleSelected();
 				return;
 			}
 
-			// 行点击：未选中则选中，已选中则启用/停用
 			var rowID:Int = getHoveredRowID();
 			if (rowID >= 0)
 			{
@@ -409,8 +416,6 @@ class ModsMenuState extends MusicBeatState
 					updateInfo();
 					updateButtons();
 				}
-				else
-					toggleSelected();
 			}
 		}
 

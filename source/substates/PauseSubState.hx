@@ -71,6 +71,15 @@ class PauseSubState extends MusicBeatSubstate
 	var mouseLockX:Float = 0;      // 键盘接管时记录的鼠标位置
 	var mouseLockY:Float = 0;
 
+	#if mobile
+	var touchDownRow:Int = -1;    // 触屏点选：按下时所在的行
+	var touchDownID:Int = -1;     // 触屏点选：触摸点 ID
+	#end
+
+	#if mobile
+	var pausePad:objects.MobileControls;
+	#end
+
 	public static var songName:String = '';
 
 	public function new(x:Float, y:Float)
@@ -100,15 +109,24 @@ class PauseSubState extends MusicBeatSubstate
 		difficultyChoices.push('返回');
 
 		pauseMusic = new FlxSound();
-		if(songName != null) {
-			pauseMusic.loadEmbedded(Paths.music(songName), true, true);
-		} else if (songName != '无') {
-			pauseMusic.loadEmbedded(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), true, true);
+		// 暂停音乐资源缺失时绝不能阻止暂停界面打开（否则会出现“暂停界面显示不出来”但游戏已冻结）
+		try
+		{
+			if(songName != null) {
+				pauseMusic.loadEmbedded(Paths.music(songName), true, true);
+			} else if (songName != '无') {
+				pauseMusic.loadEmbedded(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), true, true);
+			}
+			trace('[PAUSE] PauseSubState new: pauseMusic=' + songName);
+			pauseMusic.volume = 0;
+			pauseMusic.play(false, FlxG.random.int(0, Std.int(pauseMusic.length / 2)));
+			FlxG.sound.list.add(pauseMusic);
 		}
-		pauseMusic.volume = 0;
-		pauseMusic.play(false, FlxG.random.int(0, Std.int(pauseMusic.length / 2)));
-
-		FlxG.sound.list.add(pauseMusic);
+		catch (e:Dynamic)
+		{
+			trace('[PAUSE] 暂停音乐加载失败，跳过：' + e);
+			pauseMusic = null;
+		}
 
 		// ---- 背景 ----
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
@@ -239,6 +257,12 @@ class PauseSubState extends MusicBeatSubstate
 		add(backBtn.spr);
 		add(backBtn.label);
 
+		#if mobile
+		// 暂停界面补上 virtualpad A 键（不注册为全局 instance，避免干扰游玩触控板）
+		pausePad = new objects.MobileControls(false, cameras[0], -1, true);
+		add(pausePad);
+		#end
+
 		regenMenu();
 		FlxG.mouse.visible = true;
 		Lib.application.window.title = "FNF':Meteoric Engine - 暂停";
@@ -274,6 +298,16 @@ class PauseSubState extends MusicBeatSubstate
 
 	var holdTime:Float = 0;
 	var cantUnpause:Float = 0.1;
+
+	#if mobile
+	/** 暂停菜单里按返回键 / 左上角 X：继续游戏，不退出 */
+	override public function onAndroidBack():Bool
+	{
+		close();
+		return true;
+	}
+	#end
+
 	override function update(elapsed:Float)
 	{
 		// 每帧固定暂停相机缩放/滚动，防止暂停期间任何运行期改动导致文本截断
@@ -284,7 +318,7 @@ class PauseSubState extends MusicBeatSubstate
 		}
 		FlxG.mouse.visible = true;
 		cantUnpause -= elapsed;
-		if (pauseMusic.volume < 0.5)
+		if (pauseMusic != null && pauseMusic.volume < 0.5)
 			pauseMusic.volume += 0.01 * elapsed;
 
 		super.update(elapsed);
@@ -294,6 +328,57 @@ class PauseSubState extends MusicBeatSubstate
 		var upP = controls.UI_UP_P;
 		var downP = controls.UI_DOWN_P;
 		var accepted = controls.ACCEPT;
+		#if mobile
+		if (pausePad != null && pausePad.justPressed('accept')) accepted = true;
+
+		// ---- 触屏直接点选（不依赖鼠标模拟）：按下所在行即选中，抬起仍在同一行则确认 ----
+		for (touch in FlxG.touches.list)
+		{
+			if (touch.justPressed)
+			{
+				var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+				for (item in grpMenuShit.members)
+				{
+					if (tp.x >= item.x && tp.x <= item.x + item.width
+						&& tp.y >= item.y && tp.y <= item.y + item.height)
+					{
+						touchDownRow = item.ID;
+						touchDownID = touch.touchPointID;
+						if (touchDownRow != curSelected) changeSelection(touchDownRow - curSelected);
+						break;
+					}
+				}
+				// 返回按钮：触屏直接点按关闭
+				if (touchDownRow < 0 && backBtn.over(tp.x, tp.y))
+				{
+					mouseActive = true;
+					close();
+					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+					tp.put();
+					return;
+				}
+				tp.put();
+			}
+			else if (touch.justReleased && touch.touchPointID == touchDownID)
+			{
+				var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
+				var onRow:Bool = false;
+				for (item in grpMenuShit.members)
+				{
+					if (item.ID == touchDownRow && tp.x >= item.x && tp.x <= item.x + item.width
+						&& tp.y >= item.y && tp.y <= item.y + item.height)
+					{
+						onRow = true;
+						break;
+					}
+				}
+				tp.put();
+				if (onRow) accepted = true;
+				touchDownRow = -1;
+				touchDownID = -1;
+			}
+		}
+		#end
 
 		if (upP)
 		{
@@ -323,8 +408,13 @@ class PauseSubState extends MusicBeatSubstate
 			}
 
 			// 返回按钮：悬停高亮，点击返回游戏
+			var clickPressed:Bool = FlxG.mouse.justPressed;
+			#if mobile
+			clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+			#end
+
 			backBtn.setHovered(mousePos.x, mousePos.y);
-			if (FlxG.mouse.justPressed && backBtn.over(mousePos.x, mousePos.y))
+			if (clickPressed && backBtn.over(mousePos.x, mousePos.y))
 			{
 				mouseActive = true;
 				close();
@@ -348,7 +438,7 @@ class PauseSubState extends MusicBeatSubstate
 				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
 			}
 
-			if (hoveredID >= 0 && FlxG.mouse.justPressed)
+			if (hoveredID >= 0 && clickPressed)
 			{
 				mouseActive = true;
 				if (hoveredID != curSelected) changeSelection(hoveredID - curSelected);
@@ -398,6 +488,9 @@ class PauseSubState extends MusicBeatSubstate
 						var poop = Highscore.formatSong(name, curSelected);
 						PlayState.SONG = Song.loadFromJson(poop, name);
 						PlayState.storyDifficulty = curSelected;
+						// 更换难度后不再继续回放，退回普通游玩
+						PlayState.queuedReplay = null;
+						PlayState.carryReplay = null;
 						MusicBeatState.resetState();
 						FlxG.sound.music.volume = 0;
 						PlayState.changedDifficulty = true;
@@ -448,6 +541,9 @@ class PauseSubState extends MusicBeatSubstate
 					{
 						if (curTime != Conductor.songPosition)
 						{
+							// 回放中跳时间：把按键注入游标对齐到新时间点，避免旧按键一次性补触发
+							if (PlayState.instance.replayMode)
+								PlayState.instance.resetReplayToTime(curTime);
 							PlayState.instance.clearNotesBefore(curTime);
 							PlayState.instance.setSongTime(curTime);
 						}
@@ -522,6 +618,16 @@ class PauseSubState extends MusicBeatSubstate
 		PlayState.instance.paused = true; // For lua
 		FlxG.sound.music.volume = 0;
 		PlayState.instance.vocals.volume = 0;
+		// 重开时重置可能被 Mod 改掉的 hideHud，避免 HUD 消失
+		ClientPrefs.resetHideHud();
+
+		// 回放中重开：保留回放数据。
+		// 快速重开走 restartSongWithoutReload（数据在实例内保留）；
+		// 完整重开走 resetState → create，需要经 queuedReplay 重新喂给新实例。
+		if (PlayState.instance.replayMode && PlayState.carryReplay != null)
+			PlayState.queuedReplay = PlayState.carryReplay;
+		else
+			PlayState.queuedReplay = null;
 
 		if(skipChartReload == null) skipChartReload = ClientPrefs.data.restartNoChartReload;
 		if(skipChartReload)
@@ -544,7 +650,7 @@ class PauseSubState extends MusicBeatSubstate
 	override function destroy()
 	{
 		FlxG.mouse.visible = false;
-		pauseMusic.destroy();
+		if (pauseMusic != null) pauseMusic.destroy();
 
 		super.destroy();
 	}

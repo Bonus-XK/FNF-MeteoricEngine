@@ -32,6 +32,7 @@ import flixel.input.keyboard.FlxKey;
 import flixel.animation.FlxAnimationController;
 import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
+import openfl.events.Event;
 import openfl.events.KeyboardEvent;
 import openfl.Lib;
 import tjson.TJSON as Json;
@@ -74,7 +75,9 @@ import psychlua.*;
 #else
 import psychlua.FunkinLua;
 import psychlua.LuaUtils;
+#if HSCRIPT_ALLOWED
 import psychlua.HScript;
+#end
 #end
 
 #if (SScript >= "3.0.0")
@@ -185,6 +188,24 @@ class PlayState extends MusicBeatState
 	public var strumLineNotes:FlxTypedGroup<StrumNote>;
 	public var opponentStrums:FlxTypedGroup<StrumNote>;
 	public var playerStrums:FlxTypedGroup<StrumNote>;
+
+	// Psych 0.6.3 兼容：默认箭头位置（供 Lua 直接 getProperty/setProperty）
+	public var defaultPlayerStrumX0:Float = 0;
+	public var defaultPlayerStrumY0:Float = 0;
+	public var defaultPlayerStrumX1:Float = 0;
+	public var defaultPlayerStrumY1:Float = 0;
+	public var defaultPlayerStrumX2:Float = 0;
+	public var defaultPlayerStrumY2:Float = 0;
+	public var defaultPlayerStrumX3:Float = 0;
+	public var defaultPlayerStrumY3:Float = 0;
+	public var defaultOpponentStrumX0:Float = 0;
+	public var defaultOpponentStrumY0:Float = 0;
+	public var defaultOpponentStrumX1:Float = 0;
+	public var defaultOpponentStrumY1:Float = 0;
+	public var defaultOpponentStrumX2:Float = 0;
+	public var defaultOpponentStrumY2:Float = 0;
+	public var defaultOpponentStrumX3:Float = 0;
+	public var defaultOpponentStrumY3:Float = 0;
 	public var phigrosJudgeLine:PhigrosJudgeLine; // Phigros 玩法判定线
 	public var hudLayout:Map<String, Array<Float>>; // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
 	public var isPhigrosStyle:Bool = false;
@@ -193,7 +214,7 @@ class PlayState extends MusicBeatState
 	public var camZooming:Bool = false;
 	public var camZoomingMult:Float = 1;
 	public var camZoomingDecay:Float = 1;
-	private var curSong:String = "";
+	public var curSong:String = "";
 
 	public var gfSpeed:Int = 1;
 	public var health:Float = 1;
@@ -205,10 +226,10 @@ class PlayState extends MusicBeatState
 	public var timeBar:TimeBar;
 	public var timeBarBG:AttachedSprite;
 	public var healthBarOverlay:FlxTiledSprite;
-	var timeBarOverlay:FlxTiledSprite;
+	public var timeBarOverlay:FlxTiledSprite;
 	var healthOverlayDir:Int = -1; // 血量阴影滚动方向：-1 向左（回血） / +1 向右（掉血）
 	var lastHpPercent:Float = 50;
-	var songPercent:Float = 0;
+	public var songPercent:Float = 0;
 
 	public var ratingsData:Array<Rating> = Rating.loadDefault();
 	public var fullComboFunction:Void->Void = null;
@@ -216,7 +237,7 @@ class PlayState extends MusicBeatState
 	private var generatedMusic:Bool = false;
 	public var endingSong:Bool = false;
 	public var startingSong:Bool = false;
-	private var updateTime:Bool = true;
+	public var updateTime:Bool = true;
 	public static var changedDifficulty:Bool = false;
 	public static var chartingMode:Bool = false;
 
@@ -240,6 +261,8 @@ class PlayState extends MusicBeatState
 	var botBatchScoreShown:Bool = false;
 
 	public var botplaySine:Float = 0;
+	/** HUD/UI 子系统（重构）：负责全部 HUD 元素的创建、每帧更新与可见性权威 */
+	public var hud:GameHUD;
 	public var botplayTxt:FlxText;
 
 	public var iconP1:HealthIcon;
@@ -257,12 +280,18 @@ class PlayState extends MusicBeatState
 
 	public var replayMode:Bool = false;             // 本局是否为回放
 	public static var queuedReplay:Replay = null;   // 待进入的回放数据（结算/选歌界面设置）
+	public static var carryReplay:Replay = null;    // 暂停/死亡/重开时保留的回放数据（完整重开经 create 重新消费）
 	var recordingReplay:Bool = false;               // 本局是否在录制
 	var currentReplay:Replay = null;                // 本局录制数据
 	var replayHitSeqs:Map<Int, String> = null;      // 回放：应命中的音符（chartSeq -> 事件类型/评分）
 	var replayRatingSeqs:Map<Int, String> = null;   // 回放：评分查找（chartSeq -> 评分名）
-	var replayPressMisses:Array<ReplayEvent> = [];  // 回放：空按事件（按时间升序）
+	var replayPressMisses:Array<ReplayEvent> = [];  // 回放：空按事件（按时间升序，旧版回放用）
 	var replayPressPtr:Int = 0;                     // 回放：空按事件游标
+	var replayInputs:Array<ReplayInput> = [];       // 回放 v2：按键事件流（按下/抬起）
+	var replayInputPtr:Int = 0;                     // 回放 v2：按键事件游标
+	var replayHeld:Array<Bool> = [false, false, false, false]; // 回放 v2：当前按住的轨道
+	var replayV2:Bool = false;                      // 回放 v2：输入级回放（含按键事件）
+	var replayInjecting:Bool = false;               // 回放 v2：正在注入按键（放行 keyPressed/keyReleased）
 	public var scoreTxt:FlxText;
 	public var songTxt:FlxText;
 	public var timeTxt:FlxText;
@@ -281,7 +310,7 @@ class PlayState extends MusicBeatState
 
 	public var inCutscene:Bool = false;
 	public var skipCountdown:Bool = false;
-	var songLength:Float = 0;
+		public var songLength:Float = 0;
 
 	public var boyfriendCameraOffset:Array<Float> = null;
 	public var opponentCameraOffset:Array<Float> = null;
@@ -289,10 +318,11 @@ class PlayState extends MusicBeatState
 
 	#if desktop
 	// Discord RPC variables
-	var storyDifficultyText:String = "";
 	var detailsText:String = "";
 	var detailsPausedText:String = "";
 	#end
+	// 曲目难度文本（HUD 与标题栏显示用，桌面与非桌面都保留）
+	public var storyDifficultyText:String = "";
 
 	//Achievement shit
 	var keysPressed:Array<Int> = [];
@@ -317,6 +347,9 @@ class PlayState extends MusicBeatState
 	public var startCallback:Void->Void = null;
 	public var endCallback:Void->Void = null;
 
+	/** 游玩中按返回键 / 左上角 X 后，在 update 末尾统一转成暂停（不退出游戏） */
+	private var androidBackQueued:Bool = false;
+
 	override public function create()
 	{
 		isPhigrosStyle = ClientPrefs.data.phigrosStyle;
@@ -328,6 +361,8 @@ class PlayState extends MusicBeatState
 
 		// for lua
 		instance = this;
+
+		ClientPrefs.resetHideHud(); // 每次进入对局都恢复用户真实的 hideHud，防止 Mod 残留
 
 		PauseSubState.songName = null; //Reset to default
 		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
@@ -350,7 +385,7 @@ class PlayState extends MusicBeatState
 		practiceMode = ClientPrefs.getGameplaySetting('practice');
 		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
 		usedAutoplay = cpuControlled;
-		usedGodMode = practiceMode;
+		usedGodMode = false; // 上帝模式（practice）正常记分，只是不会死
 
 		// ---- 回放模式：存在待回放数据时本局按录制内容重放 ----
 		replayMode = queuedReplay != null;
@@ -372,10 +407,15 @@ class PlayState extends MusicBeatState
 				replayRatingSeqs = currentReplay.ratingSeqs;
 				replayPressMisses = currentReplay.pressMisses;
 				replayPressPtr = 0;
+				replayInputs = currentReplay.inputs != null ? currentReplay.inputs : [];
+				replayInputPtr = 0;
+				replayHeld = [false, false, false, false];
+				replayV2 = currentReplay.isInputReplay;
 				usedAutoplay = true; // 回放成绩不计入排行
 				startOnTime = 0;     // 回放必须从头开始
 			}
 		}
+		carryReplay = replayMode ? currentReplay : null;
 		recordingReplay = !replayMode && !chartingMode && !cpuControlled && startOnTime <= 0;
 		if (recordingReplay)
 			currentReplay = new Replay(SONG.song, Difficulty.getString(storyDifficulty));
@@ -406,9 +446,9 @@ class PlayState extends MusicBeatState
 		Conductor.mapBPMChanges(SONG);
 		Conductor.bpm = SONG.bpm;
 
-		#if desktop
 		storyDifficultyText = Difficulty.getString();
 
+		#if desktop
 		// String that contains the mode defined here so it isn't necessary to call changePresence for each mode
 		if (isStoryMode)
 			detailsText = "Story Mode: " + WeekData.getCurrentWeek().weekName;
@@ -440,6 +480,7 @@ class PlayState extends MusicBeatState
 			if (stageData.isPixelStage)
 				stageUI = "pixel";
 		}
+		trace('PlayState.stageUI=' + stageUI + ' stage=' + curStage);
 		
 		BF_X = stageData.boyfriend[0];
 		BF_Y = stageData.boyfriend[1];
@@ -553,69 +594,7 @@ class PlayState extends MusicBeatState
 		}
 		stagesFunc(function(stage:BaseStage) stage.createPost());
 
-		Conductor.songPosition = -5000 / Conductor.songPosition;
-		var showTime:Bool = (ClientPrefs.data.timeBarType != '禁用');
-		hudLayout = ClientPrefs.data.hudLayout;
-		// 时间条在上，时间文字在下
-		var hudTimeOff:Array<Float> = hudGetOffset('timeBar');
-		var timeBarY:Float = 19;
-		if(ClientPrefs.data.downScroll && !isPhigrosStyle) timeBarY = FlxG.height - 44 - 25; // 底部给时间文字留出位置
-		timeBarY += hudTimeOff[1];
-
-		timeBar = new TimeBar(0, timeBarY, function() return songPercent, 0, 1, ClientPrefs.data.newTimeBarStyle);
-		timeBar.scrollFactor.set();
-		timeBar.screenCenter(X);
-		timeBar.x += hudTimeOff[0];
-		if (ClientPrefs.data.newTimeBarStyle)
-		{
-			// 新样式：已走过部分显示对手图标颜色，颜色过暗（接近黑色）时兜底使用青色
-			var fillColor:FlxColor = FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]);
-			if (fillColor.red + fillColor.green + fillColor.blue < 120)
-				fillColor = 0xFF00FFFF;
-			timeBar.leftBar.color = fillColor;
-			timeBar.rightBar.color = 0xFF000000;
-		}
-		else
-		{
-			timeBar.leftBar.color = FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]);
-			timeBar.rightBar.color = 0xFF1A1A1A;
-		}
-		timeBar.alpha = 0;
-		timeBar.visible = showTime;
-		add(timeBar);
-
-		// 时间条血量阴影：固定向右滚动（黑色普通混合：黑底上不可见，填充部分显示暗纹）
-		timeBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(timeBar.bg.width), Std.int(timeBar.bg.height));
-		timeBarOverlay.x = timeBar.x;
-		timeBarOverlay.y = timeBar.y;
-		timeBarOverlay.scrollFactor.set();
-		timeBarOverlay.color = FlxColor.BLACK;
-		timeBarOverlay.alpha = 0;
-		timeBarOverlay.visible = showTime && !ClientPrefs.data.hideHud;
-		timeBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
-		add(timeBarOverlay);
-
-		timeTxt = new FlxText(STRUM_X + (FlxG.width / 2) - 248 + hudTimeOff[0], timeBarY + 25, 400, "", 32);
-		timeTxt.setFormat(Paths.font("vcr.ttf"), 25, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		timeTxt.scrollFactor.set();
-		timeTxt.alpha = 0;
-		timeTxt.borderSize = 2;
-		timeTxt.visible = updateTime = showTime;
-		if(ClientPrefs.data.downScroll && !isPhigrosStyle) timeTxt.y = FlxG.height - 44 + hudTimeOff[1];
-		if(ClientPrefs.data.timeBarType == '歌曲名称') timeTxt.text = SONG.song;
-
-		timeBarBG = new AttachedSprite('timeBar'); // 背景由 TimeBar 内部绘制，此对象仅保留供旧模组脚本引用
-		timeBarBG.x = timeBar.x;
-		timeBarBG.y = timeBar.y;
-		timeBarBG.scrollFactor.set();
-		timeBarBG.alpha = 0;
-		timeBarBG.visible = false;
-		timeBarBG.color = FlxColor.BLACK;
-		timeBarBG.xAdd = -4;
-		timeBarBG.yAdd = -4;
-		timeBarBG.sprTracker = timeBar;
-		add(timeBarBG);
-		add(timeTxt);
+		Conductor.songPosition = -5000;
 
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
 		add(strumLineNotes);
@@ -662,96 +641,12 @@ class PlayState extends MusicBeatState
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 		moveCameraSection();
 
-		var hudHpOff:Array<Float> = hudGetOffset('healthBar');
-		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11); // 血量条默认位置（计分/水印以此为基准，与血量条解耦）
-		healthBar = new HealthBar(0, defaultHpY + hudHpOff[1], 'healthBar', function() return (ClientPrefs.data.smoothHealth) ? smoothHealth : health, 0, 2, ClientPrefs.data.oldHealthBar);
-		healthBar.screenCenter(X);
-		healthBar.x += hudHpOff[0];
-		healthBar.leftToRight = false;
-		healthBar.scrollFactor.set();
-		healthBar.visible = !ClientPrefs.data.hideHud;
-		healthBar.alpha = ClientPrefs.data.healthBarAlpha;
-		reloadHealthBarColors();
-
-		healthBarBG = new AttachedSprite('healthBar');
-		healthBarBG.y = healthBar.y;
-		healthBarBG.screenCenter(X);
-		healthBarBG.scrollFactor.set();
-		healthBarBG.visible = false; // 背景由 HealthBar 内部绘制，此对象仅保留供旧模组脚本引用
-		healthBarBG.xAdd = -4;
-		healthBarBG.yAdd = -4;
-		healthBarBG.sprTracker = healthBar;
-		add(healthBarBG);
-
-		add(healthBar);
-		
-		healthBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(healthBar.bg.width), Std.int(healthBar.bg.height));
-		healthBarOverlay.y = healthBar.y;
-		healthBarOverlay.scrollFactor.set();
-		if (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay) {
-			healthBarOverlay.visible = true;
-		} else {
-			healthBarOverlay.visible = false;
-		}
-        healthBarOverlay.color = FlxColor.BLACK;
-		healthBarOverlay.blend = MULTIPLY;
-		healthBarOverlay.x = healthBar.x;
-	    healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha;
-		healthBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
-		add(healthBarOverlay); healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha; if(ClientPrefs.data.downScroll && !isPhigrosStyle) healthBarOverlay.y = healthBar.y;
-		if(ClientPrefs.data.oldHealthBar) healthBarOverlay.visible = false; // 旧版样式：不叠加阴影
-		
-		iconP1 = new HealthIcon(boyfriend.healthIcon, true);
-		iconP1.y = healthBar.y - 75; // 图标强绑定血量条
-		iconP1.visible = !ClientPrefs.data.hideHud;
-		iconP1.alpha = ClientPrefs.data.healthBarAlpha;
-		add(iconP1);
-
-		iconP2 = new HealthIcon(dad.healthIcon, false);
-		iconP2.y = healthBar.y - 75; // 图标强绑定血量条
-		iconP2.visible = !ClientPrefs.data.hideHud;
-		iconP2.alpha = ClientPrefs.data.healthBarAlpha;
-		add(iconP2);
-
-		var hudScoreOff:Array<Float> = hudGetOffset('score');
-		scoreTxt = new FlxText(hudScoreOff[0], defaultHpY + 55 + hudScoreOff[1], FlxG.width, "", 20);
-		if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
-			scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			scoreTxt.borderSize = 1.25;
-		}
-
-		if(ClientPrefs.data.scoreTxtFont == "默认"){
-			scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			scoreTxt.borderSize = 1.25;
-		}
-		scoreTxt.scrollFactor.set();
-		scoreTxt.visible = !ClientPrefs.data.hideHud;
-		add(scoreTxt);
-
-		var hudWmOff:Array<Float> = hudGetOffset('watermark');
-		songTxt = new FlxText(12 + hudWmOff[0], defaultHpY + 55 + hudWmOff[1], 0, "", 12);
-		songTxt.setFormat(Paths.font("future.ttf"), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		songTxt.scrollFactor.set();
-		songTxt.borderSize = 1;
-		if (!ClientPrefs.data.hideHud && !ClientPrefs.data.hideWatermark) {
-			songTxt.visible = true;
-		} else {
-			songTxt.visible = false;
-		}
-		add(songTxt);
-		songTxt.text = curSong + " (" + storyDifficultyText + ") " + "| 流星引擎 v" + Main.meVersion;
-
+		// ===== HUD/UI 子系统（GameHUD）：时间条/血条/图标/分数/歌曲名/标签的创建、
+		// 每帧更新与可见性权威全部集中于此，PlayState 只保留玩法逻辑 =====
+		hud = new GameHUD(this);
+		hud.build();
 		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong + (replayMode ? ' [回放]' : '');
 
-		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, replayMode ? "REPLAY" : "AutoPlay", 32);
-		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		botplayTxt.scrollFactor.set();
-		botplayTxt.borderSize = 1.25;
-		botplayTxt.visible = cpuControlled || replayMode;
-		add(botplayTxt);
-		if(ClientPrefs.data.downScroll && !isPhigrosStyle) {
-			botplayTxt.y = timeBar.y - 78;
-		}
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];
 		notes.cameras = [camHUD];
@@ -763,19 +658,6 @@ class PlayState extends MusicBeatState
 			grpNoteSplashes.visible = false;
 		}
 
-		healthBar.cameras = [camHUD];
-		healthBarBG.cameras = [camHUD];
-		healthBarOverlay.cameras = [camHUD];
-		timeBarOverlay.cameras = [camHUD];
-		iconP1.cameras = [camHUD];
-		iconP2.cameras = [camHUD];
-		scoreTxt.cameras = [camHUD];
-		songTxt.cameras = [camOther];
-
-		botplayTxt.cameras = [camHUD];
-		timeBar.cameras = [camHUD];
-		timeBarBG.cameras = [camHUD];
-		timeTxt.cameras = [camHUD];
 
 		startingSong = true;
 		
@@ -837,6 +719,9 @@ class PlayState extends MusicBeatState
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
+		#if mobile
+		FlxG.stage.addEventListener(Event.DEACTIVATE, onStageDeactivate);
+		#end
 		callOnScripts('onCreatePost');
 
 		cacheCountdown();
@@ -857,6 +742,9 @@ class PlayState extends MusicBeatState
 		}
 
 		super.create();
+		#if mobile
+		add(new objects.MobileControls());
+		#end
 		// 大谱面下不做同步 GC（音符对象全部存活，GC 会阻塞主线程），交给后续帧自然回收
 		Paths.clearUnusedMemory(false);
 		// 预解码贴图里未被本局消费的（如未出场角色）在此释放，避免残留大图
@@ -925,7 +813,6 @@ class PlayState extends MusicBeatState
 		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
 
 		if (cpuControlled) usedAutoplay = true;
-		if (practiceMode) usedGodMode = true;
 
 		if (practiceMode != oldPractice || cpuControlled != oldBotplay)
 			changedDifficulty = true;
@@ -955,9 +842,28 @@ class PlayState extends MusicBeatState
 		#end
 	}
 	
+	public function updateHUDVisibility() {
+		var hide:Bool = ClientPrefs.data.hideHud;
+		if (healthBar != null) healthBar.visible = !hide;
+		if (healthBarOverlay != null) healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar;
+		if (iconP1 != null) iconP1.visible = !hide;
+		if (iconP2 != null) iconP2.visible = !hide;
+		if (scoreTxt != null) scoreTxt.visible = !hide;
+		if (timeBarOverlay != null) timeBarOverlay.visible = timeBar != null && timeBar.visible && !hide;
+	}
+
+	/**
+	 * HUD 权威校验：每帧把 HUD 元素可见性强制恢复为设置值。
+	 * 无论谁（Lua/Hscript/Mod/遗留代码）把 healthBar/图标/分数直接改成不可见，
+	 * 下一帧都会被拉回 —— 彻底解决“游玩中 UI 突然消失”（只剩箭头和时间条）问题。
+	 */
+	public function enforceHUD() {
+		// 已收敛到 GameHUD.enforce()（每帧可见性权威）
+		if (hud != null) hud.enforce();
+	}
+
 	public function reloadHealthBarColors() {
-		healthBar.setColors(FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]),
-			FlxColor.fromRGB(boyfriend.healthColorArray[0], boyfriend.healthColorArray[1], boyfriend.healthColorArray[2]));
+		if (hud != null) hud.reloadHealthBarColors();
 	}
 
 	public function addCharacterToList(newCharacter:String, type:Int) {
@@ -1214,10 +1120,14 @@ class PlayState extends MusicBeatState
 			for (i in 0...playerStrums.length) {
 				setOnScripts('defaultPlayerStrumX' + i, playerStrums.members[i].x);
 				setOnScripts('defaultPlayerStrumY' + i, playerStrums.members[i].y);
+				Reflect.setProperty(this, 'defaultPlayerStrumX' + i, playerStrums.members[i].x);
+				Reflect.setProperty(this, 'defaultPlayerStrumY' + i, playerStrums.members[i].y);
 			}
 			for (i in 0...opponentStrums.length) {
 				setOnScripts('defaultOpponentStrumX' + i, opponentStrums.members[i].x);
 				setOnScripts('defaultOpponentStrumY' + i, opponentStrums.members[i].y);
+				Reflect.setProperty(this, 'defaultOpponentStrumX' + i, opponentStrums.members[i].x);
+				Reflect.setProperty(this, 'defaultOpponentStrumY' + i, opponentStrums.members[i].y);
 				//if(ClientPrefs.data.middleScroll) opponentStrums.members[i].visible = false;
 			}
 
@@ -2153,6 +2063,12 @@ class PlayState extends MusicBeatState
 			paused = false;
 			callOnScripts('onResume');
 			resetRPC(startTimer != null && startTimer.finished);
+
+			#if mobile
+			// 恢复游戏触控板
+			if (objects.MobileControls.instance != null)
+				objects.MobileControls.instance.visible = true;
+			#end
 		}
 
 		super.closeSubState();
@@ -2168,6 +2084,12 @@ class PlayState extends MusicBeatState
 	{
 		#if desktop
 		if (health > 0 && !paused) DiscordClient.changePresence(detailsPausedText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
+		#end
+
+		#if mobile
+		// 退到后台时立即暂停，避免“看似暂停实际还在运行”
+		if (startedCountdown && !endingSong && !paused && canPause)
+			openPauseMenu();
 		#end
 
 		super.onFocusLost();
@@ -2208,11 +2130,25 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
+		backend.Diag.log();
 		/*if (FlxG.keys.justPressed.NINE)
 		{
 			iconP1.swapOldIcon();
 		}*/
 		callOnScripts('onUpdate', [elapsed]);
+
+		// ===== HUD 权威校验（每帧） =====
+		// 1) hideHud 被 Mod/脚本临时改掉 → 立即恢复用户真实设置；
+		// 2) healthBar/图标/分数等 visible 被任何代码（Lua/Hscript/遗留逻辑）直接改掉
+		//    → 每帧强制拉回设置值。从根上杜绝“游玩中 UI 突然消失”。
+		// 注意：此函数只在非暂停/非结算（persistentUpdate=true）时执行，
+		// 不会干扰暂停界面、结算界面自身的显隐逻辑。
+		enforceHUD();
+
+		// 自愈：paused 卡死但没有打开任何子界面（如 PauseSubState 构造中途异常、
+		// Lua 拦截 onPause 后遗留）时解锁，避免“暂停界面显示不出来”却把游戏冻结住。
+		if (paused && subState == null && !isDead && !chartingMode)
+			paused = false;
 
 		FlxG.camera.followLerp = 0;
 		if(!inCutscene && !paused) {
@@ -2281,100 +2217,26 @@ class PlayState extends MusicBeatState
 					trace('[Rewind] FINISH (field empty), elapsed=' + rewindElapsed);
 					finishRestart();
 				}
-				else if (Std.int(rewindElapsed * 10) != Std.int((rewindElapsed - elapsed) * 10))
-					trace('[Rewind] pos=' + Conductor.songPosition + ' (from ' + rewindFromPos + ')');
 			}
 		}
 
 		setOnScripts('curDecStep', curDecStep);
 		setOnScripts('curDecBeat', curDecBeat);
 
-	if(ClientPrefs.data.sbIconBop){
-		var speed:Float = 1;
-		if (iconP1.angle >= 0) {
-			speed *= playbackRate;
-			if (iconP1.angle != 0) {
-				iconP1.angle -= speed;
-			}
-		} else {
-			if (iconP1.angle != 0) {
-				iconP1.angle += speed;
-			}
-		}
-		if (iconP2.angle >= 0) {
-			if (iconP2.angle != 0) {
-				iconP2.angle -= speed;
-			}
-		} else {
-			if (iconP2.angle != 0) {
-				iconP2.angle += speed;
-			}
-		}
-	}
+		// HUD 每帧更新（图标跳动/跟随/阴影滚动/botplay 呼吸/可见性权威）全部收敛到 GameHUD
+		if (hud != null) hud.update(elapsed);
 
-		if(botplayTxt != null && botplayTxt.visible) {
-			botplaySine += 180 * elapsed;
-			botplayTxt.alpha = 1 - Math.sin((Math.PI * botplaySine) / 180);
-		}
-
-		if (controls.PAUSE && startedCountdown && canPause)
+		if ((controls.PAUSE || androidBackQueued) && startedCountdown && canPause)
 		{
 			var ret:Dynamic = callOnScripts('onPause', null, true);
 			if(ret != FunkinLua.Function_Stop) {
 				openPauseMenu();
 			}
 		}
+		androidBackQueued = false;
 
 		if (controls.justPressed('debug_1') && !endingSong && !inCutscene)
 			openChartEditor();
-
-		if (ClientPrefs.data.keIconBop)
-		{
-			// KE 引擎图标跳动：指数衰减回基准大小（等效 Kade 引擎 60FPS 手感，且帧率无关）
-			var keDecay:Float = Math.pow(0.5, elapsed * 60 * playbackRate);
-			var keMultP1:Float = 1 + (iconP1.scale.x - 1) * keDecay;
-			iconP1.scale.set(keMultP1, keMultP1);
-			iconP1.updateHitbox();
-			iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
-			var keMultP2:Float = 1 + (iconP2.scale.x - 1) * keDecay;
-			iconP2.scale.set(keMultP2, keMultP2);
-			iconP2.updateHitbox();
-			iconP2.origin.set(0, 0);
-		}
-		else
-		{
-			var iconDecay:Float = FlxMath.bound(1 - (elapsed * 9 * playbackRate), 0, 1);
-			var multP1:Float = FlxMath.lerp(1, iconP1.scale.x, iconDecay);
-			iconP1.scale.set(multP1, multP1);
-			iconP1.updateHitbox();
-			var multP2:Float = FlxMath.lerp(1, iconP2.scale.x, iconDecay);
-			iconP2.scale.set(multP2, multP2);
-			iconP2.updateHitbox();
-		}
-
-		var iconOffset:Int = 26;
-		if (health > 2) health = 2;
-		// 图标强绑定血量条：x 跟随 barCenter（随血量增减在条上左右滑动，FNF 经典手感），y 跟随血量条，拖动血量条时整体跟随
-		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset;
-		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2;
-		iconP1.animation.curAnim.curFrame = (healthBar.percent < 20) ? 1 : 0;
-		iconP2.animation.curAnim.curFrame = (healthBar.percent > 80) ? 1 : 0;
-
-		// 血量阴影滚动：方向随推条方向（回血向左、掉血向右），UV 平铺滚动不会跑出条外
-		var hpDelta:Float = healthBar.percent - lastHpPercent;
-		if (hpDelta >= 0.01) healthOverlayDir = -1;
-		else if (hpDelta <= -0.01) healthOverlayDir = 1;
-		lastHpPercent = healthBar.percent;
-
-		if (healthBarOverlay.visible)
-			healthBarOverlay.scrollX += healthOverlayDir * 22 * elapsed;
-
-		// 时间条阴影：固定向右滚动，透明度跟随时间条淡入
-		if (timeBarOverlay != null && timeBarOverlay.visible)
-		{
-			timeBarOverlay.alpha = timeBar.alpha * 0.5;
-			timeBarOverlay.scrollX += 22 * elapsed;
-		}
 
 		if (controls.justPressed('debug_2') && !endingSong && !inCutscene)
 			openCharacterEditor();
@@ -2457,9 +2319,13 @@ class PlayState extends MusicBeatState
 			{
 				if(!rewinding && !cpuControlled && !replayMode) {
 					keysCheck();
-				} else if(boyfriend.animation.curAnim != null && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration && boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.animation.curAnim.name.endsWith('miss')) {
-					boyfriend.dance();
-					//boyfriend.animation.curAnim.finish();
+				} else {
+					// 回放 v2：按录制时间注入按键（走正常判定路径），并处理长按子段
+					if (replayMode && replayV2) updateReplayInputs();
+					if (boyfriend.animation.curAnim != null && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration && boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.animation.curAnim.name.endsWith('miss')) {
+						boyfriend.dance();
+						//boyfriend.animation.curAnim.finish();
+					}
 				}
 
 				if(notes.length > 0)
@@ -2538,8 +2404,9 @@ class PlayState extends MusicBeatState
 					processBotHits();
 				}
 
-				// 回放：按录制时间触发空按（无对应音符的按键），与原局按键时机一致
-				if (replayMode && !rewinding && !paused && !endingSong && startedCountdown)
+				// 回放（旧版）：按录制时间触发空按（无对应音符的按键），与原局按键时机一致。
+				// 回放 v2 的空按由按键注入自然复现，这里跳过避免重复 Miss。
+				if (replayMode && !replayV2 && !rewinding && !paused && !endingSong && startedCountdown)
 				{
 					while (replayPressPtr < replayPressMisses.length && Conductor.songPosition >= replayPressMisses[replayPressPtr].t)
 					{
@@ -2570,8 +2437,20 @@ class PlayState extends MusicBeatState
 		callOnScripts('onUpdatePost', [elapsed]);
 	}
 
+	#if mobile
+	/** 游玩中按返回键 / 左上角 X：暂停游戏而不是退出（菜单里仍是退出到桌面） */
+	override public function onAndroidBack():Bool
+	{
+		androidBackQueued = true;
+		return true;
+	}
+	#end
+
 	function openPauseMenu()
 	{
+		// 防重入：后台/失焦/按键可能在同一帧多次触发，避免打开多个暂停界面
+		if (paused) return;
+
 		FlxG.camera.followLerp = 0;
 		persistentUpdate = false;
 		persistentDraw = true;
@@ -2598,6 +2477,11 @@ class PlayState extends MusicBeatState
 					note.resetAnim = 0;
 				}
 		}
+		#if mobile
+		// 暂停时隐藏游戏触控板，避免暂停界面还显示游戏方向键
+		if (objects.MobileControls.instance != null)
+			objects.MobileControls.instance.visible = false;
+		#end
 		openSubState(new PauseSubState(boyfriend.getScreenPosition().x, boyfriend.getScreenPosition().y));
 		//}
 
@@ -3082,7 +2966,7 @@ class PlayState extends MusicBeatState
 			#if !switch
 			var percent:Float = ratingPercent;
 			if(Math.isNaN(percent)) percent = 0;
-			if(!usedAutoplay && !usedGodMode)
+			if(!usedAutoplay)
 				Highscore.saveScore(SONG.song, songScore, storyDifficulty, percent);
 			#end
 
@@ -3106,6 +2990,8 @@ class PlayState extends MusicBeatState
 					if (replayForResults != null)
 					{
 						// 回放本局：原地重开并进入回放模式
+						// 防止 Mod 脚本遗留 hideHud=true 导致回放时 HUD 消失
+						ClientPrefs.resetHideHud();
 						PlayState.queuedReplay = replayForResults;
 						FlxTransitionableState.skipNextTransIn = true;
 						FlxTransitionableState.skipNextTransOut = true;
@@ -3150,7 +3036,7 @@ class PlayState extends MusicBeatState
 				MusicBeatState.switchState(new StoryMenuState());
 
 				// if ()
-				if(!usedAutoplay && !usedGodMode) {
+				if(!usedAutoplay) {
 					StoryMenuState.weekCompleted.set(WeekData.weeksList[storyWeek], true);
 					Highscore.saveWeekScore(WeekData.getWeekFileName(), campaignScore, storyDifficulty);
 
@@ -3251,6 +3137,7 @@ class PlayState extends MusicBeatState
 		if (vocals != null) vocals.stop();
 
 		// 重置本局数据
+		ClientPrefs.resetHideHud();
 		health = 1;
 		smoothHealth = 1;
 		songScore = 0;
@@ -3261,7 +3148,7 @@ class PlayState extends MusicBeatState
 		combo = 0;
 		songPercent = 0;
 		usedAutoplay = cpuControlled || replayMode;
-		usedGodMode = practiceMode;
+		usedGodMode = false; // 上帝模式正常记分
 		for (rating in ratingsData) rating.hits = 0;
 		ratingName = '?';
 		ratingPercent = 0;
@@ -3271,13 +3158,17 @@ class PlayState extends MusicBeatState
 		boyfriendIdleTime = 0;
 		boyfriendIdled = false;
 
-		// 重开：录制从头开始（回放数据保持，空按游标复位）
+		// 重开：录制从头开始（回放数据保持，按键/空按游标与按住状态复位）
 		replayPressPtr = 0;
+		replayInputPtr = 0;
+		replayHeld = [false, false, false, false];
+		replayInjecting = false;
 		if (recordingReplay && !replayMode)
 			currentReplay = new Replay(SONG.song, Difficulty.getString(storyDifficulty));
 
-		// 快速重开回溯：屏幕上的箭头像时间倒流一样飞回起点，再重新开始
-		if ((ClientPrefs.data.rewindOnRestart || forceRewind) && Conductor.songPosition > rewindMinPosition)
+		// 快速重开回溯：屏幕上的箭头像时间倒流一样飞回起点，再重新开始。
+		// 回放模式跳过回溯视觉（回放数据按时间轴注入，回溯会打乱游标），直接干净重开。
+		if (!replayMode && (ClientPrefs.data.rewindOnRestart || forceRewind) && Conductor.songPosition > rewindMinPosition)
 		{
 			trace('[Rewind] START from ' + Conductor.songPosition + 'ms, pref=' + ClientPrefs.data.rewindOnRestart);
 			rewinding = true;
@@ -3366,25 +3257,12 @@ class PlayState extends MusicBeatState
 		Conductor.bpm = SONG.bpm;
 
 		// 回溯/重开完成后，时间条与时间文字立即归零，避免残留回溯结束瞬间的旧进度
-		songPercent = 0;
-		if (timeTxt != null && ClientPrefs.data.timeBarType != '歌曲名称')
-		{
-			var restartSeconds:Int = 0;
-			if (ClientPrefs.data.timeBarType == '剩余时间')
-				restartSeconds = Std.int(Math.max(0, songLength) / 1000);
-			timeTxt.text = FlxStringUtil.formatTime(restartSeconds, false);
-		}
+		if (hud != null) hud.resetForRestart();
 
 		// 重置拍点/步点缓存，避免重开后 beatHit 被旧值跳过（角色因此不动）
 		lastStepHit = -1;
 		lastBeatHit = -1;
 		resetBPMChangeCache();
-
-		// 时间条重新渐入
-		timeBar.visible = updateTime;
-		timeTxt.visible = updateTime;
-		timeBar.alpha = 0;
-		timeTxt.alpha = 0;
 
 		// 根据内存中的谱面重新生成音符（不重新读盘）
 		generateChartNotes(false);
@@ -3586,14 +3464,13 @@ class PlayState extends MusicBeatState
 			if (cpuControlled && botHitBatch) botBatchSplashDone[note.noteData] = true;
 		}
 
-		if(!practiceMode) {
-			songScore += score;
-			if(!note.ratingDisabled)
-			{
-				songHits++;
-				totalPlayed++;
-				RecalculateRating(false);
-			}
+		// 上帝模式（practice）同样正常记分/记命中/评准确率（只是不会死）
+		songScore += score;
+		if(!note.ratingDisabled)
+		{
+			songHits++;
+			totalPlayed++;
+			RecalculateRating(false);
 		}
 
 		// 自动游玩批处理：堆叠命中只显示一次评分（其余仅计分），避免一帧内创建大量评分/连击精灵
@@ -3746,6 +3623,19 @@ class PlayState extends MusicBeatState
 	}
 
 	public var strumsBlocked:Array<Bool> = [];
+	#if mobile
+	/** 后台化时自动暂停：返回键/侧滑返回/Home 键都会先把游戏切到后台 */
+	private function onStageDeactivate(event:Event):Void
+	{
+		trace('[PAUSE] onStageDeactivate started=' + startedCountdown + ' paused=' + paused + ' canPause=' + canPause);
+		if (startedCountdown && !endingSong && !paused && canPause)
+		{
+			trace('[PAUSE] openPauseMenu from deactivate');
+			openPauseMenu();
+		}
+	}
+	#end
+
 	private function onKeyPress(event:KeyboardEvent):Void
 	{
 		var eventKey:FlxKey = event.keyCode;
@@ -3755,8 +3645,11 @@ class PlayState extends MusicBeatState
 
 	private function keyPressed(key:Int)
 	{
-		if (!cpuControlled && !replayMode && startedCountdown && !paused && !rewinding && key > -1)
+		if (!cpuControlled && !paused && !rewinding && key > -1 && startedCountdown && (!replayMode || replayInjecting))
 		{
+			// 回放录制：记录按键按下事件（重放时按时间注入，走同样的判定路径）
+			if (recordingReplay && currentReplay != null)
+				currentReplay.recordInput(Conductor.songPosition, key, false);
 			var mashPenalty:Bool = false;
 
 			if(notes.length > 0 && !boyfriend.stunned && generatedMusic && !endingSong)
@@ -3797,7 +3690,7 @@ class PlayState extends MusicBeatState
 						if (pressedCount > allowedPresses)
 						{
 							mashPenalty = true;
-							if (!practiceMode) songScore -= 25;
+							songScore -= 25;
 							FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
 							playerStrums.forEach(function(spr:StrumNote)
 							{
@@ -3907,8 +3800,11 @@ class PlayState extends MusicBeatState
 
 	private function keyReleased(key:Int)
 	{
-		if(!cpuControlled && !replayMode && startedCountdown && !paused)
+		if(!cpuControlled && startedCountdown && !paused && (!replayMode || replayInjecting))
 		{
+			// 回放录制：记录按键抬起事件
+			if (recordingReplay && currentReplay != null)
+				currentReplay.recordInput(Conductor.songPosition, key, true);
 			var spr:StrumNote = playerStrums.members[key];
 			if(spr != null)
 			{
@@ -4003,6 +3899,69 @@ class PlayState extends MusicBeatState
 					keyReleased(i);
 	}
 
+	/** 回放 v2：按录制时间注入按键按下/抬起（走正常判定路径），并处理长按子段命中 */
+	private function updateReplayInputs():Void
+	{
+		if (!startedCountdown || paused || rewinding || endingSong || inCutscene) return;
+
+		// 注入到点按键事件：按下走 keyPressed（真实判定），抬起走 keyReleased（strum 复位）
+		replayInjecting = true;
+		while (replayInputPtr < replayInputs.length && Conductor.songPosition >= replayInputs[replayInputPtr].t)
+		{
+			var ev:ReplayInput = replayInputs[replayInputPtr++];
+			if (ev.d < 0 || ev.d > 3) continue;
+			if (ev.u)
+			{
+				replayHeld[ev.d] = false;
+				keyReleased(ev.d);
+			}
+			else
+			{
+				replayHeld[ev.d] = true;
+				keyPressed(ev.d);
+			}
+		}
+		replayInjecting = false;
+
+		// 长按：与 keysCheck 的 HOLD 段一致（按住期间长条子段逐个命中/消除）
+		if (generatedMusic && notes.length > 0 && !boyfriend.stunned)
+		{
+			var anyHold:Bool = false;
+			for (i in 0...4)
+				if (replayHeld[i]) { anyHold = true; break; }
+			if (anyHold)
+			{
+				notes.forEachAlive(function(daNote:Note)
+				{
+					if (strumsBlocked[daNote.noteData] != true && daNote.isSustainNote && replayHeld[daNote.noteData]
+						&& daNote.canBeHit && daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit && !daNote.blockHit)
+					{
+						if (ClientPrefs.data.noteJudgment == 'KE 判定')
+						{
+							// KE 判定：长条不参与判定，按住时子段仅做视觉消除
+							daNote.wasGoodHit = true;
+							daNote.active = false;
+							daNote.visible = false;
+							daNote.kill();
+							notes.remove(daNote, true);
+							daNote.destroy();
+						}
+						else goodNoteHit(daNote);
+					}
+				});
+			}
+		}
+	}
+
+	/** 回放 v2：暂停菜单跳时间后，把按键游标对齐到新时间点 */
+	public function resetReplayToTime(t:Float):Void
+	{
+		replayInputPtr = 0;
+		while (replayInputPtr < replayInputs.length && replayInputs[replayInputPtr].t < t)
+			replayInputPtr++;
+		replayHeld = [false, false, false, false];
+	}
+
 	function noteMiss(daNote:Note):Void { //You didn't hit the key and let it go offscreen, also used by Hurt Notes
 		//Dupe note remove
 		notes.forEachAlive(function(note:Note) {
@@ -4041,7 +4000,7 @@ class PlayState extends MusicBeatState
 		}
 		combo = 0;
 
-		if(!practiceMode) songScore -= 10;
+		songScore -= 10;
 		if(!endingSong) songMisses++;
 		totalPlayed++;
 		RecalculateRating(true);
@@ -4308,10 +4267,15 @@ class PlayState extends MusicBeatState
 
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
+		#if mobile
+		FlxG.stage.removeEventListener(Event.DEACTIVATE, onStageDeactivate);
+		#end
 		FlxAnimationController.globalSpeed = 1;
 		FlxG.sound.music.pitch = 1;
 		Note.globalRgbShaders = [];
 		backend.NoteTypesConfig.clearNoteTypesData();
+		// 离开对局后清掉待重开的回放数据，避免影响后续普通对局
+		carryReplay = null;
 		instance = null;
 		super.destroy();
 
@@ -4850,9 +4814,361 @@ class PlayState extends MusicBeatState
 		}
 		FlxG.log.warn('Missing shader $name .frag AND .vert files!');
 		#else
-		FlxG.log.warn('This platform doesn\'t support Runtime Shaders!', false, false, FlxColor.RED);
+		FlxG.log.warn('This platform doesn\'t support Runtime Shaders!');
 		#end
 		return false;
 	}
 	#end
+}
+
+/**
+ * ============================================================
+ * GameHUD —— PlayState 的 HUD/UI 子系统（重构版）
+ * ============================================================
+ * 从 PlayState 中抽离的全部 HUD 职责集中于此：
+ *   1. 创建：血条/血量阴影/图标/分数/歌曲名/时间条/时间文字/自动游玩标签
+ *   2. 每帧更新：图标跳动回缩、图标跟随血量条、血量/时间阴影滚动、botplay 呼吸
+ *   3. 可见性权威 enforce()：每帧把 HUD 可见性强制恢复为设置值，
+ *      无论 Lua/Hscript/Mod/遗留代码把哪个元素 visible 改掉，下一帧都拉回 ——
+ *      根治“游玩中 UI 突然消失（只剩箭头和时间条）”问题。
+ * 兼容性：所有元素仍通过 PlayState 的 public 字段暴露（healthBar/iconP1/scoreTxt…），
+ * Lua/Hscript 的 getProperty/setProperty 完全不受影响。
+ */
+class GameHUD
+{
+	public var healthBar:HealthBar;
+	public var healthBarOverlay:FlxTiledSprite;
+	public var healthBarBG:AttachedSprite;
+	public var iconP1:HealthIcon;
+	public var iconP2:HealthIcon;
+	public var scoreTxt:FlxText;
+	public var songTxt:FlxText;
+	public var timeBar:TimeBar;
+	public var timeBarOverlay:FlxTiledSprite;
+	public var timeTxt:FlxText;
+	public var timeBarBG:AttachedSprite;
+	public var botplayTxt:FlxText;
+
+	var st:PlayState;            // 宿主对局
+	var lastHpPercent:Float = 50;
+	var healthOverlayDir:Int = -1; // 血量阴影滚动方向：-1 向左（回血） / +1 向右（掉血）
+
+	public function new(st:PlayState)
+	{
+		this.st = st;
+	}
+
+	// ==================== 创建 ====================
+
+	public function build():Void
+	{
+		var showTime:Bool = (ClientPrefs.data.timeBarType != '禁用');
+		st.hudLayout = ClientPrefs.data.hudLayout;
+
+		// ---- 时间条（上）+ 时间文字（下） ----
+		var hudTimeOff:Array<Float> = st.hudGetOffset('timeBar');
+		var timeBarY:Float = 19;
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeBarY = FlxG.height - 44 - 25;
+		timeBarY += hudTimeOff[1];
+
+		timeBar = new TimeBar(0, timeBarY, function() return st.songPercent, 0, 1, ClientPrefs.data.newTimeBarStyle);
+		timeBar.scrollFactor.set();
+		timeBar.screenCenter(X);
+		timeBar.x += hudTimeOff[0];
+		if (ClientPrefs.data.newTimeBarStyle)
+		{
+			var fillColor:FlxColor = FlxColor.fromRGB(st.dad.healthColorArray[0], st.dad.healthColorArray[1], st.dad.healthColorArray[2]);
+			if (fillColor.red + fillColor.green + fillColor.blue < 120) fillColor = 0xFF00FFFF;
+			timeBar.leftBar.color = fillColor;
+			timeBar.rightBar.color = 0xFF000000;
+		}
+		else
+		{
+			timeBar.leftBar.color = FlxColor.fromRGB(st.dad.healthColorArray[0], st.dad.healthColorArray[1], st.dad.healthColorArray[2]);
+			timeBar.rightBar.color = 0xFF1A1A1A;
+		}
+		timeBar.alpha = 0;
+		timeBar.visible = showTime;
+		st.add(timeBar);
+
+		timeBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(timeBar.bg.width), Std.int(timeBar.bg.height));
+		timeBarOverlay.x = timeBar.x;
+		timeBarOverlay.y = timeBar.y;
+		timeBarOverlay.scrollFactor.set();
+		timeBarOverlay.color = FlxColor.BLACK;
+		timeBarOverlay.alpha = 0;
+		timeBarOverlay.visible = showTime && !ClientPrefs.data.hideHud;
+		timeBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
+		st.add(timeBarOverlay);
+
+		timeTxt = new FlxText(PlayState.STRUM_X + (FlxG.width / 2) - 248 + hudTimeOff[0], timeBarY + 25, 400, "", 32);
+		timeTxt.setFormat(Paths.font("vcr.ttf"), 25, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		timeTxt.scrollFactor.set();
+		timeTxt.alpha = 0;
+		timeTxt.borderSize = 2;
+		timeTxt.visible = st.updateTime = showTime;
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeTxt.y = FlxG.height - 44 + hudTimeOff[1];
+		if (ClientPrefs.data.timeBarType == '歌曲名称') timeTxt.text = PlayState.SONG.song;
+
+		timeBarBG = new AttachedSprite('timeBar');
+		timeBarBG.x = timeBar.x;
+		timeBarBG.y = timeBar.y;
+		timeBarBG.scrollFactor.set();
+		timeBarBG.alpha = 0;
+		timeBarBG.visible = false;
+		timeBarBG.color = FlxColor.BLACK;
+		timeBarBG.xAdd = -4;
+		timeBarBG.yAdd = -4;
+		timeBarBG.sprTracker = timeBar;
+		st.add(timeBarBG);
+		st.add(timeTxt);
+
+		if (ClientPrefs.data.timeBarType == '歌曲名称')
+		{
+			timeTxt.size = 24;
+			timeTxt.y += 3;
+		}
+
+		// ---- 血量条 + 图标 + 分数 + 歌曲名 + 自动游玩标签 ----
+		var hudHpOff:Array<Float> = st.hudGetOffset('healthBar');
+		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || st.isPhigrosStyle ? 0.89 : 0.11);
+		healthBar = new HealthBar(0, defaultHpY + hudHpOff[1], 'healthBar',
+			function() return (ClientPrefs.data.smoothHealth) ? st.smoothHealth : st.health, 0, 2, ClientPrefs.data.oldHealthBar);
+		healthBar.screenCenter(X);
+		healthBar.x += hudHpOff[0];
+		healthBar.leftToRight = false;
+		healthBar.scrollFactor.set();
+		healthBar.visible = !ClientPrefs.data.hideHud;
+		healthBar.alpha = ClientPrefs.data.healthBarAlpha;
+		reloadHealthBarColors();
+
+		healthBarBG = new AttachedSprite('healthBar');
+		healthBarBG.y = healthBar.y;
+		healthBarBG.screenCenter(X);
+		healthBarBG.scrollFactor.set();
+		healthBarBG.visible = false;
+		healthBarBG.xAdd = -4;
+		healthBarBG.yAdd = -4;
+		healthBarBG.sprTracker = healthBar;
+		st.add(healthBarBG);
+
+		st.add(healthBar);
+
+		healthBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(healthBar.bg.width), Std.int(healthBar.bg.height));
+		healthBarOverlay.y = healthBar.y;
+		healthBarOverlay.scrollFactor.set();
+		healthBarOverlay.visible = (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay);
+		healthBarOverlay.color = FlxColor.BLACK;
+		healthBarOverlay.blend = MULTIPLY;
+		healthBarOverlay.x = healthBar.x;
+		healthBarOverlay.alpha = ClientPrefs.data.healthBarAlpha;
+		healthBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
+		st.add(healthBarOverlay);
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) healthBarOverlay.y = healthBar.y;
+		if (ClientPrefs.data.oldHealthBar) healthBarOverlay.visible = false;
+
+		iconP1 = new HealthIcon(st.boyfriend.healthIcon, true);
+		iconP1.y = healthBar.y - 75;
+		iconP1.visible = !ClientPrefs.data.hideHud;
+		iconP1.alpha = ClientPrefs.data.healthBarAlpha;
+		st.add(iconP1);
+
+		iconP2 = new HealthIcon(st.dad.healthIcon, false);
+		iconP2.y = healthBar.y - 75;
+		iconP2.visible = !ClientPrefs.data.hideHud;
+		iconP2.alpha = ClientPrefs.data.healthBarAlpha;
+		st.add(iconP2);
+
+		var hudScoreOff:Array<Float> = st.hudGetOffset('score');
+		scoreTxt = new FlxText(hudScoreOff[0], defaultHpY + 55 + hudScoreOff[1], FlxG.width, "", 20);
+		if (ClientPrefs.data.scoreTxtFont == "Bahnschrift")
+		{
+			scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			scoreTxt.borderSize = 1.25;
+		}
+		if (ClientPrefs.data.scoreTxtFont == "默认")
+		{
+			scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			scoreTxt.borderSize = 1.25;
+		}
+		scoreTxt.scrollFactor.set();
+		scoreTxt.visible = !ClientPrefs.data.hideHud;
+		st.add(scoreTxt);
+
+		var hudWmOff:Array<Float> = st.hudGetOffset('watermark');
+		songTxt = new FlxText(12 + hudWmOff[0], defaultHpY + 55 + hudWmOff[1], 0, "", 12);
+		songTxt.setFormat(Paths.font("future.ttf"), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		songTxt.scrollFactor.set();
+		songTxt.borderSize = 1;
+		songTxt.visible = (!ClientPrefs.data.hideHud && !ClientPrefs.data.hideWatermark);
+		st.add(songTxt);
+		songTxt.text = st.curSong + " (" + st.storyDifficultyText + ") " + "| 流星引擎 v" + Main.meVersion;
+
+		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, st.replayMode ? "REPLAY" : "AutoPlay", 32);
+		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		botplayTxt.scrollFactor.set();
+		botplayTxt.borderSize = 1.25;
+		botplayTxt.visible = st.cpuControlled || st.replayMode;
+		st.add(botplayTxt);
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) botplayTxt.y = timeBar.y - 78;
+
+		// ---- 相机归属 ----
+		healthBar.cameras = [st.camHUD];
+		healthBarBG.cameras = [st.camHUD];
+		healthBarOverlay.cameras = [st.camHUD];
+		timeBarOverlay.cameras = [st.camHUD];
+		iconP1.cameras = [st.camHUD];
+		iconP2.cameras = [st.camHUD];
+		scoreTxt.cameras = [st.camHUD];
+		songTxt.cameras = [st.camOther];
+		botplayTxt.cameras = [st.camHUD];
+		timeBar.cameras = [st.camHUD];
+		timeBarBG.cameras = [st.camHUD];
+		timeTxt.cameras = [st.camHUD];
+
+		// 同步到 PlayState 公开字段（Lua/Hscript getProperty/setProperty 兼容）
+		st.healthBar = healthBar;
+		st.healthBarBG = healthBarBG;
+		st.healthBarOverlay = healthBarOverlay;
+		st.timeBar = timeBar;
+		st.timeBarBG = timeBarBG;
+		st.timeBarOverlay = timeBarOverlay;
+		st.timeTxt = timeTxt;
+		st.iconP1 = iconP1;
+		st.iconP2 = iconP2;
+		st.scoreTxt = scoreTxt;
+		st.songTxt = songTxt;
+		st.botplayTxt = botplayTxt;
+
+		enforce();
+	}
+
+	// ==================== 每帧更新 ====================
+
+	public function update(elapsed:Float):Void
+	{
+		// 图标角度回正（SB 图标跳动）
+		if (ClientPrefs.data.sbIconBop)
+		{
+			var speed:Float = 1;
+			if (iconP1.angle >= 0)
+			{
+				speed *= st.playbackRate;
+				if (iconP1.angle != 0) iconP1.angle -= speed;
+			}
+			else if (iconP1.angle != 0) iconP1.angle += speed;
+
+			if (iconP2.angle >= 0)
+			{
+				if (iconP2.angle != 0) iconP2.angle -= speed;
+			}
+			else if (iconP2.angle != 0) iconP2.angle += speed;
+		}
+
+		// botplay 标签呼吸
+		if (botplayTxt != null && botplayTxt.visible)
+		{
+			st.botplaySine += 180 * elapsed;
+			botplayTxt.alpha = 1 - Math.sin((Math.PI * st.botplaySine) / 180);
+		}
+
+		// 图标跳动回缩
+		if (ClientPrefs.data.keIconBop)
+		{
+			var keDecay:Float = Math.pow(0.5, elapsed * 60 * st.playbackRate);
+			var keMultP1:Float = 1 + (iconP1.scale.x - 1) * keDecay;
+			iconP1.scale.set(keMultP1, keMultP1);
+			iconP1.updateHitbox();
+			iconP1.origin.set(0, 0);
+			var keMultP2:Float = 1 + (iconP2.scale.x - 1) * keDecay;
+			iconP2.scale.set(keMultP2, keMultP2);
+			iconP2.updateHitbox();
+			iconP2.origin.set(0, 0);
+		}
+		else
+		{
+			var iconDecay:Float = FlxMath.bound(1 - (elapsed * 9 * st.playbackRate), 0, 1);
+			var multP1:Float = FlxMath.lerp(1, iconP1.scale.x, iconDecay);
+			iconP1.scale.set(multP1, multP1);
+			iconP1.updateHitbox();
+			var multP2:Float = FlxMath.lerp(1, iconP2.scale.x, iconDecay);
+			iconP2.scale.set(multP2, multP2);
+			iconP2.updateHitbox();
+		}
+
+		// 图标强绑定血量条：x 跟随 barCenter，y 跟随血量条
+		var iconOffset:Int = 26;
+		if (st.health > 2) st.health = 2;
+		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset;
+		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2;
+		iconP1.animation.curAnim.curFrame = (healthBar.percent < 20) ? 1 : 0;
+		iconP2.animation.curAnim.curFrame = (healthBar.percent > 80) ? 1 : 0;
+
+		// 血量阴影滚动：方向随推条方向（回血向左、掉血向右）
+		var hpDelta:Float = healthBar.percent - lastHpPercent;
+		if (hpDelta >= 0.01) healthOverlayDir = -1;
+		else if (hpDelta <= -0.01) healthOverlayDir = 1;
+		lastHpPercent = healthBar.percent;
+
+		if (healthBarOverlay.visible)
+			healthBarOverlay.scrollX += healthOverlayDir * 22 * elapsed;
+
+		// 时间条阴影：固定向右滚动，透明度跟随时间条淡入
+		if (timeBarOverlay != null && timeBarOverlay.visible)
+		{
+			timeBarOverlay.alpha = timeBar.alpha * 0.5;
+			timeBarOverlay.scrollX += 22 * elapsed;
+		}
+
+		// 可见性权威：每帧拉回设置值
+		enforce();
+	}
+
+	// ==================== 可见性权威 ====================
+
+	/**
+	 * 每帧把 HUD 元素可见性强制恢复为设置值。
+	 * 无论谁（Lua/Hscript/Mod/遗留代码）把 healthBar/图标/分数/歌曲名/标签
+	 * 直接改成不可见，下一帧都会被拉回 —— 根治“游玩中 UI 突然消失”。
+	 */
+	public function enforce():Void
+	{
+		if (ClientPrefs.data.hideHud != ClientPrefs.savedHideHud)
+			ClientPrefs.data.hideHud = ClientPrefs.savedHideHud;
+
+		var hide:Bool = ClientPrefs.data.hideHud;
+		if (healthBar != null) healthBar.visible = !hide;
+		if (healthBarOverlay != null) healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar;
+		if (iconP1 != null) iconP1.visible = !hide;
+		if (iconP2 != null) iconP2.visible = !hide;
+		if (scoreTxt != null) scoreTxt.visible = !hide;
+		if (timeBarOverlay != null) timeBarOverlay.visible = timeBar != null && timeBar.visible && !hide;
+		if (botplayTxt != null) botplayTxt.visible = (st.cpuControlled || st.replayMode);
+		if (songTxt != null) songTxt.visible = !hide && !ClientPrefs.data.hideWatermark;
+	}
+
+	// ==================== 其他 ====================
+
+	public function reloadHealthBarColors():Void
+	{
+		healthBar.setColors(FlxColor.fromRGB(st.dad.healthColorArray[0], st.dad.healthColorArray[1], st.dad.healthColorArray[2]),
+			FlxColor.fromRGB(st.boyfriend.healthColorArray[0], st.boyfriend.healthColorArray[1], st.boyfriend.healthColorArray[2]));
+	}
+
+	/** 快速重开/回溯完成后：时间条与时间文字复位（渐入归零） */
+	public function resetForRestart():Void
+	{
+		st.songPercent = 0;
+		if (timeTxt != null && ClientPrefs.data.timeBarType != '歌曲名称')
+		{
+			var restartSeconds:Int = 0;
+			if (ClientPrefs.data.timeBarType == '剩余时间')
+				restartSeconds = Std.int(Math.max(0, st.songLength) / 1000);
+			timeTxt.text = FlxStringUtil.formatTime(restartSeconds, false);
+		}
+		timeBar.visible = st.updateTime;
+		timeTxt.visible = st.updateTime;
+		timeBar.alpha = 0;
+		timeTxt.alpha = 0;
+	}
 }

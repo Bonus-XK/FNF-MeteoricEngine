@@ -27,6 +27,7 @@ class StrumNote extends FlxSprite
 		rgbShader = new RGBShaderReference(this, Note.initializeGlobalRGBShader(leData));
 		rgbShader.enabled = false;
 		if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) useRGBShader = false;
+		if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) useRGBShader = false;
 		
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[leData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[leData];
@@ -49,6 +50,11 @@ class StrumNote extends FlxSprite
 		var skin:String = null;
 		if(PlayState.SONG != null && PlayState.SONG.arrowSkin != null && PlayState.SONG.arrowSkin.length > 1) skin = PlayState.SONG.arrowSkin;
 		else skin = Note.defaultNoteSkin;
+
+		// Psych 0.6.3 兼容：自动补 noteSkins/ 前缀
+		if(skin.indexOf('/') < 0 && !Paths.fileExists('images/' + skin + '.png', IMAGE)
+			&& Paths.fileExists('images/noteSkins/' + skin + '.png', IMAGE))
+			skin = 'noteSkins/' + skin;
 
 		var customSkin:String = skin + Note.getNoteSkinPostfix();
 		if(Paths.fileExists('images/$customSkin.png', IMAGE)) skin = customSkin;

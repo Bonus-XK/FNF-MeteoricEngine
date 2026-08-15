@@ -51,6 +51,7 @@ class OldMenuState extends MusicBeatState
 
 	override function create()
 	{
+		trace('OldMenuState: create');
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
@@ -147,7 +148,7 @@ class OldMenuState extends MusicBeatState
 		}
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(0, 676, FlxG.width, '经典界面 · 滚轮 / 方向键 选择 · Enter 确认 · 点击 < 返回新界面', 16);
+		var hint:FlxText = new FlxText(0, 676, FlxG.width, '经典界面 · 触控/滚轮 选择 · A / Enter 确认 · Esc 返回', 16);
 		hint.scrollFactor.set();
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hint.borderSize = 2;
@@ -277,7 +278,6 @@ class OldMenuState extends MusicBeatState
 					changeItem(clickID - curSelected);
 					FlxG.sound.play(Paths.sound('scrollMenu'));
 				}
-				selectItem();
 			}
 		}
 	}

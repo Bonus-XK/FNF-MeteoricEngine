@@ -150,7 +150,7 @@ class MasterEditorMenu extends MusicBeatState
 		#end
 
 		// ---- 底部提示 ----
-		var hint:FlxText = makeText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter 确认 · ←/→ 切换模组 · Esc 返回主菜单', 16, 0xFFFFFFFF);
+		var hint:FlxText = makeText(40, 672, 1160, '触控/滚轮 选择 · A / Enter 确认 · ←/→ 切换模组 · Esc 返回主菜单', 16, 0xFFFFFFFF);
 		hint.alignment = CENTER;
 		add(hint);
 
@@ -254,10 +254,7 @@ class MasterEditorMenu extends MusicBeatState
 			changeSelection(0);
 		}
 
-		if (hoverID >= 0 && FlxG.mouse.justPressed)
-		{
-			selectItem();
-		}
+		// 点击只选中，进入由 A 键触发（上方 hover 已处理选中）
 	}
 
 	function takeKeyboardControl()
@@ -292,7 +289,7 @@ class MasterEditorMenu extends MusicBeatState
 		var leItem:Array<Dynamic> = optionShit[curSelected];
 		var nameStr:String = leItem[1];
 		var descStr:String = leItem[2] + '\n\n' + leItem[3];
-		var actionStr:String = '按 Enter / 点击进入';
+		var actionStr:String = '按 A / Enter 进入';
 
 		// 防文字跳舞：内容未变化时不重绘
 		if (lastItemName != nameStr) { lastItemName = nameStr; itemNameText.text = nameStr; itemNameText.updateHitbox(); }

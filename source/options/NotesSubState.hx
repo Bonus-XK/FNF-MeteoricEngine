@@ -14,6 +14,7 @@ import lime.system.Clipboard;
 import objects.StrumNote;
 import objects.Note;
 
+import shaders.RGBPalette;
 import shaders.RGBPalette.RGBShaderReference;
 
 class NotesSubState extends MusicBeatSubstate
@@ -341,12 +342,20 @@ class NotesSubState extends MusicBeatSubstate
 			if (dx * dx + dy * dy > 100) mouseActive = true;
 		}
 
-		// 滚轮切换音符
-		if (FlxG.mouse.wheel != 0)
+		// 滚轮切换音符（触屏上手指拖动也会合成滚轮事件，拖动调色/滚动时不切换选中音符）
+		if (FlxG.mouse.wheel != 0 && holdingOnObj == null)
 		{
-			mouseActive = true;
-			hexTypeNum = -1;
-			changeSelectionNote(FlxG.mouse.wheel > 0 ? -1 : 1);
+			#if mobile
+			var wheelClick:Bool = !Main.touchWasDragging();
+			#else
+			var wheelClick:Bool = true;
+			#end
+			if (wheelClick)
+			{
+				mouseActive = true;
+				hexTypeNum = -1;
+				changeSelectionNote(FlxG.mouse.wheel > 0 ? -1 : 1);
+			}
 		}
 
 		// 返回按钮
@@ -440,6 +449,12 @@ class NotesSubState extends MusicBeatSubstate
 		// Copy/Paste buttons
 		var generalMoved:Bool = (FlxG.mouse.justMoved || analogMoved);
 		var generalPressed:Bool = (FlxG.mouse.justPressed || controllerPressed);
+		// 触屏：手指抬起且未滑动才算点击（拖动只操作颜色控件，不切换选中音符）
+		var clickPressed:Bool = generalPressed;
+		#if mobile
+		if (!controls.controllerMode)
+			clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+		#end
 		if (generalMoved)
 		{
 			copyButton.alpha = 0.6;
@@ -476,10 +491,12 @@ class NotesSubState extends MusicBeatSubstate
 			hexTypeNum = -1;
 		}
 
-		// Click
-		if (generalPressed)
+		// 点击：选择模式 / 音符
+		if (clickPressed)
 		{
-			hexTypeNum = -1;
+			// 点按 HEX 输入框不算切换选择，不重置输入状态
+			if (!(pointerY() >= 530 && pointerY() < 570 && pointerX() >= 800 && pointerX() <= 1120))
+				hexTypeNum = -1;
 			if (pointerOverlaps(modeNotes))
 			{
 				modeNotes.forEachAlive(function(note:FlxSprite) {
@@ -508,7 +525,13 @@ class NotesSubState extends MusicBeatSubstate
 					}
 				});
 			}
-			else if (pointerOverlaps(colorWheel))
+		}
+
+		// 按下：开始操作颜色控件 / 其它按钮
+		if (generalPressed)
+		{
+			hexTypeNum = -1;
+			if (pointerOverlaps(colorWheel))
 			{
 				_storedColor = getShaderColor();
 				holdingOnObj = colorWheel;
@@ -520,10 +543,11 @@ class NotesSubState extends MusicBeatSubstate
 			}
 			else if (pointerOverlaps(colorPalette))
 			{
-				setShaderColor(colorPalette.pixels.getPixel32(
-					Std.int((pointerX() - colorPalette.x) / PALETTE_SCALE),
-					Std.int((pointerY() - colorPalette.y) / PALETTE_SCALE)));
+				var palX:Int = Std.int(FlxMath.bound((pointerX() - colorPalette.x) / PALETTE_SCALE, 0, colorPalette.pixels.width - 1));
+				var palY:Int = Std.int(FlxMath.bound((pointerY() - colorPalette.y) / PALETTE_SCALE, 0, colorPalette.pixels.height - 1));
+				setShaderColor(colorPalette.pixels.getPixel32(palX, palY));
 				_storedColor = getShaderColor();
+				holdingOnObj = colorPalette;
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 				updateColors();
 			}
@@ -572,17 +596,25 @@ class NotesSubState extends MusicBeatSubstate
 						setShaderColor(FlxColor.fromHSB(_storedColor.hue, _storedColor.saturation, newBrightness));
 					updateColors(_storedColor);
 				}
-				else if (holdingOnObj == colorWheel)
-				{
-					var center:FlxPoint = new FlxPoint(colorWheel.x + colorWheel.width / 2, colorWheel.y + colorWheel.height / 2);
-					var mouse:FlxPoint = pointerFlxPoint();
-					var hue:Float = FlxMath.wrap(FlxMath.wrap(Std.int(mouse.degreesTo(center)), 0, 360) - 90, 0, 360);
-					var sat:Float = FlxMath.bound(mouse.dist(center) / colorWheel.width * 2, 0, 1);
-					if (sat != 0) setShaderColor(FlxColor.fromHSB(hue, sat, _storedColor.brightness));
-					else setShaderColor(FlxColor.fromRGBFloat(_storedColor.brightness, _storedColor.brightness, _storedColor.brightness));
-					updateColors();
-				}
+			else if (holdingOnObj == colorWheel)
+			{
+				var center:FlxPoint = new FlxPoint(colorWheel.x + colorWheel.width / 2, colorWheel.y + colorWheel.height / 2);
+				var mouse:FlxPoint = pointerFlxPoint();
+				var hue:Float = FlxMath.wrap(FlxMath.wrap(Std.int(mouse.degreesTo(center)), 0, 360) - 90, 0, 360);
+				var sat:Float = FlxMath.bound(mouse.dist(center) / colorWheel.width * 2, 0, 1);
+				if (sat != 0) setShaderColor(FlxColor.fromHSB(hue, sat, _storedColor.brightness));
+				else setShaderColor(FlxColor.fromRGBFloat(_storedColor.brightness, _storedColor.brightness, _storedColor.brightness));
+				updateColors();
 			}
+			else if (holdingOnObj == colorPalette)
+			{
+				var palX:Int = Std.int(FlxMath.bound((pointerX() - colorPalette.x) / PALETTE_SCALE, 0, colorPalette.pixels.width - 1));
+				var palY:Int = Std.int(FlxMath.bound((pointerY() - colorPalette.y) / PALETTE_SCALE, 0, colorPalette.pixels.height - 1));
+				setShaderColor(colorPalette.pixels.getPixel32(palX, palY));
+				_storedColor = getShaderColor();
+				updateColors();
+			}
+		}
 		}
 		else if (controls.RESET && hexTypeNum < 0)
 		{

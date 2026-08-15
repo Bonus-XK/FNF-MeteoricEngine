@@ -36,7 +36,7 @@ import substates.GameOverSubstate;
 
 import psychlua.LuaUtils;
 import psychlua.LuaUtils.LuaTweenOptions;
-#if (SScript >= "3.0.0")
+#if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
 import psychlua.HScript;
 #end
 import psychlua.DebugLuaText;
@@ -59,7 +59,7 @@ class FunkinLua {
 	public var importedScripts:Array<String> = [];
 	private var importingScripts:Array<String> = [];
 
-	#if (SScript >= "3.0.0")
+	#if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
 	public var hscript:HScript = null;
 	#end
 	
@@ -1445,7 +1445,7 @@ class FunkinLua {
 		});
 
 		#if desktop DiscordClient.addLuaCallbacks(lua); #end
-		#if (SScript >= "3.0.0") HScript.implement(this); #end
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.0") HScript.implement(this); #end
 		ReflectionFunctions.implement(this);
 		TextFunctions.implement(this);
 		ExtraFunctions.implement(this);
@@ -1545,7 +1545,7 @@ class FunkinLua {
 		}
 		Lua.close(lua);
 		lua = null;
-		#if (SScript >= "3.0.0")
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
 		if(hscript != null)
 		{
 			hscript.active = false;
@@ -1660,10 +1660,14 @@ class FunkinLua {
 	// 解析 import 的路径：先相对当前导入基准（主脚本或正在导入的库）目录，再走 mods/preload 搜索
 	function findImportPath(luaFile:String):String
 	{
+		#if LUA_ALLOWED
 		var baseScript:String = scriptName;
 		if(importingScripts.length > 0)
 			baseScript = importingScripts[importingScripts.length - 1];
 		return LuaImport.findImportPath(luaFile, baseScript);
+		#else
+		return null;
+		#end
 	}
 
 	// import 导入库：在当前 Lua 状态中执行一次目标文件，库内定义的全局函数/变量
