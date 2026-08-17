@@ -67,7 +67,6 @@ class HScript extends SScript
 		set('Conductor', Conductor);
 		set('ClientPrefs', ClientPrefs);
 		set('Character', Character);
-		set('Alphabet', Alphabet);
 		set('Note', objects.Note);
 		set('CustomSubstate', CustomSubstate);
 		set('Countdown', backend.BaseStage.Countdown);

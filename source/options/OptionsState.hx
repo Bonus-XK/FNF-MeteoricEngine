@@ -19,12 +19,13 @@ class OptionsState extends MusicBeatState
 	static final ROWS_VISIBLE:Int = #if mobile 8 #else 7 #end;
 
 	var options:Array<String> = [
-		'箭头配色', '按键设置', '调整延迟与Combo', '图像设置', '视觉与界面', '游戏设置', '自定义界面'
+		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '按键设置', '调整延迟与Combo', '自定义界面'
 		#if mobile
 		, '移动触控'
 		#end
 	];
 	private static var curSelected:Int = 0;
+	private var scrollOffset:Int = 0; // 可见行窗口顶部的分类索引
 	public static var onPlayState:Bool = false;
 
 	var bg:FlxSprite;
@@ -41,16 +42,22 @@ class OptionsState extends MusicBeatState
 
 	function openSelectedSubstate(label:String) {
 		switch(label) {
+			case '音符':
+				openSubState(new options.NoteSettingsSubState());
 			case '箭头配色':
 				openSubState(new options.NotesSubState());
+			case '界面':
+				openSubState(new options.InterfaceSettingsSubState());
+			case '画面':
+				openSubState(new options.GraphicsSettingsSubState());
+			case '效果':
+				openSubState(new options.EffectsSubState());
+			case '玩法':
+				openSubState(new options.GameplaySettingsSubState());
+			case '判定':
+				openSubState(new options.JudgmentSettingsSubState());
 			case '按键设置':
 				openSubState(new options.ControlsSubState());
-			case '图像设置':
-				openSubState(new options.GraphicsSettingsSubState());
-			case '视觉与界面':
-				openSubState(new options.VisualsUISubState());
-			case '游戏设置':
-				openSubState(new options.GameplaySettingsSubState());
 			case '自定义界面':
 				MusicBeatState.switchState(new options.HUDCustomizeState());
 			case '调整延迟与Combo':
@@ -92,7 +99,7 @@ class OptionsState extends MusicBeatState
 		// ---- 选项行（静态行，选中高亮条移动） ----
 		for (r in 0...ROWS_VISIBLE)
 		{
-			var row:FlxText = new FlxText(PANEL_X + 100, LIST_Y + (r * ROW_GAP), PANEL_W - 200, options[r], 32);
+			var row:FlxText = new FlxText(PANEL_X + 100, LIST_Y + (r * ROW_GAP), PANEL_W - 200, getOptionAt(r), 32);
 			row.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			row.borderSize = 2;
 			row.antialiasing = ClientPrefs.data.antialiasing;
@@ -136,6 +143,10 @@ class OptionsState extends MusicBeatState
 
 		// 鼠标在本界面始终可见
 		FlxG.mouse.visible = true;
+
+		// 子界面（按键设置等）打开期间，本层不再响应输入，
+		// 防止进入瞬间的点击/按键被父层再次消费（如重复打开子界面、误触发绑定）
+		if (subState != null) return;
 
 		if (!quitting)
 		{
@@ -192,6 +203,11 @@ class OptionsState extends MusicBeatState
 						changeSelection(clickID - curSelected);
 						holdTime = 0;
 					}
+					else if (clickID == curSelected)
+					{
+						// 点击已选中分类：直接进入（触屏友好，与主菜单一致）
+						openSelectedSubstate(options[curSelected]);
+					}
 				}
 			}
 
@@ -229,9 +245,16 @@ class OptionsState extends MusicBeatState
 		{
 			var row:FlxText = rows[r];
 			if (mx >= PANEL_X + 60 && mx <= PANEL_X + PANEL_W - 60 && my >= row.y - 10 && my <= row.y + 48)
-				return r;
+				return scrollOffset + r;
 		}
 		return -1;
+	}
+
+	function getOptionAt(r:Int):String
+	{
+		var idx:Int = scrollOffset + r;
+		if (idx < 0 || idx >= options.length) return '';
+		return options[idx];
 	}
 
 	function changeSelection(change:Int = 0, playSound:Bool = true) {
@@ -243,15 +266,25 @@ class OptionsState extends MusicBeatState
 
 		if (playSound) FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 
-		for (r in 0...rows.length)
+		// 滚动窗口跟随选中项
+		var newOffset:Int = scrollOffset;
+		if (curSelected < newOffset) newOffset = curSelected;
+		if (curSelected >= newOffset + ROWS_VISIBLE) newOffset = curSelected - ROWS_VISIBLE + 1;
+		if (newOffset != scrollOffset)
 		{
-			var row:FlxText = rows[r];
-			var isSel:Bool = (r == curSelected);
-			row.alpha = isSel ? 1 : 0.72;
-			row.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+			scrollOffset = newOffset;
+			for (r in 0...rows.length)
+				rows[r].text = getOptionAt(r);
 		}
 
-		var barY:Float = LIST_Y - 5 + (curSelected * ROW_GAP);
+		for (r in 0...rows.length)
+		{
+			var isSel:Bool = (scrollOffset + r == curSelected);
+			rows[r].alpha = isSel ? 1 : 0.72;
+			rows[r].color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+		}
+
+		var barY:Float = LIST_Y - 5 + ((curSelected - scrollOffset) * ROW_GAP);
 		selectorBar.visible = true;
 		if (selectorTween != null) { selectorTween.cancel(); selectorTween = null; }
 		if (selectorBar.y != barY)

@@ -734,7 +734,9 @@ class ModsMenuState extends MusicBeatState
 		}
 
 		try {
-			File.saveContent('modsList.txt', fileStr);
+			// 与 Mods.parseList 读取同一路径（安卓为外部存储 modsList.txt），
+			// 否则保存到相对路径导致禁用/启用状态不生效
+			File.saveContent(Mods.modsListPath(), fileStr);
 		} catch(e:Dynamic) {
 			trace('Could not save modsList.txt: $e');
 		}

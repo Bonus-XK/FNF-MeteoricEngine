@@ -64,6 +64,9 @@ class FreeplayState extends MusicBeatState
 	var mouseLockY:Float = 0;
 
 	var backBtn:BackButton;
+	// 0.6.3 模组兼容：Freeplay 歌曲颜色表（旧版模组 Lua 通过
+	// setPropertyFromClass('states.FreeplayState', 'songColors[i]', 颜色) 逐个设置）
+	public static var songColors:Array<FlxColor> = [];
 
 	var bg:FlxSprite;
 	var intendedColor:Int;
@@ -186,7 +189,6 @@ class FreeplayState extends MusicBeatState
 		add(missingText);
 
 		if(curSelected >= songs.length) curSelected = 0;
-		trace('FREEPLAY ENTER songs=' + songs.length + ' cur=' + curSelected + ' name=' + (curSelected < songs.length ? songs[curSelected].songName : '?'));
 		bg.color = songs[curSelected].color;
 		intendedColor = bg.color;
 
@@ -222,6 +224,29 @@ class FreeplayState extends MusicBeatState
 		#end
 
 		loadUIscripts('freeplay');
+
+		// 0.6.3 模组兼容：Lua onCreate 设置 songColors 后应用到歌曲列表
+		applySongColors();
+	}
+
+	/** 0.6.3 模组兼容：把 songColors 应用到歌曲列表颜色。
+	 *  支持 setPropertyFromClass('states.FreeplayState', 'songColors[i]', 颜色) 逐个设置；
+	 *  整体赋值为 Lua 表（非 Haxe Array）时安全忽略 */
+	function applySongColors():Void
+	{
+		if (songColors == null || !Std.isOfType(songColors, Array) || songColors.length == 0) return;
+		for (i in 0...songs.length)
+		{
+			if (i >= songColors.length) break;
+			var c:Dynamic = songColors[i];
+			if (c == null || Std.isOfType(c, Array)) continue; // Lua 表元素/空值跳过
+			songs[i].color = c;
+		}
+		if (songs.length > 0)
+		{
+			bg.color = songs[curSelected].color;
+			intendedColor = bg.color;
+		}
 	}
 
 	function makeInfoText(content:String, yPos:Float, ?size:Int = 28, ?textColor:FlxColor = FlxColor.WHITE):FlxText
@@ -399,15 +424,6 @@ class FreeplayState extends MusicBeatState
 				}
 
 				var hoveredID:Int = getHoveredSongID();
-				#if mobile
-				var dragging:Bool = Main.touchWasDragging();
-				#else
-				var dragging:Bool = false;
-				#end
-				if (clickPressed)
-					trace('FreeplayState: click at ' + FlxG.mouse.screenX + ',' + FlxG.mouse.screenY + ' -> song ' + hoveredID + ' drag=' + dragging);
-				else if (FlxG.mouse.justReleased)
-					trace('FREEPLAY RELEASE no click: drag=' + dragging + ' hover=' + hoveredID);
 
 				// 鼠标离开键盘接管位置超过阈值 → 恢复鼠标跟随（防轻微抖动误触发）
 				if (!mouseActive)

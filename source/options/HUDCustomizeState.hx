@@ -12,7 +12,6 @@ import objects.Character;
 import objects.HealthBar;
 import objects.HealthIcon;
 import objects.Note;
-import objects.PhigrosJudgeLine;
 import objects.StrumNote;
 import objects.TimeBar;
 
@@ -31,7 +30,6 @@ class HUDCustomizeState extends MusicBeatState
 
 	// 模拟 HUD 元素
 	var strumLineNotes:Array<StrumNote> = []; // 0-3 对手，4-7 玩家
-	var phigrosJudgeLine:PhigrosJudgeLine;
 	var timeBar:TimeBar;
 	var timeTxt:FlxText;
 	var healthBar:HealthBar;
@@ -181,31 +179,20 @@ class HUDCustomizeState extends MusicBeatState
 
 	function createSimulatedHUD():Void
 	{
-		var phigros:Bool = ClientPrefs.data.phigrosStyle;
-
 		// 音符（对手 0-3，玩家 4-7）
 		for (p in 0...2)
 		{
 			for (i in 0...4)
 			{
 				var strum:StrumNote = new StrumNote(0, 0, i, p);
-				strum.downScroll = ClientPrefs.data.downScroll && !phigros;
+				strum.downScroll = ClientPrefs.data.downScroll;
 				strum.playAnim('static');
 				strum.cameras = [camHUD];
-				if (phigros)
-					strum.alpha = 0; // Phigros 下箭头隐藏，仅作锚点
-				else if (p == 0)
+				if (p == 0)
 					strum.alpha = ClientPrefs.data.opponentStrums ? (ClientPrefs.data.middleScroll ? 0.35 : 1) : 0;
 				add(strum);
 				strumLineNotes.push(strum);
 			}
-		}
-
-		if (phigros)
-		{
-			phigrosJudgeLine = new PhigrosJudgeLine();
-			phigrosJudgeLine.cameras = [camHUD];
-			add(phigrosJudgeLine);
 		}
 
 		// 时间条 + 时间文字
@@ -266,16 +253,14 @@ class HUDCustomizeState extends MusicBeatState
 	// 按保存的偏移重算模拟 HUD 位置（与 PlayState 默认位置公式一致）
 	function repositionHUD():Void
 	{
-		var phigros:Bool = ClientPrefs.data.phigrosStyle;
-
 		var noteOff:Array<Float> = hudGetOffset('note');
-		var strumLineX:Float = (phigros || ClientPrefs.data.middleScroll) ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X;
-		var strumLineY:Float = phigros ? 50 : (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		var strumLineX:Float = ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X;
+		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
 		for (i in 0...strumLineNotes.length)
 		{
 			var strum:StrumNote = strumLineNotes[i];
 			var px:Float = strumLineX + (i * Note.swagWidth) + noteOff[0];
-			if (i < 4 && (phigros || ClientPrefs.data.middleScroll))
+			if (i < 4 && ClientPrefs.data.middleScroll)
 			{
 				px += 310;
 				if (i > 1) px += FlxG.width / 2 + 25;
@@ -283,24 +268,19 @@ class HUDCustomizeState extends MusicBeatState
 			strum.x = px;
 			strum.y = strumLineY + noteOff[1];
 		}
-		if (phigrosJudgeLine != null)
-		{
-			phigrosJudgeLine.layoutOffsetY = noteOff[1];
-			phigrosJudgeLine.y = 50 + noteOff[1];
-		}
 
 		var timeOff:Array<Float> = hudGetOffset('timeBar');
 		var tbY:Float = 19;
-		if (ClientPrefs.data.downScroll && !phigros) tbY = FlxG.height - 44 - 25;
+		if (ClientPrefs.data.downScroll) tbY = FlxG.height - 44 - 25;
 		timeBar.y = tbY + timeOff[1];
 		timeBar.screenCenter(X);
 		timeBar.x += timeOff[0];
 		timeTxt.x = PlayState.STRUM_X + (FlxG.width / 2) - 248 + timeOff[0];
 		timeTxt.y = timeBar.y + 25;
-		if (ClientPrefs.data.downScroll && !phigros) timeTxt.y = FlxG.height - 44 + timeOff[1];
+		if (ClientPrefs.data.downScroll) timeTxt.y = FlxG.height - 44 + timeOff[1];
 
 		var hpOff:Array<Float> = hudGetOffset('healthBar');
-		var hbY:Float = FlxG.height * (!ClientPrefs.data.downScroll || phigros ? 0.89 : 0.11) + hpOff[1];
+		var hbY:Float = FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11) + hpOff[1];
 		healthBar.y = hbY;
 		healthBar.screenCenter(X);
 		healthBar.x += hpOff[0];
@@ -310,7 +290,7 @@ class HUDCustomizeState extends MusicBeatState
 		iconP2.y = healthBar.y - 75;
 
 		// 计分文字/水印：以默认血量条位置为基准，与血量条当前偏移解耦
-		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || phigros ? 0.89 : 0.11);
+		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11);
 		var scoreOff:Array<Float> = hudGetOffset('score');
 		scoreTxt.x = scoreOff[0];
 		scoreTxt.y = defaultHpY + 55 + scoreOff[1];
@@ -332,11 +312,6 @@ class HUDCustomizeState extends MusicBeatState
 					minY = Math.min(minY, s.y);
 					maxX = Math.max(maxX, s.x + s.width);
 					maxY = Math.max(maxY, s.y + s.height);
-				}
-				if (phigrosJudgeLine != null)
-				{
-					minY = Math.min(minY, phigrosJudgeLine.y - 20);
-					maxY = Math.max(maxY, phigrosJudgeLine.y + 20);
 				}
 				return inflateRect(new FlxRect(minX, minY, maxX - minX, maxY - minY), 14);
 			case 'timeBar':

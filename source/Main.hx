@@ -290,6 +290,9 @@ class Main extends Sprite
 		// FPS 计数器：所有平台都创建，安卓/iOS 同样显示（标题栏模式仅在桌面端生效）
 		fpsVar = new FPS(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
+		if(fpsVar.speedTxt != null) {
+			addChild(fpsVar.speedTxt);
+		}
 		if(fpsVar != null) {
 			fpsVar.applyDisplayMode();
 		}

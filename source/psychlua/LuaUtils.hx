@@ -46,7 +46,15 @@ class LuaUtils
 				if(retVal != null)
 					target = retVal;
 			}
-			else target = Reflect.getProperty(instance, splitProps[0]);
+			else
+			{
+				// 容错：字段不存在（含静态类字段与拼写错误）不抛错
+				try {
+					target = Reflect.getProperty(instance, splitProps[0]);
+				} catch(e:Dynamic) {
+					return value;
+				}
+			}
 
 			for (i in 1...splitProps.length)
 			{
@@ -71,7 +79,11 @@ class LuaUtils
 			PlayState.instance.variables.set(variable, value);
 			return value;
 		}
-		Reflect.setProperty(instance, variable, value);
+		// 容错：typed 对象上不存在的字段跳过设置（防 Mod 脚本拼写错误如 igfVersion 崩溃；
+		// 静态类字段（如 FreeplayState.songColors）可正常设置）
+		try {
+			Reflect.setProperty(instance, variable, value);
+		} catch(e:Dynamic) {}
 		return value;
 	}
 	public static function getVarInArray(instance:Dynamic, variable:String, allowMaps:Bool = false):Any
@@ -87,7 +99,14 @@ class LuaUtils
 					target = retVal;
 			}
 			else
-				target = Reflect.getProperty(instance, splitProps[0]);
+			{
+				// 容错：字段不存在（含静态类字段与拼写错误）不抛错
+				try {
+					target = Reflect.getProperty(instance, splitProps[0]);
+				} catch(e:Dynamic) {
+					return null;
+				}
+			}
 
 			for (i in 1...splitProps.length)
 			{
@@ -109,7 +128,12 @@ class LuaUtils
 			if(retVal != null)
 				return retVal;
 		}
-		return Reflect.getProperty(instance, variable);
+		// 容错：typed 对象上不存在的字段返回 null（防 Mod 脚本拼写错误如 igfVersion 崩溃）
+		try {
+			return Reflect.getProperty(instance, variable);
+		} catch(e:Dynamic) {
+			return null;
+		}
 	}
 	
 	public static function isMap(variable:Dynamic)

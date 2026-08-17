@@ -16,16 +16,25 @@ class DeprecatedFunctions
 			return LuaUtils.addAnimByIndices(obj, name, prefix, indices, framerate, true);
 		});
 
-		Lua_helper.add_callback(lua, "objectPlayAnimation", function(obj:String, name:String, forced:Bool = false, ?startFrame:Int = 0) {
+		Lua_helper.add_callback(lua, "objectPlayAnimation", function(obj:String, name:Dynamic = '', forced:Bool = false, ?startFrame:Int = 0) {
+			// 兼容旧版 mod 的 objectPlayAnimation(obj, true) 调用：第二参为布尔时视作 forced，播放当前动画
+			if (Std.isOfType(name, Bool))
+			{
+				forced = name;
+				name = '';
+			}
 			FunkinLua.luaTrace("objectPlayAnimation is deprecated! Use playAnim instead", false, true);
 			if(PlayState.instance.getLuaObject(obj,false) != null) {
-				PlayState.instance.getLuaObject(obj,false).animation.play(name, forced, false, startFrame);
+				var spr:FlxSprite = PlayState.instance.getLuaObject(obj,false);
+				var animName:String = (name == null || name == '') ? (spr.animation.curAnim != null ? spr.animation.curAnim.name : '') : Std.string(name);
+				if (animName != '') spr.animation.play(animName, forced, false, startFrame);
 				return true;
 			}
 
-			var spr:FlxSprite = Reflect.getProperty(LuaUtils.getTargetInstance(), obj);
-			if(spr != null) {
-				spr.animation.play(name, forced, false, startFrame);
+			var spr2:FlxSprite = Reflect.getProperty(LuaUtils.getTargetInstance(), obj);
+			if(spr2 != null) {
+				var animName:String = (name == null || name == '') ? (spr2.animation.curAnim != null ? spr2.animation.curAnim.name : '') : Std.string(name);
+				if (animName != '') spr2.animation.play(animName, forced, false, startFrame);
 				return true;
 			}
 			return false;

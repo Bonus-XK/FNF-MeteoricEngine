@@ -55,9 +55,11 @@ class HealthBar extends FlxSpriteGroup
 		}
 		else
 		{
+			// bg 置于填充之下：0.6.3 模组的 healthBar.png 是实心底框（无镂空），
+			// 若 bg 在最上层会盖住彩色填充导致血量条变灰白
+			add(bg);
 			add(leftBar);
 			add(rightBar);
-			add(bg);
 		}
 		regenerateClips();
 	}

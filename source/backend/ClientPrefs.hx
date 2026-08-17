@@ -14,7 +14,8 @@ class SaveVariables {
 	@:keep public var showFPS:Bool = true;
 	@:keep public var showVer:Bool = true;
 	@:keep public var fpsInTitleBar:Bool = false;
-	@:keep public var fpsColor:String = '白色';
+	@:keep public var fpsColor:String = '自动';
+	@:keep public var showScrollSpeed:Bool = true; // FPS 计数器下方显示当前滚动速度（颜色随速度变化）
 	@:keep public var flashing:Bool = true;
 	@:keep public var CustomFade:String = '移动';
 	@:keep public var CustomFadeText:Bool = true;
@@ -51,6 +52,7 @@ class SaveVariables {
 	@:keep public var keIconBop:Bool = false;
 	@:keep public var timeBarType:String = '剩余时间';
 	@:keep public var newTimeBarStyle:Bool = false;
+	@:keep public var timeBarOpponentColors:Bool = false; // 时间条填充色跟随对方角色血量颜色（贴图样式下生效）
 	@:keep public var noReset:Bool = false;
 	@:keep public var restartNoChartReload:Bool = false;
 	@:keep public var rewindOnRestart:Bool = true;

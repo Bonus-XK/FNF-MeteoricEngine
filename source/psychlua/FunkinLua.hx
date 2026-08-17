@@ -68,6 +68,11 @@ class FunkinLua {
 
 	public function new(scriptName:String) {
 		#if LUA_ALLOWED
+		// 回放模式不加载任何 Lua 脚本：避免脚本修改 note/strum 的显示
+		// （alpha/visible/坐标/颜色等）导致回放时箭头无法正常显示
+		if (PlayState.instance != null && PlayState.instance.replayMode)
+			return;
+
 		lua = LuaL.newstate();
 		LuaL.openlibs(lua);
 

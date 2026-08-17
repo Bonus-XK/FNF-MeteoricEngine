@@ -38,8 +38,7 @@ class ReplaySubState extends MusicBeatSubstate
 	var missingText:FlxText;
 
 	#if mobile
-	var touchDownRow:Int = -1;   // 触屏点选：按下时所在的行（含 scrollIndex 偏移）
-	var touchDownID:Int = -1;    // 触屏点选：触摸点 ID
+	var pad:objects.MobileControls; // virtualpad：A 确认 + 上下箭头（自带按下动画）
 	#end
 
 	public function new(song:String, diff:Int)
@@ -109,6 +108,14 @@ class ReplaySubState extends MusicBeatSubstate
 		missingText.scrollFactor.set();
 		missingText.visible = false;
 		add(missingText);
+
+		#if mobile
+		// virtualpad：A 在右下，[上][下] 依次在 A 左侧（同一行，不遮挡面板）；按下有动画
+		pad = new objects.MobileControls(false, cameras[0], -1, true);
+		pad.addPadArrow('ui_up', 'up', FlxG.width - objects.MobileControls.BTN_W * 3 - 20 - 24, FlxG.height - objects.MobileControls.BTN_H - 20);
+		pad.addPadArrow('ui_down', 'down', FlxG.width - objects.MobileControls.BTN_W * 2 - 20 - 12, FlxG.height - objects.MobileControls.BTN_H - 20);
+		add(pad);
+		#end
 
 		FlxG.mouse.visible = true;
 		Lib.application.window.title = "FNF':Meteoric Engine - 回放列表";
@@ -220,6 +227,15 @@ class ReplaySubState extends MusicBeatSubstate
 		var accepted:Bool = controls.ACCEPT;
 		var upP:Bool = controls.UI_UP_P;
 		var downP:Bool = controls.UI_DOWN_P;
+		#if mobile
+		// virtualpad 按键（走 stage tap 队列，安卓 FlxG.touches 为空也能触发）
+		if (pad != null)
+		{
+			if (pad.justPressed('accept')) accepted = true;
+			if (pad.justPressed('ui_up')) upP = true;
+			if (pad.justPressed('ui_down')) downP = true;
+		}
+		#end
 
 		if (replays.length > 0)
 		{
@@ -248,65 +264,21 @@ class ReplaySubState extends MusicBeatSubstate
 			}
 
 			#if mobile
-			// ---- 触屏直接点选（不依赖鼠标模拟）：按下所在行即选中，抬起仍在同一行则确认 ----
-			for (touch in FlxG.touches.list)
+			// ---- 触屏：拖动上下滚动（选择只靠拖动/箭头，A 播放；点按行不改变选中）；点按返回按钮关闭 ----
+			var steps:Int = objects.MobileControls.consumeDragSteps();
+			if (steps != 0 && replays.length > 0)
 			{
-				if (touch.justPressed)
-				{
-					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
-					if (backBtn.over(tp.x, tp.y))
-					{
-						FlxG.sound.play(Paths.sound('cancelMenu'));
-						close();
-						tp.put();
-						return;
-					}
-					if (replays.length > 0)
-					{
-						for (row in rows)
-						{
-							if (row.visible && tp.x >= row.x && tp.x <= row.x + row.width
-								&& tp.y >= row.y && tp.y <= row.y + row.height)
-							{
-								touchDownRow = scrollIndex + row.ID;
-								touchDownID = touch.touchPointID;
-								if (touchDownRow != curSelected) changeSelection(touchDownRow - curSelected);
-								break;
-							}
-						}
-					}
-					tp.put();
-				}
-				else if (touch.justReleased && touch.touchPointID == touchDownID)
-				{
-					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
-					var onRow:Bool = false;
-					if (replays.length > 0)
-					{
-						for (row in rows)
-						{
-							if (row.visible && scrollIndex + row.ID == touchDownRow
-								&& tp.x >= row.x && tp.x <= row.x + row.width
-								&& tp.y >= row.y && tp.y <= row.y + row.height)
-							{
-								onRow = true;
-								break;
-							}
-						}
-					}
-					tp.put();
-					if (onRow)
-					{
-						FlxG.sound.play(Paths.sound('confirmMenu'));
-						startReplay();
-						return;
-					}
-					touchDownRow = -1;
-					touchDownID = -1;
-				}
+				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+				changeSelection(steps);
 			}
-			#end
-
+			if (objects.MobileControls.drainTapInRect(backBtn.spr.x, backBtn.spr.y, backBtn.spr.width, backBtn.spr.height))
+			{
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				close();
+				mousePos.put();
+				return;
+			}
+			#else
 			if (replays.length > 0)
 			{
 				var hoveredID:Int = -1;
@@ -324,6 +296,7 @@ class ReplaySubState extends MusicBeatSubstate
 					accepted = true;
 				}
 			}
+			#end
 			mousePos.put();
 		}
 

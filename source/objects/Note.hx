@@ -95,15 +95,10 @@ class Note extends FlxSprite
 	public static inline var BAKE_NOTE:Int = 0;
 	public static inline var BAKE_HOLD:Int = 1;
 	public static inline var BAKE_HOLDEND:Int = 2;
-	// Phigros 玩法表演块：无长条=黄色，带长条=青色
-	public static var phigrosPerformColor:FlxColor = 0xFFFFE600;
-	public static var phigrosPerformHoldColor:FlxColor = 0xFF00E5FF;
-
 	public static var defaultNoteSkin(default, never):String = 'noteSkins/NOTE_assets';
 
 	// 大谱面优化：同一音符皮肤只解析一次图集/贴图，全部音符共享
 	static var noteFramesCache:Map<String, FlxAtlasFrames> = [];
-	static var phigrosGraphicCache:Map<String, FlxGraphic> = [];
 	// 烘焙专用 CPU 位图/图集缓存（cacheOnGPU 开启时引擎位图不可读，需从资产库重新读取一次并复用）
 	static var bakeBitmapCache:Map<String, BitmapData> = [];
 	static var bakeAtlasCache:Map<String, FlxAtlasFrames> = [];
@@ -126,29 +121,10 @@ class Note extends FlxSprite
 	public static function clearNoteCaches()
 	{
 		noteFramesCache = [];
-		phigrosGraphicCache = [];
 		bakeBitmapCache = [];
 		bakeAtlasCache = [];
 		bakedNoteGraphics = [];
 		bakedArrowRenderWidth = [];
-	}
-
-	// 获取/构建共享的 Phigros 表演图形（圆角矩形，绘制一次，全部音符复用）
-	static function getPhigrosGraphic(key:String, w:Int, h:Int, radius:Float, col:FlxColor, ?inner:Bool = false):FlxGraphic
-	{
-		var graphic:FlxGraphic = phigrosGraphicCache.get(key);
-		if (graphic == null)
-		{
-			var tmp:FlxSprite = new FlxSprite().makeGraphic(w, h, FlxColor.TRANSPARENT);
-			FlxSpriteUtil.drawRoundRect(tmp, 0, 0, w, h, radius, radius, col);
-			if (inner)
-				FlxSpriteUtil.drawRoundRect(tmp, 6, 6, w - 12, h - 12, 9, 9, 0x38FFFFFF);
-			graphic = tmp.graphic;
-			graphic.persist = true;
-			graphic.destroyOnNoUse = false;
-			phigrosGraphicCache.set(key, graphic);
-		}
-		return graphic;
 	}
 
 	// 懒加载：大部分音符（尤其大谱面未击打音符）不需要特效数据，构造时不分配
@@ -349,8 +325,7 @@ class Note extends FlxSprite
 		if(noteData > -1) {
 			texture = '';
 			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
-			if(ClientPrefs.data.phigrosStyle) rgbShader.enabled = false; // Phigros 方块颜色直接绘制，不受 RGB 着色
-			else if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) rgbShader.enabled = false; // 0.6.3 兼容/关着色器时避免 RGB 渲染成黑
 			else if (bakedKind >= 0) rgbShader.enabled = false; // 提前渲染：颜色已烘焙进贴图，不再叠加 RGB 着色器（叠加会钳制成白色）
 			trace('NoteInit col=' + noteData + ' baked=' + bakedKind + ' rgbOn=' + (rgbShader != null ? rgbShader.enabled : false));
@@ -457,11 +432,6 @@ class Note extends FlxSprite
 	public var originalHeight:Float = 6;
 	public var correctionOffset:Float = 0; //dont mess with this
 	public function reloadNote(texture:String = '', postfix:String = '') {
-		if (ClientPrefs.data.phigrosStyle)
-		{
-			loadPhigrosNote();
-			return;
-		}
 		if(texture == null) texture = '';
 		if(postfix == null) postfix = '';
 
@@ -578,63 +548,6 @@ class Note extends FlxSprite
 
 		if(animName != null)
 			animation.play(animName, true);
-	}
-
-	// Phigros 玩法渲染：不加载箭头贴图，直接绘制彩色圆角方块 / 长条
-	function loadPhigrosNote():Void
-	{
-		// RGB 着色会覆盖方块颜色，Phigros 玩法下直接禁用
-		if (rgbShader != null) rgbShader.enabled = false;
-
-		if (isSustainNote)
-		{
-			// 初始高度 = SUSTAIN_SIZE(44)：与 Psych 段拉伸逻辑（stepCrochet 比例）自洽
-			// 表演块长条为青色（宽度与主表演块一致），玩家长条为轨道 note 颜色
-			var w:Int = mustPress ? 24 : 56;
-			var h:Int = SUSTAIN_SIZE;
-			var col:FlxColor = mustPress ? getPhigrosColor() : phigrosPerformHoldColor;
-			loadGraphic(getPhigrosGraphic('sustain|' + col, w, h, 8, col));
-			alpha = 0.6;
-			multAlpha = 0.6;
-		}
-		else if (!mustPress)
-		{
-			// 表演块：横向细条（与判定线同高 5px，宽度与长条一致），默认黄色（带长条时由 generateNotes 重绘为青色）
-			var w:Int = 56;
-			var h:Int = 5;
-			loadGraphic(getPhigrosGraphic('perform|' + phigrosPerformColor, w, h, 2.5, phigrosPerformColor));
-			centerOffsets();
-			centerOrigin();
-		}
-		else
-		{
-			var w:Int = 56;
-			var h:Int = 56;
-			loadGraphic(getPhigrosGraphic('note|' + getPhigrosColor(), w, h, 14, getPhigrosColor(), true));
-			centerOffsets();
-			centerOrigin();
-		}
-		updateHitbox();
-	}
-
-	// 表演块带长条时调用：主块重绘为青色长条型
-	public function repaintPhigrosPerform(hasHold:Bool):Void
-	{
-		if (isSustainNote || mustPress) return;
-		var w:Int = 56;
-		var h:Int = 5;
-		var col:FlxColor = hasHold ? phigrosPerformHoldColor : phigrosPerformColor;
-		loadGraphic(getPhigrosGraphic('perform|' + col, w, h, 2.5, col));
-		centerOffsets();
-		centerOrigin();
-		updateHitbox();
-	}
-
-	inline function getPhigrosColor():FlxColor
-	{
-		// 玩家与对手表演块统一使用设置中的 note 颜色（arrowRGB 主色）
-		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData % ClientPrefs.data.arrowRGB.length];
-		return arr[0];
 	}
 
 	public static function getNoteSkinPostfix()
@@ -809,7 +722,6 @@ class Note extends FlxSprite
 	public static function chartBakesReady():Bool
 	{
 		if (PlayState.SONG == null) return false;
-		if (ClientPrefs.data.phigrosStyle) return true; // Phigros 音符本来就是静态贴图，无需烘焙
 		return bakedChartSignature != null && bakedChartSignature == currentChartSignature()
 			&& botplaySignature != null && botplaySignature == currentChartSignature();
 	}
@@ -818,11 +730,6 @@ class Note extends FlxSprite
 	public static function preRenderChartNotes():Void
 	{
 		if (PlayState.SONG == null) return;
-		if (ClientPrefs.data.phigrosStyle)
-		{
-			bakedChartSignature = currentChartSignature();
-			return;
-		}
 
 		var pixelStage:Bool = getChartPixelStage();
 
@@ -916,7 +823,7 @@ class Note extends FlxSprite
 	// 取当前谱面的自动游玩预演计划（null = 未预演/不可用，运行时回退实时判定）
 	public static function getBotplayPlan():Array<Array<Float>>
 	{
-		if (!ClientPrefs.data.preRenderNotes || ClientPrefs.data.phigrosStyle) return null;
+		if (!ClientPrefs.data.preRenderNotes) return null;
 		if (PlayState.SONG == null || botplaySignature == null || botplaySignature != currentChartSignature()) return null;
 		return botplayLanes;
 	}

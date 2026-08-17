@@ -25,7 +25,7 @@
 	<define name="LUA_ALLOWED" if="desktop || mobile" unless="hl"/>
 	<define name="ACHIEVEMENTS_ALLOWED" />
 	<!-- 安卓禁用视频：hxCodec 预编译的 VLC 库为 4KB 对齐，不符合 Android 15+ 的 16KB 页对齐要求 -->
-	<define name="VIDEOS_ALLOWED" if="windows || linux" unless="32bits"/>
+	<define name="VIDEOS_ALLOWED" if="windows || linux" unless="32bits || win32build"/>
 	<define name="PSYCH_WATERMARKS"/> <!-- DELETE THIS TO REMOVE WATERMARKS/DEV NAMES ON TITLE SCREEN -->
 	<define name="TITLE_SCREEN_EASTER_EGG" if="officialBuild"/> <!-- DELETE THE if="officialBuild" for enabling this on an unofficial build -->
 
@@ -56,6 +56,9 @@
 	</config:android>
 	<!-- 仅构建 arm64：32 位预编译库无法满足 16KB 页对齐要求，且 Android 16 均为 64 位设备 -->
 	<architecture if="android" exclude="armv7" />
+	<!-- Windows x86 构建：命令行传 -D win32build 时使用 32 位工具链（lime 8 的 -32 参数经 haxelib 传递会丢失） -->
+	<architecture name="x86" if="win32build" />
+	<architecture if="win32build" exclude="x64" />
 
 	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
@@ -63,8 +66,8 @@
 	<!-- _____________________________ Path Settings ____________________________ -->
 
 	<set name="BUILD_DIR" value="export/debug" if="debug" />
-	<set name="BUILD_DIR" value="export/release" unless="debug" />
-	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
+	<set name="BUILD_DIR" value="export/release" unless="debug || win32build" />
+	<set name="BUILD_DIR" value="export/32bit" if="32bits || win32build" />
 
 	<classpath name="source" />
 

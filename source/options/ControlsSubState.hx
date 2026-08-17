@@ -103,7 +103,7 @@ class ControlsSubState extends MusicBeatSubstate
 	var mouseLockX:Float = 0;
 	var mouseLockY:Float = 0;
 	var holdTime:Float = 0;
-	var timeForMoving:Float = 0.1; // 进入子状态先忽略输入，防控制器误触
+	var timeForMoving:Float = 0.5; // 进入子状态先忽略输入，防控制器误触（0.5s 覆盖刚进入的误点）
 
 	public function new()
 	{
@@ -495,7 +495,8 @@ class ControlsSubState extends MusicBeatSubstate
 				return;
 			}
 
-			// 点击行：选中；点击已选中的行则执行
+			// 点击行：只选中，不触发绑定（绑定请点击键位框，或按 A/Enter ——
+			// 防止刚进入/意外点击落在已选中行上时突然弹出“正在绑定”）
 			var rowID:Int = getHoveredRowID();
 			if (rowID >= 0)
 			{
@@ -505,10 +506,6 @@ class ControlsSubState extends MusicBeatSubstate
 					FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 					selectRow(rowID);
 					holdTime = 0;
-				}
-				else
-				{
-					activateSelected();
 				}
 			}
 		}

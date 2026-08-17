@@ -47,8 +47,7 @@ class ResultsSubState extends MusicBeatSubstate
 	var mouseLockY:Float = 0;
 
 	#if mobile
-	var touchDownRow:Int = -1;   // 触屏点选：按下时所在的行
-	var touchDownID:Int = -1;    // 触屏点选：触摸点 ID
+	var pad:objects.MobileControls; // virtualpad：A 确认 + 上下箭头（自带按下动画）
 	#end
 
 	public function new(?hasReplay:Bool = false)
@@ -118,6 +117,14 @@ class ResultsSubState extends MusicBeatSubstate
 		FlxTween.tween(menuPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.2});
 
 		var hintText:FlxText = new FlxText(SAFE_MARGIN, MENU_PANEL_Y + panelHeight + 12, 0, getHintText(), 18);
+
+		#if mobile
+		// virtualpad：A 在右下，[上][下] 依次在 A 左侧（同一行，不遮挡面板）；按下有动画
+		pad = new objects.MobileControls(false, cameras[0], -1, true);
+		pad.addPadArrow('ui_up', 'up', FlxG.width - objects.MobileControls.BTN_W * 3 - 20 - 24, FlxG.height - objects.MobileControls.BTN_H - 20);
+		pad.addPadArrow('ui_down', 'down', FlxG.width - objects.MobileControls.BTN_W * 2 - 20 - 12, FlxG.height - objects.MobileControls.BTN_H - 20);
+		add(pad);
+		#end
 		hintText.scrollFactor.set();
 		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hintText.borderSize = 1.5;
@@ -241,6 +248,15 @@ class ResultsSubState extends MusicBeatSubstate
 		var upP = controls.UI_UP_P;
 		var downP = controls.UI_DOWN_P;
 		var accepted = controls.ACCEPT;
+		#if mobile
+		// virtualpad 按键（走 stage tap 队列，安卓 FlxG.touches 为空也能触发）
+		if (pad != null)
+		{
+			if (pad.justPressed('accept')) accepted = true;
+			if (pad.justPressed('ui_up')) upP = true;
+			if (pad.justPressed('ui_down')) downP = true;
+		}
+		#end
 
 		if (upP)
 		{
@@ -262,47 +278,6 @@ class ResultsSubState extends MusicBeatSubstate
 			var mousePos:FlxPoint = FlxG.mouse.getScreenPosition(cameras[0], FlxPoint.get());
 			var hoveredID:Int = -1;
 
-			#if mobile
-			// ---- 触屏直接点选（不依赖鼠标模拟）：按下所在行即选中，抬起仍在同一行则确认 ----
-			for (touch in FlxG.touches.list)
-			{
-				if (touch.justPressed)
-				{
-					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
-					for (item in grpMenuShit.members)
-					{
-						if (tp.x >= item.x && tp.x <= item.x + item.width
-							&& tp.y >= item.y && tp.y <= item.y + item.height)
-						{
-							touchDownRow = item.ID;
-							touchDownID = touch.touchPointID;
-							if (touchDownRow != curSelected) changeSelection(touchDownRow - curSelected);
-							break;
-						}
-					}
-					tp.put();
-				}
-				else if (touch.justReleased && touch.touchPointID == touchDownID)
-				{
-					var tp:FlxPoint = touch.getPositionInCameraView(cameras[0], FlxPoint.get());
-					var onRow:Bool = false;
-					for (item in grpMenuShit.members)
-					{
-						if (item.ID == touchDownRow && tp.x >= item.x && tp.x <= item.x + item.width
-							&& tp.y >= item.y && tp.y <= item.y + item.height)
-						{
-							onRow = true;
-							break;
-						}
-					}
-					tp.put();
-					if (onRow) accepted = true;
-					touchDownRow = -1;
-					touchDownID = -1;
-				}
-			}
-			#end
-
 			for (item in grpMenuShit.members)
 			{
 				if (mousePos.x >= item.x && mousePos.x <= item.x + item.width
@@ -317,19 +292,32 @@ class ResultsSubState extends MusicBeatSubstate
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
+			#if !mobile
 			if (FlxG.mouse.wheel != 0)
 			{
 				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
 			}
+			#end
 
+			#if mobile
+			// ---- 触屏：拖动上下滚动（选择只靠拖动/箭头，A 确认；点按行不改变选中）----
+			var steps:Int = objects.MobileControls.consumeDragSteps();
+			if (steps != 0)
+			{
+				mouseActive = true;
+				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+				changeSelection(steps);
+			}
+			#else
 			if (hoveredID >= 0 && FlxG.mouse.justPressed)
 			{
 				mouseActive = true;
 				if (hoveredID != curSelected) changeSelection(hoveredID - curSelected);
 				accepted = true;
 			}
+			#end
 			mousePos.put();
 		}
 

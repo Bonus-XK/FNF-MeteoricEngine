@@ -2,6 +2,7 @@ package options;
 
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
+import openfl.Lib;
 
 class BaseOptionsMenu extends MusicBeatSubstate
 {
@@ -42,6 +43,10 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween;
 	var backBtn:BackButton;
+	var diffLeftBtn:FlxSprite;  // 移动端 ◀ 调节按钮
+	var diffRightBtn:FlxSprite; // 移动端 ▶ 调节按钮
+	var menuPad:objects.MobileControls; // 移动端菜单 pad（右下角 A 确认键，等效 Enter）
+	var lastPadBtnTap:Int = 0;  // 移动端 ◀▶ 按钮点击冷却（防一次按下触发两次）
 
 	var scrollIndex:Int = 0;
 	var mouseActive:Bool = true;   // 键盘操作后冻结，鼠标移动/滚轮/点击恢复
@@ -142,10 +147,31 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		add(backBtn.label);
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(120, 672, 1040, '滚轮 / 方向键 选择 · 左/右 调整数值 · Enter 切换 · R 重置 · 点击 < 返回', 16);
+		var hint:FlxText = new FlxText(300, 672, 680, '滚轮 / 方向键 选择 · 左/右 调整数值 · Enter 切换 · R 重置 · 点击 < 返回', 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 		hint.scrollFactor.set();
 		add(hint);
+
+		#if mobile
+		// ---- 移动端 ◀ ▶ 调节按钮（等效左右方向键，修改当前选项值）----
+		diffLeftBtn = objects.MobileControls.makePadSprite('left', 0xFFFFFFFF);
+		diffLeftBtn.setGraphicSize(110, 106);
+		diffLeftBtn.updateHitbox();
+		diffLeftBtn.x = 20;
+		diffLeftBtn.y = FlxG.height - diffLeftBtn.height - 12;
+		add(diffLeftBtn);
+
+		diffRightBtn = objects.MobileControls.makePadSprite('right', 0xFFFFFFFF);
+		diffRightBtn.setGraphicSize(110, 106);
+		diffRightBtn.updateHitbox();
+		diffRightBtn.x = 20 + diffLeftBtn.width + 8;
+		diffRightBtn.y = FlxG.height - diffRightBtn.height - 12;
+		add(diffRightBtn);
+
+		// 右下角 A 确认键：复用暂停界面同一套逻辑（menuMode pad，不注册为全局 instance）
+		menuPad = new objects.MobileControls(false, FlxG.camera, -1, true);
+		add(menuPad);
+		#end
 
 		changeSelection();
 		FlxG.mouse.visible = true;
@@ -274,6 +300,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	// ===== 主循环 =====
 	override function update(elapsed:Float)
 	{
+		updatePadBtnVisuals();
 		if (timeForMoving > 0)
 		{
 			timeForMoving = Math.max(0, timeForMoving - elapsed);
@@ -344,6 +371,34 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 		if (clickPressed)
 		{
+			#if mobile
+			// ◀ ▶ 按钮：FlxG.mouse 通道 + 300ms 冷却。instance 的触摸路径（dpad）触发时
+			// 会在下方 nextAccept 块更新 lastPadBtnTap，本检测随即被冷却挡住，保证一次按下只触发一次。
+			if (Lib.getTimer() - lastPadBtnTap > 300)
+			{
+				// ◀ 按钮：调节当前选项值（等效左方向键；bool 选项=切换，key 选项不可调）
+				if (diffLeftBtn != null && FlxG.mouse.screenX >= diffLeftBtn.x && FlxG.mouse.screenX <= diffLeftBtn.x + diffLeftBtn.width
+					&& FlxG.mouse.screenY >= diffLeftBtn.y && FlxG.mouse.screenY <= diffLeftBtn.y + diffLeftBtn.height)
+				{
+					lastPadBtnTap = Lib.getTimer();
+					mouseActive = true;
+					if (curOption != null && curOption.type == 'bool')
+						toggleSelected();
+					else if (curOption != null && curOption.type != 'key')
+						changeOptionValue(-1);
+				}
+				else if (diffRightBtn != null && FlxG.mouse.screenX >= diffRightBtn.x && FlxG.mouse.screenX <= diffRightBtn.x + diffRightBtn.width
+					&& FlxG.mouse.screenY >= diffRightBtn.y && FlxG.mouse.screenY <= diffRightBtn.y + diffRightBtn.height)
+				{
+					lastPadBtnTap = Lib.getTimer();
+					mouseActive = true;
+					if (curOption != null && curOption.type == 'bool')
+						toggleSelected();
+					else if (curOption != null && curOption.type != 'key')
+						changeOptionValue(1);
+				}
+			}
+			#end
 			var checkboxHit:Int = getHoveredCheckbox();
 			if (checkboxHit >= 0)
 			{
@@ -384,13 +439,38 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 			if (usesCheckbox)
 			{
-				if (controls.ACCEPT)
+				var acceptNow:Bool = controls.ACCEPT;
+				#if mobile
+				// A 确认键映射为 Enter：FlxG.mouse 通道命中右下角 A 键 zone（300ms 冷却防双触发）。
+				// instance 的触摸路径（controls.ACCEPT）触发时也会在下方更新 lastPadBtnTap，互斥生效。
+				if (!acceptNow && Lib.getTimer() - lastPadBtnTap > 300)
+				{
+					var aZone:FlxSprite = (menuPad != null && menuPad.padButtons.exists('accept') && menuPad.padButtons.get('accept').length > 0)
+						? menuPad.padButtons.get('accept')[0] : null;
+					if (aZone != null && FlxG.mouse.justReleased && !Main.touchWasDragging()
+						&& FlxG.mouse.screenX >= aZone.x && FlxG.mouse.screenX <= aZone.x + aZone.width
+						&& FlxG.mouse.screenY >= aZone.y && FlxG.mouse.screenY <= aZone.y + aZone.height)
+					{
+						acceptNow = true;
+					}
+				}
+				#end
+				if (acceptNow)
+				{
+					#if mobile
+					// 无论键盘 Enter / instance 触摸 / FlxG.mouse 兜底，触发后都计入冷却，防止按下+松开双触发
+					lastPadBtnTap = Lib.getTimer();
+					#end
 					toggleSelected();
+				}
 			}
 			else
 			{
 				if (controls.UI_LEFT || controls.UI_RIGHT) {
 					var pressed:Bool = (controls.UI_LEFT_P || controls.UI_RIGHT_P);
+					#if mobile
+					if (pressed) lastPadBtnTap = Lib.getTimer(); // instance 路径（dpad）触发也计入冷却，防双触发
+					#end
 					if (pressed) holdTime = 0; // 左右键调数值也独立计时，不与上下键互相污染
 					if (holdTime > 0.5 || pressed) {
 						if (pressed) {
@@ -446,6 +526,46 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		curOption.setValue((curOption.getValue() == true) ? false : true);
 		curOption.change();
 		refreshRows();
+	}
+
+	/** 移动端 ◀ ▶ A 按钮按下动画：贴图第 3 帧为按下态（与游玩 pad 一致），
+	 *  按住且指针在按钮内时切到按下帧，否则恢复普通帧 */
+	function updatePadBtnVisuals():Void
+	{
+		#if mobile
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		var held:Bool = FlxG.mouse.pressed;
+
+		if (diffLeftBtn != null)
+		{
+			var hit:Bool = held && mx >= diffLeftBtn.x && mx <= diffLeftBtn.x + diffLeftBtn.width
+				&& my >= diffLeftBtn.y && my <= diffLeftBtn.y + diffLeftBtn.height;
+			if (diffLeftBtn.frames != null && diffLeftBtn.frames.frames.length >= 3)
+				diffLeftBtn.animation.frameIndex = hit ? 2 : 0;
+			else
+				diffLeftBtn.alpha = hit ? 1 : 0.75;
+		}
+		if (diffRightBtn != null)
+		{
+			var hit:Bool = held && mx >= diffRightBtn.x && mx <= diffRightBtn.x + diffRightBtn.width
+				&& my >= diffRightBtn.y && my <= diffRightBtn.y + diffRightBtn.height;
+			if (diffRightBtn.frames != null && diffRightBtn.frames.frames.length >= 3)
+				diffRightBtn.animation.frameIndex = hit ? 2 : 0;
+			else
+				diffRightBtn.alpha = hit ? 1 : 0.75;
+		}
+		if (menuPad != null && menuPad.padButtons.exists('accept') && menuPad.padButtons.get('accept').length > 0)
+		{
+			var aZone:FlxSprite = menuPad.padButtons.get('accept')[0];
+			var hit:Bool = held && mx >= aZone.x && mx <= aZone.x + aZone.width
+				&& my >= aZone.y && my <= aZone.y + aZone.height;
+			if (aZone.frames != null && aZone.frames.frames.length >= 3)
+				aZone.animation.frameIndex = hit ? 2 : 0;
+			else
+				aZone.alpha = hit ? 1 : 0.75;
+		}
+		#end
 	}
 
 	function clearHold()

@@ -161,7 +161,7 @@ class Mods
 	public static var updatedOnState:Bool = false;
 
 	// modsList.txt 在安卓上写到外部存储（/sdcard/meteoric），桌面保持原样
-	inline static function modsListPath():String
+	public static inline function modsListPath():String
 	{
 		#if android
 		return backend.AndroidStorage.root() + '/modsList.txt';

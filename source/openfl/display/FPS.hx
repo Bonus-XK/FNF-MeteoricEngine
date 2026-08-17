@@ -33,12 +33,18 @@ class FPS extends TextField
 {
 	public var currentFPS(default, null):Int = 0;
 
+	// 滚动速度指示器：独立 TextField（FPS 不是容器无法挂子对象，由 Main.hx addChild）
+	public var speedTxt:TextField;
+
 	var _frameCount:Int = 0;
 	var _elapsed:Float = 0;
 
 	var _warnColor:Int = 0xFFFF0000;
 	var _defaultColor:Int;
 	var _fpsColor:Int;
+
+	// 彩虹模式：色相轮循环角度
+	var _rainbowHue:Float = 0;
 
 	// 峰值内存：与 Mem 同一口径（totalMemory），取运行以来的最大值
 	var _peakMem:Float = 0;
@@ -68,9 +74,26 @@ class FPS extends TextField
 
 		selectable = false;
 		mouseEnabled = false;
+		// 手机端屏幕大（物理像素高），FPS 字号放大方便查看
+		#if mobile
+		defaultTextFormat = new TextFormat("VCR OSD Mono", 28, color);
+		#else
 		defaultTextFormat = new TextFormat("VCR OSD Mono", 14, color);
+		#end
 		autoSize = LEFT;
 		multiline = true;
+
+		// 滚动速度指示器（默认隐藏，游戏内且开启设置时才显示）
+		speedTxt = new TextField();
+		speedTxt.selectable = false;
+		speedTxt.mouseEnabled = false;
+		#if mobile
+		speedTxt.defaultTextFormat = new TextFormat("VCR OSD Mono", 28, 0xFF00FF00);
+		#else
+		speedTxt.defaultTextFormat = new TextFormat("VCR OSD Mono", 14, 0xFF00FF00);
+		#end
+		speedTxt.autoSize = LEFT;
+		speedTxt.visible = false;
 
 		#if desktop
 		var w:Window = lime.app.Application.current.window;
@@ -96,15 +119,32 @@ class FPS extends TextField
 
 			updateColor();
 			updateText();
+			updateSpeedTxt();
 		}
 	}
 
 	function updateColor():Void
 	{
+		var mode:String = ClientPrefs.data.fpsColor.toUpperCase();
+		if (mode == '自动')
+		{
+			// 彩色 FPS：按帧率分级变色（高帧绿 / 中帧黄 / 低帧红）
+			if (currentFPS >= 55) _fpsColor = 0xFF00FF00;
+			else if (currentFPS >= 30) _fpsColor = 0xFFFFFF00;
+			else _fpsColor = _warnColor;
+			return;
+		}
+		if (mode == '彩虹')
+		{
+			// Rainbow FPS（Kade Engine 风格）：颜色在色相轮上循环
+			_rainbowHue = (_rainbowHue + 20) % 360;
+			_fpsColor = 0xFF000000 | hsvToRgb(_rainbowHue, 1, 1);
+			return;
+		}
 		if (currentFPS < 30)
 			_fpsColor = _warnColor;
 		else
-			_fpsColor = switch (ClientPrefs.data.fpsColor.toUpperCase()) {
+			_fpsColor = switch (mode) {
 				case "青色":    0xFF00FFFF;
 				case "蓝色":    0xFF0000FF;
 				case "红色":     0xFFFF0000;
@@ -112,6 +152,42 @@ class FPS extends TextField
 				case "黄色":  0xFFFFFF00;
 				default:        _defaultColor;
 			};
+	}
+
+	// HSV → RGB（0-360 色相），返回 0xRRGGBB
+	function hsvToRgb(h:Float, s:Float, v:Float):Int
+	{
+		var c:Float = v * s;
+		var hp:Float = h / 60;
+		var x:Float = c * (1 - Math.abs(hp % 2 - 1));
+		var r:Float = 0, g:Float = 0, b:Float = 0;
+		if (hp < 1) { r = c; g = x; }
+		else if (hp < 2) { r = x; g = c; }
+		else if (hp < 3) { g = c; b = x; }
+		else if (hp < 4) { g = x; b = c; }
+		else if (hp < 5) { r = x; b = c; }
+		else { r = c; b = x; }
+		var m:Float = v - c;
+		return (Std.int((r + m) * 255) << 16) | (Std.int((g + m) * 255) << 8) | Std.int((b + m) * 255);
+	}
+
+	// 滚动速度指示器：显示当前音符滚动速度，颜色随速度变化（慢绿 / 中黄 / 快红）
+	function updateSpeedTxt():Void
+	{
+		if (!ClientPrefs.data.showScrollSpeed || states.PlayState.instance == null)
+		{
+			speedTxt.visible = false;
+			return;
+		}
+		var spd:Float = states.PlayState.instance.songSpeed;
+		if (spd <= 0) spd = 1;
+		speedTxt.text = 'SPD: ' + (Math.round(spd * 100) / 100) + 'x';
+		if (spd < 1.5) speedTxt.textColor = 0xFF00FF00;
+		else if (spd < 2.5) speedTxt.textColor = 0xFFFFFF00;
+		else speedTxt.textColor = 0xFFFF0000;
+		speedTxt.x = x;
+		speedTxt.y = y + textHeight + 4;
+		speedTxt.visible = visible;
 	}
 
 	dynamic function updateText():Void

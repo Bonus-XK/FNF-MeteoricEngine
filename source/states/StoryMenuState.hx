@@ -5,20 +5,39 @@ import backend.Highscore;
 import backend.Song;
 
 import flixel.group.FlxGroup;
+import flixel.math.FlxPoint;
 import flixel.graphics.FlxGraphic;
+import flixel.graphics.frames.FlxAtlasFrames;
+import flixel.animation.FlxAnimation;
 import openfl.Lib;
 
 import objects.MenuItem;
 import objects.MenuCharacter;
-import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
 
 import substates.GameplayChangersSubstate;
 import substates.ResetScoreSubState;
 
+/**
+ * StoryMenuState —— 故事模式选周界面（显示逻辑重写版）
+ *
+ * 保留备份版整体视觉（黄色标题条、每周背景、周目轮播、角色立绘、曲目轨条），
+ * 重点重写“难度切换”的显示与输入：
+ *   - 难度选择器（◀ 难度 ▶）固定坐标、固定可见（不再锚定周目缩略图、
+ *     不再受锁定状态影响）、最后添加永远在最上层
+ *   - 触控：点 ◀▶ 切难度、点周目选中、拖动滚周目（stage tap 队列，安卓必定可用）
+ *   - 键盘/鼠标沿用备份版
+ *   - 安卓系统返回键 → 回主菜单（不再退出游戏）
+ */
 class StoryMenuState extends MusicBeatState
 {
 	public static var weekCompleted:Map<String, Bool> = new Map<String, Bool>();
+
+	// ===== 难度选择器固定位置（逻辑坐标，1280x720） =====
+	// 位于黄色标题条中部偏右，避开周目轮播/角色/曲目轨条
+	static final DIFF_X:Float = 830;   // 之前的位置（备份版箭头坐标，A 键上方）
+	static final DIFF_Y:Float = 462;
+	static final DIFF_GAP:Float = 376;
 
 	var scoreText:FlxText;
 
@@ -39,36 +58,33 @@ class StoryMenuState extends MusicBeatState
 
 	var difficultySelectors:FlxGroup;
 	var sprDifficulty:FlxSprite;
+	var diffTxt:FlxText; // 难度图缺失时的文字兜底
 	var leftArrow:FlxSprite;
 	var rightArrow:FlxSprite;
+	var diffLeftBtn:FlxSprite;  // 移动端自绘难度 ◀ 按钮（不依赖 MobileControls.instance）
+	var diffRightBtn:FlxSprite; // 移动端自绘难度 ▶ 按钮
 
 	var loadedWeeks:Array<WeekData> = [];
 
-	// ===== 鼠标/键盘输入分离 =====
-	// 键盘永远可用；鼠标跟随只在“物理移动超过阈值”后生效（屏幕坐标，不受轮播移动影响）
-	var mouseActive:Bool = true;  // 默认鼠标活跃：悬停即可滚动，键盘操作后冻结
-	var mouseLockX:Float = 0;
-	var mouseLockY:Float = 0;
-	var mouseLastScreenX:Int = 0;
-	var mouseLastScreenY:Int = 0;
-
-	var backBtn:BackButton;
-	static final MOUSE_REACTIVATE_DIST:Float = 8;
+	var movedBack:Bool = false;
+	var selectedWeek:Bool = false;
+	var stopspamming:Bool = false;
+	var tweenDifficulty:FlxTween;
+	var backBtn:objects.BackButton;
 
 	override function create()
 	{
-		mouseLockX = FlxG.mouse.screenX;
-		mouseLockY = FlxG.mouse.screenY;
-
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 
-	    Lib.application.window.title = "FNF':Meteoric Engine - Select Week:";
+		Lib.application.window.title = "FNF':Meteoric Engine - Select Week:";
 
 		PlayState.isStoryMode = true;
 		WeekData.reloadWeekFiles(true);
-		if(curWeek >= WeekData.weeksList.length) curWeek = 0;
+		if (curWeek >= WeekData.weeksList.length) curWeek = 0;
 		persistentUpdate = persistentDraw = true;
+
+		super.create();
 
 		scoreText = new FlxText(10, 10, 0, "SCORE: 49324858", 36);
 		scoreText.setFormat(Paths.font("future.ttf"), 32);
@@ -76,12 +92,6 @@ class StoryMenuState extends MusicBeatState
 		txtWeekTitle = new FlxText(FlxG.width * 0.7, 10, 0, "", 32);
 		txtWeekTitle.setFormat(Paths.font("future.ttf"), 32, FlxColor.WHITE, RIGHT);
 		txtWeekTitle.alpha = 0.7;
-
-		var rankText:FlxText = new FlxText(0, 10);
-		rankText.text = 'RANK: GREAT';
-		rankText.setFormat(Paths.font("future.ttf"), 32);
-		rankText.size = scoreText.size;
-		rankText.screenCenter(X);
 
 		var ui_tex = Paths.getSparrowAtlas('campaign_menu_UI_assets');
 		var bgYellow:FlxSprite = new FlxSprite(0, 56).makeGraphic(FlxG.width, 386, 0xFFF9CF51);
@@ -99,7 +109,6 @@ class StoryMenuState extends MusicBeatState
 		add(grpLocks);
 
 		#if desktop
-		// Updating Discord Rich Presence
 		DiscordClient.changePresence("In the Menus", null);
 		#end
 
@@ -108,14 +117,14 @@ class StoryMenuState extends MusicBeatState
 		{
 			var weekFile:WeekData = WeekData.weeksLoaded.get(WeekData.weeksList[i]);
 			var isLocked:Bool = weekIsLocked(WeekData.weeksList[i]);
-			if(!isLocked || !weekFile.hiddenUntilUnlocked)
+			if (!isLocked || !weekFile.hiddenUntilUnlocked)
 			{
 				loadedWeeks.push(weekFile);
 				WeekData.setDirectoryFromWeek(weekFile);
 				var weekThing:MenuItem = new MenuItem(0, bgSprite.y + 396, WeekData.weeksList[i]);
 				weekThing.y += ((weekThing.height + 20) * num);
 				weekThing.targetY = num;
-				weekThing.ID = num; // 固定周目序号，供鼠标命中判断使用（targetY 会被轮播逻辑改写，不能用作序号）
+				weekThing.ID = num;
 				grpWeekText.add(weekThing);
 
 				weekThing.screenCenter(X);
@@ -143,35 +152,32 @@ class StoryMenuState extends MusicBeatState
 			grpWeekCharacters.add(weekCharacterThing);
 		}
 
-		difficultySelectors = new FlxGroup();
-		add(difficultySelectors);
-
-		leftArrow = new FlxSprite(grpWeekText.members[0].x + grpWeekText.members[0].width + 10, grpWeekText.members[0].y + 10);
-		leftArrow.antialiasing = ClientPrefs.data.antialiasing;
-		leftArrow.frames = ui_tex;
-		leftArrow.animation.addByPrefix('idle', "arrow left");
-		leftArrow.animation.addByPrefix('press', "arrow push left");
-		leftArrow.animation.play('idle');
-		difficultySelectors.add(leftArrow);
-
 		Difficulty.resetList();
-		if(lastDifficultyName == '')
-		{
+		if (lastDifficultyName == '')
 			lastDifficultyName = Difficulty.getDefault();
-		}
 		curDifficulty = Math.round(Math.max(0, Difficulty.defaultList.indexOf(lastDifficultyName)));
 
-		sprDifficulty = new FlxSprite(0, leftArrow.y);
+		// ===== 难度选择器：固定坐标、最后添加（永远最上层）、始终可见 =====
+		difficultySelectors = new FlxGroup();
+
+		// 箭头：优先使用原图集贴图（campaign_menu_UI_assets），图集帧不可用时自动自绘兜底
+		leftArrow = makeArrow(-1, DIFF_X, DIFF_Y, ui_tex);
+		if (leftArrow != null) difficultySelectors.add(leftArrow);
+
+		sprDifficulty = new FlxSprite(0, DIFF_Y);
 		sprDifficulty.antialiasing = ClientPrefs.data.antialiasing;
 		difficultySelectors.add(sprDifficulty);
 
-		rightArrow = new FlxSprite(leftArrow.x + 376, leftArrow.y);
-		rightArrow.antialiasing = ClientPrefs.data.antialiasing;
-		rightArrow.frames = ui_tex;
-		rightArrow.animation.addByPrefix('idle', 'arrow right');
-		rightArrow.animation.addByPrefix('press', "arrow push right", 24, false);
-		rightArrow.animation.play('idle');
-		difficultySelectors.add(rightArrow);
+		// 难度图缺失时的文字兜底（避免 flixel 默认 Haxe 占位图）
+		diffTxt = new FlxText(0, 0, 0, '', 40);
+		diffTxt.setFormat(Paths.font('future.ttf'), 40, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		diffTxt.borderSize = 2;
+		diffTxt.visible = false;
+		difficultySelectors.add(diffTxt);
+
+		rightArrow = makeArrow(1, DIFF_X + DIFF_GAP, DIFF_Y, ui_tex);
+		if (rightArrow != null) difficultySelectors.add(rightArrow);
+		// 注意：difficultySelectors 延后到 create 末尾再 add —— 必须盖在黄色条/背景/角色之上
 
 		add(bgYellow);
 		add(bgSprite);
@@ -183,14 +189,33 @@ class StoryMenuState extends MusicBeatState
 
 		txtTracklist = new FlxText(FlxG.width * 0.05, tracksSprite.y + 60, 0, "", 32);
 		txtTracklist.alignment = CENTER;
-		txtTracklist.font = rankText.font;
+		txtTracklist.font = scoreText.font;
 		txtTracklist.color = 0xFFe55777;
 		add(txtTracklist);
-		// add(rankText);
 		add(scoreText);
 		add(txtWeekTitle);
 
-		backBtn = new BackButton(FlxG.width - 72, 12);
+		// 难度选择器最后添加：永远绘制在黄色标题条/每周背景/角色之上
+		add(difficultySelectors);
+
+		#if mobile
+		// 移动端：隐藏自绘箭头（makeArrow 返回 null，此处必须判空）
+		if (leftArrow != null) leftArrow.visible = false;
+		if (rightArrow != null) rightArrow.visible = false;
+		// 难度切换 ◀ ▶ 自绘按钮（不依赖 MobileControls.instance：冷启动直进 StoryMenu 时
+		// instance 不存在，tap 通道由 MobileControls 静态监听常驻提供）
+		diffLeftBtn = objects.MobileControls.makePadSprite('left', 0xFFFFFFFF);
+		diffLeftBtn.x = 20;
+		diffLeftBtn.y = FlxG.height - objects.MobileControls.BTN_H - 20;
+		add(diffLeftBtn);
+		diffRightBtn = objects.MobileControls.makePadSprite('right', 0xFFFFFFFF);
+		diffRightBtn.x = 20 + objects.MobileControls.BTN_W + 8;
+		diffRightBtn.y = FlxG.height - objects.MobileControls.BTN_H - 20;
+		add(diffRightBtn);
+		#end
+
+		// 右上角返回键
+		backBtn = new objects.BackButton(FlxG.width - 72, 12);
 		add(backBtn.glow);
 		add(backBtn.spr);
 		add(backBtn.label);
@@ -199,15 +224,25 @@ class StoryMenuState extends MusicBeatState
 		changeDifficulty();
 		FlxG.mouse.visible = true;
 
-		mouseLastScreenX = FlxG.mouse.screenX;
-		mouseLastScreenY = FlxG.mouse.screenY;
-
-		super.create();
-
 		loadUIscripts('story_menu');
 	}
 
-	override function closeSubState() {
+	#if mobile
+	/** 安卓返回键：回主菜单（不退出游戏） */
+	override public function onAndroidBack():Bool
+	{
+		if (!movedBack && !selectedWeek)
+		{
+			FlxG.sound.play(Paths.sound('cancelMenu'));
+			movedBack = true;
+			MusicBeatState.switchState(new MainMenuState());
+		}
+		return true;
+	}
+	#end
+
+	override function closeSubState()
+	{
 		FlxG.mouse.visible = true;
 		persistentUpdate = true;
 		changeWeek();
@@ -217,48 +252,114 @@ class StoryMenuState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, FlxMath.bound(elapsed * 30, 0, 1)));
-		if(Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
-
+		if (Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
 		scoreText.text = "本周分数：" + lerpScore;
 
 		if (!movedBack && !selectedWeek)
 		{
 			var upP = controls.UI_UP_P;
 			var downP = controls.UI_DOWN_P;
+
+			// 返回键悬停发光（与 Freeplay 一致：鼠标/触摸靠近即点亮，点击有反馈）
+			backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
+
+			#if mobile
+			// ---- 触屏：FlxG.mouse 触摸→鼠标模拟（与主菜单/Freeplay 同一可靠通道）----
+			// 拖动滚周目（stage 拖动跟踪可用时；往下拖=下一个，往上拖=上一个）
+			var steps:Int = objects.MobileControls.consumeDragSteps();
+			if (steps != 0)
+			{
+				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+				changeWeek(steps);
+				changeDifficulty();
+			}
+			// 点按：手指抬起且未滑动才算点击（与 Freeplay 一致）
+			var clickPressed:Bool = FlxG.mouse.justReleased && !Main.touchWasDragging();
+			if (clickPressed)
+			{
+				var mx:Float = FlxG.mouse.screenX;
+				var my:Float = FlxG.mouse.screenY;
+				// 难度切换 ◀ ▶（自绘按钮区域）
+				if (diffLeftBtn != null && mx >= diffLeftBtn.x && mx <= diffLeftBtn.x + diffLeftBtn.width
+					&& my >= diffLeftBtn.y && my <= diffLeftBtn.y + diffLeftBtn.height)
+				{
+					FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+					changeDifficulty(-1);
+				}
+				else if (diffRightBtn != null && mx >= diffRightBtn.x && mx <= diffRightBtn.x + diffRightBtn.width
+					&& my >= diffRightBtn.y && my <= diffRightBtn.y + diffRightBtn.height)
+				{
+					FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+					changeDifficulty(1);
+				}
+				else
+				{
+					// 点周目 = 选中（A 键才真正进入）
+					var hitWeek:Bool = false;
+					for (item in grpWeekText.members)
+					{
+						if (mx >= item.x && mx <= item.x + item.width && my >= item.y && my <= item.y + item.height)
+						{
+							var idx:Int = grpWeekText.members.indexOf(item);
+							if (idx != curWeek)
+							{
+								changeWeek(idx - curWeek);
+								changeDifficulty();
+							}
+							hitWeek = true;
+							break;
+						}
+					}
+					// 右上角返回键（圆形判定，与 Freeplay 一致；等同 ESC/系统返回键）
+					if (!hitWeek && backBtn.over(mx, my))
+					{
+						FlxG.sound.play(Paths.sound('cancelMenu'));
+						movedBack = true;
+						MusicBeatState.switchState(new MainMenuState());
+						return;
+					}
+				}
+			}
+			#end
+
 			if (upP)
 			{
-				takeKeyboardControl();
 				changeWeek(-1);
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 
 			if (downP)
 			{
-				takeKeyboardControl();
 				changeWeek(1);
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 
-			if(FlxG.mouse.wheel != 0)
+			if (FlxG.mouse.wheel != 0)
 			{
-				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
-				changeWeek(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeWeek(-FlxG.mouse.wheel);
 				changeDifficulty();
 			}
 
-			if (controls.UI_RIGHT)
-				rightArrow.animation.play('press')
-			else
-				rightArrow.animation.play('idle');
-
-			if (controls.UI_LEFT)
-				leftArrow.animation.play('press');
-			else
-				leftArrow.animation.play('idle');
-
-			if (!controls.controllerMode)
-				updateMouseControl();
+			// 移动端 makeArrow 返回 null（难度切换走左下角 virtualpad）——所有箭头引用必须判空
+			if (rightArrow != null && rightArrow.animation.getByName('press') != null)
+			{
+				if (controls.UI_RIGHT)
+					rightArrow.animation.play('press')
+				else
+					rightArrow.animation.play('idle');
+			}
+			else if (rightArrow != null)
+				rightArrow.alpha = controls.UI_RIGHT ? 1 : 0.9;
+			if (leftArrow != null && leftArrow.animation.getByName('press') != null)
+			{
+				if (controls.UI_LEFT)
+					leftArrow.animation.play('press')
+				else
+					leftArrow.animation.play('idle');
+			}
+			else if (leftArrow != null)
+				leftArrow.alpha = controls.UI_LEFT ? 1 : 0.9;
 
 			if (controls.UI_RIGHT_P)
 				changeDifficulty(1);
@@ -267,12 +368,29 @@ class StoryMenuState extends MusicBeatState
 			else if (upP || downP)
 				changeDifficulty();
 
-			if(FlxG.keys.justPressed.CONTROL)
+			#if !mobile
+			// 桌面：鼠标点 ◀▶ 切难度 / 点返回键
+			if (FlxG.mouse.justPressed)
+			{
+				if (FlxG.mouse.overlaps(leftArrow))
+					changeDifficulty(-1);
+				else if (FlxG.mouse.overlaps(rightArrow))
+					changeDifficulty(1);
+				else if (backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+				{
+					FlxG.sound.play(Paths.sound('cancelMenu'));
+					movedBack = true;
+					MusicBeatState.switchState(new MainMenuState());
+				}
+			}
+			#end
+
+			if (FlxG.keys.justPressed.CONTROL)
 			{
 				persistentUpdate = false;
 				openSubState(new GameplayChangersSubstate());
 			}
-			else if(controls.RESET)
+			else if (controls.RESET)
 			{
 				persistentUpdate = false;
 				openSubState(new ResetScoreSubState('', curDifficulty, '', curWeek));
@@ -299,104 +417,17 @@ class StoryMenuState extends MusicBeatState
 		});
 	}
 
-	// ===== 鼠标控制（全部基于屏幕坐标，不受轮播/镜头移动影响） =====
-	function updateMouseControl()
-	{
-		var clickPressed:Bool = FlxG.mouse.justPressed;
-		#if mobile
-		// 触屏：手指抬起且未滑动才算点击，拖动滚动时不误选
-		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
-		#end
-
-		// 键盘接管后：鼠标必须物理移动超过阈值（屏幕坐标）才恢复跟随
-		if (!mouseActive)
-		{
-			var dx:Float = FlxG.mouse.screenX - mouseLockX;
-			var dy:Float = FlxG.mouse.screenY - mouseLockY;
-			if (dx * dx + dy * dy > MOUSE_REACTIVATE_DIST * MOUSE_REACTIVATE_DIST)
-				mouseActive = true;
-		}
-
-		// 返回按钮：悬停高亮，点击返回主菜单
-		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
-		{
-			mouseActive = true;
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			movedBack = true;
-			MusicBeatState.switchState(new MainMenuState());
-		}
-
-		// 难度箭头：悬停高亮（仅鼠标活跃时，点击不受限）
-		if (mouseActive && FlxG.mouse.overlaps(leftArrow))
-			leftArrow.animation.play('press');
-		else if (mouseActive && FlxG.mouse.overlaps(rightArrow))
-			rightArrow.animation.play('press');
-
-		// 触控/点击只负责选中周目，真正进入由 A 键触发
-		if (clickPressed)
-		{
-			var clickID:Int = getHoveredWeekID();
-			if (clickID >= 0)
-			{
-				mouseActive = true;
-				if (clickID != curWeek)
-				{
-					changeWeek(clickID - curWeek);
-					changeDifficulty();
-				}
-			}
-		}
-
-		if (clickPressed && FlxG.mouse.overlaps(leftArrow))
-		{
-			mouseActive = true;
-			changeDifficulty(-1);
-		}
-		else if (clickPressed && FlxG.mouse.overlaps(rightArrow))
-		{
-			mouseActive = true;
-			changeDifficulty(1);
-		}
-	}
-
-	function takeKeyboardControl()
-	{
-		mouseActive = false;
-		mouseLockX = FlxG.mouse.screenX;
-		mouseLockY = FlxG.mouse.screenY;
-	}
-
-	function getHoveredWeekID():Int
-	{
-		var hoveredID:Int = -1;
-		var mx:Float = FlxG.mouse.screenX;
-		var my:Float = FlxG.mouse.screenY;
-		for (item in grpWeekText.members)
-		{
-			if (mx >= item.x && mx <= item.x + item.width && my >= item.y && my <= item.y + item.height)
-				hoveredID = item.ID;
-		}
-		return hoveredID;
-	}
-
-	var movedBack:Bool = false;
-	var selectedWeek:Bool = false;
-	var stopspamming:Bool = false;
-
 	function selectWeek()
 	{
 		if (!weekIsLocked(loadedWeeks[curWeek].fileName))
 		{
-			// We can't use Dynamic Array .copy() because that crashes HTML5, here's a workaround.
 			var songArray:Array<String> = [];
 			var leWeek:Array<Dynamic> = loadedWeeks[curWeek].songs;
-			for (i in 0...leWeek.length) {
+			for (i in 0...leWeek.length)
 				songArray.push(leWeek[i][0]);
-			}
 
 			var diffic:String = Difficulty.getFilePath(curDifficulty);
-			if(diffic == null) diffic = '';
+			if (diffic == null) diffic = '';
 			var firstSong:String = Paths.formatToSongPath(songArray[0]);
 
 			try
@@ -415,7 +446,7 @@ class StoryMenuState extends MusicBeatState
 				PlayState.campaignScore = 0;
 				PlayState.campaignMisses = 0;
 			}
-			catch(e:Dynamic)
+			catch (e:Dynamic)
 			{
 				trace('ERROR! $e');
 				return;
@@ -424,15 +455,11 @@ class StoryMenuState extends MusicBeatState
 			if (stopspamming == false)
 			{
 				FlxG.sound.play(Paths.sound('confirmMenu'));
-
 				grpWeekText.members[curWeek].startFlashing();
-
 				for (char in grpWeekCharacters.members)
 				{
 					if (char.character != '' && char.hasConfirmAnimation)
-					{
 						char.animation.play('confirm');
-					}
 				}
 				stopspamming = true;
 			}
@@ -448,18 +475,19 @@ class StoryMenuState extends MusicBeatState
 			DiscordClient.loadModRPC();
 			#end
 			#end
-		} else {
+		}
+		else
+		{
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 	}
 
-	var tweenDifficulty:FlxTween;
 	function changeDifficulty(change:Int = 0):Void
 	{
 		curDifficulty += change;
 
 		if (curDifficulty < 0)
-			curDifficulty = Difficulty.list.length-1;
+			curDifficulty = Difficulty.list.length - 1;
 		if (curDifficulty >= Difficulty.list.length)
 			curDifficulty = 0;
 
@@ -468,16 +496,29 @@ class StoryMenuState extends MusicBeatState
 		var diff:String = Difficulty.getString(curDifficulty);
 		var newImage:FlxGraphic = Paths.image('menudifficulties/' + Paths.formatToSongPath(diff));
 
-		if(sprDifficulty.graphic != newImage)
+		if (newImage == null)
 		{
+			// 难度图缺失：改用文字显示（绝不让 loadGraphic(null) 渲染 Haxe 占位图）
+			sprDifficulty.visible = false;
+			diffTxt.visible = true;
+			diffTxt.text = diff.toUpperCase();
+			diffTxt.x = DIFF_X + 20;
+			diffTxt.y = DIFF_Y + (90 - diffTxt.height) / 2;
+		}
+		else if (sprDifficulty.graphic != newImage)
+		{
+			diffTxt.visible = false;
+			sprDifficulty.visible = true;
 			sprDifficulty.loadGraphic(newImage);
-			sprDifficulty.x = leftArrow.x + 60;
-			sprDifficulty.x += (308 - sprDifficulty.width) / 3;
+			sprDifficulty.setGraphicSize(220, 0); // 统一缩放到箭头间距内
+			sprDifficulty.updateHitbox();
+			sprDifficulty.x = DIFF_X + 60;
+			sprDifficulty.x += (DIFF_GAP - 60 - sprDifficulty.width) / 2;
 			sprDifficulty.alpha = 0;
-			sprDifficulty.y = leftArrow.y - 15;
+			sprDifficulty.y = DIFF_Y + (90 - sprDifficulty.height) / 2;
 
-			if(tweenDifficulty != null) tweenDifficulty.cancel();
-			tweenDifficulty = FlxTween.tween(sprDifficulty, {y: leftArrow.y + 15, alpha: 1}, 0.07, {onComplete: function(twn:FlxTween)
+			if (tweenDifficulty != null) tweenDifficulty.cancel();
+			tweenDifficulty = FlxTween.tween(sprDifficulty, {y: DIFF_Y + 15, alpha: 1}, 0.07, {onComplete: function(twn:FlxTween)
 			{
 				tweenDifficulty = null;
 			}});
@@ -509,7 +550,6 @@ class StoryMenuState extends MusicBeatState
 		txtWeekTitle.x = FlxG.width - (txtWeekTitle.width + 10);
 
 		var bullShit:Int = 0;
-
 		var unlocked:Bool = !weekIsLocked(leWeek.fileName);
 		for (item in grpWeekText.members)
 		{
@@ -523,32 +563,94 @@ class StoryMenuState extends MusicBeatState
 
 		bgSprite.visible = true;
 		var assetName:String = leWeek.weekBackground;
-		if(assetName == null || assetName.length < 1) {
+		if (assetName == null || assetName.length < 1)
 			bgSprite.visible = false;
-		} else {
+		else
 			bgSprite.loadGraphic(Paths.image('menubackgrounds/menu_' + assetName));
-		}
 		PlayState.storyWeek = curWeek;
 
 		Difficulty.loadFromWeek();
-		difficultySelectors.visible = unlocked;
+		// 只有一种难度时（如 mod 周的 dside）隐藏箭头——没得切，避免“点了没反应”的错觉
+		// 注意：sprDifficulty/diffTxt 的可见性由 changeDifficulty() 决定（难度名在单难度周也要显示），不在此覆盖
+		var hasChoice:Bool = Difficulty.list.length > 1;
+		if (leftArrow != null) leftArrow.visible = hasChoice;
+		if (rightArrow != null) rightArrow.visible = hasChoice;
+		#if mobile
+		if (diffLeftBtn != null) diffLeftBtn.visible = hasChoice;
+		if (diffRightBtn != null) diffRightBtn.visible = hasChoice;
+		#end
+		difficultySelectors.visible = true;
 
-		if(Difficulty.list.contains(Difficulty.getDefault()))
+		if (Difficulty.list.contains(Difficulty.getDefault()))
 			curDifficulty = Math.round(Math.max(0, Difficulty.defaultList.indexOf(Difficulty.getDefault())));
 		else
 			curDifficulty = 0;
 
 		var newPos:Int = Difficulty.list.indexOf(lastDifficultyName);
-		if(newPos > -1)
-		{
+		if (newPos > -1)
 			curDifficulty = newPos;
-		}
+
 		updateText();
 
 		callUIScripts('onChangeSelection', [curWeek, loadedWeeks[curWeek].storyName]);
 	}
 
-	function weekIsLocked(name:String):Bool {
+	/** 难度箭头：优先加载原图集贴图（campaign_menu_UI_assets 的 arrow left/right），
+	 *  图集帧缺失/不可用时自动自绘三角形兜底（保证必定可见）。dir=-1 左，1 右 */
+	function makeArrow(dir:Int, x:Float, y:Float, ui_tex:FlxAtlasFrames):FlxSprite
+	{
+		#if mobile
+		// 安卓端：不创建任何箭头对象（难度切换已由左下角 virtualpad ◀ ▶ 承担），
+		// 难度文字位置使用固定常量，不依赖箭头对象。
+		return null;
+		#end
+		var spr:FlxSprite = new FlxSprite(x, y);
+		spr.antialiasing = ClientPrefs.data.antialiasing;
+		var useAtlas:Bool = (ui_tex != null);
+		if (useAtlas)
+		{
+			spr.frames = ui_tex;
+			spr.animation.addByPrefix('idle', dir < 0 ? "arrow left" : 'arrow right');
+			var idle:FlxAnimation = spr.animation.getByName('idle');
+			useAtlas = (idle != null && idle.frames.length > 0);
+			if (useAtlas)
+			{
+				spr.animation.addByPrefix('press', dir < 0 ? "arrow push left" : "arrow push right");
+				spr.animation.play('idle');
+			}
+		}
+		if (!useAtlas)
+		{
+			// 兜底：自绘三角形箭头
+			spr.frames = null;
+			spr.makeGraphic(70, 90, FlxColor.TRANSPARENT, true);
+			var pts:Array<FlxPoint> = [];
+			if (dir < 0)
+			{
+				pts.push(FlxPoint.get(66, 45));
+				pts.push(FlxPoint.get(8, 8));
+				pts.push(FlxPoint.get(8, 82));
+				FlxSpriteUtil.drawPolygon(spr, pts, 0xFFFFFFFF);
+				var tail:Array<FlxPoint> = [FlxPoint.get(8, 20), FlxPoint.get(30, 45), FlxPoint.get(8, 70)];
+				FlxSpriteUtil.drawPolygon(spr, tail, 0xFFFFFFFF);
+			}
+			else
+			{
+				pts.push(FlxPoint.get(4, 45));
+				pts.push(FlxPoint.get(62, 8));
+				pts.push(FlxPoint.get(62, 82));
+				FlxSpriteUtil.drawPolygon(spr, pts, 0xFFFFFFFF);
+				var tail:Array<FlxPoint> = [FlxPoint.get(62, 20), FlxPoint.get(40, 45), FlxPoint.get(62, 70)];
+				FlxSpriteUtil.drawPolygon(spr, tail, 0xFFFFFFFF);
+			}
+			for (p in pts) p.put();
+			spr.alpha = 0.9;
+		}
+		return spr;
+	}
+
+	function weekIsLocked(name:String):Bool
+	{
 		var leWeek:WeekData = WeekData.weeksLoaded.get(name);
 		return (!leWeek.startUnlocked && leWeek.weekBefore.length > 0 && (!weekCompleted.exists(leWeek.weekBefore) || !weekCompleted.get(leWeek.weekBefore)));
 	}
@@ -556,22 +658,17 @@ class StoryMenuState extends MusicBeatState
 	function updateText()
 	{
 		var weekArray:Array<String> = loadedWeeks[curWeek].weekCharacters;
-		for (i in 0...grpWeekCharacters.length) {
+		for (i in 0...grpWeekCharacters.length)
 			grpWeekCharacters.members[i].changeCharacter(weekArray[i]);
-		}
 
 		var leWeek:WeekData = loadedWeeks[curWeek];
 		var stringThing:Array<String> = [];
-		for (i in 0...leWeek.songs.length) {
+		for (i in 0...leWeek.songs.length)
 			stringThing.push(leWeek.songs[i][0]);
-		}
 
 		txtTracklist.text = '';
 		for (i in 0...stringThing.length)
-		{
 			txtTracklist.text += stringThing[i] + '\n';
-		}
-
 		txtTracklist.text = txtTracklist.text.toUpperCase();
 
 		txtTracklist.screenCenter(X);

@@ -14,10 +14,12 @@ import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
 import flash.geom.Point;
 import openfl.Lib;
+import openfl.events.KeyboardEvent;
 import openfl.events.TouchEvent;
 import openfl.utils.Assets;
 import backend.ClientPrefs;
 import backend.Paths;
+import flixel.input.keyboard.FlxKey;
 import states.PlayState;
 
 /**
@@ -216,7 +218,8 @@ class MobileControls extends FlxSpriteGroup
 
 	// ---- 视觉 ----
 
-	function makePadSprite(graphic:String, color:Int):FlxSprite
+	/** 创建 virtualpad 样式按键贴图（公开静态：供结算/回放列表等轻量界面直接复用，不挂实例） */
+	public static function makePadSprite(graphic:String, color:Int):FlxSprite
 	{
 		var spr:FlxSprite = new FlxSprite();
 		try
@@ -318,6 +321,20 @@ class MobileControls extends FlxSpriteGroup
 	static var _tapDown:Map<Int, FlxPoint> = new Map<Int, FlxPoint>();
 	static var _tapDownTime:Map<Int, Int> = new Map<Int, Int>();
 	static var _tapQueue:Array<QueuedTap> = [];
+	// stage 级拖动跟踪（结算/回放列表等界面滚动用，不依赖 FlxG.touches/鼠标模拟）
+	static var _dragID:Int = -1;
+	static var _dragLastY:Float = 0;
+	static var _dragAccum:Float = 0;
+	static var _dragSteps:Int = 0;
+	// ---- 安卓滑键（stage 级触摸跟踪，不依赖 FlxG.touches）----
+	// 手指按住不放从一个按键滑到另一个按键时，按键判定跟随触点：
+	// 触点当前所在按键 = 按住（pressed），滑入瞬间 = 按下（justPressed），滑出/抬起 = 释放（justReleased）
+	static var _touchKey:Map<Int, String> = new Map<Int, String>();       // touchPointID -> 当前所在按键（note_left 等）
+	static var _slidePresses:Map<String, Bool> = new Map<String, Bool>(); // 滑入/按下事件（justPressed 消费）
+	static var _slideReleases:Map<String, Bool> = new Map<String, Bool>();// 滑出/抬起事件（justReleased 消费）
+	// ---- 触控按键 -> 键盘注入（映射到按键设置里的键位）----
+	// 让读取物理键盘状态的 Mod/Lua（如 FlxG.keys.pressed.A）在触控游玩时同样生效
+	static var _injectedKeys:Map<String, Bool> = new Map<String, Bool>(); // 已注入 KEY_DOWN 的按键（防止重复注入）
 	static var _stagePoint:Point = new Point();
 	static var _tapCaptureInstalled:Bool = false;
 	static var _tapCaptureUsers:Int = 0;
@@ -329,6 +346,7 @@ class MobileControls extends FlxSpriteGroup
 		_tapCaptureInstalled = true;
 		var stage = Lib.current.stage;
 		stage.addEventListener(TouchEvent.TOUCH_BEGIN, onTapBegin);
+		stage.addEventListener(TouchEvent.TOUCH_MOVE, onTouchMove);
 		stage.addEventListener(TouchEvent.TOUCH_END, onTapEnd);
 	}
 
@@ -341,14 +359,19 @@ class MobileControls extends FlxSpriteGroup
 	{
 		_tapCaptureUsers--;
 		if (_tapCaptureUsers > 0 || !_tapCaptureInstalled) return;
-		_tapCaptureInstalled = false;
-		var stage = Lib.current.stage;
-		stage.removeEventListener(TouchEvent.TOUCH_BEGIN, onTapBegin);
-		stage.removeEventListener(TouchEvent.TOUCH_END, onTapEnd);
+		// 监听常驻：安卓端 FlxG.touches 为空，stage tap 队列是全局唯一触控通道，
+		// 主菜单/StoryMenu/结算/设置等界面都在消费它，不能随 instance 生命周期卸载。
+		// 这里只清理会话状态，不移除 stage 监听。
 		for (p in _tapDown) p.put();
 		_tapDown.clear();
 		_tapDownTime.clear();
 		_tapQueue.resize(0);
+		_dragID = -1;
+		_dragSteps = 0;
+		_touchKey.clear();
+		_slidePresses.clear();
+		_slideReleases.clear();
+		_injectedKeys.clear();
 	}
 
 	static function clearTapQueue():Void
@@ -373,13 +396,74 @@ class MobileControls extends FlxSpriteGroup
 
 	static function onTapBegin(e:TouchEvent):Void
 	{
+		// 清理该触点的残留状态（防 TOUCH_END 事件丢失导致键盘键卡住、动画只播一次）
+		var staleKey:String = _touchKey.get(e.touchPointID);
+		if (staleKey != null)
+		{
+			if (injectedKeyCode(staleKey) < 0) _slideReleases.set(staleKey, true);
+			injectKeyUp(staleKey);
+		}
+		_touchKey.remove(e.touchPointID);
+
 		var p:FlxPoint = stageToLogical(e.stageX, e.stageY);
 		_tapDown.set(e.touchPointID, p);
 		_tapDownTime.set(e.touchPointID, Lib.getTimer());
+		// 滑键：记录触点初始所在按键（按下即按住）
+		trackSlideKey(e.touchPointID, p.x, p.y);
+		// 拖动会话开始（跟随第一个按下的触点）
+		if (_dragID < 0)
+		{
+			_dragID = e.touchPointID;
+			_dragLastY = p.y;
+			_dragAccum = 0;
+			_dragSteps = 0;
+		}
+	}
+
+	// stage 级拖动：每滑动 90 逻辑像素累计一格滚动步数（避免过快）
+	// 方向约定：往上拖 → 上一个选项（-1），往下拖 → 下一个选项（+1）
+	static function onTouchMove(e:TouchEvent):Void
+	{
+		var p:FlxPoint = stageToLogical(e.stageX, e.stageY);
+		// 滑键跟踪：所有触点都跟随（不限于 _dragID），滑入/滑出即按键切换
+		trackSlideKey(e.touchPointID, p.x, p.y);
+
+		if (e.touchPointID != _dragID) { p.put(); return; }
+		var dy:Float = p.y - _dragLastY;
+		_dragLastY = p.y;
+		_dragAccum += dy;
+		while (_dragAccum >= 90)
+		{
+			_dragAccum -= 90;
+			_dragSteps++;
+		}
+		while (_dragAccum <= -90)
+		{
+			_dragAccum += 90;
+			_dragSteps--;
+		}
+		p.put();
+	}
+
+	/** 消费本帧累计的拖动滚动格数（+1 向下一个选项，-1 向上一个选项） */
+	public static function consumeDragSteps():Int
+	{
+		var s:Int = _dragSteps;
+		_dragSteps = 0;
+		return s;
 	}
 
 	static function onTapEnd(e:TouchEvent):Void
 	{
+		if (e.touchPointID == _dragID) _dragID = -1;
+		// 滑键：触点抬起释放所在按键（并注入键盘释放）
+		var relKey:String = _touchKey.get(e.touchPointID);
+		if (relKey != null)
+		{
+			if (injectedKeyCode(relKey) < 0) _slideReleases.set(relKey, true);
+			injectKeyUp(relKey);
+		}
+		_touchKey.remove(e.touchPointID);
 		var down:FlxPoint = _tapDown.get(e.touchPointID);
 		var downT:Null<Int> = _tapDownTime.get(e.touchPointID);
 		_tapDown.remove(e.touchPointID);
@@ -500,6 +584,13 @@ class MobileControls extends FlxSpriteGroup
 	public function justPressed(key:String):Bool
 	{
 		var normKey:String = normalizeKey(key);
+		// 安卓滑键（stage 级）：仅当 flixel 无触摸托管时启用（避免与 flixel 触摸路径双触发），
+		// 触点滑入/按下该键的瞬间判定为“按下”
+		if (FlxG.touches.list.length == 0 && _slidePresses.exists(normKey))
+		{
+			_slidePresses.remove(normKey);
+			return true;
+		}
 		var zones:Array<FlxSprite> = zonesFor(normKey);
 		if (zones == null || zones.length == 0) return false;
 
@@ -557,9 +648,98 @@ class MobileControls extends FlxSpriteGroup
 		return null;
 	}
 
+	/** 安卓滑键：逻辑坐标 -> 触点所在按键（与 consumeQueuedTap 同一套 controlCam 视图换算） */
+	static function keyAt(x:Float, y:Float):String
+	{
+		var inst:MobileControls = instance;
+		if (inst == null) return null;
+		var vx:Float = (x - inst.controlCam.x) / inst.controlCam.zoom + inst.controlCam.viewMarginX;
+		var vy:Float = (y - inst.controlCam.y) / inst.controlCam.zoom + inst.controlCam.viewMarginY;
+		for (key => zones in inst.padButtons)
+		{
+			if (zones == null) continue;
+			for (zone in zones)
+			{
+				if (vx >= zone.x && vx <= zone.x + zone.width && vy >= zone.y && vy <= zone.y + zone.height)
+					return key;
+			}
+		}
+		return null;
+	}
+
+	/** 安卓滑键：触点按下/移动/抬起时更新触点所在按键与滑入滑出事件。
+	 *  有键盘绑定的键由键盘注入负责 justPressed/justReleased（避免双触发），
+	 *  无绑定的键（injectedKeyCode < 0）才记录滑键事件走 instance 路径 */
+	static function trackSlideKey(id:Int, x:Float, y:Float):Void
+	{
+		var newKey:String = keyAt(x, y);
+		var oldKey:String = _touchKey.get(id);
+		if (newKey == oldKey) return;
+		if (oldKey != null)
+		{
+			if (injectedKeyCode(oldKey) < 0) _slideReleases.set(oldKey, true);
+			injectKeyUp(oldKey);
+		}
+		_touchKey.set(id, newKey);
+		if (newKey != null)
+		{
+			if (injectedKeyCode(newKey) < 0) _slidePresses.set(newKey, true);
+			injectKeyDown(newKey);
+		}
+	}
+
+	/** 触控按键对应的键盘键码（按键设置里该按键的第一个绑定键，如 note_left -> A） */
+	static function injectedKeyCode(normKey:String):Int
+	{
+		var binds:Array<FlxKey> = ClientPrefs.keyBinds.get(normKey);
+		if (binds == null || binds.length == 0) return -1;
+		// A 确认键对应 Enter：绑定里有 Enter 时优先用 Enter
+		// （SPACE 会与暂停等冲突，且部分脚本/Mod 只认 FlxG.keys.justPressed.ENTER）
+		if (normKey == 'accept')
+		{
+			for (k in binds)
+				if (k == FlxKey.ENTER) return k;
+		}
+		return binds[0];
+	}
+
+	/** 注入键盘按下：触控按下某键时，同时按下按键设置中对应的键盘键（供读 FlxG.keys 的 Mod/Lua 生效）。
+	 *  若键盘键仍处于按下（TOUCH_END 丢失导致的卡键），先补发 KEY_UP 再按下，保证每次触控按下都产生 justPressed */
+	static function injectKeyDown(normKey:String):Void
+	{
+		var kc:Int = injectedKeyCode(normKey);
+		if (kc < 0) return;
+		if (FlxG.keys.anyPressed([cast kc]))
+		{
+			var up:KeyboardEvent = new KeyboardEvent(KeyboardEvent.KEY_UP, true, false, kc, kc);
+			Lib.current.stage.dispatchEvent(up);
+		}
+		var ev:KeyboardEvent = new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, false, kc, kc);
+		Lib.current.stage.dispatchEvent(ev);
+		_injectedKeys.set(normKey, true);
+	}
+
+	/** 注入键盘释放：触控抬起/滑出时释放对应的键盘键 */
+	static function injectKeyUp(normKey:String):Void
+	{
+		if (!_injectedKeys.exists(normKey)) return;
+		_injectedKeys.remove(normKey);
+		var kc:Int = injectedKeyCode(normKey);
+		if (kc < 0) return;
+		var ev:KeyboardEvent = new KeyboardEvent(KeyboardEvent.KEY_UP, true, false, kc, kc);
+		Lib.current.stage.dispatchEvent(ev);
+	}
+
 	public function pressed(key:String):Bool
 	{
-		var zones:Array<FlxSprite> = zonesFor(normalizeKey(key));
+		var normKey:String = normalizeKey(key);
+		// 安卓滑键（stage 级）：触点当前所在按键视为按住
+		if (FlxG.touches.list.length == 0)
+		{
+			for (id => k in _touchKey)
+				if (k == normKey) return true;
+		}
+		var zones:Array<FlxSprite> = zonesFor(normKey);
 		if (zones == null || zones.length == 0) return false;
 		for (touch in FlxG.touches.list)
 			if (touch.pressed && touchInAny(zones, touch))
@@ -569,7 +749,14 @@ class MobileControls extends FlxSpriteGroup
 
 	public function justReleased(key:String):Bool
 	{
-		var zones:Array<FlxSprite> = zonesFor(normalizeKey(key));
+		var normKey:String = normalizeKey(key);
+		// 安卓滑键（stage 级）：触点滑出/抬起该键的瞬间判定为“释放”
+		if (FlxG.touches.list.length == 0 && _slideReleases.exists(normKey))
+		{
+			_slideReleases.remove(normKey);
+			return true;
+		}
+		var zones:Array<FlxSprite> = zonesFor(normKey);
 		if (zones == null || zones.length == 0) return false;
 		for (touch in FlxG.touches.list)
 			if (touch.justReleased && touchInAny(zones, touch))

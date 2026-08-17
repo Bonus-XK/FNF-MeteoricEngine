@@ -22,7 +22,6 @@ import backend.BaseStage;
 import backend.Difficulty;
 import backend.Mods;
 
-import objects.Alphabet;
 import objects.MenuText;
 import objects.BGSprite;
 

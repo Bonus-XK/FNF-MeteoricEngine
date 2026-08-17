@@ -183,6 +183,7 @@ class PlayState extends MusicBeatState
 	public var cachedEventNotes:Array<EventNote> = [];   // 已修正偏移与提前触发的事件缓存（快速重开用）
 
 	public var camFollow:FlxObject;
+	public var camFollowPos:FlxObject; // 0.6.3 模组兼容：与 camFollow 同一对象（旧模组 Lua 用 camFollowPos 控制相机）
 	private static var prevCamFollow:FlxObject;
 
 	public var strumLineNotes:FlxTypedGroup<StrumNote>;
@@ -206,7 +207,6 @@ class PlayState extends MusicBeatState
 	public var defaultOpponentStrumY2:Float = 0;
 	public var defaultOpponentStrumX3:Float = 0;
 	public var defaultOpponentStrumY3:Float = 0;
-	public var phigrosJudgeLine:PhigrosJudgeLine; // Phigros 玩法判定线
 	public var hudLayout:Map<String, Array<Float>>; // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
 	public var isPhigrosStyle:Bool = false;
 	public var grpNoteSplashes:FlxTypedGroup<NoteSplash>;
@@ -352,7 +352,6 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
-		isPhigrosStyle = ClientPrefs.data.phigrosStyle;
 		//trace('Playback Rate: ' + playbackRate);
 		Paths.clearStoredMemory();
 
@@ -535,17 +534,20 @@ class PlayState extends MusicBeatState
 		add(luaDebugGroup);
 		#end
 
-		// "GLOBAL" SCRIPTS
+		// "GLOBAL" SCRIPTS（回放模式不加载，见 FunkinLua.new / initHScript 的 replayMode 拦截）
 		#if LUA_ALLOWED
-		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/');
-		for (folder in foldersToCheck)
-			for (file in FileSystem.readDirectory(folder))
-			{
-				if(file.toLowerCase().endsWith('.lua'))
-					new FunkinLua(folder + file);
-				if(file.toLowerCase().endsWith('.hx'))
-					initHScript(folder + file);
-			}
+		if (!replayMode)
+		{
+			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/');
+			for (folder in foldersToCheck)
+				for (file in FileSystem.readDirectory(folder))
+				{
+					if(file.toLowerCase().endsWith('.lua'))
+						new FunkinLua(folder + file);
+					if(file.toLowerCase().endsWith('.hx'))
+						initHScript(folder + file);
+				}
+		}
 		#end
 
 		// STAGE SCRIPTS
@@ -600,14 +602,6 @@ class PlayState extends MusicBeatState
 		add(strumLineNotes);
 		add(grpNoteSplashes);
 
-		if (isPhigrosStyle)
-		{
-			phigrosJudgeLine = new PhigrosJudgeLine();
-			phigrosJudgeLine.layoutOffsetY = hudGetOffset('note')[1];
-			phigrosJudgeLine.cameras = [camHUD];
-			add(phigrosJudgeLine);
-		}
-
 		if(ClientPrefs.data.timeBarType == '歌曲名称')
 		{
 			timeTxt.size = 24;
@@ -632,6 +626,8 @@ class PlayState extends MusicBeatState
 			camFollow = prevCamFollow;
 			prevCamFollow = null;
 		}
+		// 0.6.3 模组兼容：camFollowPos 与 camFollow 同一对象（旧版模组 Lua 读写 camFollowPos 控制相机）
+		camFollowPos = camFollow;
 		add(camFollow);
 
 		FlxG.camera.follow(camFollow, LOCKON, 0);
@@ -650,13 +646,6 @@ class PlayState extends MusicBeatState
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];
 		notes.cameras = [camHUD];
-
-		if (isPhigrosStyle)
-		{
-			// 隐藏传统箭头与打击水花：strum 仅作为音符位置锚点（alpha 保持 1 供音符跟随）
-			strumLineNotes.visible = false;
-			grpNoteSplashes.visible = false;
-		}
 
 
 		startingSong = true;
@@ -686,17 +675,20 @@ class PlayState extends MusicBeatState
 		}
 		cachedEventNotes = eventNotes.copy();
 
-		// SONG SPECIFIC SCRIPTS
+		// SONG SPECIFIC SCRIPTS（回放模式不加载，见 FunkinLua.new / initHScript 的 replayMode 拦截）
 		#if LUA_ALLOWED
-		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/');
-		for (folder in foldersToCheck)
-			for (file in FileSystem.readDirectory(folder))
-			{
-				if(file.toLowerCase().endsWith('.lua'))
-					new FunkinLua(folder + file);
-				if(file.toLowerCase().endsWith('.hx'))
-					initHScript(folder + file);
-			}
+		if (!replayMode)
+		{
+			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/');
+			for (folder in foldersToCheck)
+				for (file in FileSystem.readDirectory(folder))
+				{
+					if(file.toLowerCase().endsWith('.lua'))
+						new FunkinLua(folder + file);
+					if(file.toLowerCase().endsWith('.hx'))
+						initHScript(folder + file);
+				}
+		}
 		#end
 
 		startCallback();
@@ -1473,7 +1465,7 @@ class PlayState extends MusicBeatState
 				case "constant":
 					songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
 			}
-			var res:PreGenResult = buildChartNotes(SONG, Note.getBotplayPlan(), ClientPrefs.data.phigrosStyle,
+			var res:PreGenResult = buildChartNotes(SONG, Note.getBotplayPlan(), false,
 				{ songSpeed: songSpeed }, ClientPrefs.getGameplaySetting('songspeed'));
 			res.notes.sort(sortByTime);
 			preGenNotes = res.notes;
@@ -1540,8 +1532,6 @@ class PlayState extends MusicBeatState
 					botLaneCounts[daNoteData]++;
 					if (floorSus > 0) botLaneCounts[daNoteData] += floorSus + 1;
 				}
-				if (isPhigrosStyle && !swagNote.mustPress && floorSus > 0)
-					swagNote.repaintPhigrosPerform(true); // 带长条的表演块：主块重绘为青色
 				if(floorSus > 0) {
 					for (susNote in 0...floorSus+1)
 					{
@@ -1704,8 +1694,6 @@ class PlayState extends MusicBeatState
 						botLaneCounts[daNoteData]++;
 						if (floorSus > 0) botLaneCounts[daNoteData] += floorSus + 1;
 					}
-					if (isPhigrosStyle && !swagNote.mustPress && floorSus > 0)
-						swagNote.repaintPhigrosPerform(true); // 带长条的表演块：主块重绘为青色
 					if(floorSus > 0) {
 						for (susNote in 0...floorSus+1)
 						{
@@ -1884,13 +1872,13 @@ class PlayState extends MusicBeatState
 
 		// 音符 / Phigros 判定线
 		var noteOff:Array<Float> = hudGetOffset('note');
-		var strumLineX:Float = (isPhigrosStyle || ClientPrefs.data.middleScroll) ? STRUM_X_MIDDLESCROLL : STRUM_X;
-		var strumLineY:Float = isPhigrosStyle ? 50 : (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		var strumLineX:Float = ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X;
+		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
 		for (i in 0...strumLineNotes.members.length)
 		{
 			var strum:StrumNote = strumLineNotes.members[i];
 			var px:Float = strumLineX + (i * Note.swagWidth) + noteOff[0];
-			if (i < 4 && (isPhigrosStyle || ClientPrefs.data.middleScroll))
+			if (i < 4 && ClientPrefs.data.middleScroll)
 			{
 				px += 310;
 				if (i > 1) px += FlxG.width / 2 + 25;
@@ -1898,15 +1886,12 @@ class PlayState extends MusicBeatState
 			strum.x = px;
 			strum.y = strumLineY + noteOff[1];
 		}
-		if (phigrosJudgeLine != null)
-			phigrosJudgeLine.layoutOffsetY = noteOff[1];
-
 		// 时间条（含时间文字、Autoplay 提示）
 		if (timeBar != null)
 		{
 			var timeOff:Array<Float> = hudGetOffset('timeBar');
 			var tbY:Float = 19;
-			if (ClientPrefs.data.downScroll && !isPhigrosStyle) tbY = FlxG.height - 44 - 25;
+			if (ClientPrefs.data.downScroll) tbY = FlxG.height - 44 - 25;
 			timeBar.y = tbY + timeOff[1];
 			timeBar.screenCenter(X);
 			timeBar.x += timeOff[0];
@@ -1917,12 +1902,12 @@ class PlayState extends MusicBeatState
 				var txtBase:Float = 25 + (ClientPrefs.data.timeBarType == '歌曲名称' ? 3 : 0);
 				timeTxt.x = STRUM_X + (FlxG.width / 2) - 248 + timeOff[0];
 				timeTxt.y = timeBar.y + txtBase;
-				if (ClientPrefs.data.downScroll && !isPhigrosStyle) timeTxt.y = FlxG.height - 44 + timeOff[1];
+				if (ClientPrefs.data.downScroll) timeTxt.y = FlxG.height - 44 + timeOff[1];
 			}
 			if (botplayTxt != null)
 			{
 				botplayTxt.y = timeBar.y + 55;
-				if (ClientPrefs.data.downScroll && !isPhigrosStyle) botplayTxt.y = timeBar.y - 78;
+				if (ClientPrefs.data.downScroll) botplayTxt.y = timeBar.y - 78;
 			}
 		}
 
@@ -1930,7 +1915,7 @@ class PlayState extends MusicBeatState
 		if (healthBar != null)
 		{
 			var hpOff:Array<Float> = hudGetOffset('healthBar');
-			var hbY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11) + hpOff[1];
+			var hbY:Float = FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11) + hpOff[1];
 			healthBar.y = hbY;
 			healthBar.screenCenter(X);
 			healthBar.x += hpOff[0];
@@ -1942,7 +1927,7 @@ class PlayState extends MusicBeatState
 		}
 
 		// 计分文字：以默认血量条位置为基准，与血量条当前偏移解耦
-		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || isPhigrosStyle ? 0.89 : 0.11);
+		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11);
 		var scoreOff:Array<Float> = hudGetOffset('score');
 		if (scoreTxt != null)
 		{
@@ -1963,8 +1948,8 @@ class PlayState extends MusicBeatState
 	private function generateStaticArrows(player:Int):Void
 	{
 		var hudNoteOff:Array<Float> = hudGetOffset('note');
-		var strumLineX:Float = (isPhigrosStyle || ClientPrefs.data.middleScroll) ? STRUM_X_MIDDLESCROLL : STRUM_X;
-		var strumLineY:Float = isPhigrosStyle ? 50 : (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		var strumLineX:Float = ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X;
+		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
 		strumLineX += hudNoteOff[0];
 		strumLineY += hudNoteOff[1];
 		for (i in 0...4)
@@ -1978,7 +1963,7 @@ class PlayState extends MusicBeatState
 			}
 
 			var babyArrow:StrumNote = new StrumNote(strumLineX, strumLineY, i, player);
-			babyArrow.downScroll = ClientPrefs.data.downScroll && !isPhigrosStyle;
+			babyArrow.downScroll = ClientPrefs.data.downScroll;
 			if (!isStoryMode && !skipArrowStartTween)
 			{
 				//babyArrow.y -= 10;
@@ -1992,7 +1977,7 @@ class PlayState extends MusicBeatState
 				playerStrums.add(babyArrow);
 			else
 			{
-				if(isPhigrosStyle || ClientPrefs.data.middleScroll)
+				if(ClientPrefs.data.middleScroll)
 				{
 					babyArrow.x += 310;
 					if(i > 1) { //Up and Right
@@ -2130,7 +2115,6 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
-		backend.Diag.log();
 		/*if (FlxG.keys.justPressed.NINE)
 		{
 			iconP1.swapOldIcon();
@@ -2304,17 +2288,6 @@ class PlayState extends MusicBeatState
 
 		if (generatedMusic)
 		{
-			if (isPhigrosStyle && phigrosJudgeLine != null)
-			{
-				// 判定线上下浮动，strum 锚点（隐藏）同步跟随，音符即随之整体移动
-				phigrosJudgeLine.updateFloat(elapsed);
-				var jy:Float = phigrosJudgeLine.y;
-				for (i in 0...4)
-				{
-					if (playerStrums.members[i] != null) playerStrums.members[i].y = jy;
-					if (opponentStrums.members[i] != null) opponentStrums.members[i].y = jy;
-				}
-			}
 			if(!inCutscene)
 			{
 				if(!rewinding && !cpuControlled && !replayMode) {
@@ -4166,8 +4139,6 @@ class PlayState extends MusicBeatState
 				// 回放录制：主音符命中（评分取本局真实判定结果）
 				if (recordingReplay && !cpuControlled && currentReplay != null)
 					currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
-				if (isPhigrosStyle && phigrosJudgeLine != null)
-					phigrosJudgeLine.flash(); // Phigros 命中反馈：判定线闪白
 			}
 			health += note.hitHealth * healthGain;
 			// Bad 及以下评分扣一点点血
@@ -4329,7 +4300,7 @@ class PlayState extends MusicBeatState
 		}
 
 		if (generatedMusic)
-			notes.sort(FlxSort.byY, (ClientPrefs.data.downScroll && !isPhigrosStyle) ? FlxSort.ASCENDING : FlxSort.DESCENDING);
+			notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
 
 	if(ClientPrefs.data.sbIconBop){
 		if (curBeat % gfSpeed == 0) {
@@ -4458,6 +4429,8 @@ class PlayState extends MusicBeatState
 
 	public function initHScript(file:String)
 	{
+		// 回放模式不加载 HScript（与 Lua 同理：避免脚本修改箭头显示影响回放）
+		if (replayMode) return;
 		try
 		{
 			var newScript:HScript = new HScript(null, file);
@@ -4884,8 +4857,17 @@ class GameHUD
 		}
 		else
 		{
-			timeBar.leftBar.color = FlxColor.fromRGB(st.dad.healthColorArray[0], st.dad.healthColorArray[1], st.dad.healthColorArray[2]);
-			timeBar.rightBar.color = 0xFF1A1A1A;
+			// Psych 0.6.3 兼容：贴图模式（timeBar.png）的填充默认为 0.6.3 的青色；
+			// 设置中开启"时间条颜色跟随对方"后，使用对方角色血量条颜色（过暗/过亮时兜底青色）
+			var fillColor:FlxColor = 0xFF00FFFF;
+			if (ClientPrefs.data.timeBarOpponentColors && st.dad != null)
+			{
+				fillColor = FlxColor.fromRGB(st.dad.healthColorArray[0], st.dad.healthColorArray[1], st.dad.healthColorArray[2]);
+				if (fillColor.red + fillColor.green + fillColor.blue < 120 || fillColor.red + fillColor.green + fillColor.blue > 660)
+					fillColor = 0xFF00FFFF;
+			}
+			timeBar.leftBar.color = fillColor;
+			timeBar.rightBar.color = 0xFF000000;
 		}
 		timeBar.alpha = 0;
 		timeBar.visible = showTime;

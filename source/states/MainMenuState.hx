@@ -36,7 +36,7 @@ class MainMenuState extends MusicBeatState
 	var optionShit:Array<Array<Dynamic>> = [
 		['story_mode', '故事模式', '按章节顺序挑战官方曲目，一路打到周日晚上的对决。', 0xFFDD88FF],
 		['freeplay', '自由游玩', '从全部已解锁曲目中任选一首挑战，还能查看最佳成绩与准确率。', 0xFF66DDFF],
-		['online', '联机', '创建或加入房间，房主直连进行联机。', 0xFF66FF88],
+		// ['online', '联机', ...] 联机功能暂时屏蔽
 		#if MODS_ALLOWED
 		['mods', 'MOD', '管理已安装的模组：启用、停用或浏览模组内容。', 0xFF88E58A],
 		#end
@@ -47,9 +47,7 @@ class MainMenuState extends MusicBeatState
 		#if !switch
 		['donate', '赞助', '打开赞助页面，支持游戏的开发与后续更新。', 0xFFFF9E5E],
 		#end
-		['options', '设置', '调整图像、视觉、游戏玩法与按键绑定等全部设置。', 0xFFB0B6FF],
-		['old_menu', '旧版界面', '切换到 1.0.4 的经典主界面，重温 Alphabet 字母菜单。', 0xFF9E8AFF],
-		['crash_test', '崩溃测试', '故意触发一个异常，用来测试游戏内报错系统。测试完按 Enter 即可返回主菜单。', 0xFF555555]
+		['options', '设置', '调整图像、视觉、游戏玩法与按键绑定等全部设置。', 0xFFB0B6FF]
 	];
 
 	public static var curSelected:Int = 0;
@@ -99,6 +97,7 @@ class MainMenuState extends MusicBeatState
 
 	override function create()
 	{
+		trace("DBG MainMenuState create");
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
@@ -477,6 +476,11 @@ class MainMenuState extends MusicBeatState
 					changeSelection(clickID - curSelected);
 					FlxG.sound.play(Paths.sound('scrollMenu'));
 				}
+				else if (clickID == curSelected)
+				{
+					// 点击已选中行：直接进入（触屏友好，Psych 原版行为）
+					selectItem();
+				}
 			}
 		}
 	}
@@ -580,8 +584,7 @@ class MainMenuState extends MusicBeatState
 				MusicBeatState.switchState(new StoryMenuState());
 			case 'freeplay':
 				MusicBeatState.switchState(new FreeplayState());
-			case 'online':
-				MusicBeatState.switchState(new OnlineMenuState());
+			// case 'online': 联机功能暂时屏蔽
 			#if MODS_ALLOWED
 			case 'mods':
 				MusicBeatState.switchState(new ModsMenuState());
@@ -600,10 +603,6 @@ class MainMenuState extends MusicBeatState
 					PlayState.SONG.arrowSkin = null;
 					PlayState.SONG.splashSkin = null;
 				}
-			case 'old_menu':
-				MusicBeatState.switchState(new OldMenuState());
-			case 'crash_test':
-				throw '崩溃测试：这是故意触发的异常，用来验证游戏内报错系统。';
 		}
 	}
 

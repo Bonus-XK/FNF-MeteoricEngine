@@ -78,9 +78,11 @@ class TimeBar extends FlxSpriteGroup
 		{
 			checkForHollowShape();
 
+			// bg 置于填充之下：0.6.3 模组的 timeBar.png 是实心底框（无镂空），
+			// 若 bg 在最上层会盖住彩色填充导致时间条变灰白
+			add(bg);
 			add(leftBar);
 			add(rightBar);
-			add(bg);
 		}
 		regenerateClips();
 	}
@@ -129,6 +131,16 @@ class TimeBar extends FlxSpriteGroup
 	{
 		leftBar.color = left;
 		rightBar.color = right;
+	}
+
+	override function set_color(Value:Int):Int
+	{
+		// Psych 0.6.3 兼容语义：timeBar.color 只作用于底框（bg）。
+		// 0.6.3 模组脚本（如 weddream remix 的"裤时间.lua"）每帧把 timeBar.color 设为白色
+		// 来给底框染色；若像 FlxSpriteGroup 默认那样传播到 leftBar/rightBar，
+		// 会把整个时间条（含青色填充）染成白色。
+		if (bg != null) bg.color = Value;
+		return color = Value;
 	}
 
 	public function updateBar()
