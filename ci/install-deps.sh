@@ -21,7 +21,7 @@ install() { # $1=库名 $2=版本（可空=最新）
 
 echo "==> 安装 haxelib 依赖"
 install lime 8.2.2
-install openfl 9.5.2
+install openfl 9.2.1  # 本机激活版本（9.5.2 移除了 SoundChannel.__source，引擎 FlxSound 依赖）
 install flixel 5.2.2  # 本机激活版本（6.2.0 需要 flixel-addons >= 3.3.0）
 install flixel-ui 2.5.0
 install flixel-addons 3.0.2

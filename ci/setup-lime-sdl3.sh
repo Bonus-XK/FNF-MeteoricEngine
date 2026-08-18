@@ -61,13 +61,17 @@ mkdir -p "$LIME_DIR/templates/android/template/app/src/main/java/org/libsdl"
 cp -R "$LIME_DIR/project/lib/sdl/android-project/app/src/main/java/org/libsdl/app" \
       "$LIME_DIR/templates/android/template/app/src/main/java/org/libsdl/"
 
-echo "==> [6/8] 编译 lime tools（git 源码不含预编译 tools.n）"
-(cd "$LIME_DIR/tools" && haxe tools.hxml)
+echo "==> [6/7] 使用 haxelib 发行版 tools.n（git 源码不含；发行版 tools.n 的 optional-cffi 在无 lime.ndll 时正常 fallback）"
+HAXELIB_LIME=$(ls -d "$HOME/haxelib/lime/8,2,2" 2>/dev/null || ls -d /usr/local/lib/haxe/lib/lime/8,2,2 2>/dev/null)
+if [ -f "$HAXELIB_LIME/tools/tools.n" ]; then
+  cp "$HAXELIB_LIME/tools/tools.n" "$LIME_DIR/tools/tools.n"
+  echo "已复制: $HAXELIB_LIME/tools/tools.n"
+else
+  echo "警告: 未找到发行版 tools.n，尝试编译"
+  (cd "$LIME_DIR/tools" && haxe tools.hxml)
+fi
 
-echo "==> [7/8] 重建 lime neko 工具 ndll（编译期需要 lime.ndll）"
-(cd "$LIME_DIR" && neko run.n rebuild lime neko)
-
-echo "==> [8/8] haxelib dev 指向"
+echo "==> [7/7] haxelib dev 指向"
 haxelib dev lime "$LIME_DIR"
 
 echo "==> SDL3 lime 就绪: $LIME_DIR"
