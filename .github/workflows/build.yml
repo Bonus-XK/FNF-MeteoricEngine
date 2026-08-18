@@ -147,7 +147,8 @@ jobs:
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          haxelib run lime build windows -release -mingw -D win32build -D MINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
+          # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
+          haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
 
       - name: 上传 x64
         uses: actions/upload-artifact@v5
