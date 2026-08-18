@@ -44,18 +44,18 @@ echo "$HAXE_DIR:$NEKO_DIR" >> "$GITHUB_PATH"
 echo "NEKOPATH=$NEKO_DIR" >> "$GITHUB_ENV"
 echo "HAXE_STD_PATH=$STD_DIR/std" >> "$GITHUB_ENV"
 if [ "$(uname -s)" = "Linux" ]; then
-  echo "LD_LIBRARY_PATH=$NEKO_DIR/lib:\$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+  echo "LD_LIBRARY_PATH=$NEKO_DIR" >> "$GITHUB_ENV"
 else
-  echo "DYLD_LIBRARY_PATH=$NEKO_DIR/lib:\$DYLD_LIBRARY_PATH" >> "$GITHUB_ENV"
+  echo "DYLD_LIBRARY_PATH=$NEKO_DIR" >> "$GITHUB_ENV"
 fi
 
 export PATH="$HAXE_DIR:$NEKO_DIR:$PATH"
 export NEKOPATH="$NEKO_DIR"
 export HAXE_STD_PATH="$STD_DIR/std"
 if [ "$(uname -s)" = "Linux" ]; then
-  export LD_LIBRARY_PATH="$NEKO_DIR/lib:$LD_LIBRARY_PATH"
+  export LD_LIBRARY_PATH="$NEKO_DIR:$LD_LIBRARY_PATH"
 else
-  export DYLD_LIBRARY_PATH="$NEKO_DIR/lib:$DYLD_LIBRARY_PATH"
+  export DYLD_LIBRARY_PATH="$NEKO_DIR:$DYLD_LIBRARY_PATH"
 fi
 
 haxe --version
