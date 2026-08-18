@@ -6,9 +6,9 @@
 set -e
 
 # haxelib 首次运行需要 setup（指定仓库目录）
-if [ ! -d /opt/haxelib ]; then
-  echo "==> haxelib setup /opt/haxelib"
-  haxelib setup /opt/haxelib
+if [ ! -d "$HOME/haxelib" ]; then
+  echo "==> haxelib setup $HOME/haxelib"
+  haxelib setup "$HOME/haxelib"
 fi
 
 install() { # $1=库名 $2=版本（可空=最新）

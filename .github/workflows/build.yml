@@ -40,8 +40,8 @@ jobs:
 
       - name: 安装 NDK 21.4 与平台
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager || true)"; fi
           echo "sdkmanager: $SDKMANAGER"
@@ -51,20 +51,20 @@ jobs:
 
       - name: 安装 haxelib 依赖
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/21.4.7075529"
           export ANDROID_SETUP=true
@@ -98,20 +98,20 @@ jobs:
 
       - name: 安装 haxelib 依赖
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime Windows ndll（x64 + x86）
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           neko run.n rebuild lime windows
           neko run.n rebuild lime windows -x86_32
@@ -121,8 +121,8 @@ jobs:
 
       - name: 构建 Windows x86
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           haxelib run lime build windows -release -mingw -D win32build
 
       - name: 上传 x64
@@ -151,20 +151,20 @@ jobs:
 
       - name: 安装 haxelib 依赖
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime macOS ndll（x86_64 + arm64）
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           neko run.n rebuild lime mac
           neko run.n rebuild lime mac -arm64
@@ -181,8 +181,8 @@ jobs:
 
       - name: 构建 macOS arm64
         run: |
-          export PATH="/opt/haxe:/opt/neko:$PATH"
-          export NEKOPATH=/opt/neko
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
           haxelib run lime build macos -release -arm64
           rm -rf export/release/macos-arm64
           mkdir -p export/release/macos-arm64
