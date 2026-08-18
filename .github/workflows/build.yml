@@ -30,7 +30,7 @@ jobs:
         run: bash ci/setup-haxe-ci.sh
 
       - name: 安装 Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -40,28 +40,41 @@ jobs:
 
       - name: 安装 NDK 21.4 与平台
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager || true)"; fi
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
 
       - name: 安装 haxelib 依赖
-        run: bash ci/install-deps.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
-        run: bash ci/setup-lime-sdl3.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
         run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
           cd /tmp/lime-full
           export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/21.4.7075529"
           export ANDROID_SETUP=true
-          NEKOPATH=/opt/neko neko run.n rebuild lime android
+          neko run.n rebuild lime android
 
       - name: 构建 Android APK
         run: ./compile-android.sh
 
       - name: 上传 APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meteoric-android-arm64
           path: export/release/android/bin/app/build/outputs/apk/debug/Meteoric-debug.apk
@@ -84,32 +97,42 @@ jobs:
           sudo apt-get install -y -q gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
 
       - name: 安装 haxelib 依赖
-        run: bash ci/install-deps.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
-        run: bash ci/setup-lime-sdl3.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime Windows ndll（x64 + x86）
         run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
           cd /tmp/lime-full
-          NEKOPATH=/opt/neko neko run.n rebuild lime windows
-          NEKOPATH=/opt/neko neko run.n rebuild lime windows -x86_32
+          neko run.n rebuild lime windows
+          neko run.n rebuild lime windows -x86_32
 
       - name: 构建 Windows x64
         run: ./compile-windows.sh
 
       - name: 构建 Windows x86
         run: |
-          NEKOPATH=/opt/neko haxelib run lime build windows -release -mingw -D win32build
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          haxelib run lime build windows -release -mingw -D win32build
 
       - name: 上传 x64
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meteoric-windows-x64
           path: export/release/windows/bin/
 
       - name: 上传 x86
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meteoric-windows-x86
           path: export/32bit/windows/bin/
@@ -127,16 +150,24 @@ jobs:
         run: bash ci/setup-haxe-ci.sh
 
       - name: 安装 haxelib 依赖
-        run: bash ci/install-deps.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/install-deps.sh
 
       - name: 组装 SDL3 lime
-        run: bash ci/setup-lime-sdl3.sh
+        run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime macOS ndll（x86_64 + arm64）
         run: |
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
           cd /tmp/lime-full
-          NEKOPATH=/opt/neko neko run.n rebuild lime mac
-          NEKOPATH=/opt/neko neko run.n rebuild lime mac -arm64
+          neko run.n rebuild lime mac
+          neko run.n rebuild lime mac -arm64
           cp ndll/MacArm64/lime-64.ndll ndll/MacArm64/lime.ndll
 
       - name: 构建 macOS x86_64
@@ -150,19 +181,21 @@ jobs:
 
       - name: 构建 macOS arm64
         run: |
-          NEKOPATH=/opt/neko haxelib run lime build macos -release -arm64
+          export PATH="/opt/haxe:/opt/neko:$PATH"
+          export NEKOPATH=/opt/neko
+          haxelib run lime build macos -release -arm64
           rm -rf export/release/macos-arm64
           mkdir -p export/release/macos-arm64
           cp -R export/release/macos/bin/Meteoric.app export/release/macos-arm64/
 
       - name: 上传 x86_64
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meteoric-macos-x64
           path: export/release/macos-x64/
 
       - name: 上传 arm64
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: meteoric-macos-arm64
           path: export/release/macos-arm64/
