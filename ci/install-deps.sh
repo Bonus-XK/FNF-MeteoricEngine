@@ -25,6 +25,9 @@ install hxCodec 3.0.2
 install tjson 1.4.0
 install hscript 2.6.0
 install actuate 1.9.0
+# lime tools 编译所需（CI 需从源码编译 tools.n）
+install format 3.8.0
+install hxp 1.3.1
 
 echo "==> 安装 git 依赖"
 haxelib git discord_rpc https://github.com/Aidan63/linc_discord-rpc main 2>/dev/null || \

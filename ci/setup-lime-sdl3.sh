@@ -67,7 +67,10 @@ mkdir -p "$LIME_DIR/templates/android/template/app/src/main/java/org/libsdl"
 cp -R "$LIME_DIR/project/lib/sdl/android-project/app/src/main/java/org/libsdl/app" \
       "$LIME_DIR/templates/android/template/app/src/main/java/org/libsdl/"
 
-echo "==> [6/6] haxelib dev 指向"
+echo "==> [6/7] 编译 lime tools（git 源码不含预编译 tools.n）"
+(cd "$LIME_DIR/tools" && haxe tools.hxml)
+
+echo "==> [7/7] haxelib dev 指向"
 haxelib dev lime "$LIME_DIR"
 
 echo "==> SDL3 lime 就绪: $LIME_DIR"
