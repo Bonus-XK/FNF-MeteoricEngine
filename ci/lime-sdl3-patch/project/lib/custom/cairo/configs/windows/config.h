@@ -36,7 +36,8 @@
 // #define CAIRO_HAS_TEST_SURFACES 1
 // #define CAIRO_HAS_TEE_SURFACE 1
 // #define CAIRO_HAS_XML_SURFACE 1
-// #define CAIRO_HAS_PTHREAD 1
+/* 启用 pthread mutex：mingw 走 _WIN32 分支优先，mac 交叉编译 windows 配置时兜底 */
+#define CAIRO_HAS_PTHREAD 1
 // #define CAIRO_HAS_GOBJECT_FUNCTIONS 1
 // #define CAIRO_HAS_TRACE 1
 // #define CAIRO_HAS_INTERPRETER 1

@@ -110,6 +110,17 @@ jobs:
           export NEKOPATH="$HOME/neko"
           bash ci/setup-lime-sdl3.sh
 
+      - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
+          cp ci/hxcpp-mac-cross/BuildTool.hx "$HXCPP_DIR/tools/hxcpp/BuildTool.hx"
+          cp ci/hxcpp-mac-cross/mingw-toolchain.xml "$HXCPP_DIR/toolchain/mingw-toolchain.xml"
+          cd "$HXCPP_DIR"
+          haxe -cp tools/hxcpp -neko hxcpp.n -main BuildTool -D neko_v1 -debug
+          ls -la hxcpp.n
+
       - name: 重建 lime Windows ndll（x64 + x86 手动 hxcpp，避免 -arch x86 bug）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"

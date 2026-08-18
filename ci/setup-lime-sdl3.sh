@@ -71,7 +71,15 @@ else
   (cd "$LIME_DIR/tools" && haxe tools.hxml)
 fi
 
-echo "==> [7/7] haxelib dev 指向"
+echo "==> [7/8] 拷贝发行版预编译 ndll（git 源码不含二进制 ndll；tools 处理图标/图像需要 host 版 lime.ndll）"
+if [ -d "$HAXELIB_LIME/ndll" ]; then
+  cp -R "$HAXELIB_LIME/ndll/." "$LIME_DIR/ndll/"
+  echo "已拷贝: $HAXELIB_LIME/ndll → $LIME_DIR/ndll/（后续 rebuild 会覆盖目标平台）"
+else
+  echo "警告: 未找到发行版 ndll 目录（$HAXELIB_LIME/ndll）"
+fi
+
+echo "==> [8/8] haxelib dev 指向"
 haxelib dev lime "$LIME_DIR"
 
 echo "==> SDL3 lime 就绪: $LIME_DIR"
