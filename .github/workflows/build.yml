@@ -110,13 +110,17 @@ jobs:
           export NEKOPATH="$HOME/neko"
           bash ci/setup-lime-sdl3.sh
 
-      - name: 重建 lime Windows ndll（x64 + x86）
+      - name: 重建 lime Windows ndll（x64 用 rebuild；x86 用手动 hxcpp，避免 -x86_32 触发 -arch x86 bug）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           neko run.n rebuild lime windows
-          neko run.n rebuild lime windows -x86_32
+          # x86 (i686) ndll：手动 hxcpp（hxcpp 默认 windows 32 位；不带 -DHXCPP_M64）
+          cd /tmp/lime-full/project
+          haxelib run hxcpp Build.xml -Dwindows -Dlime-openal -Dlime-curl -Dlime-harfbuzz -Dlime-cairo \
+            -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 -Drebuild=1 \
+            -Dlime-native -Dmingw
 
       - name: 构建 Windows x64
         run: ./compile-windows.sh
