@@ -82,7 +82,7 @@ jobs:
   # ---------- Windows x64 + x86 ----------
   windows:
     name: Windows (x64 + x86)
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     timeout-minutes: 120
     steps:
       - name: 检出代码
@@ -91,10 +91,12 @@ jobs:
       - name: 安装 Haxe/Neko
         run: bash ci/setup-haxe-ci.sh
 
-      - name: 安装 mingw-w64 交叉工具链
+      - name: 安装 mingw-w64 交叉工具链（与本地开发环境一致）
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+          brew install mingw-w64
+          echo "$(brew --prefix mingw-w64)/bin" >> "$GITHUB_PATH"
+          x86_64-w64-mingw32-g++ --version | head -1
+          i686-w64-mingw32-g++ --version | head -1
 
       - name: 安装 haxelib 依赖
         run: |

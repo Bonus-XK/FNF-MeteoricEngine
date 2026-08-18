@@ -25,30 +25,24 @@ cp -R ci/lime-sdl3-patch/tools/platforms/WindowsPlatform.hx "$LIME_DIR/tools/pla
 cp -R ci/lime-sdl3-patch/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java "$LIME_DIR/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java"
 
 echo "==> [3/6] 对齐定制库版本（pixman/cairo/harfbuzz/openal/curl/efsw）"
-fetch_lib() { # $1=目标目录  $2=URL
-  local dir="$1" url="$2"
+# 注意：浅克隆（--depth 1）后 checkout tag 会失败（tag 不在浅历史），
+# 必须用 --branch 直接拉指定 tag
+fetch_lib() { # $1=目标目录  $2=URL  $3=tag
+  local dir="$1" url="$2" tag="$3"
   rm -rf "$dir"
-  git clone --depth 1 "$url" "$dir"
+  if [ -n "$tag" ]; then
+    git clone --depth 1 --branch "$tag" "$url" "$dir"
+  else
+    git clone --depth 1 "$url" "$dir"
+  fi
 }
 
-# pixman 0.46.4
-fetch_lib "$LIME_DIR/project/lib/pixman" "https://gitlab.freedesktop.org/pixman/pixman.git"
-(cd "$LIME_DIR/project/lib/pixman" && git checkout pixman-0.46.4 2>/dev/null || true)
-# cairo 1.18.2
-fetch_lib "$LIME_DIR/project/lib/cairo" "https://gitlab.freedesktop.org/cairo/cairo.git"
-(cd "$LIME_DIR/project/lib/cairo" && git checkout 1.18.2 2>/dev/null || true)
-# harfbuzz 8.2.0
-fetch_lib "$LIME_DIR/project/lib/harfbuzz" "https://github.com/harfbuzz/harfbuzz.git"
-(cd "$LIME_DIR/project/lib/harfbuzz" && git checkout 8.2.0 2>/dev/null || true)
-# openal-soft 1.20.1
-fetch_lib "$LIME_DIR/project/lib/openal" "https://github.com/kcat/openal-soft.git"
-(cd "$LIME_DIR/project/lib/openal" && git checkout openal-soft-1.20.1 2>/dev/null || true)
-# curl 7.88.1
-fetch_lib "$LIME_DIR/project/lib/curl" "https://github.com/curl/curl.git"
-(cd "$LIME_DIR/project/lib/curl" && git checkout curl-7_88_1 2>/dev/null || true)
-# efsw 1.6.3
-fetch_lib "$LIME_DIR/project/lib/efsw" "https://github.com/SpartanJ/efsw.git"
-(cd "$LIME_DIR/project/lib/efsw" && git checkout 1.6.3 2>/dev/null || true)
+fetch_lib "$LIME_DIR/project/lib/pixman"    "https://gitlab.freedesktop.org/pixman/pixman.git" pixman-0.46.4
+fetch_lib "$LIME_DIR/project/lib/cairo"     "https://gitlab.freedesktop.org/cairo/cairo.git" 1.18.2
+fetch_lib "$LIME_DIR/project/lib/harfbuzz"  "https://github.com/harfbuzz/harfbuzz.git" 8.2.0
+fetch_lib "$LIME_DIR/project/lib/openal"    "https://github.com/kcat/openal-soft.git" openal-soft-1.20.1
+fetch_lib "$LIME_DIR/project/lib/curl"      "https://github.com/curl/curl.git" curl-7_88_1
+fetch_lib "$LIME_DIR/project/lib/efsw"      "https://github.com/SpartanJ/efsw.git" 1.6.3
 
 echo "==> [4/6] 获取 SDL3 release-3.2.8 源码并替换"
 curl -sL https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.8.tar.gz -o /tmp/sdl3.tar.gz
