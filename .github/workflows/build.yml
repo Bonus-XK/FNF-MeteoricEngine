@@ -15,6 +15,11 @@ on:
   pull_request:
     branches: [master, main]
   workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（留空则自动读取 source/Main.hx 的 meVersion）'
+        required: false
+        type: string
 
 jobs:
   # ---------- Android ----------
@@ -130,8 +135,8 @@ jobs:
           haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M64 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
             -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
             -Drebuild=1 -Dlime-native -Dmingw
-          # x86 (i686-w64-mingw32-g++，hxcpp 默认 windows 32 位；不带 -DHXCPP_M64）
-          haxelib run hxcpp Build.xml -Dwindows -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
+          # x86 (i686-w64-mingw32-g++；必须显式 -DHXCPP_M32，否则 hxcpp 按宿主默认 m64 编出 x64）
+          haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M32 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
             -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
             -Drebuild=1 -Dlime-native -Dmingw
 
@@ -142,7 +147,7 @@ jobs:
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          haxelib run lime build windows -release -mingw -D win32build
+          haxelib run lime build windows -release -mingw -D win32build -D MINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
 
       - name: 上传 x64
         uses: actions/upload-artifact@v5
@@ -218,3 +223,63 @@ jobs:
         with:
           name: meteoric-macos-arm64
           path: export/release/macos-arm64/
+
+  # ---------- 发布 Pre-release ----------
+  # 三个平台全部构建成功后自动创建 GitHub Pre-release（PR 不发布）
+  release:
+    name: 发布 Pre-release
+    needs: [android, windows, macos]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码（读取 source/Main.hx 版本号）
+        uses: actions/checkout@v5
+
+      - name: 确定版本号（优先手动输入，否则读 source/Main.hx 的 meVersion；统一追加构建日期）
+        id: version
+        run: |
+          BASE="${{ github.event.inputs.version }}"
+          if [ -z "$BASE" ]; then
+            BASE="$(sed -n "s/.*meVersion:String = '\([^']*\)'.*/\1/p" source/Main.hx | head -1)"
+          fi
+          if [ -z "$BASE" ]; then
+            BASE="0.0.0"
+          fi
+          VERSION="${BASE}-$(date -u +%Y%m%d-%H%M)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "发布版本: v$VERSION"
+
+      - name: 下载全部构建产物
+        uses: actions/download-artifact@v5
+        with:
+          path: release-artifacts
+
+      - name: 校验产物清单
+        run: |
+          find release-artifacts -maxdepth 2 | sort
+          test -f release-artifacts/meteoric-android-arm64/Meteoric-debug.apk
+          test -f release-artifacts/meteoric-windows-x64/Meteoric.exe
+          test -f release-artifacts/meteoric-windows-x86/Meteoric.exe
+          test -d release-artifacts/meteoric-macos-x64/Meteoric.app
+          test -d release-artifacts/meteoric-macos-arm64/Meteoric.app
+          echo "五端产物齐全 ✓"
+
+      - name: 发布 Pre-release（同名旧版先删除，实现覆盖）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "v$VERSION" --yes --cleanup-tag 2>/dev/null || true
+          printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n- Windows x64 / Windows x86\n- macOS x86_64 / macOS arm64\n- Android arm64（APK）\n\n由 GitHub Actions 自动构建\n' > /tmp/release-notes.md
+          gh release create "v$VERSION" \
+            --prerelease \
+            --title "Pre-release v$VERSION" \
+            --notes-file /tmp/release-notes.md \
+            release-artifacts/meteoric-android-arm64/Meteoric-debug.apk \
+            release-artifacts/meteoric-windows-x64/* \
+            release-artifacts/meteoric-windows-x86/* \
+            release-artifacts/meteoric-macos-x64/Meteoric.app \
+            release-artifacts/meteoric-macos-arm64/Meteoric.app
+          echo "已发布: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
