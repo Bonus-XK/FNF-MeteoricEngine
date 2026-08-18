@@ -44,13 +44,15 @@
 	<window if="mobile" orientation="landscape" fullscreen="true" width="0" height="0" resizable="false"/>
 
 	<!--Android-specific-->
-	<android if="android" minimum-sdk-version="21" install-location="auto" />
+	<android if="android" minimum-sdk-version="21" target-sdk-version="34" install-location="auto" />
 	<!-- mod / 外部存储：读写 /sdcard/meteoric（Android 10 用 legacy 模式，Android 11+ 需"所有文件访问"授权） -->
 	<android permission="android.permission.READ_EXTERNAL_STORAGE" />
 	<android permission="android.permission.WRITE_EXTERNAL_STORAGE" />
 	<android permission="android.permission.MANAGE_EXTERNAL_STORAGE" />
 	<android permission="android.permission.INTERNET" />
 	<android permission="android.permission.ACCESS_NETWORK_STATE" />
+	<!-- VIBRATE：GameActivity.onPause 会 vibrator.cancel()，缺权限会 SecurityException 崩溃（后台被杀根因） -->
+	<android permission="android.permission.VIBRATE" />
 	<config:android>
 		<application android:requestLegacyExternalStorage="true" />
 	</config:android>

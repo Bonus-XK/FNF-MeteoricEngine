@@ -233,13 +233,13 @@ class AndroidStorage
 
 	// ---------- 权限 ----------
 	// Android 10：运行时请求旧存储权限（配合 manifest 的 requestLegacyExternalStorage）
+	// 注意：只请求 WRITE（Android 上 WRITE 已隐含 READ）；连发两个会被系统拒绝（"only one set of permissions at a time"）
 	public static function requestLegacyPermissions():Void
 	{
 		try
 		{
 			var req = JNI.createStaticMethod('org/libsdl/app/SDLActivity', 'requestPermission', '(Ljava/lang/String;I)V', false);
 			req('android.permission.WRITE_EXTERNAL_STORAGE', 1001);
-			req('android.permission.READ_EXTERNAL_STORAGE', 1002);
 		}
 		catch (e:Dynamic) {}
 	}

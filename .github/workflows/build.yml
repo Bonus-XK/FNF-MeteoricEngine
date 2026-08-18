@@ -1,0 +1,164 @@
+# ============================================================
+# Meteoric Engine 全端构建工作流
+# 触发: push / pull_request / 手动（workflow_dispatch）
+# 构建: Android / Windows x64 / Windows x86 / macOS x86_64 / macOS arm64
+#
+# 说明: 引擎使用 SDL3 移植版 lime（lime 8.2.2 + SDL3 3.2.8），
+#       构建前由 ci/setup-lime-sdl3.sh 在 CI 上现场组装。
+# ============================================================
+name: 构建（Build）
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  NEKOPATH: /usr/local/lib/neko
+
+jobs:
+  # ---------- Android ----------
+  android:
+    name: Android (arm64)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.2.5
+
+      - name: 安装 Neko
+        run: brew install neko
+
+      - name: 安装 Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 NDK 21.4
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
+
+      - name: 安装 haxelib 依赖
+        run: bash ci/install-deps.sh
+
+      - name: 组装 SDL3 lime
+        run: bash ci/setup-lime-sdl3.sh
+
+      - name: 构建 Android APK
+        run: |
+          export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/21.4.7075529"
+          ./compile-android.sh
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteoric-android-arm64
+          path: export/release/android/bin/app/build/outputs/apk/debug/Meteoric-debug.apk
+
+  # ---------- Windows x64 + x86 ----------
+  windows:
+    name: Windows (x64 + x86)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.2.5
+
+      - name: 安装 Neko 与 mingw-w64
+        run: |
+          brew install neko mingw-w64
+          echo "$(brew --prefix mingw-w64)/bin" >> "$GITHUB_PATH"
+
+      - name: 安装 haxelib 依赖
+        run: bash ci/install-deps.sh
+
+      - name: 组装 SDL3 lime
+        run: bash ci/setup-lime-sdl3.sh
+
+      - name: 构建 Windows x64
+        run: ./compile-windows.sh
+
+      - name: 构建 Windows x86
+        run: |
+          NEKOPATH=/usr/local/lib/neko haxelib run lime build windows -release -mingw -D win32build
+
+      - name: 上传 x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteoric-windows-x64
+          path: export/release/windows/bin/
+
+      - name: 上传 x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteoric-windows-x86
+          path: export/32bit/windows/bin/
+
+  # ---------- macOS x86_64 + arm64 ----------
+  macos:
+    name: macOS (x86_64 + arm64)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.2.5
+
+      - name: 安装 Neko
+        run: brew install neko
+
+      - name: 安装 haxelib 依赖
+        run: bash ci/install-deps.sh
+
+      - name: 组装 SDL3 lime
+        run: bash ci/setup-lime-sdl3.sh
+
+      - name: 构建 macOS x86_64
+        run: ./compile-mac.sh
+
+      - name: 归档 x86_64 版
+        run: |
+          rm -rf export/release/macos-x64
+          mkdir -p export/release/macos-x64
+          cp -R export/release/macos/bin/Meteoric.app export/release/macos-x64/
+
+      - name: 构建 macOS arm64
+        run: |
+          NEKOPATH=/usr/local/lib/neko haxelib run lime build macos -release -arm64
+          rm -rf export/release/macos-arm64
+          mkdir -p export/release/macos-arm64
+          cp -R export/release/macos/bin/Meteoric.app export/release/macos-arm64/
+
+      - name: 上传 x86_64
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteoric-macos-x64
+          path: export/release/macos-x64/
+
+      - name: 上传 arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteoric-macos-arm64
+          path: export/release/macos-arm64/
