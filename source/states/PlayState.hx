@@ -148,6 +148,11 @@ class PlayState extends MusicBeatState
 	public var songSpeedType:String = "multiplicative";
 	public var noteKillOffset:Float = 350;
 
+	// NPS 统计：每秒收到并判定的音符数（不含长条），供 FPS 计数器显示
+	public var npsDisplay:Int = 0;
+	var _npsCount:Int = 0;
+	var _npsTimer:Float = 0;
+
 	public var playbackRate(default, set):Float = 1;
 
 	public var boyfriendGroup:FlxSpriteGroup;
@@ -2121,6 +2126,15 @@ class PlayState extends MusicBeatState
 		}*/
 		callOnScripts('onUpdate', [elapsed]);
 
+		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零
+		_npsTimer += elapsed;
+		if (_npsTimer >= 1)
+		{
+			npsDisplay = _npsCount;
+			_npsCount = 0;
+			_npsTimer -= 1;
+		}
+
 		// ===== HUD 权威校验（每帧） =====
 		// 1) hideHud 被 Mod/脚本临时改掉 → 立即恢复用户真实设置；
 		// 2) healthBar/图标/分数等 visible 被任何代码（Lua/Hscript/遗留逻辑）直接改掉
@@ -3936,6 +3950,8 @@ class PlayState extends MusicBeatState
 	}
 
 	function noteMiss(daNote:Note):Void { //You didn't hit the key and let it go offscreen, also used by Hurt Notes
+		// NPS 统计：漏掉的音符也计入“收到”
+		if (!daNote.isSustainNote) _npsCount++;
 		//Dupe note remove
 		notes.forEachAlive(function(note:Note) {
 			if (daNote != note && daNote.mustPress && daNote.noteData == note.noteData && daNote.isSustainNote == note.isSustainNote && Math.abs(daNote.strumTime - note.strumTime) < 1) {
@@ -4092,6 +4108,8 @@ class PlayState extends MusicBeatState
 	{
 		if (!note.wasGoodHit)
 		{
+			// NPS 统计：每个音符（含长条）只计一次，只计独立音符
+			if (!note.isSustainNote) _npsCount++;
 			if(cpuControlled && (note.ignoreNote || note.hitCausesMiss)) return;
 
 			note.wasGoodHit = true;

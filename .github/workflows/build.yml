@@ -64,7 +64,7 @@ jobs:
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          bash ci/setup-lime-sdl3.sh
+          GH_PROXY="" bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
         run: |
@@ -113,7 +113,7 @@ jobs:
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          bash ci/setup-lime-sdl3.sh
+          GH_PROXY="" bash ci/setup-lime-sdl3.sh
 
       - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
         run: |
@@ -184,7 +184,7 @@ jobs:
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          bash ci/setup-lime-sdl3.sh
+          GH_PROXY="" bash ci/setup-lime-sdl3.sh
 
       - name: 重建 lime macOS ndll（x86_64 + arm64）
         run: |
@@ -268,19 +268,30 @@ jobs:
           test -d release-artifacts/meteoric-macos-arm64/Meteoric.app
           echo "五端产物齐全 ✓"
 
+      - name: 打包产物（zip/apk 单文件，避免目录上传问题）
+        run: |
+          set -e
+          mkdir -p dist
+          cp release-artifacts/meteoric-android-arm64/Meteoric-debug.apk dist/Meteoric-Android-arm64.apk
+          (cd release-artifacts/meteoric-windows-x64 && zip -qr ../../dist/Meteoric-Windows-x64.zip .)
+          (cd release-artifacts/meteoric-windows-x86 && zip -qr ../../dist/Meteoric-Windows-x86.zip .)
+          (cd release-artifacts/meteoric-macos-x64 && zip -qr ../../dist/Meteoric-macOS-x86_64.zip Meteoric.app)
+          (cd release-artifacts/meteoric-macos-arm64 && zip -qr ../../dist/Meteoric-macOS-arm64.zip Meteoric.app)
+          ls -la dist/
+
       - name: 发布 Pre-release（同名旧版先删除，实现覆盖）
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete "v$VERSION" --yes --cleanup-tag 2>/dev/null || true
-          printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n- Windows x64 / Windows x86\n- macOS x86_64 / macOS arm64\n- Android arm64（APK）\n\n由 GitHub Actions 自动构建\n' > /tmp/release-notes.md
+          printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n- Windows x64 / Windows x86（zip，解压即用）\n- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n- Android arm64（APK）\n\n由 GitHub Actions 自动构建\n' > /tmp/release-notes.md
           gh release create "v$VERSION" \
             --prerelease \
             --title "Pre-release v$VERSION" \
             --notes-file /tmp/release-notes.md \
-            release-artifacts/meteoric-android-arm64/Meteoric-debug.apk \
-            release-artifacts/meteoric-windows-x64/* \
-            release-artifacts/meteoric-windows-x86/* \
-            release-artifacts/meteoric-macos-x64/Meteoric.app \
-            release-artifacts/meteoric-macos-arm64/Meteoric.app
+            dist/Meteoric-Android-arm64.apk \
+            dist/Meteoric-Windows-x64.zip \
+            dist/Meteoric-Windows-x86.zip \
+            dist/Meteoric-macOS-x86_64.zip \
+            dist/Meteoric-macOS-arm64.zip
           echo "已发布: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"

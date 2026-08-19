@@ -97,6 +97,12 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('显示NPS',
+			'开启后，FPS 计数器下方显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）',
+			'showNPS',
+			'bool');
+		addOption(option);
+
 		super();
 	}
 

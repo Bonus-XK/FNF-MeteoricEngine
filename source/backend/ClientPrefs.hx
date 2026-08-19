@@ -16,6 +16,7 @@ class SaveVariables {
 	@:keep public var fpsInTitleBar:Bool = false;
 	@:keep public var fpsColor:String = '自动';
 	@:keep public var showScrollSpeed:Bool = true; // FPS 计数器下方显示当前滚动速度（颜色随速度变化）
+	@:keep public var showNPS:Bool = false; // FPS 计数器下方显示每秒收到的音符数（NPS）
 	@:keep public var flashing:Bool = true;
 	@:keep public var CustomFade:String = '移动';
 	@:keep public var CustomFadeText:Bool = true;
