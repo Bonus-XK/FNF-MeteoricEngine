@@ -32,8 +32,11 @@ class SaveVariables {
 	@:keep public var camZooms:Bool = true;
 	@:keep public var hideHud:Bool = false;
 	@:keep public var scoreTxtFont:String = '默认';
+	@:keep public var scoreTxtFormat:String = 'Score: {score} | Misses: {misses} | Rank: {rank} | Accuracy: {accuracy}% | {fc}'; // Score 栏自定义格式，可用变量见 PlayState.buildScoreText
 	@:keep public var hideWatermark:Bool = false;
 	@:keep public var healthBarOverlay:Bool = true;
+	@:keep public var minimalHealthBar:Bool = false; // 极简血条：隐藏图标与阴影，血条移到 Score 栏位置，scoreTxt 嵌入血条
+	@:keep public var newHealthBar:Bool = false; // 新版血量条：自绘（不依赖贴图），并融合 0.6.3 兼容模式
 	@:keep public var oldHealthBar:Bool = false; // Psych 0.6.3 旧版血量条（兼容 0.6.3 及以下的旧模组）
 	public var noteOffset:Int = 0;
 	public var arrowRGB:Array<Array<FlxColor>> = [
@@ -97,6 +100,8 @@ class SaveVariables {
 	@:keep @:keep public var badWindow:Int = 135;
 	@:keep public var safeFrames:Float = 10;
 	@:keep public var noteJudgment:String = 'PE 判定';
+	@:keep public var marvelousJudgement:Bool = false; // Marvelous 判定：最高判定（Sick/45ms）显示为 Marvelous 贴图
+	@:keep public var showJudgementCounter:Bool = false; // 侧边栏显示总命中/连击/各判定计数
 	@:keep public var phigrosStyle:Bool = false; // Phigros 式判定线玩法
 	@:keep public var discordRPC:Bool = true;
 	@:keep public var hudLayout:Map<String, Array<Float>> = [ // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]

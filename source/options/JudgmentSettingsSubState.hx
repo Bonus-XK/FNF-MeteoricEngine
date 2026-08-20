@@ -76,6 +76,12 @@ class JudgmentSettingsSubState extends BaseOptionsMenu
 			['PE 判定', 'KE 判定']);
 		addOption(option);
 
+		var option:Option = new Option('Marvelous 判定',
+			'开启后，最高判定（Sick/45ms）显示为 Marvelous 贴图（KE 1.8 风格）',
+			'marvelousJudgement',
+			'bool');
+		addOption(option);
+
 		super();
 	}
 

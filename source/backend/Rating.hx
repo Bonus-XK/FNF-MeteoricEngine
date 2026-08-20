@@ -30,6 +30,18 @@ class Rating
 	{
 		var ratingsData:Array<Rating> = [new Rating('sick')]; //highest rating goes first
 
+		// Marvelous 判定（KE 1.8 风格）：开启后在最前方插入更严的 Marvelous（窗口 = Sick 的一半 ≈ 22ms）
+		if (ClientPrefs.data.marvelousJudgement)
+		{
+			var mv:Rating = new Rating('marvelous');
+			mv.hitWindow = Std.int(ratingsData[0].hitWindow / 2);
+			mv.image = 'marvelous';
+			mv.score = 500;
+			mv.ratingMod = 1;
+			mv.noteSplash = true;
+			ratingsData.unshift(mv);
+		}
+
 		var rating:Rating = new Rating('good');
 		rating.ratingMod = 0.67;
 		rating.score = 200;

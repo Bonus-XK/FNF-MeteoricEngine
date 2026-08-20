@@ -198,6 +198,9 @@ jobs:
       - name: 构建 macOS x86_64
         run: ./compile-mac.sh
 
+      - name: ad-hoc 签名（x86_64）
+        run: codesign --force --deep -s - export/release/macos/bin/Meteoric.app
+
       - name: 归档 x86_64 版
         run: |
           rm -rf export/release/macos-x64
@@ -209,6 +212,7 @@ jobs:
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           haxelib run lime build macos -release -arm64
+          codesign --force --deep -s - export/release/macos/bin/Meteoric.app
           rm -rf export/release/macos-arm64
           mkdir -p export/release/macos-arm64
           cp -R export/release/macos/bin/Meteoric.app export/release/macos-arm64/
@@ -273,10 +277,10 @@ jobs:
           set -e
           mkdir -p dist
           cp release-artifacts/meteoric-android-arm64/Meteoric-debug.apk dist/Meteoric-Android-arm64.apk
-          (cd release-artifacts/meteoric-windows-x64 && zip -qr ../../dist/Meteoric-Windows-x64.zip .)
-          (cd release-artifacts/meteoric-windows-x86 && zip -qr ../../dist/Meteoric-Windows-x86.zip .)
-          (cd release-artifacts/meteoric-macos-x64 && zip -qr ../../dist/Meteoric-macOS-x86_64.zip Meteoric.app)
-          (cd release-artifacts/meteoric-macos-arm64 && zip -qr ../../dist/Meteoric-macOS-arm64.zip Meteoric.app)
+          (cd release-artifacts/meteoric-windows-x64 && zip -qry ../../dist/Meteoric-Windows-x64.zip .)
+          (cd release-artifacts/meteoric-windows-x86 && zip -qry ../../dist/Meteoric-Windows-x86.zip .)
+          (cd release-artifacts/meteoric-macos-x64 && zip -qry ../../dist/Meteoric-macOS-x86_64.zip Meteoric.app)
+          (cd release-artifacts/meteoric-macos-arm64 && zip -qry ../../dist/Meteoric-macOS-arm64.zip Meteoric.app)
           ls -la dist/
 
       - name: 发布 Pre-release（同名旧版先删除，实现覆盖）

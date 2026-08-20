@@ -299,6 +299,7 @@ class PlayState extends MusicBeatState
 	var replayInjecting:Bool = false;               // 回放 v2：正在注入按键（放行 keyPressed/keyReleased）
 	public var scoreTxt:FlxText;
 	public var songTxt:FlxText;
+	public var judgementField:openfl.text.TextField; // 判定计数侧边栏
 	public var timeTxt:FlxText;
 	var scoreTxtTween:FlxTween;
 
@@ -1287,48 +1288,61 @@ class PlayState extends MusicBeatState
 			var percent:Float = CoolUtil.floorDecimal(ratingPercent * 100, 2);
 		}
 
-		scoreTxt.text = 'Score: ' + songScore
-		+ ' | Misses: ' + songMisses
-		+ ' | Rank: ' + ratingName
-		+ ' | Accuracy: ' + CoolUtil.floorDecimal(ratingPercent * 100, 2) + '%'
-		+ ' | ' + ratingFC;
-		if(health <= 0.4)
-		{
-		    if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
-			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
+		scoreTxt.text = buildScoreText();
 
-		    if(ClientPrefs.data.scoreTxtFont == "默认"){
-			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.RED, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
-		}
-		else if(health >= 1.55)
-		{
-		    if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
-			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
-
-		    if(ClientPrefs.data.scoreTxtFont == "默认"){
-			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.LIME, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
-		}
+		// 字体：文本含中文 → 自动用 future（含中文字形）；否则用设置里的字体
+		var fontPath:String;
+		if (containsChinese(scoreTxt.text))
+			fontPath = Paths.font('future.ttf');
+		else if (ClientPrefs.data.scoreTxtFont == 'Bahnschrift')
+			fontPath = Paths.font('bahnschrift.ttf');
 		else
-		{
-			if(ClientPrefs.data.scoreTxtFont == "Bahnschrift"){
-			    scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
+			fontPath = Paths.font('vcr.ttf');
 
-		    if(ClientPrefs.data.scoreTxtFont == "默认"){
-			    scoreTxt.setFormat(Paths.font("vcr.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			    scoreTxt.borderSize = 1.25;
-		    }
-		}
+		var txtColor:FlxColor = FlxColor.WHITE;
+		if (health <= 0.4) txtColor = FlxColor.RED;
+		else if (health >= 1.55) txtColor = FlxColor.LIME;
+
+		scoreTxt.setFormat(fontPath, 15, txtColor, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		scoreTxt.borderSize = 1.25;
 		callOnScripts('onUpdateScore', [miss]);
+	}
+
+	// 是否含 CJK 汉字（用于 scoreTxt 中文字体自动切换）
+	function containsChinese(s:String):Bool
+	{
+		if (s == null || s == '') return false;
+		for (i in 0...s.length)
+		{
+			var c:Int = s.charCodeAt(i);
+			if (c >= 0x4E00 && c <= 0x9FFF) return true;
+		}
+		return false;
+	}
+
+	// Score 栏文本：用 ClientPrefs.scoreTxtFormat 自定义格式 + 变量替换
+	// 可用变量：
+	//   {score} 分数 | {misses} Miss数 | {rank} 评级 | {accuracy} 准度(纯数字，%自己加)
+	//   {nps} 每秒音符数 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比
+	function buildScoreText():String
+	{
+		var fmt:String = ClientPrefs.data.scoreTxtFormat;
+		// 兼容旧“显示NPS”开关：开启且格式里没写 {nps} 时，自动在 {fc} 后追加
+		if (ClientPrefs.data.showNPS && fmt.indexOf('{nps}') == -1)
+			fmt = StringTools.replace(fmt, '{fc}', '{fc} | NPS: {nps}');
+
+		var acc:String = Std.string(CoolUtil.floorDecimal(ratingPercent * 100, 2));
+		// health 范围 0~2（默认 1 = 50%），换算成 0%~100%
+		var healthPct:String = Std.string(Math.round(health / 2 * 100)) + '%';
+		return fmt
+			.replace('{score}', Std.string(songScore))
+			.replace('{misses}', Std.string(songMisses))
+			.replace('{rank}', ratingName)
+			.replace('{accuracy}', acc)
+			.replace('{nps}', Std.string(npsDisplay))
+			.replace('{fc}', ratingFC)
+			.replace('{combo}', Std.string(combo))
+			.replace('{health}', healthPct);
 	}
 
 	public function setSongTime(time:Float)
@@ -1933,11 +1947,12 @@ class PlayState extends MusicBeatState
 
 		// 计分文字：以默认血量条位置为基准，与血量条当前偏移解耦
 		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11);
+		var scoreY:Float = ClientPrefs.data.downScroll ? 5 : defaultHpY + 55;
 		var scoreOff:Array<Float> = hudGetOffset('score');
 		if (scoreTxt != null)
 		{
 			scoreTxt.x = scoreOff[0];
-			scoreTxt.y = defaultHpY + 55 + scoreOff[1];
+			scoreTxt.y = scoreY + scoreOff[1];
 		}
 
 		// 左下角水印：独立定位
@@ -1945,8 +1960,10 @@ class PlayState extends MusicBeatState
 		if (songTxt != null)
 		{
 			songTxt.x = 12 + wmOff[0];
-			songTxt.y = defaultHpY + 55 + wmOff[1];
+			songTxt.y = scoreY + wmOff[1];
 		}
+
+		// 判定计数侧边栏：位置由 GameHUD.updateJudgementTxt 每帧管理（openfl TextField）
 
 	}
 
@@ -2126,13 +2143,14 @@ class PlayState extends MusicBeatState
 		}*/
 		callOnScripts('onUpdate', [elapsed]);
 
-		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零
+		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零，同时刷新 Score 栏
 		_npsTimer += elapsed;
 		if (_npsTimer >= 1)
 		{
 			npsDisplay = _npsCount;
 			_npsCount = 0;
 			_npsTimer -= 1;
+			if (ClientPrefs.data.showNPS && !endingSong && scoreTxt != null) updateScore();
 		}
 
 		// ===== HUD 权威校验（每帧） =====
@@ -2442,6 +2460,8 @@ class PlayState extends MusicBeatState
 		persistentUpdate = false;
 		persistentDraw = true;
 		paused = true;
+		// 侧边栏（stage 级 TextField）不随 flixel 暂停，需手动隐藏，恢复后 updateJudgementTxt 自动显示
+		if (hud != null && hud.judgementField != null) hud.judgementField.visible = false;
 
 		// 1 / 1000 chance for Gitaroo Man easter egg
 		/*if (FlxG.random.bool(0.1))
@@ -3408,14 +3428,19 @@ class PlayState extends MusicBeatState
 	{
 		var signedDiff:Float = note.strumTime - Conductor.songPosition;
 		var timeScale:Float = Conductor.safeZoneOffset / 166;
+		var off:Int = ClientPrefs.data.marvelousJudgement ? 1 : 0;
 
-		if (signedDiff > 135 * timeScale) return ratingsData[3]; // way early
-		if (signedDiff > 90 * timeScale) return ratingsData[2]; // early
-		if (signedDiff > 45 * timeScale) return ratingsData[1]; // kinda there
-		if (signedDiff < -45 * timeScale) return ratingsData[1]; // little late
-		if (signedDiff < -90 * timeScale) return ratingsData[2]; // late
-		if (signedDiff < -135 * timeScale) return ratingsData[3]; // late as fuck
-		return ratingsData[0]; // sick
+		// Marvelous：比 Sick 更严（窗口 = Sick 的一半）
+		if (off == 1 && Math.abs(signedDiff) <= ratingsData[0].hitWindow * timeScale)
+			return ratingsData[0];
+
+		if (signedDiff > 135 * timeScale) return ratingsData[off + 3]; // way early
+		if (signedDiff > 90 * timeScale) return ratingsData[off + 2]; // early
+		if (signedDiff > 45 * timeScale) return ratingsData[off + 1]; // kinda there
+		if (signedDiff < -45 * timeScale) return ratingsData[off + 1]; // little late
+		if (signedDiff < -90 * timeScale) return ratingsData[off + 2]; // late
+		if (signedDiff < -135 * timeScale) return ratingsData[off + 3]; // late as fuck
+		return ratingsData[off]; // sick（marvelous 窗口外）
 	}
 
 	private function popUpScore(note:Note = null):Void
@@ -3478,7 +3503,10 @@ class PlayState extends MusicBeatState
 			antialias = !isPixelStage;
 		}
 
-		rating.loadGraphic(Paths.image(uiPrefix + daRating.image + uiSuffix));
+		var ratingImg:String = daRating.image;
+		// Marvelous 无像素版贴图，像素关卡回退 sick
+		if (ratingImg == 'marvelous' && PlayState.isPixelStage) ratingImg = 'sick';
+		rating.loadGraphic(Paths.image(uiPrefix + ratingImg + uiSuffix));
 		rating.cameras = [camHUD];
 		rating.screenCenter();
 		rating.x = placement - 40;
@@ -4266,6 +4294,8 @@ class PlayState extends MusicBeatState
 		// 离开对局后清掉待重开的回放数据，避免影响后续普通对局
 		carryReplay = null;
 		instance = null;
+		if (hud != null && hud.judgementField != null && hud.judgementField.parent != null)
+			FlxG.stage.removeChild(hud.judgementField);
 		super.destroy();
 
 		// 完成或退出曲目后自动清理 RAM
@@ -4839,6 +4869,7 @@ class GameHUD
 	public var timeTxt:FlxText;
 	public var timeBarBG:AttachedSprite;
 	public var botplayTxt:FlxText;
+	public var judgementField:openfl.text.TextField; // 判定计数侧边栏（openfl 直接渲染，部分着色）
 
 	var st:PlayState;            // 宿主对局
 	var lastHpPercent:Float = 50;
@@ -4859,7 +4890,7 @@ class GameHUD
 		// ---- 时间条（上）+ 时间文字（下） ----
 		var hudTimeOff:Array<Float> = st.hudGetOffset('timeBar');
 		var timeBarY:Float = 19;
-		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeBarY = FlxG.height - 44 - 25;
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeBarY = FlxG.height - 44;
 		timeBarY += hudTimeOff[1];
 
 		timeBar = new TimeBar(0, timeBarY, function() return st.songPercent, 0, 1, ClientPrefs.data.newTimeBarStyle);
@@ -4907,7 +4938,8 @@ class GameHUD
 		timeTxt.alpha = 0;
 		timeTxt.borderSize = 2;
 		timeTxt.visible = st.updateTime = showTime;
-		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeTxt.y = FlxG.height - 44 + hudTimeOff[1];
+		// downScroll 时调换：时间条贴底，时间文字移到时间条上方
+		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) timeTxt.y = timeBarY - 25;
 		if (ClientPrefs.data.timeBarType == '歌曲名称') timeTxt.text = PlayState.SONG.song;
 
 		timeBarBG = new AttachedSprite('timeBar');
@@ -4933,7 +4965,8 @@ class GameHUD
 		var hudHpOff:Array<Float> = st.hudGetOffset('healthBar');
 		var defaultHpY:Float = FlxG.height * (!ClientPrefs.data.downScroll || st.isPhigrosStyle ? 0.89 : 0.11);
 		healthBar = new HealthBar(0, defaultHpY + hudHpOff[1], 'healthBar',
-			function() return (ClientPrefs.data.smoothHealth) ? st.smoothHealth : st.health, 0, 2, ClientPrefs.data.oldHealthBar);
+			function() return (ClientPrefs.data.smoothHealth) ? st.smoothHealth : st.health, 0, 2,
+			ClientPrefs.data.oldHealthBar || ClientPrefs.data.newHealthBar);
 		healthBar.screenCenter(X);
 		healthBar.x += hudHpOff[0];
 		healthBar.leftToRight = false;
@@ -4957,7 +4990,7 @@ class GameHUD
 		healthBarOverlay = new FlxTiledSprite(Paths.image('healthBarOverlay'), Std.int(healthBar.bg.width), Std.int(healthBar.bg.height));
 		healthBarOverlay.y = healthBar.y;
 		healthBarOverlay.scrollFactor.set();
-		healthBarOverlay.visible = (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay);
+		healthBarOverlay.visible = (!ClientPrefs.data.hideHud && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar && !ClientPrefs.data.newHealthBar);
 		healthBarOverlay.color = FlxColor.BLACK;
 		healthBarOverlay.blend = MULTIPLY;
 		healthBarOverlay.x = healthBar.x;
@@ -4965,7 +4998,7 @@ class GameHUD
 		healthBarOverlay.antialiasing = ClientPrefs.data.antialiasing;
 		st.add(healthBarOverlay);
 		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) healthBarOverlay.y = healthBar.y;
-		if (ClientPrefs.data.oldHealthBar) healthBarOverlay.visible = false;
+		if (ClientPrefs.data.oldHealthBar || ClientPrefs.data.newHealthBar) healthBarOverlay.visible = false;
 
 		iconP1 = new HealthIcon(st.boyfriend.healthIcon, true);
 		iconP1.y = healthBar.y - 75;
@@ -4980,7 +5013,8 @@ class GameHUD
 		st.add(iconP2);
 
 		var hudScoreOff:Array<Float> = st.hudGetOffset('score');
-		scoreTxt = new FlxText(hudScoreOff[0], defaultHpY + 55 + hudScoreOff[1], FlxG.width, "", 20);
+		var scoreY:Float = (ClientPrefs.data.downScroll ? 5 : defaultHpY + 55);
+		scoreTxt = new FlxText(hudScoreOff[0], scoreY + hudScoreOff[1], FlxG.width, "", 20);
 		if (ClientPrefs.data.scoreTxtFont == "Bahnschrift")
 		{
 			scoreTxt.setFormat(Paths.font("bahnschrift.ttf"), 15, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -4996,7 +5030,7 @@ class GameHUD
 		st.add(scoreTxt);
 
 		var hudWmOff:Array<Float> = st.hudGetOffset('watermark');
-		songTxt = new FlxText(12 + hudWmOff[0], defaultHpY + 55 + hudWmOff[1], 0, "", 12);
+		songTxt = new FlxText(12 + hudWmOff[0], scoreY + hudWmOff[1], 0, "", 12);
 		songTxt.setFormat(Paths.font("future.ttf"), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		songTxt.scrollFactor.set();
 		songTxt.borderSize = 1;
@@ -5011,6 +5045,21 @@ class GameHUD
 		botplayTxt.visible = st.cpuControlled || st.replayMode;
 		st.add(botplayTxt);
 		if (ClientPrefs.data.downScroll && !st.isPhigrosStyle) botplayTxt.y = timeBar.y - 78;
+
+		// ---- 判定计数侧边栏（openfl TextField 直接渲染，支持部分着色；默认左侧中间） ----
+		var jcOff:Array<Float> = st.hudGetOffset('judgementTxt');
+		judgementField = new openfl.text.TextField();
+		judgementField.multiline = true;
+		judgementField.wordWrap = false;
+		judgementField.selectable = false;
+		judgementField.width = 260;
+		judgementField.height = 220;
+		judgementField.defaultTextFormat = new openfl.text.TextFormat('VCR OSD Mono', 16, 0xFFFFFFFF);
+		judgementField.x = 10 + jcOff[0];
+		judgementField.y = FlxG.height / 2 - 65 + jcOff[1];
+		judgementField.visible = !ClientPrefs.data.hideHud && ClientPrefs.data.showJudgementCounter;
+		FlxG.stage.addChild(judgementField);
+		st.judgementField = judgementField;
 
 		// ---- 相机归属 ----
 		healthBar.cameras = [st.camHUD];
@@ -5120,8 +5169,64 @@ class GameHUD
 			timeBarOverlay.scrollX += 22 * elapsed;
 		}
 
+		// 判定计数侧边栏
+		updateJudgementTxt();
+
 		// 可见性权威：每帧拉回设置值
 		enforce();
+	}
+
+	function updateJudgementTxt():Void
+	{
+		if (judgementField == null) return;
+
+		var mv:Int = 0, sick:Int = 0, good:Int = 0, bad:Int = 0, shit:Int = 0;
+		if (st.ratingsData != null)
+		{
+			for (r in st.ratingsData)
+			{
+				switch (r.name)
+				{
+					case 'marvelous': mv = r.hits;
+					case 'sick': sick = r.hits;
+					case 'good': good = r.hits;
+					case 'bad': bad = r.hits;
+					case 'shit': shit = r.hits;
+				}
+			}
+		}
+
+		// 行内容（Marvelous 判定未开启时不包含 Marvelous 行，其余行紧凑排列）
+		var buf = new StringBuf();
+		buf.add('Hits: ' + st.songHits);
+		buf.add('\nCombo: ' + st.combo);
+		if (ClientPrefs.data.marvelousJudgement) buf.add('\nMarvelous: ' + mv);
+		buf.add('\nSick: ' + sick);
+		buf.add('\nGood: ' + good);
+		buf.add('\nBad: ' + bad);
+		buf.add('\nShit: ' + shit);
+		buf.add('\nMisses: ' + st.songMisses);
+		var txt:String = buf.toString();
+
+		var jcOff:Array<Float> = st.hudGetOffset('judgementTxt');
+		judgementField.x = 10 + jcOff[0];
+		judgementField.y = FlxG.height / 2 - 65 + jcOff[1];
+		judgementField.visible = !ClientPrefs.data.hideHud && ClientPrefs.data.showJudgementCounter;
+		if (!judgementField.visible) return;
+
+		judgementField.text = txt;
+
+		// 行着色：Hits / Combo 青色，Misses 浅红（openfl TextField 原生范围着色）
+		var cyan:openfl.text.TextFormat = new openfl.text.TextFormat('VCR OSD Mono', 16, 0xFF00FFFF);
+		var lightRed:openfl.text.TextFormat = new openfl.text.TextFormat('VCR OSD Mono', 16, 0xFFFF7777);
+
+		var line2:Int = txt.indexOf('\n');
+		if (line2 > 0) judgementField.setTextFormat(cyan, 0, line2); // Hits
+		var line3:Int = txt.indexOf('\n', line2 + 1);
+		if (line3 > line2) judgementField.setTextFormat(cyan, line2 + 1, line3); // Combo
+		var lastStart:Int = txt.lastIndexOf('\n') + 1;
+		if (lastStart > 0 && lastStart < txt.length)
+			judgementField.setTextFormat(lightRed, lastStart, txt.length); // Misses
 	}
 
 	// ==================== 可见性权威 ====================
@@ -5137,14 +5242,31 @@ class GameHUD
 			ClientPrefs.data.hideHud = ClientPrefs.savedHideHud;
 
 		var hide:Bool = ClientPrefs.data.hideHud;
-		if (healthBar != null) healthBar.visible = !hide;
-		if (healthBarOverlay != null) healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar;
-		if (iconP1 != null) iconP1.visible = !hide;
-		if (iconP2 != null) iconP2.visible = !hide;
+		var minimal:Bool = ClientPrefs.data.minimalHealthBar;
+		if (healthBar != null)
+		{
+			healthBar.visible = !hide;
+			healthBar.setNewStyle(ClientPrefs.data.newHealthBar);
+		}
+		if (healthBarOverlay != null) healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar && !ClientPrefs.data.newHealthBar && !minimal;
+		if (iconP1 != null) iconP1.visible = !hide && !minimal;
+		if (iconP2 != null) iconP2.visible = !hide && !minimal;
 		if (scoreTxt != null) scoreTxt.visible = !hide;
 		if (timeBarOverlay != null) timeBarOverlay.visible = timeBar != null && timeBar.visible && !hide;
 		if (botplayTxt != null) botplayTxt.visible = (st.cpuControlled || st.replayMode);
 		if (songTxt != null) songTxt.visible = !hide && !ClientPrefs.data.hideWatermark;
+		if (judgementField != null) judgementField.visible = !hide && ClientPrefs.data.showJudgementCounter;
+
+		// 极简血条：血条移到 Score 栏位置，scoreTxt 垂直居中嵌入血条（无图标、无阴影）
+		if (minimal && healthBar != null && scoreTxt != null)
+		{
+			// downScroll 时 Score 栏置顶，极简血条跟随置顶
+			var scoreY:Float = (ClientPrefs.data.downScroll ? 5 : FlxG.height * 0.89 + 55) + st.hudGetOffset('score')[1];
+			healthBar.y = scoreY;
+			healthBar.screenCenter(X);
+			healthBar.x += st.hudGetOffset('healthBar')[0];
+			scoreTxt.y = healthBar.y + (healthBar.height - scoreTxt.height) / 2;
+		}
 	}
 
 	// ==================== 其他 ====================

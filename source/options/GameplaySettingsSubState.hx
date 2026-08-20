@@ -56,9 +56,21 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('极简血条',
+		    '开启后，隐藏血量条图标与阴影，血量条移到 Score 栏位置，Score 栏文字嵌入血量条中',
+			'minimalHealthBar',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('旧版血量条',
 		    '开启后，使用旧版血量条样式（填充裁剪为血条内部形状、背景由血量条自行绘制），用于兼容 0.6.3 及以下版本的旧模组脚本',
 			'oldHealthBar',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('新版血量条',
+		    '开启后，血量条不再依赖贴图而是自己绘制（白边框 + 内部填充），并自动融合 0.6.3 兼容模式（无阴影）',
+			'newHealthBar',
 			'bool');
 		addOption(option);
 

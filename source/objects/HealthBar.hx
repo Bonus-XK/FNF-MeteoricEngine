@@ -17,12 +17,19 @@ class HealthBar extends FlxSpriteGroup
 	public var leftToRight(default, set):Bool = true;
 	public var barCenter(default, null):Float = 0;
 
+	// 填充左右颜色（setColors 记录），用于新版血条外框跟随血量多的一方
+	var leftColor:FlxColor = FlxColor.WHITE;
+	var rightColor:FlxColor = FlxColor.BLACK;
+
 	// you might need to change this if you want to use a custom bar
 	public var barWidth(default, set):Int = 1;
 	public var barHeight(default, set):Int = 1;
 	public var barOffset:FlxPoint = new FlxPoint(3, 3);
 	public var borderSize(default, set):Int = 0;
 	public var hollowShape:Bool = false;
+
+	var _image:String = 'healthBar';
+	var _useNew:Bool = false;
 
 	public function new(x:Float, y:Float, image:String = 'healthBar', valueFunction:Void->Float = null, boundX:Float = 0, boundY:Float = 1,
 			?oldVersion:Bool = false)
@@ -31,11 +38,10 @@ class HealthBar extends FlxSpriteGroup
 		
 		if(valueFunction != null) this.valueFunction = valueFunction;
 		setBounds(boundX, boundY);
-		
-		bg = new FlxSprite().loadGraphic(Paths.image(image));
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		barWidth = Std.int(bg.width - 6);
-		barHeight = Std.int(bg.height - 6);
+
+		_image = image;
+		_useNew = ClientPrefs.data.newHealthBar;
+		buildBg();
 
 		leftBar = new FlxSprite().makeGraphic(Std.int(bg.width), Std.int(bg.height), FlxColor.WHITE);
 		//leftBar.color = FlxColor.WHITE;
@@ -47,26 +53,65 @@ class HealthBar extends FlxSpriteGroup
 
 		checkForHollowShape();
 
-		if(oldVersion)
+		add(bg);
+		add(leftBar);
+		add(rightBar);
+		regenerateClips();
+	}
+
+	// 创建/重建血条背景：新版自绘（不依赖贴图，融合 0.6.3），旧版加载贴图
+	function buildBg():Void
+	{
+		var barW:Int = 601;
+		var barH:Int = 19;
+
+		if(_useNew)
 		{
-			add(bg);
-			add(leftBar);
-			add(rightBar);
+			try {
+				var g = Paths.image(_image);
+				if (g != null) { barW = Std.int(g.width); barH = Std.int(g.height); }
+			} catch (e:Dynamic) {}
+			// 白边框底（0.6.3 createFilledBar 风格），填充用 barOffset 内边距，形成边框
+			bg = new FlxSprite().makeGraphic(barW, barH, FlxColor.WHITE);
 		}
 		else
 		{
-			// bg 置于填充之下：0.6.3 模组的 healthBar.png 是实心底框（无镂空），
-			// 若 bg 在最上层会盖住彩色填充导致血量条变灰白
-			add(bg);
-			add(leftBar);
-			add(rightBar);
+			bg = new FlxSprite().loadGraphic(Paths.image(_image));
+			barW = Std.int(bg.width);
+			barH = Std.int(bg.height);
 		}
+		bg.antialiasing = ClientPrefs.data.antialiasing;
+		barWidth = barW - 6;
+		barHeight = barH - 6;
+	}
+
+	// 运行时切换新旧血条样式（设置改变后立即生效）
+	public function setNewStyle(useNew:Bool):Void
+	{
+		if (_useNew == useNew || bg == null) return;
+		_useNew = useNew;
+		remove(bg);
+		buildBg();
+		insert(0, bg);
+		leftBar.setGraphicSize(Std.int(bg.width), Std.int(bg.height));
+		leftBar.updateHitbox();
+		rightBar.setGraphicSize(Std.int(bg.width), Std.int(bg.height));
+		rightBar.updateHitbox();
 		regenerateClips();
 	}
 
 	override function update(elapsed:Float) {
 		var value:Null<Float> = FlxMath.remapToRange(FlxMath.bound(valueFunction(), bounds.min, bounds.max), bounds.min, bounds.max, 0, 100);
 		percent = (value != null ? value : 0);
+
+		// 新版血条：外框颜色跟随血量多的一方（玩家满血偏右/左，按 leftToRight 分辨玩家色）
+		if (ClientPrefs.data.newHealthBar && bg != null)
+		{
+			var playerColor:FlxColor = leftToRight ? leftColor : rightColor;
+			var opponentColor:FlxColor = leftToRight ? rightColor : leftColor;
+			bg.color = (percent >= 50) ? playerColor : opponentColor;
+		}
+
 		super.update(elapsed);
 	}
 	
@@ -78,6 +123,8 @@ class HealthBar extends FlxSpriteGroup
 
 	public function setColors(left:FlxColor, right:FlxColor)
 	{
+		leftColor = left;
+		rightColor = right;
 		leftBar.color = left;
 		rightBar.color = right;
 	}

@@ -1,5 +1,7 @@
 package options;
 
+import substates.TextInputPrompt;
+
 class InterfaceSettingsSubState extends BaseOptionsMenu
 {
 	public function new()
@@ -19,6 +21,14 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'string',
 			['默认', 'Bahnschrift']);
 		addOption(option);
+
+		var option:Option = new Option('Score栏格式',
+			'自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {fc} {combo} {health}。按确认键打开输入框',
+			'scoreTxtFormat',
+			'string',
+			[ClientPrefs.data.scoreTxtFormat]);
+		addOption(option);
+		option.onChange = openScoreFormatPrompt;
 
 		var option:Option = new Option('隐藏水印',
 			'开启后，左下角的水印将不会显示',
@@ -98,12 +108,34 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('显示NPS',
-			'开启后，FPS 计数器下方显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）',
+			'开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）',
 			'showNPS',
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('判定计数侧边栏',
+			'开启后，屏幕右上角显示总命中数、连击数、Marvelous/Sick/Good/Bad/Shit/Misses 数量',
+			'showJudgementCounter',
+			'bool');
+		addOption(option);
+
 		super();
+	}
+
+	function openScoreFormatPrompt()
+	{
+		openSubState(new TextInputPrompt(
+			'自定义 Score 栏格式',
+			'可用变量：\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\n{nps} 每秒音符 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比',
+			ClientPrefs.data.scoreTxtFormat,
+			function(value:String) {
+				if (value != null && value.trim() != '')
+				{
+					ClientPrefs.data.scoreTxtFormat = value;
+					ClientPrefs.saveSettings();
+				}
+			}
+		));
 	}
 
 	#if !mobile

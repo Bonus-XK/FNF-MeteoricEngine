@@ -217,10 +217,6 @@ class FPS extends TextField
 		#if sys
 		buf.add('\nCPU: ${Math.round(_cpuPct)}%');
 		#end
-		if (ClientPrefs.data.showNPS && states.PlayState.instance != null)
-		{
-			buf.add('\nNPS: ${states.PlayState.instance.npsDisplay}');
-		}
 		if (ClientPrefs.data.showVer)
 		{
 			buf.add('\nMeteoric Engine v${Main.meVersion}');
@@ -263,10 +259,6 @@ class FPS extends TextField
 		#if sys
 		buf.add(' | CPU: ${Math.round(_cpuPct)}%');
 		#end
-		if (ClientPrefs.data.showNPS && states.PlayState.instance != null)
-		{
-			buf.add(' | NPS: ${states.PlayState.instance.npsDisplay}');
-		}
 		return buf.toString();
 	}
 

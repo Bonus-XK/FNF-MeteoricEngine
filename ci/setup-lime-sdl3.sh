@@ -129,6 +129,12 @@ cp ci/lime-sdl3-patch/project/lib/sdl/src/SDL_build_config.h "$LIME_DIR/project/
 cp ci/lime-sdl3-patch/project/lib/sdl/include/SDL3/SDL_build_config.h "$LIME_DIR/project/lib/sdl/include/SDL3/SDL_build_config.h"
 # freetype ftmodule.h 定制（去掉 hvf 驱动）
 cp ci/lime-sdl3-patch/project/lib/freetype/include/freetype/config/ftmodule.h "$LIME_DIR/project/lib/freetype/include/freetype/config/ftmodule.h"
+# libpng pngpriv.h 定制：新版 macOS SDK（Xcode 16+/SDK 26+）系统头默认定义
+# TARGET_OS_MAC，会触发 pngpriv.h 的老 Mac <fp.h> 分支导致编译失败 → 移除该条件
+cp ci/lime-sdl3-patch/project/lib/png/pngpriv.h "$LIME_DIR/project/lib/png/pngpriv.h"
+# zlib zutil.h 定制：同上，TARGET_OS_MAC 触发老 Mac 分支定义 fdopen 宏，
+# 与新版 SDK 的 <stdio.h> fdopen 声明冲突 → 禁用该宏
+cp ci/lime-sdl3-patch/project/lib/zlib/zutil.h "$LIME_DIR/project/lib/zlib/zutil.h"
 
 echo "==> [5/6] SDL3 Android Java 壳（org/libsdl/app）"
 rm -rf "$LIME_DIR/templates/android/template/app/src/main/java/org/libsdl"

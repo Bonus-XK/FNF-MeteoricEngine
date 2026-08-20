@@ -37,6 +37,7 @@ class HUDCustomizeState extends MusicBeatState
 	var iconP2:HealthIcon;
 	var scoreTxt:FlxText;
 	var songTxt:FlxText; // 左下角水印
+	var judgementTxt:FlxText;
 
 	// 编辑 UI
 	static final TITLE_Y:Float = 4;
@@ -45,13 +46,14 @@ class HUDCustomizeState extends MusicBeatState
 	static final PANEL_W:Float = 960;
 	static final PANEL_H:Float = 80;
 
-	var elements:Array<String> = ['timeBar', 'healthBar', 'score', 'watermark', 'note'];
+	var elements:Array<String> = ['timeBar', 'healthBar', 'score', 'watermark', 'judgementTxt', 'note'];
 	var elementNames:Map<String, String> = [
 		'note' => '音符',
 		'timeBar' => '时间条',
 		'healthBar' => '血量条',
 		'score' => '计分文字',
-		'watermark' => '水印'
+		'watermark' => '水印',
+		'judgementTxt' => '判定计数'
 	];
 
 	var borders:Array<Array<FlxSprite>> = [];
@@ -240,6 +242,13 @@ class HUDCustomizeState extends MusicBeatState
 		songTxt.scrollFactor.set();
 		songTxt.cameras = [camHUD];
 		add(songTxt);
+
+		// 判定计数侧边栏（模拟）
+		judgementTxt = new FlxText(0, 0, 230, 'Hits: 0\nCombo: 0\nSick: 0\nGood: 0\nBad: 0\nShit: 0\nMisses: 0', 16);
+		judgementTxt.setFormat(Paths.font('vcr.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		judgementTxt.scrollFactor.set();
+		judgementTxt.cameras = [camHUD];
+		add(judgementTxt);
 	}
 
 	function hudGetOffset(id:String):Array<Float>
@@ -298,6 +307,11 @@ class HUDCustomizeState extends MusicBeatState
 		var wmOff:Array<Float> = hudGetOffset('watermark');
 		songTxt.x = 12 + wmOff[0];
 		songTxt.y = defaultHpY + 55 + wmOff[1];
+
+		// 判定计数侧边栏：默认左侧中间
+		var jcOff:Array<Float> = hudGetOffset('judgementTxt');
+		judgementTxt.x = 10 + jcOff[0];
+		judgementTxt.y = FlxG.height / 2 - 65 + jcOff[1];
 	}
 
 	function getElementRect(id:String):FlxRect
@@ -328,6 +342,8 @@ class HUDCustomizeState extends MusicBeatState
 				return new FlxRect(scoreTxt.x + (FlxG.width - w) / 2, scoreTxt.y - 8, w, scoreTxt.height + 16);
 			case 'watermark':
 				return inflateRect(new FlxRect(songTxt.x, songTxt.y, songTxt.textField.textWidth + 20, songTxt.height), 10);
+			case 'judgementTxt':
+				return inflateRect(new FlxRect(judgementTxt.x, judgementTxt.y, judgementTxt.textField.textWidth + 20, judgementTxt.height), 10);
 		}
 		return new FlxRect(0, 0, 100, 100);
 	}

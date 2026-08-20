@@ -466,6 +466,11 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			}
 			else
 			{
+				// 非 bool 选项：string 类型且带 onChange（如自定义 Score 栏格式）按确认键也触发弹窗/回调
+				if (controls.ACCEPT && curOption.type == 'string' && curOption.onChange != null)
+				{
+					curOption.change();
+				}
 				if (controls.UI_LEFT || controls.UI_RIGHT) {
 					var pressed:Bool = (controls.UI_LEFT_P || controls.UI_RIGHT_P);
 					#if mobile
