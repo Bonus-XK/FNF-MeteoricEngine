@@ -33,24 +33,24 @@ class ErrorState extends FlxState
 		add(topBar);
 
 		var title:FlxText = new FlxText(24, 24, FlxG.width - 48, '游戏发生错误', 40);
-		title.color = 0xFFFF5555;
+		title.setFormat(Paths.font('future.ttf'), 40, 0xFFFF5555, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(title);
 
 		var sourceTxt:FlxText = new FlxText(24, 84, FlxG.width - 48, '错误来源：' + CrashHandler.errorSource, 20);
-		sourceTxt.color = 0xFFFFCCCC;
+		sourceTxt.setFormat(Paths.font('future.ttf'), 20, 0xFFFFCCCC, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(sourceTxt);
 
 		var errTxt:FlxText = new FlxText(24, 114, FlxG.width - 48, '错误信息：' + CrashHandler.errorMessage, 20);
-		errTxt.color = 0xFFFFDDDD;
+		errTxt.setFormat(Paths.font('future.ttf'), 20, 0xFFFFDDDD, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(errTxt);
 
 		stackText = new FlxText(24, 170, FlxG.width - 48, '调用堆栈：\n' + CrashHandler.errorStack, 16);
-		stackText.color = 0xFFAAAAAA;
+		stackText.setFormat(Paths.font('future.ttf'), 16, 0xFFAAAAAA, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(stackText);
 
 		var hintTxt:FlxText = new FlxText(24, FlxG.height - 46, FlxG.width - 48,
 			'完整错误信息已保存到 crash 目录下的日志文件\n[Enter] 返回主菜单    [Esc] 退出游戏', 18);
-		hintTxt.color = 0xFFDDDDDD;
+		hintTxt.setFormat(Paths.font('future.ttf'), 18, 0xFFDDDDDD, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(hintTxt);
 
 		// A/B 触控键：A=返回主菜单，B=退出游戏（安卓也能用）
@@ -63,13 +63,11 @@ class ErrorState extends FlxState
 		add(btnB);
 
 		btnAText = new FlxText(btnA.x, btnA.y, btnW, 'A = 返回主菜单', 22);
-		btnAText.alignment = CENTER;
-		btnAText.color = FlxColor.WHITE;
+		btnAText.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(btnAText);
 
 		btnBText = new FlxText(btnB.x, btnB.y, btnW, 'B = 退出游戏', 22);
-		btnBText.alignment = CENTER;
-		btnBText.color = FlxColor.WHITE;
+		btnBText.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(btnBText);
 	}
 

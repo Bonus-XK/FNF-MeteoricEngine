@@ -113,6 +113,23 @@ namespace lime {
 				std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 				result = new std::wstring (converter.from_bytes(path));
 				#else
+				// macOS app bundle：SDL_GetBasePath 返回可执行目录 Contents/MacOS/，
+				// 但 lime 的 manifest / libraryPaths 都相对 applicationDirectory 解析，
+				// 实际资源（manifest/*.json、assets/）在 Contents/Resources/。
+				// 不修正则 shared/week_assets 等懒加载库的 manifest 路径指向 Contents/MacOS/manifest/，
+				// loadLibrary 永远读不到 → 所有 OpenFlAssets.exists/加载失败。
+				{
+					size_t len = strlen (path);
+					const char* marker = "/Contents/MacOS/";
+					size_t mlen = strlen (marker);
+					if (len > mlen && strncmp (path + len - mlen, marker, mlen) == 0) {
+						std::string dir (path, len - mlen);
+						dir += "/Resources/";
+						result = new std::wstring (dir.begin (), dir.end ());
+						SDL_free ((void*)path);
+						break;
+					}
+				}
 				result = new std::wstring (path, path + strlen (path));
 				#endif
 				SDL_free ((void*)path);

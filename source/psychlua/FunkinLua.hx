@@ -68,9 +68,10 @@ class FunkinLua {
 
 	public function new(scriptName:String) {
 		#if LUA_ALLOWED
-		// 回放模式不加载任何 Lua 脚本：避免脚本修改 note/strum 的显示
-		// （alpha/visible/坐标/颜色等）导致回放时箭头无法正常显示
-		if (PlayState.instance != null && PlayState.instance.replayMode)
+		// 回放模式：仅放行舞台脚本（背景显示需要），其余脚本不加载
+		// （避免脚本修改 note/strum 的显示 alpha/visible/坐标/颜色等导致回放箭头异常）
+		if (PlayState.instance != null && PlayState.instance.replayMode
+			&& (scriptName == null || scriptName.indexOf('/stages/') == -1))
 			return;
 
 		lua = LuaL.newstate();

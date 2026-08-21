@@ -151,7 +151,7 @@ class MobileControls extends FlxSpriteGroup
 		}
 	}
 
-	// 菜单模式：只放 A（确认）键，B 键已按要求移除
+	// 菜单模式：A（确认）+ B（取消/返回）键
 	function buildMenuButtons():Void
 	{
 		var aBtn:FlxSprite = makePadSprite('a', 0xFF7CFC8A);
@@ -160,6 +160,13 @@ class MobileControls extends FlxSpriteGroup
 		add(aBtn);
 		if (!padButtons.exists('accept')) padButtons.set('accept', []);
 		padButtons.get('accept').push(aBtn);
+
+		var bBtn:FlxSprite = makePadSprite('b', 0xFFFC7C7C);
+		bBtn.x = aBtn.x - BTN_W - 20;
+		bBtn.y = aBtn.y;
+		add(bBtn);
+		if (!padButtons.exists('back')) padButtons.set('back', []);
+		padButtons.get('back').push(bBtn);
 	}
 
 	/** 供 Freeplay 等界面额外添加 virtualpad 风格字母键（如 L / P） */

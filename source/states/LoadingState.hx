@@ -226,18 +226,21 @@ class LoadingState extends MusicBeatState
 		else chartLoaded = true;
 
 		// 谱面已就绪（缓存命中/重开同曲）且烘焙未完成：直接在加载界面预烘焙音符贴图
+		// （等 shared 库就绪再执行，否则音符贴图解析全部失败）
 		if (ClientPrefs.data.preRenderNotes && PlayState.SONG != null
 			&& (pendingChartJson == null || pendingSongName == PlayState.SONG.song)
 			&& !Note.chartBakesReady())
 		{
 			var cb:Void->Void = callbacks.add('prerender');
-			Note.preRenderChartNotes();
-			if (cb != null) cb();
+			whenSharedReady(function() {
+				Note.preRenderChartNotes();
+				if (cb != null) cb();
+			});
 		}
 
 		// 谱面已就绪（缓存命中/重开同曲）：加载空闲期预生成音符，进入游戏后直接复用
 		if (PlayState.SONG != null && (pendingChartJson == null || pendingSongName == PlayState.SONG.song))
-			startPreGen();
+			whenSharedReady(function() { startPreGen(); });
 
 		// 音频加载：后台线程并行解码，不冻结主线程，并且每个文件都计入进度
 		var songToLoad:String = pendingSongName != null ? pendingSongName : (PlayState.SONG != null ? PlayState.SONG.song : null);
@@ -580,12 +583,29 @@ class LoadingState extends MusicBeatState
 		if (ClientPrefs.data.preRenderNotes)
 		{
 			var cb:Void->Void = callbacks != null ? callbacks.add('prerender') : null;
-			Note.preRenderChartNotes();
-			if (cb != null) cb();
+			whenSharedReady(function() {
+				Note.preRenderChartNotes();
+				if (cb != null) cb();
+			});
 		}
+		else
+			whenSharedReady(function() {});
 
 		// 提前生成：利用等待音频解码/角色预载的空闲期构建整张谱面的音符（大谱面省去进入后 500ms+）
-		startPreGen();
+		whenSharedReady(function() { startPreGen(); });
+	}
+
+	// shared 库就绪后再执行回调：音符贴图等 shared 资源依赖它，
+	// 未加载完成时 OpenFlAssets.exists/getBitmapData 全部失败（懒加载库未注册）。
+	// 已就绪则同步立即执行；未就绪则异步等 loadLibrary 完成（chart 与 shared 并行加载，互不阻塞）。
+	static function whenSharedReady(cb:Void->Void):Void
+	{
+		if (Assets.getLibrary('shared') != null)
+		{
+			cb();
+			return;
+		}
+		Assets.loadLibrary('shared').onComplete(function(_) { cb(); });
 	}
 
 	// 加载空闲期预生成音符（同步执行，进度计入加载条；失败自动回退创建期生成）

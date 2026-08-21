@@ -253,7 +253,7 @@ jobs:
           if [ -z "$BASE" ]; then
             BASE="0.0.0"
           fi
-          VERSION="${BASE}-$(date -u +%Y%m%d-%H%M)"
+          VERSION="${BASE}-$(TZ='Asia/Shanghai' date +%Y%m%d-%H%M)"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "发布版本: v$VERSION"
 

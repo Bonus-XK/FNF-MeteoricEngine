@@ -127,6 +127,13 @@ class Note extends FlxSprite
 		bakedArrowRenderWidth = [];
 	}
 
+	// 进曲目时调用：只清运行时图集缓存（其 FlxGraphic 由 Paths 追踪，跨曲目可能被内存清理销毁），
+	// 烘焙贴图缓存（bakedNoteGraphics，graphic 独立持有）保留复用
+	public static function clearRuntimeAtlasCache()
+	{
+		noteFramesCache = [];
+	}
+
 	// 懒加载：大部分音符（尤其大谱面未击打音符）不需要特效数据，构造时不分配
 	public var noteSplashData(get, never):NoteSplashData;
 	var _noteSplashData:NoteSplashData = null;
@@ -328,6 +335,7 @@ class Note extends FlxSprite
 			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) rgbShader.enabled = false; // 0.6.3 兼容/关着色器时避免 RGB 渲染成黑
 			else if (bakedKind >= 0) rgbShader.enabled = false; // 提前渲染：颜色已烘焙进贴图，不再叠加 RGB 着色器（叠加会钳制成白色）
+			else rgbShader.enabled = false; // 烘焙失败/未烘焙：RGB 着色器在部分 GPU/GLES 驱动输出全黑 → 关闭用原始贴图（发白为正常外观）
 			trace('NoteInit col=' + noteData + ' baked=' + bakedKind + ' rgbOn=' + (rgbShader != null ? rgbShader.enabled : false));
 
 			x += swagWidth * (noteData);
@@ -532,12 +540,23 @@ class Note extends FlxSprite
 				atlas = Paths.getSparrowAtlas(loadPath);
 				noteFramesCache.set(loadPath, atlas);
 			}
-			frames = atlas;
-			loadNoteAnims();
-			if(!isSustainNote)
+			if (atlas == null)
 			{
-				centerOffsets();
-				centerOrigin();
+				// 防御：图集加载失败（贴图/XML 缺失）时用纯色占位，避免 frames=null 绘制崩溃
+				// （FlxDrawQuadsItem Null Object Reference）。贴图路径修好后正常路径不触发。
+				trace('NOTE FALLBACK solid: ' + loadPath);
+				loadGraphic(FlxGraphic.fromBitmapData(new BitmapData(Std.int(swagWidth), Std.int(swagWidth), false, 0xFF606060)));
+				updateHitbox();
+			}
+			else
+			{
+				frames = atlas;
+				loadNoteAnims();
+				if(!isSustainNote)
+				{
+					centerOffsets();
+					centerOrigin();
+				}
 			}
 		}
 
@@ -870,13 +889,46 @@ class Note extends FlxSprite
 			{
 				if (f.name != null && f.name.startsWith(prefix)) { frame = f; break; }
 			}
-			if (frame == null) { trace('BAKE FAIL frame: ' + loadPath); return null; }
+			if (frame == null)
+			{
+				// 素材拼写容错：NOTE_assets.xml 的紫色长条尾帧名是 "pruple end hold0000"（拼写错误），
+				// 代码按 "purple hold end" 前缀找不到 → 改按“含 hold end + 含颜色名（含错误拼写 pruple）”匹配
+				if (kind == BAKE_HOLDEND)
+				{
+					for (f in atlas.frames)
+					{
+						if (f.name == null) continue;
+						if (f.name.indexOf('hold end') >= 0
+							&& (f.name.indexOf(colArray[col]) >= 0 || f.name.toLowerCase().indexOf('pruple') >= 0))
+						{ frame = f; break; }
+					}
+				}
+			}
+			if (frame == null)
+			{
+				// 诊断：打印图集帧名，定位帧匹配失败原因
+				var sample:String = '';
+				for (f in atlas.frames)
+				{
+					if (sample.length < 240)
+						sample += (f.name != null ? f.name : 'null') + ' ';
+				}
+				trace('BAKE FAIL frame: ' + loadPath + ' | prefix=' + prefix + ' | n=' + atlas.frames.length + ' | ' + sample);
+				return null;
+			}
 			bitmap = bakeAtlasFrame(frame);
 			if (kind == BAKE_NOTE && col == 0)
 				bakedArrowRenderWidth.set(loadPath, Std.int(bitmap.width * 0.7));
 		}
 
-		if (useRGB) applyRGBToBitmap(bitmap, r, g, b);
+		if (useRGB)
+		{
+			// 防御：r/g/b 颜色矩阵为全黑（0）时着色会把贴图烘成黑块 → 跳过着色保留原始贴图
+			var blackMatrix:Bool = (r.redFloat + r.greenFloat + r.blueFloat <= 0.01)
+				|| (g.redFloat + g.greenFloat + g.blueFloat <= 0.01)
+				|| (b.redFloat + b.greenFloat + b.blueFloat <= 0.01);
+			if (!blackMatrix) applyRGBToBitmap(bitmap, r, g, b);
+		}
 
 		// 不入 FlxG.bitmap 缓存：由本类静态引用持有，全局清缓存（PlayState.create 等）不会销毁
 		var graphic:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, null, false);
@@ -1102,9 +1154,11 @@ class Note extends FlxSprite
 				canBeHit = false;
 			}
 			else if (ClientPrefs.data.noteJudgment == 'KE 判定')
-				// KE 判定：提前窗口更短（0.5x），更容易在晚到一侧命中
+				// KE 判定：命中窗口与标准判定一致（早侧 1.0x）。
+				// 原实现早侧 0.5x（22.5ms）过严——玩家习惯提前 20-30ms 按，窗口外且 ghostTapping 静默，
+				// 表现为"断触/接不着"。KE 的严格性体现在防乱按与评分规则，而非缩短命中窗口。
 				canBeHit = (strumTime > Conductor.songPosition - (Conductor.safeZoneOffset * lateHitMult) &&
-							strumTime < Conductor.songPosition + (Conductor.safeZoneOffset * 0.5 * earlyHitMult));
+							strumTime < Conductor.songPosition + (Conductor.safeZoneOffset * earlyHitMult));
 			else
 				canBeHit = (strumTime > Conductor.songPosition - (Conductor.safeZoneOffset * lateHitMult) &&
 							strumTime < Conductor.songPosition + (Conductor.safeZoneOffset * earlyHitMult));

@@ -76,7 +76,7 @@
   <flag value="--enable-auto-import"/>
   <flag value="-m32" unless="HXCPP_M64"/>
   <flag value="-static" if="no_shared_libs"/>
-  <flag value="-static" if="mac_host" unless="HXCPP_M64"/>
+  <flag value="-static" if="mac_host"/>
   <flag value="-static-libgcc" if="no_shared_libs"/>
   <flag value="-static-libstdc++" if="no_shared_libs"/>
   <flag value="-L${MINGW_ROOT}/lib/libs" />
@@ -91,7 +91,7 @@
   <flag value="-mwindows" if="SUBSYSTEMWINDOWS" />
   <flag value="-m32" unless="HXCPP_M64"/>
   <flag value="-static" if="no_shared_libs"/>
-  <flag value="-static" if="mac_host" unless="HXCPP_M64"/>
+  <flag value="-static" if="mac_host"/>
   <flag value="-static-libgcc" if="no_shared_libs" unless="linux_host"/>
   <flag value="-static-libstdc++" if="no_shared_libs" unless="linux_host"/>
   <flag value="-static-libgcc" if="linux_host"/>

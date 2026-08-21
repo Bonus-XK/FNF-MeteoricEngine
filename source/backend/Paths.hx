@@ -132,6 +132,29 @@ class Paths
 		currentLevel = name.toLowerCase();
 	}
 
+	// lime 资产 id 兜底：lime manifest 的资产 id 是 URL 编码形态（assets%2Fshared%2Fimages%2F...），
+	// OpenFlAssets.exists 用解码形态 id 查询永远不匹配，这里顺带尝试 URL 编码形态
+	static function tryResolveAsset(path:String, ?type:AssetType):String
+	{
+		if (OpenFlAssets.exists(path, type)) return path;
+		var colonAt:Int = path.indexOf(':');
+		if (colonAt > 0)
+		{
+			var plain:String = path.substr(colonAt + 1);
+			if (plain != path && OpenFlAssets.exists(plain, type)) return plain;
+		}
+		// lime manifest 实际注册的 id 形态：路径中的 '/' 被编码为 %2F
+		var encoded:String = StringTools.replace(plainOrSelf(path), '/', '%2F');
+		if (encoded != path && OpenFlAssets.exists(encoded, type)) return encoded;
+		return null;
+	}
+
+	inline static function plainOrSelf(path:String):String
+	{
+		var colonAt:Int = path.indexOf(':');
+		return colonAt > 0 ? path.substr(colonAt + 1) : path;
+	}
+
 	public static function getPath(file:String, ?type:AssetType = TEXT, ?library:Null<String> = null, ?modsAllowed:Bool = false):String
 	{
 		#if MODS_ALLOWED
@@ -147,15 +170,37 @@ class Paths
 
 		if (currentLevel != null)
 		{
+			// 运行时 cwd = 资源目录（macOS 上 SDLApplication chdir 到 Contents/Resources）：
+			// 文件系统存在性检查是唯一可靠的资源定位方式（OpenFlAssets.exists 的 id 形态不匹配）。
+			#if sys
+			if(currentLevel != 'shared')
+			{
+				var weekFsPath:String = 'assets/$currentLevel/$file';
+				if (FileSystem.exists(weekFsPath))
+					return weekFsPath;
+			}
+			#end
+
 			var levelPath:String = '';
 			if(currentLevel != 'shared') {
 				levelPath = getLibraryPathForce(file, 'week_assets', currentLevel);
-				if (OpenFlAssets.exists(levelPath, type))
+				levelPath = tryResolveAsset(levelPath, type);
+				if (levelPath != null)
 					return levelPath;
 			}
+		}
 
-			levelPath = getLibraryPathForce(file, "shared");
-			if (OpenFlAssets.exists(levelPath, type))
+		// shared 库：无条件尝试文件系统路径（不依赖 currentLevel——
+		// 音符预生成可能发生在 setCurrentLevel 之前，例如 mod stage 下 stageDir 为空）
+		#if sys
+		var sharedFsPath:String = 'assets/shared/$file';
+		if (FileSystem.exists(sharedFsPath))
+			return sharedFsPath;
+		#end
+		{
+			var levelPath:String = getLibraryPathForce(file, "shared");
+			levelPath = tryResolveAsset(levelPath, type);
+			if (levelPath != null)
 				return levelPath;
 		}
 
@@ -164,7 +209,10 @@ class Paths
 
 	static public function getLibraryPath(file:String, library = "preload")
 	{
-		return if (library == "preload" || library == "default") getPreloadPath(file); else getLibraryPathForce(file, library);
+		if (library == "preload" || library == "default") return getPreloadPath(file);
+		var path:String = getLibraryPathForce(file, library);
+		var resolved:String = tryResolveAsset(path);
+		return resolved != null ? resolved : path;
 	}
 
 	inline static function getLibraryPathForce(file:String, library:String, ?level:String)
@@ -314,6 +362,16 @@ class Paths
 				bitmap = OpenFlAssets.getBitmapData(file);
 			else if (FileSystem.exists(file))
 				bitmap = BitmapData.fromFile(file);
+			// 兜底：lime 库前缀 id（shared:assets/shared/...）解析失败时，
+			// 尝试无前缀完整路径（manifest 的 id 是不带前缀的 assets/shared/images/...）
+			if (bitmap == null)
+			{
+				var plainId:String = file;
+				var colonAt:Int = plainId.indexOf(':');
+				if (colonAt > 0) plainId = plainId.substr(colonAt + 1);
+				if (plainId != file && OpenFlAssets.exists(plainId, IMAGE))
+					bitmap = OpenFlAssets.getBitmapData(plainId);
+			}
 		}
 
 		if (bitmap != null)
@@ -321,12 +379,20 @@ class Paths
 			localTrackedAssets.push(file);
 			if (allowGPU && ClientPrefs.data.cacheOnGPU)
 			{
-				var texture:RectangleTexture = FlxG.stage.context3D.createRectangleTexture(bitmap.width, bitmap.height, BGRA, true);
-				texture.uploadFromBitmapData(bitmap);
-				bitmap.image.data = null;
-				bitmap.dispose();
-				bitmap.disposeImage();
-				bitmap = BitmapData.fromTexture(texture);
+				// context3D 未就绪（加载界面早期）时 GPU 上传会失败 → 回退 CPU 位图，避免贴图加载失败
+				try
+				{
+					var texture:RectangleTexture = FlxG.stage.context3D.createRectangleTexture(bitmap.width, bitmap.height, BGRA, true);
+					texture.uploadFromBitmapData(bitmap);
+					bitmap.image.data = null;
+					bitmap.dispose();
+					bitmap.disposeImage();
+					bitmap = BitmapData.fromTexture(texture);
+				}
+				catch (e:Dynamic)
+				{
+					// GPU 不可用，保持 CPU 位图
+				}
 			}
 			var newGraphic:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, file);
 			newGraphic.persist = true;
@@ -347,25 +413,35 @@ class Paths
 			return File.getContent(modFolders(key));
 		#end
 
-		if (FileSystem.exists(getPreloadPath(key)))
-			return File.getContent(getPreloadPath(key));
-
+		// 运行时 cwd = 资源目录（macOS chdir 到 Resources）：文件系统直接读取最可靠
 		if (currentLevel != null)
 		{
-			var levelPath:String = '';
 			if(currentLevel != 'shared') {
-				levelPath = getLibraryPathForce(key, 'week_assets', currentLevel);
-				if (FileSystem.exists(levelPath))
-					return File.getContent(levelPath);
+				var weekFs:String = 'assets/$currentLevel/$key';
+				if (FileSystem.exists(weekFs))
+					return File.getContent(weekFs);
 			}
-
-			levelPath = getLibraryPathForce(key, 'shared');
-			if (FileSystem.exists(levelPath))
-				return File.getContent(levelPath);
 		}
+
+		// shared 库：无条件尝试（不依赖 currentLevel 是否已设置）
+		var sharedFs:String = 'assets/shared/$key';
+		if (FileSystem.exists(sharedFs))
+			return File.getContent(sharedFs);
+
+		if (FileSystem.exists(getPreloadPath(key)))
+			return File.getContent(getPreloadPath(key));
 		#end
 		var path:String = getPath(key, TEXT);
+		#if sys
+		if (FileSystem.exists(path))
+			return File.getContent(path);
+		#end
 		if(OpenFlAssets.exists(path, TEXT)) return Assets.getText(path);
+		// 兜底：URL 编码形态 id（lime manifest 实际注册形态：'/' → %2F）
+		var colonTxt:Int = path.indexOf(':');
+		var plainTxt:String = colonTxt > 0 ? path.substr(colonTxt + 1) : path;
+		var encodedTxt:String = StringTools.replace(plainTxt, '/', '%2F');
+		if (encodedTxt != path && OpenFlAssets.exists(encodedTxt, TEXT)) return Assets.getText(encodedTxt);
 		return null;
 	}
 

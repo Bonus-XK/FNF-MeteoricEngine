@@ -452,6 +452,9 @@ class FreeplayState extends MusicBeatState
 						changeSelection(hoveredID - curSelected);
 						holdTime = 0;
 					}
+					// 鼠标/触屏点击歌曲行：选中并直接进入该曲目
+					// （原实现点击已选中的行无任何反应，也没有"点击进入游戏"的路径）
+					accepted = true;
 				}
 				if (FlxG.mouse.overlaps(diffText) && clickPressed)
 				{

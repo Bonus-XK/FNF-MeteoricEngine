@@ -359,6 +359,9 @@ class PlayState extends MusicBeatState
 	override public function create()
 	{
 		//trace('Playback Rate: ' + playbackRate);
+		// 进曲目即丢弃上一局的运行时音符图集缓存：其 FlxGraphic 随上次退出被内存清理销毁，
+		// 跨曲目复用会拿到 bitmap=null 的图集导致绘制崩溃（FlxDrawQuadsItem Null Object Reference）
+		objects.Note.clearRuntimeAtlasCache();
 		Paths.clearStoredMemory();
 
 		startCallback = startCountdown;
@@ -512,6 +515,8 @@ class PlayState extends MusicBeatState
 		boyfriendGroup = new FlxSpriteGroup(BF_X, BF_Y);
 		dadGroup = new FlxSpriteGroup(DAD_X, DAD_Y);
 		gfGroup = new FlxSpriteGroup(GF_X, GF_Y);
+
+		trace('[Stage] create stage: ' + curStage + ' | replayMode=' + replayMode + ' | isPixelStage=' + isPixelStage);
 
 		switch (curStage)
 		{
@@ -2357,16 +2362,20 @@ class PlayState extends MusicBeatState
 								if(!rewinding && (cpuControlled || replayMode) && !daNote.blockHit && !daNote.wasGoodHit)
 								{
 									var shouldHit:Bool = false;
-									if (replayMode)
+									if (replayMode && !replayV2)
 									{
-										// 回放：只命中录制时打中的音符（按谱面序号精确匹配），
-										// 未记录的箭头自然滑过并触发 miss，与原局表现一致
+										// 旧版回放（v1，无按键流）：按录制命中记录合成命中，
+										// 未记录的箭头自然滑过并触发 miss，与原局表现一致。
+										// 注意：v2（含按键流）不走这里——自动命中会在 strumTime 一到就抢先把
+										// 音符打掉，之后注入的真实按键（晚按）找不到可命中音符会变成 ghost miss，
+										// 导致回放 Miss 数膨胀（2 → 10）。v2 完全靠 updateReplayInputs 按键注入，
+										// 同时间同按键必然命中同一音符，与实玩 1:1 复刻。
 										if (replayHitSeqs != null && daNote.chartSeq >= 0 && replayHitSeqs.exists(daNote.chartSeq)
 											&& !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
 											shouldHit = true;
 									}
-									else if ((botplayPlan != null && !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
-										|| (botplayPlan == null && daNote.canBeHit && (daNote.isSustainNote || songPos + botAdvance >= daNote.strumTime)))
+									else if (!replayMode && ((botplayPlan != null && !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
+										|| (botplayPlan == null && daNote.canBeHit && (daNote.isSustainNote || songPos + botAdvance >= daNote.strumTime))))
 										shouldHit = true;
 
 									if (shouldHit)
@@ -3388,9 +3397,9 @@ class PlayState extends MusicBeatState
 	public var rewindMinPosition:Float = 1000; // 歌曲位置低于该毫秒数时不回溯，直接重开
 	public var rewindOvershoot:Float = 5000;   // 回溯终点下探上限：最远回溯到 -5000 毫秒（安全兜底）
 	public var rewindEndPos:Float = 0;         // 回溯终点（毫秒），由最早音符飞出“出生窗口”的位置自动计算
-	public var rewindSpeedMs:Float = 6000;     // 回溯平均速度（毫秒歌曲时间/秒），越小越慢、越有倒带感
-	public var rewindMinDuration:Float = 1.5;  // 回溯时长下限（秒）
-	public var rewindMaxDuration:Float = 9.0;  // 回溯时长上限（秒）
+	public var rewindSpeedMs:Float = 15000;    // 回溯平均速度（毫秒歌曲时间/秒），越大越快
+	public var rewindMinDuration:Float = 0.7;  // 回溯时长下限（秒）
+	public var rewindMaxDuration:Float = 4.0;  // 回溯时长上限（秒）
 
 	public var totalPlayed:Int = 0;
 	public var totalNotes:Int = 0;
@@ -3808,8 +3817,6 @@ class PlayState extends MusicBeatState
 	{
 		var eventKey:FlxKey = event.keyCode;
 		var key:Int = getKeyFromEvent(keysArray, eventKey);
-		//trace('Pressed: ' + eventKey);
-
 		if(!controls.controllerMode && key > -1) keyReleased(key);
 	}
 
@@ -4312,16 +4319,25 @@ class PlayState extends MusicBeatState
 	}
 
 	var lastStepHit:Int = -1;
+	// 判定时序诊断：music.time 与 songPosition 的偏差（SDL3 音频时序漂移会导致判定窗口错位）
+	static var _lastDriftTraceStep:Int = -9999;
 	override function stepHit()
 	{
 		if (rewinding) return; // 回溯期间不触发步点回调，避免重开音频
 
 		if(FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
 		{
-			if (Math.abs(FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)
+			var drift:Float = FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset);
+			if (Math.abs(drift) > (20 * playbackRate)
 				|| (SONG.needsVoices && Math.abs(vocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)))
 			{
 				resyncVocals();
+			}
+			// 节流诊断：每 48 步（约 12 拍 @120BPM）打印一次时序偏差
+			if (curStep - _lastDriftTraceStep >= 48)
+			{
+				_lastDriftTraceStep = curStep;
+				trace('[TIMING] step=' + curStep + ' music=' + Std.int(FlxG.sound.music.time) + ' songPos=' + Std.int(Conductor.songPosition) + ' drift=' + Std.int(drift) + 'ms fps=' + Std.int(FlxG.drawFramerate));
 			}
 		}
 
@@ -5253,7 +5269,7 @@ class GameHUD
 		if (iconP2 != null) iconP2.visible = !hide && !minimal;
 		if (scoreTxt != null) scoreTxt.visible = !hide;
 		if (timeBarOverlay != null) timeBarOverlay.visible = timeBar != null && timeBar.visible && !hide;
-		if (botplayTxt != null) botplayTxt.visible = (st.cpuControlled || st.replayMode);
+		if (botplayTxt != null) botplayTxt.visible = (st.cpuControlled || st.replayMode) && !st.endingSong;
 		if (songTxt != null) songTxt.visible = !hide && !ClientPrefs.data.hideWatermark;
 		if (judgementField != null) judgementField.visible = !hide && ClientPrefs.data.showJudgementCounter;
 
