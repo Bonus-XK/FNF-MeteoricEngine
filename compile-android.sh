@@ -66,7 +66,7 @@ export ANDROID_SETUP=true
 
 if [ "$1" = "install" ]; then
   # lime 8.x 已移除 `install` 命令：构建后直接用 adb 安装
-  haxelib run lime build android -release
+  haxelib run lime build android -release -DANDROID_HOST=darwin-x86_64
   ADB="${ANDROID_SDK}/platform-tools/adb"
   if [ ! -x "$ADB" ]; then ADB="$(command -v adb || true)"; fi
   APK="$(find export/release/android/bin -name '*.apk' -type f | head -1)"
@@ -77,5 +77,5 @@ if [ "$1" = "install" ]; then
   echo "安装 $APK ..."
   exec "$ADB" install -r "$APK"
 else
-  exec haxelib run lime build android -release
+  exec haxelib run lime build android -release -DANDROID_HOST=darwin-x86_64
 fi

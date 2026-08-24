@@ -102,16 +102,15 @@ class TitleState extends MusicBeatState
 		ClientPrefs.loadPrefs();
 
 		if(ClientPrefs.data.checkForUpdates && !closedState) {
-			//更新检查放到后台线程里跑，避免在网速差/被墙时阻塞主线程导致启动黑屏
+			// 更新检查为异步回调（haxe.Http 不阻塞主线程），主线程发起、回调回主线程执行。
+			// 不包后台线程：线程化会让回调里的字符串解析/分配在子线程执行，
+			// 与主线程 GC 并发会破坏 hxcpp 堆 → SIGILL/SIGSEGV 无日志闪退（加载期崩溃同源）。
 			#if sys
-			// 安卓等平台：haxe.Http 在子线程可能抛异常（网络不可用等），必须兜住，否则整个进程 abort
-			sys.thread.Thread.create(function() {
-				try {
-					checkForUpdates();
-				} catch (e:Dynamic) {
-					trace('update check crashed: $e');
-				}
-			});
+			try {
+				checkForUpdates();
+			} catch (e:Dynamic) {
+				trace('update check crashed: $e');
+			}
 			#else
 			checkForUpdates();
 			#end

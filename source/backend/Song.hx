@@ -300,7 +300,6 @@ class Song
 			rawJson = rawJson.substr(0, rawJson.length - 1);
 			// LOL GOING THROUGH THE BULLSHIT TO CLEAN IDK WHATS STRANGE
 		}
-
 		var songJson:Dynamic = parseJSONshit(rawJson);
 		onLoadJson(songJson);
 
@@ -329,6 +328,15 @@ class Song
 		#end
 		#if (sys && !android)
 		return FileSystem.exists('assets/songs/' + songPath + '/' + vocalName + '.' + Paths.SOUND_EXT);
+		#elseif android
+		// 安卓：与 returnSound 完全同源的判定。
+		// ① 外部 .meteoric 覆盖优先（AndroidStorage.root() 绝对路径，用户可替换音频）；
+		// ② 'songs:' 库（APK 内置资产，returnSound 经 getLibraryPath/tryResolveAsset 实际命中）。
+		// 不可用无前缀 Assets.exists/相对 FileSystem：「songs」音频注册在独立库，且运行时 cwd 不指向外部资产
+		// → 恒 false → 所有歌的人声永不加载（整首无人声、且无 MISSING 日志的根因）。
+		var relPath:String = 'assets/songs/' + songPath + '/' + vocalName + '.' + Paths.SOUND_EXT;
+		if (FileSystem.exists(backend.AndroidStorage.root() + '/' + relPath)) return true;
+		return lime.utils.Assets.exists('songs:' + relPath, SOUND) || lime.utils.Assets.exists(relPath, SOUND);
 		#else
 		return Assets.exists('assets/songs/' + songPath + '/' + vocalName + '.' + Paths.SOUND_EXT, SOUND);
 		#end

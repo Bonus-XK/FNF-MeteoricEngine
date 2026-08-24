@@ -91,10 +91,15 @@ class Controls
 		if(result) controllerMode = false;
 
 		#if mobile
-		if (!result && objects.MobileControls.instance != null)
+		if (!result && objects.MobileControls.instance != null && !isPausedStack())
 		{
 			result = objects.MobileControls.instance.justPressed(key);
-			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+			// 触屏虚拟垫不再置 controllerMode：该标记是"手柄导航/游玩输入路由"语义，
+			// 虚拟垫按键已由滑键系统注入键盘（PlayState 键盘路径可接收），且触屏游玩后
+			// controllerMode 残留为 true 会屏蔽所有菜单界面的鼠标/触摸点击路径
+			// （暂停→游玩设置 滑动/返回键失效的根因）。真手柄仍由 _myGamepad* 置位。
+			// 暂停期间不查询 instance（游玩垫）：否则暂停堆栈里的触摸会被游玩垫键区
+			// 误吃（点屏幕右侧=右键、按 ◀▶ 却上下切选项）。
 		}
 		#end
 
@@ -107,10 +112,10 @@ class Controls
 		if(result) controllerMode = false;
 
 		#if mobile
-		if (!result && objects.MobileControls.instance != null)
+		if (!result && objects.MobileControls.instance != null && !isPausedStack())
 		{
 			result = objects.MobileControls.instance.pressed(key);
-			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+			// 触屏虚拟垫不再置 controllerMode（见 justPressed 注释）；暂停期间不查询 instance
 		}
 		#end
 
@@ -123,14 +128,22 @@ class Controls
 		if(result) controllerMode = false;
 
 		#if mobile
-		if (!result && objects.MobileControls.instance != null)
+		if (!result && objects.MobileControls.instance != null && !isPausedStack())
 		{
 			result = objects.MobileControls.instance.justReleased(key);
-			if (result && !objects.MobileControls.instance.menuMode) controllerMode = true;
+			// 触屏虚拟垫不再置 controllerMode（见 justPressed 注释）；暂停期间不查询 instance
 		}
 		#end
 
 		return result || _myGamepadJustReleased(gamepadBinds[key]) == true;
+	}
+
+	/** 暂停堆栈（暂停菜单及其所有子界面）？期间全局 instance=游玩垫仅 visible=false，
+	 *  键区命中判定仍在运行，会吞掉暂停界面的触摸（右键/方向键串扰）。
+	 *  菜单 A 键走 pausePad 直查（不经 Controls），键盘/手柄不受影响。 */
+	static inline function isPausedStack():Bool
+	{
+		return states.PlayState.instance != null && states.PlayState.instance.paused;
 	}
 
 	public var controllerMode:Bool = false;

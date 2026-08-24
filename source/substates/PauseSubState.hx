@@ -5,6 +5,7 @@ import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
 
+import flixel.FlxBasic;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.input.keyboard.FlxKey;
 import flixel.math.FlxPoint;
@@ -66,6 +67,9 @@ class PauseSubState extends MusicBeatSubstate
 	var menuSelector:FlxSprite;
 	var menuSelectorTween:FlxTween;
 	var backBtn:BackButton;
+	// 子页（设置/脚本管理等）打开时整体隐藏的"菜单侧"UI（右侧本局数据面板保留）
+	var menuUI:Array<FlxBasic> = [];
+	var menuUIHidden:Bool = false;
 	var statPanel:FlxSprite;
 	var statLabels:Array<FlxText> = [];
 	var statTexts:Array<FlxText> = [];
@@ -290,6 +294,18 @@ class PauseSubState extends MusicBeatSubstate
 		trace('[PAUSE] 信息文本最右缘=' + (blueballedTxt.x + blueballedTxt.width) + ' | 安全上限=' + SAFE_RIGHT);
 
 		loadUIscripts('pause');
+
+		// 收集"菜单侧"UI：子页打开时整体隐藏（右侧本局数据面板 statPanel/statLabels/statTexts 保留）
+		menuUI = [bg, titleText, chartingPanel, chartingText, infoPanel, levelInfo, levelDifficulty,
+			blueballedTxt, practiceText, menuPanel, menuSelector, grpMenuShit,
+			backBtn.glow, backBtn.spr, backBtn.label];
+	}
+
+	function setMenuUI(visible:Bool):Void
+	{
+		for (obj in menuUI)
+			if (obj != null) obj.visible = visible;
+		if (!visible && skipTimeText != null) skipTimeText.visible = false;
 	}
 
 	function makeInfoText(content:String, yPos:Float, ?textColor:FlxColor = FlxColor.WHITE, ?size:Int = 26):FlxText
@@ -336,6 +352,18 @@ class PauseSubState extends MusicBeatSubstate
 			cameras[0].scroll.set(0, 0);
 		}
 		FlxG.mouse.visible = true;
+		// 子页（设置列表/脚本管理等）打开期间：暂停菜单冻结输入并隐藏菜单侧 UI，由子页独占
+		// （相机层上子页与暂停同用 camOther，渲染顺序由嵌套保证在暂停菜单之上；隐藏菜单是双保险）
+		if (subState != null)
+		{
+			if (!menuUIHidden) { setMenuUI(false); menuUIHidden = true; }
+			cantUnpause -= elapsed;
+			if (pauseMusic != null && pauseMusic.volume < 0.5)
+				pauseMusic.volume += 0.01 * elapsed;
+			super.update(elapsed);
+			return;
+		}
+		if (menuUIHidden) { setMenuUI(true); menuUIHidden = false; }
 		cantUnpause -= elapsed;
 		if (pauseMusic != null && pauseMusic.volume < 0.5)
 			pauseMusic.volume += 0.01 * elapsed;
@@ -599,16 +627,9 @@ class PauseSubState extends MusicBeatSubstate
 					};
 					openSubState(scriptManagerSubState);
 				case '设置':
-					PlayState.instance.paused = true; // For lua
-					PlayState.instance.vocals.volume = 0;
-					MusicBeatState.switchState(new OptionsState());
-					if(ClientPrefs.data.pauseMusic != '无')
-					{
-						FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), pauseMusic.volume);
-						FlxTween.tween(FlxG.sound.music, {volume: 1}, 0.8);
-						FlxG.sound.music.time = pauseMusic.time;
-					}
-					OptionsState.onPlayState = true;
+					// 嵌入式设置：直接叠加分类列表子页，关闭后回到暂停菜单（保持暂停、不重载曲目）。
+					// 设置改动即时生效；需重载的项（判定模式/音符皮肤等）在下次重开曲目时生效。
+					openSubState(new PauseSettingsSubstate());
 				case "返回主菜单":
 					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;

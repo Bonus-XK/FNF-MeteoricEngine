@@ -39,22 +39,33 @@ class AndroidStorage
 	{
 		if (_fallbackRoot == null)
 		{
+			// 优先 extension-androidtools 的 Context.getExternalFilesDir（兼容性好，无需自写 JNI）
 			try
 			{
-				var getSingleton = JNI.createStaticField('org/libsdl/app/SDLActivity', 'mSingleton', 'Lorg/libsdl/app/SDLActivity;');
-				var act = getSingleton.get();
-				if (act != null)
-				{
-					var getExternalFilesDir = JNI.createMemberMethod('android/app/Activity', 'getExternalFilesDir', '(Ljava/lang/String;)Ljava/io/File;', false);
-					var file = getExternalFilesDir(act, null);
-					if (file != null)
-					{
-						var getPath = JNI.createMemberMethod('java/io/File', 'getPath', '()Ljava/lang/String;', false);
-						_fallbackRoot = Std.string(getPath(file));
-					}
-				}
+				var ext = extension.androidtools.content.Context.getExternalFilesDir(null);
+				if (ext != null && ext != 'null' && ext.length > 0)
+					_fallbackRoot = Std.string(ext);
 			}
 			catch (e:Dynamic) {}
+			if (_fallbackRoot == null || _fallbackRoot == 'null' || _fallbackRoot == '')
+			{
+				try
+				{
+					var getSingleton = JNI.createStaticField('org/libsdl/app/SDLActivity', 'mSingleton', 'Lorg/libsdl/app/SDLActivity;');
+					var act = getSingleton.get();
+					if (act != null)
+					{
+						var getExternalFilesDir = JNI.createMemberMethod('android/app/Activity', 'getExternalFilesDir', '(Ljava/lang/String;)Ljava/io/File;', false);
+						var file = getExternalFilesDir(act, null);
+						if (file != null)
+						{
+							var getPath = JNI.createMemberMethod('java/io/File', 'getPath', '()Ljava/lang/String;', false);
+							_fallbackRoot = Std.string(getPath(file));
+						}
+					}
+				}
+				catch (e:Dynamic) {}
+			}
 			if (_fallbackRoot == null || _fallbackRoot == 'null' || _fallbackRoot == '')
 				_fallbackRoot = '/sdcard/Android/data/' + packageName() + '/files';
 			_fallbackRoot = StringTools.endsWith(_fallbackRoot, '/') ? _fallbackRoot + '.meteoric' : _fallbackRoot + '/.meteoric';
@@ -253,6 +264,101 @@ class AndroidStorage
 			if (open != null) open(packageName());
 		}
 		catch (e:Dynamic) {}
+	}
+
+	// ---------- 权限状态判定（Main 的启动流程按此决策，不再静默回退）----------
+
+	/** Android 11+（API 30+）？决定走"所有文件访问"还是旧 WRITE 权限 */
+	public static function isAndroid11Plus():Bool
+	{
+		try
+		{
+			return extension.androidtools.os.Build.VERSION.SDK_INT >= 30;
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	/** 已获得在根目录 /sdcard/.meteoric 读写所需的存储权限？
+	 *  Android 10 = WRITE_EXTERNAL_STORAGE 已授权；Android 11+ = "所有文件访问"已授权 */
+	public static function hasStoragePermission():Bool
+	{
+		try
+		{
+			if (isAndroid11Plus())
+			{
+				var m = JNI.createStaticMethod('android/os/Environment', 'isExternalStorageManager', '()Z', false);
+				var ok:Dynamic = m();
+				return ok != null && ok == true;
+			}
+			return hasWritePermission();
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	static function hasWritePermission():Bool
+	{
+		try
+		{
+			var getSingleton = JNI.createStaticField('org/libsdl/app/SDLActivity', 'mSingleton', 'Lorg/libsdl/app/SDLActivity;');
+			var act = getSingleton.get();
+			if (act == null) return false;
+			var check = JNI.createMemberMethod('android/app/Activity', 'checkSelfPermission', '(Ljava/lang/String;)I', false);
+			var granted:Dynamic = check(act, 'android.permission.WRITE_EXTERNAL_STORAGE');
+			return granted != null && Std.int(granted) == 0;
+		}
+		catch (e:Dynamic) { return false; }
+	}
+
+	/** 只尝试当前 root()（公共根目录或回退目录）的目录结构，失败返回错误，绝不静默切换（决策权在 Main） */
+	public static function tryEnsureRootDirs():String
+	{
+		return tryEnsureDirs(root());
+	}
+
+	/** 是否处于回退模式（应用专属目录） */
+	public static function usingFallback():Bool
+	{
+		return _useFallbackRoot;
+	}
+
+	/** 切到应用专属回退目录（仅在明确失败/用户拒绝时，由 Main 决策调用） */
+	public static function enableFallback():Void
+	{
+		_useFallbackRoot = true;
+	}
+
+	/** 关闭回退模式（授权成功时调用）：root() 恢复指向公共根目录 /sdcard/.meteoric */
+	public static function enableFallbackOff():Void
+	{
+		_useFallbackRoot = false;
+	}
+
+	/** 把回退目录整体迁移到公共根目录（同卷 rename，秒级；mods/assets/进度全部带走）。
+	 *  仅当公共目录尚不存在、回退目录存在时执行；返回是否迁移成功 */
+	public static function migrateFromFallback():Bool
+	{
+		try
+		{
+			if (_useFallbackRoot) return false;
+			var pub:String = root();
+			var fb:String = fallbackRoot();
+			if (pub == fb) return false;
+			if (FileSystem.exists(pub) || !FileSystem.exists(fb)) return false;
+			var parent:String = haxe.io.Path.directory(pub);
+			if (parent != null && parent.length > 0 && !FileSystem.exists(parent))
+				FileSystem.createDirectory(parent);
+			FileSystem.rename(fb, pub);
+			// 迁移成功后回退模式解锁：后续 root() 稳定指向公共目录
+			_fallbackRoot = pub;
+			return true;
+		}
+		catch (e:Dynamic) { return false; }
 	}
 
 	static function packageName():String

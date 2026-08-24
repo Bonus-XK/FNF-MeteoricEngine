@@ -41,28 +41,52 @@ typedef EventNote = {
 // 进入游戏后按需通过 NoteGroup 对象池实例化成 Note。
 // noteData 位打包：1-8 位 = 轨道；9 = mustHit；10 = isHold；11 = isHoldEnd；12 = gfNote；
 // 13 = altAnim；14 = noAnim&noMissAnim；15 = blockHit；16 = ignoreNote
-typedef CastNote = {
-	var strumTime:Float;
-	var noteData:Int;
-	@:optional var chartSeq:Int;          // 谱面唯一序号（回放录制/匹配）；Lua 动态音符为 -1
-	@:optional var density:Null<Float>;   // 堆叠合并计数：同一(时间,轨道)合并为一个音符代表的箭头数
-	@:optional var holdLength:Null<Float>;
-	@:optional var noteType:String;
-	@:optional var multSpeed:Null<Float>; // 每音符滚动倍速（默认 1）
-	@:optional var cmpSpam:Array<Dynamic>;// H-Slice 挤压音符扩展 [剩余数, 密度]（展开为连续同轨音符）
-	@:optional var offs:Array<Float>;      // 堆叠合并展开：本组内每个箭头相对基准时间的偏移（ms）
-	                                       //（后台压缩为一条 CastNote；生成时按偏移展开为 N 个视觉箭头，
-	                                       //  画面与未压缩时逐像素一致）
+// 类型化类（非匿名结构）：hxcpp 下字段为静态访问，避免 anon 动态字段表（Anon::__Field）
+// 在 GC/线程场景被回收导致 UAF（安卓 Blazin 进曲 SIGSEGV 根因）。
+// 字段默认值语义与原 @:optional 一致：未赋值=null/false（调用处已有 null 判断）。
+class CastNote
+{
+	public var strumTime:Float;
+	public var noteData:Int;
+	public var chartSeq:Int;          // 谱面唯一序号（回放录制/匹配）；Lua 动态音符为 -1
+	public var density:Float;         // 堆叠合并计数：同一(时间,轨道)合并为一个音符代表的箭头数
+	public var holdLength:Float;
+	public var noteType:String;
+	public var multSpeed:Float;       // 每音符滚动倍速（默认 1）
+	public var cmpSpam:Array<Dynamic>;// H-Slice 挤压音符扩展 [剩余数, 密度]（展开为连续同轨音符）
+	public var offs:Array<Float>;     // 堆叠合并展开：本组内每个箭头相对基准时间的偏移（ms）
+									//（后台压缩为一条 CastNote；生成时按偏移展开为 N 个视觉箭头，
+									//  画面与未压缩时逐像素一致）
 	// 舞台脚本（PhillyStreets/PhillyBlazin 等）会直接改这些字段；必须初始化默认值
-	@:optional var noAnimation:Bool;
-	@:optional var noMissAnimation:Bool;
-	@:optional var blockHit:Bool;
+	public var noAnimation:Bool = false;
+	public var noMissAnimation:Bool = false;
+	public var blockHit:Bool = false;
+
+	public function new()
+	{
+		strumTime = 0;
+		noteData = 0;
+		chartSeq = -1;
+		density = 1;
+		holdLength = 0;
+		noteType = null;
+		multSpeed = 1;
+		cmpSpam = null;
+		offs = null;
+	}
 }
 
-typedef SpamNoteData = {
-	var remaining:Float;
-	var density:Float;
-	var seedNote:CastNote; // 原始种子（每次展开后 strumTime 递增）
+class SpamNoteData
+{
+	public var remaining:Float;
+	public var density:Float;
+	public var seedNote:CastNote; // 原始种子（每次展开后 strumTime 递增）
+	public function new(remaining:Float, density:Float, seedNote:CastNote)
+	{
+		this.remaining = remaining;
+		this.density = density;
+		this.seedNote = seedNote;
+	}
 }
 
 typedef NoteSplashData = {
@@ -371,6 +395,9 @@ class Note extends FlxSprite
 			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) rgbShader.enabled = false; // 0.6.3 兼容/关着色器时避免 RGB 渲染成黑
+			#if mobile
+			else rgbShader.enabled = false; // 安卓 GPU：RGB 着色器输出全黑（箭头不可见），强制用贴图原色/烘焙色
+			#else
 			else if (bakedKind >= 0) rgbShader.enabled = false; // 提前渲染：颜色已烘焙进贴图，不再叠加 RGB 着色器（叠加会钳制成白色）
 			else
 			{
@@ -379,6 +406,7 @@ class Note extends FlxSprite
 				var skinPath:String = getNoteSkinLoadPathCached(texture, '', PlayState.isPixelStage, isSustainNote);
 				rgbShader.enabled = (skinPath.indexOf('chip') < 0);
 			}
+			#end
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
@@ -1331,8 +1359,8 @@ class Note extends FlxSprite
 		exists = true;
 		spawned = true;
 
-		density = (target.density != null && target.density > 0) ? target.density : 1;
-		chartSeq = (target.chartSeq != null) ? target.chartSeq : -1;
+		density = (target.density > 0) ? target.density : 1;
+		chartSeq = target.chartSeq;
 		prevNote = null;
 		nextNote = null;
 		parent = null;
@@ -1365,8 +1393,8 @@ class Note extends FlxSprite
 			if (ct != null && ct.length > 0) noteType = ct;
 		} catch (e:Dynamic) {}
 
-		sustainLength = target.holdLength != null ? target.holdLength : 0;
-		multSpeed = (target.multSpeed != null) ? target.multSpeed : 1; // set_multSpeed 同步 resize 长条
+		sustainLength = target.holdLength;
+		multSpeed = target.multSpeed; // set_multSpeed 同步 resize 长条
 
 		// 长条分段样式：尾段直接用 holdend 贴图/动画；非尾段一步到位换 hold（等价于构造时逐段转换）
 		ensureAllNoteAnims(); // 池化换轨：补齐全部轨道动画，避免 play 失败停在左箭头帧

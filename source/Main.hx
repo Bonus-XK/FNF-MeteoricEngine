@@ -146,10 +146,16 @@ class Main extends Sprite
 	}
 
 	#if android
-	// ---------- 安卓外部存储初始化：/sdcard/meteoric（assets + mods） ----------
+	// ---------- 安卓外部存储初始化：/sdcard/.meteoric（assets + mods） ----------
+	// 权限决策链（Android 10 旧 WRITE / Android 11+ "所有文件访问"）：
+	//   已授权 → 直接尝试公共根目录 /sdcard/.meteoric（失败才回退）；
+	//   未授权 → Android 10 弹旧权限框；Android 11+ 跳"所有文件访问"设置页；
+	//           等待授权（10 秒），成功 → 公共根目录 + 自动迁移旧数据；
+	//           超时/拒绝 → 提示后回退到应用专属目录继续（不卡死）。
 	var _storageLabel:openfl.text.TextField;
 	var _storageError:Bool = false;
 	var _storageWaitFrames:Int = 0;
+	var _storageGuideShown:Bool = false; // 本会话已引导过权限页（避免反复跳转）
 
 	function setupAndroidStorage():Void
 	{
@@ -162,17 +168,46 @@ class Main extends Sprite
 		_storageLabel.text = '正在准备 ' + backend.AndroidStorage.root() + ' ...';
 		addChild(_storageLabel);
 
-		// Android 10：先请求旧存储权限（弹窗）；Android 11+ 弹窗会被系统忽略，随后走"所有文件访问"引导
-		backend.AndroidStorage.requestLegacyPermissions();
-		var err = backend.AndroidStorage.ensureDirs();
-		if (err == null)
+		var st = backend.AndroidStorage;
+
+		if (st.hasStoragePermission())
 		{
-			backend.AndroidStorage.startCopyAssets();
+			// 已授权：直接用公共根目录；失败再回退
+			var err = st.tryEnsureRootDirs();
+			if (err != null && !st.usingFallback())
+			{
+				st.enableFallback();
+				err = st.tryEnsureRootDirs();
+			}
+			if (err == null)
+			{
+				// 若此前数据在应用专属目录（升级用户），整体迁到根目录（mods/assets 一并带走）
+				st.migrateFromFallback();
+				st.startCopyAssets();
+			}
+			else
+			{
+				_storageError = true;
+				_storageLabel.text = '无法访问存储（' + err + '）';
+			}
 		}
 		else
 		{
+			// 未授权：进入权限引导阶段（Android 10 弹窗 / 11+ 跳设置页），等待轮询
 			_storageError = true;
-			_storageWaitFrames = 180; // 等 3 秒，给用户点权限弹窗的时间
+			_storageWaitFrames = 600; // 10 秒等待授权
+			if (st.isAndroid11Plus())
+			{
+				_storageLabel.text = '需要"所有文件访问"权限\n'
+					+ '授权后即可把 Mod 直接放进手机根目录的 .meteoric/mods 文件夹\n'
+					+ '正在打开系统设置...';
+				st.openStorageSettings();
+			}
+			else
+			{
+				_storageLabel.text = '请在弹窗中允许存储权限...';
+				st.requestLegacyPermissions();
+			}
 		}
 		addEventListener(Event.ENTER_FRAME, onAndroidStorageFrame);
 	}
@@ -200,34 +235,53 @@ class Main extends Sprite
 			return;
 		}
 
-		// 权限未就绪：先等权限弹窗，再引导"所有文件访问"
+		// ---- 权限等待阶段：每帧检查授权结果 ----
+		if (st.hasStoragePermission())
+		{
+			// 授权成功（设置页返回 / 弹窗授权）：切公共根目录，迁移旧数据，开始复制
+			st.enableFallbackOff();
+			var err = st.tryEnsureRootDirs();
+			if (err == null)
+			{
+				st.migrateFromFallback();
+				_storageError = false;
+				st.startCopyAssets();
+				return;
+			}
+			// 公共目录仍失败：保持现状（下面走超时/回退逻辑）
+		}
+
 		if (_storageWaitFrames > 0)
 		{
 			_storageWaitFrames--;
-			_storageLabel.text = '请在弹窗中允许存储权限...';
-			var err = st.ensureDirs();
+			if (st.isAndroid11Plus())
+				_storageLabel.text = '等待"所有文件访问"授权...\n'
+					+ '完成后把 Mod 放进手机根目录 .meteoric/mods 即可\n'
+					+ '（返回游戏自动继续）';
+			else
+				_storageLabel.text = '请在弹窗中允许存储权限...';
+			return;
+		}
+
+		// ---- 超时/用户拒绝：提示后回退到应用专属目录，不卡死 ----
+		if (!st.usingFallback())
+		{
+			st.enableFallback();
+			var err = st.tryEnsureRootDirs();
 			if (err == null)
 			{
 				_storageError = false;
+				_storageLabel.text = '未获得存储权限，改用应用专用目录：\n' + st.root()
+					+ '\n（下次可在系统设置允许"所有文件访问"后使用根目录 .meteoric）';
+				try { extension.androidtools.widget.Toast.makeText('未获权限，使用应用专用目录', 0); } catch (e:Dynamic) {}
 				st.startCopyAssets();
+				return;
 			}
-			return;
 		}
-
-		var err2 = st.ensureDirs();
-		if (err2 == null)
+		_storageLabel.text = '无法访问存储目录\n请在系统设置中为本应用授予"所有文件访问"权限（Android 11+），\n授权后回到游戏会自动继续。';
+		if (!_storageGuideShown)
 		{
-			_storageError = false;
-			st.startCopyAssets();
-			return;
-		}
-
-		_storageLabel.text = '无法访问 ' + st.root() + '（' + err2 + '）\n\n'
-			+ '请在系统设置中为本应用授予“所有文件访问”权限（Android 11+），\n'
-			+ '授权后回到游戏会自动继续。';
-		if (!_storageError)
-		{
-			_storageError = true;
+			_storageGuideShown = true;
 			st.openStorageSettings();
 		}
 	}
@@ -301,6 +355,11 @@ class Main extends Sprite
 				stage.dispatchEvent(new Event(Event.RESIZE));
 			}
 			processTouchScroll();
+			#if desktop
+			// Discord RPC 主线程 tick（替代原守护线程：子线程分配与主线程 GC 并发破坏堆）
+			if (backend.DiscordClient.isInitialized)
+				backend.DiscordClient.tick();
+			#end
 		});
 		#end
 

@@ -128,7 +128,7 @@
 	<haxelib name="flixel" />
 	<haxelib name="flixel-ui" />
 	<haxelib name="flixel-addons" />
-	<haxelib name="flxanimate" if="desktop"/>
+	<haxelib name="flxanimate" /> <!-- 全平台启用：PsychFlxAnimate/loadAnimateAtlas 无条件编译，Android 同样需要 -->
 
 	<!--Psych stuff needed-->
 	<haxelib name="linc_luajit" if="LUA_ALLOWED"/>
@@ -136,6 +136,8 @@
 	<haxelib name="hxCodec" if="VIDEOS_ALLOWED"/>
 	<haxelib name="discord_rpc" if="desktop"/>
 	<haxelib name="tjson" />
+	<!--- 安卓原生工具（Toast/弹窗/权限/外部存储目录），仅安卓编译时引入 -->
+	<haxelib name="extension-androidtools" if="android" />
 	<haxedef name="openflPos" />
 	<haxedef name="hscriptPos" />
 

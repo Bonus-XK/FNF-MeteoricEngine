@@ -215,6 +215,15 @@ class ClientPrefs {
 	}
 
 	public static function saveSettings() {
+		#if android
+		// 安卓权威设置文件：写入 .meteoric/meoptions（无后缀 JSON，随外部资源目录，
+		// 卸载不清、玩家可备份/编辑）。FlxG.save 保留双写（兼容旧版本迁移与读取）。
+		try
+		{
+			sys.io.File.saveContent(backend.AndroidStorage.root() + '/meoptions', haxe.Json.stringify(data));
+		}
+		catch (e:Dynamic) {}
+		#end
 		for (key in Reflect.fields(data)) {
 			//trace('saved variable: $key');
 			Reflect.setField(FlxG.save.data, key, Reflect.field(data, key));
@@ -242,12 +251,38 @@ class ClientPrefs {
 		if(data == null) data = new SaveVariables();
 		if(defaultData == null) defaultData = new SaveVariables();
 
+		#if android
+		// 安卓：meoptions 文件为权威设置源；不存在时回退 FlxG.save（旧版本迁移，
+		// 下次 saveSettings 自动落盘 meoptions）
+		var _optionsFromFile:Bool = false;
+		try
+		{
+			var optFile:String = backend.AndroidStorage.root() + '/meoptions';
+			if (sys.FileSystem.exists(optFile))
+			{
+				var parsed:Dynamic = haxe.Json.parse(sys.io.File.getContent(optFile));
+				if (parsed != null)
+				{
+					for (key in Reflect.fields(data))
+						if (key != 'gameplaySettings' && Reflect.hasField(parsed, key))
+							Reflect.setField(data, key, Reflect.field(parsed, key));
+					_optionsFromFile = true;
+				}
+			}
+		}
+		catch (e:Dynamic) {}
+		if (!_optionsFromFile)
+		{
+		#end
 		for (key in Reflect.fields(data)) {
 			if (key != 'gameplaySettings' && Reflect.hasField(FlxG.save.data, key)) {
 				//trace('loaded variable: $key');
 				Reflect.setField(data, key, Reflect.field(FlxG.save.data, key));
 			}
 		}
+		#if android
+		}
+		#end
 		savedHideHud = data.hideHud;
 
 		// 判定选项旧值迁移：'新版' -> 'KE 判定'，'旧判定' -> 'PE 判定'

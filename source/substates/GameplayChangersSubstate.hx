@@ -333,6 +333,15 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			changeSelection(1);
 		}
 
+		#if mobile
+		// ---- 触屏滑动：与 Freeplay 一致 = 只走 wheel 合成通道（Main.processTouchScroll，45px/格 + 70ms 限速）----
+		// 此处“消费并丢弃”stage 拖动步数（90px/格），不用于滚动：
+		//  ① 21:38 曾直接用 consumeDragSteps 滚动：与合成滚轮通道叠加成双通道（45px+90px 同时生效），
+		//     快速滑动时选中条一次跳 2~3 格（乱跳根因）；Freeplay 只走滚轮通道，故正常。
+		//  ② 丢弃同时把本界面滑动产生的积攒步数清零，防止退出后 StoryMenu/结算一次性吃掉（迟到乱跳）。
+		objects.MobileControls.consumeDragSteps();
+		#end
+
 		if (!controls.controllerMode)
 		{
 			var clickPressed:Bool = FlxG.mouse.justPressed;

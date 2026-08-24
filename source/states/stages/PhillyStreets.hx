@@ -171,8 +171,18 @@ class PhillyStreets extends BaseStage
 	var noteTypes:Array<String> = [];
 	override function createPost()
 	{
-		var unspawnNotes:Array<Note> = cast game.unspawnNotes;
+		// 按平台分型访问 unspawnNotes：
+		//  安卓：直建 Note 实体对象数组（8月17 管线），按 Note 类型直接访问；
+		//  桌面：轻量 CastNote（H-Slice）结构数组。
+		// 交叉 cast（安卓被当 CastNote / 桌面被当 Note 的属性访问器）都会产生
+		// 野偏移/野调用 → 静默闪退（createPost 内定位的根因）。
+		#if android
+		var unspawnNotes:Array<objects.Note> = cast game.unspawnNotes;
 		for (note in unspawnNotes)
+		#else
+		var unspawnNotes:Array<objects.Note.CastNote> = cast game.unspawnNotes;
+		for (note in unspawnNotes)
+		#end
 		{
 			if(note == null) continue;
 

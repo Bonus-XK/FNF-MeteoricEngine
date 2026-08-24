@@ -31,6 +31,7 @@ install hxCodec 3.0.2
 install tjson 1.4.0
 install hscript 2.6.0
 install actuate 1.9.0
+install flxanimate 4.0.0  # 本机激活版本（PsychFlxAnimate 引用 flxanimate.frames/data/FlxAnimate API）
 # lime tools 编译所需（CI 需从源码编译 tools.n）
 install format 3.8.0
 install hxp 1.3.1

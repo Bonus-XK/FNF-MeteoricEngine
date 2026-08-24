@@ -112,6 +112,10 @@ class FlxSoundTray extends Sprite
 	{
 		super();
 
+		// 移动端（触屏/物理高分辨率屏）：托盘放大显示；命中判定按 /scale 换算（见 update 内 mx/my）
+		#if mobile
+		_defaultScale = 1.25;
+		#end
 		visible = false;
 		scaleX = _defaultScale;
 		scaleY = _defaultScale;
@@ -234,8 +238,10 @@ class FlxSoundTray extends Sprite
 		if (!previewActive && expandT <= 0.002)
 			playerVisible = false;
 
-		var mx:Float = FlxG.mouse.screenX - FlxG.game.x - x;
-		var my:Float = FlxG.mouse.screenY - FlxG.game.y - y;
+		// 局部坐标统一：减 letterbox offset + 除以缩放（判定与放大后视觉完全一致；触屏同享鼠标模拟通道）
+		trayMouse(FlxG.game.mouseX, FlxG.game.mouseY);
+		var mx:Float = _tmX;
+		var my:Float = _tmY;
 
 		// ---- 悬停高亮（仅播放器态有按钮）----
 		btPlayHover = playerVisible && hitCircle(mx, my, PLAY_CX, BTN_CY, BTN_HIT_R);
@@ -357,16 +363,29 @@ class FlxSoundTray extends Sprite
 	{
 		scaleX = _defaultScale;
 		scaleY = _defaultScale;
-		x = (0.5 * (Lib.current.stage.stageWidth - _width * _defaultScale) - FlxG.game.x);
+		// 逻辑视口（FlxG.width）居中：老公式用 stage 物理宽 + game.x（letterbox/容器缩放）
+		// 双重复换算导致托盘错位（显示与命中都偏）；game 本地坐标下直接按逻辑视口居中即可。
+		x = 0.5 * (FlxG.width - _width * _defaultScale);
+	}
+
+	// 鼠标位置 → 托盘本地未缩放坐标（实例字段，避免每帧池化点）。
+	// 用 FlxG.game.mouseX/Y：托盘挂载于 FlxG.game，同一坐标系（已含容器变换/letterbox 换算），
+	// 不再经过 FlxG.mouse.screenX —— 它被 FlxMouse.update 二次除以 scaleMode.scale
+	// （FlxG.game.mouseX → setGlobalScreenPositionUnsafe(/scale)），叠加 offset 后大偏移。
+	var _tmX:Float = 0;
+	var _tmY:Float = 0;
+	inline function trayMouse(px:Float, py:Float):Void
+	{
+		_tmX = (px - x) / scaleX;
+		_tmY = (py - y) / scaleY;
 	}
 
 	// 鼠标在托盘范围内
 	function isHovered():Bool
 	{
 		if (!visible) return false;
-		var mx:Float = FlxG.mouse.screenX - FlxG.game.x - x;
-		var my:Float = FlxG.mouse.screenY - FlxG.game.y - y;
-		return mx >= 0 && mx <= _width && my >= 0 && my <= _height;
+		trayMouse(FlxG.game.mouseX, FlxG.game.mouseY);
+		return _tmX >= 0 && _tmX <= _width && _tmY >= 0 && _tmY <= _height;
 	}
 
 	// 圆形命中（含容差）
@@ -397,8 +416,8 @@ class FlxSoundTray extends Sprite
 	// 按鼠标位置设置音量
 	function updateFromMouse():Void
 	{
-		var mx:Float = FlxG.mouse.screenX - FlxG.game.x - x;
-		setVolume((mx - volTrackX()) / volTrackW(), false);
+		trayMouse(FlxG.game.mouseX, FlxG.game.mouseY);
+		setVolume((_tmX - volTrackX()) / volTrackW(), false);
 	}
 
 	function setVolume(v:Float, playTone:Bool = false):Void

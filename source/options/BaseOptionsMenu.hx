@@ -4,6 +4,7 @@ import backend.WheelScroll;
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
 import openfl.Lib;
+import states.PlayState;
 
 class BaseOptionsMenu extends MusicBeatSubstate
 {
@@ -73,10 +74,27 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		DiscordClient.changePresence(rpcTitle, null);
 		#end
 
-		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
-		bg.color = 0xFFea71fd;
-		bg.screenCenter();
-		bg.antialiasing = ClientPrefs.data.antialiasing;
+		var bg:FlxSprite;
+		// 判定"暂停内嵌"：以游戏暂停状态为权威信号（无标志位/无相机时序依赖）。
+		// 暂停菜单打开时 PlayState.instance.paused == true（设置列表/子页都在暂停堆栈内）；
+		// 主菜单路径：PlayState.instance 为 null（对局已销毁）或在游玩中（paused==false）。
+		// 相机检测作为附加信号保留（仅在两者同时为真时走暗化，绝不误伤主菜单）
+		var isInPause:Bool = PlayState.instance != null && PlayState.instance.paused;
+		var camIsPause:Bool = (PlayState.instance != null && PlayState.instance.camOther != null
+			&& cameras != null && cameras.length > 0 && cameras[0] == PlayState.instance.camOther);
+		if (isInPause || camIsPause)
+		{
+			// 暂停内嵌：暗化覆盖（不再整屏 menuDesat，避免"跳转到新界面"的视觉）
+			bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+			bg.alpha = 0.6;
+		}
+		else
+		{
+			bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+			bg.color = 0xFFea71fd;
+			bg.screenCenter();
+			bg.antialiasing = ClientPrefs.data.antialiasing;
+		}
 		add(bg);
 
 		// ---- 圆角磨砂面板 ----
@@ -403,6 +421,9 @@ class BaseOptionsMenu extends MusicBeatSubstate
 				}
 			}
 			#end
+			#if !mobile
+			// 桌面：点击复选框/选项行 = 选中/切换数值（与 Psych 原版一致）。
+			// 手机不启用：触屏拖动手势的释放帧易被误判为点击，改为「拖动选中 + A/◀▶ 确认调整」。
 			var checkboxHit:Int = getHoveredCheckbox();
 			if (checkboxHit >= 0)
 			{
@@ -430,6 +451,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 					}
 				}
 			}
+			#end
 		}
 
 		if (controls.BACK) {

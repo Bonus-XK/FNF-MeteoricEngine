@@ -151,7 +151,7 @@ class MobileControls extends FlxSpriteGroup
 		}
 	}
 
-	// 菜单模式：A（确认）+ B（取消/返回）键
+	// 菜单模式：A（确认）键（B 取消/返回键已移除：返回用系统返回键/左上角 X 角标）
 	function buildMenuButtons():Void
 	{
 		var aBtn:FlxSprite = makePadSprite('a', 0xFF7CFC8A);
@@ -160,13 +160,6 @@ class MobileControls extends FlxSpriteGroup
 		add(aBtn);
 		if (!padButtons.exists('accept')) padButtons.set('accept', []);
 		padButtons.get('accept').push(aBtn);
-
-		var bBtn:FlxSprite = makePadSprite('b', 0xFFFC7C7C);
-		bBtn.x = aBtn.x - BTN_W - 20;
-		bBtn.y = aBtn.y;
-		add(bBtn);
-		if (!padButtons.exists('back')) padButtons.set('back', []);
-		padButtons.get('back').push(bBtn);
 	}
 
 	/** 供 Freeplay 等界面额外添加 virtualpad 风格字母键（如 L / P） */
@@ -260,10 +253,43 @@ class MobileControls extends FlxSpriteGroup
 
 	function buildCorners():Void
 	{
-		pauseZone = makeZone(FlxG.width - CORNER_SIZE, 0, CORNER_SIZE, CORNER_SIZE, 0x22FFFFFF);
-		backZone = makeZone(0, 0, CORNER_SIZE, CORNER_SIZE, 0x22FFFFFF);
-		makeCornerLabel(pauseZone, 'II');
-		makeCornerLabel(backZone, 'X');
+		// 与主菜单 BackButton 同款磨砂玻璃圆：发光三层 + 圆玻璃描边（替换原半透明方块）
+		pauseZone = makeGlassCircleBtn(FlxG.width - CORNER_SIZE, 0, CORNER_SIZE, '');
+		backZone = makeGlassCircleBtn(0, 0, CORNER_SIZE, '');
+		add(pauseZone);
+		add(makeGlassCircleLabel(pauseZone, 'II'));
+		add(backZone);
+		add(makeGlassCircleLabel(backZone, 'X'));
+	}
+
+	// 磨砂玻璃圆形按钮（BackButton 同款视觉：三层白圆发光 + 玻璃底 + 细白描边）
+	public static function makeGlassCircleBtn(x:Float, y:Float, size:Float, labelText:String):FlxSprite
+	{
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(size), Std.int(size), FlxColor.TRANSPARENT, true);
+		FlxSpriteUtil.drawCircle(spr, size / 2, size / 2, size / 2 - 1.5, 0x22FFFFFF);
+		FlxSpriteUtil.drawCircle(spr, size / 2, size / 2, size / 2 - 5, 0x1AFFFFFF);
+		FlxSpriteUtil.drawCircle(spr, size / 2, size / 2, size / 2 - 9, 0x10FFFFFF);
+		FlxSpriteUtil.drawCircle(spr, size / 2, size / 2, size / 2 - 13, 0x26FFFFFF, {color: 0x8CFFFFFF, thickness: 1.5});
+		spr.color = 0xFFD5D9DF;
+		spr.immovable = true;
+		spr.solid = false;
+		spr.moves = false;
+		spr.scrollFactor.set();
+		return spr;
+	}
+
+	public static function makeGlassCircleLabel(parent:FlxSprite, text:String):FlxText
+	{
+		var label:FlxText = new FlxText(0, 0, 0, text, Std.int(parent.width * 0.38));
+		label.font = Paths.font('future.ttf');
+		label.color = FlxColor.WHITE;
+		label.borderStyle = FlxTextBorderStyle.OUTLINE;
+		label.borderColor = FlxColor.BLACK;
+		label.borderSize = 1.5;
+		label.screenCenter();
+		label.x = parent.x + (parent.width - label.width) / 2;
+		label.y = parent.y + (parent.height - label.height) / 2 - 2;
+		return label;
 	}
 
 	function makeZone(x:Float, y:Float, w:Float, h:Float, color:Int):FlxSprite
@@ -328,15 +354,21 @@ class MobileControls extends FlxSpriteGroup
 	static var _tapDown:Map<Int, FlxPoint> = new Map<Int, FlxPoint>();
 	static var _tapDownTime:Map<Int, Int> = new Map<Int, Int>();
 	static var _tapQueue:Array<QueuedTap> = [];
+	// 本次按压是否已被"即时路径"消费（滑键按下/zones 路由）：
+	// 已消费的触点不再入点按队列，防止同一次点击被延迟消费（菜单打开期间队列积压，
+	// 关闭后旧点击被 consumeQueuedTap 再次命中 → "点一次开，关后又会弹"）。
+	static var _tapConsumed:Map<Int, Bool> = new Map<Int, Bool>();
 	// stage 级拖动跟踪（结算/回放列表等界面滚动用，不依赖 FlxG.touches/鼠标模拟）
 	static var _dragID:Int = -1;
 	static var _dragLastY:Float = 0;
 	static var _dragAccum:Float = 0;
 	static var _dragSteps:Int = 0;
-	// ---- 安卓滑键（stage 级触摸跟踪，不依赖 FlxG.touches）----
+	// 安卓滑键（stage 级触摸跟踪，不依赖 FlxG.touches）：
 	// 手指按住不放从一个按键滑到另一个按键时，按键判定跟随触点：
-	// 触点当前所在按键 = 按住（pressed），滑入瞬间 = 按下（justPressed），滑出/抬起 = 释放（justReleased）
-	static var _touchKey:Map<Int, String> = new Map<Int, String>();       // touchPointID -> 当前所在按键（note_left 等）
+	// 触点当前所在按键 = 按住（pressed），滑入瞬间 = 按下（justPressed），滑出/抬起 = 释放（justReleased）。
+	// 触点可能同时落在多个重叠按键上（自定义布局叠键）：记录**所有**命中键，
+	// 一次按下同时对全部重叠键注入键盘 → 叠放后一触四键同判定。
+	static var _touchKey:Map<Int, Array<String>> = new Map<Int, Array<String>>(); // touchPointID -> 当前所在按键集合（note_left 等）
 	static var _slidePresses:Map<String, Bool> = new Map<String, Bool>(); // 滑入/按下事件（justPressed 消费）
 	static var _slideReleases:Map<String, Bool> = new Map<String, Bool>();// 滑出/抬起事件（justReleased 消费）
 	// ---- 触控按键 -> 键盘注入（映射到按键设置里的键位）----
@@ -389,28 +421,46 @@ class MobileControls extends FlxSpriteGroup
 		_tapQueue.resize(0);
 	}
 
-	// stage 像素 → 游戏逻辑坐标（与 FlxTouch.setXY 完全一致：先换算到 FlxG.game 局部，
-	// 再除以 scaleMode 缩放）
+	// stage 像素 → 游戏逻辑坐标。安卓（SDL3）窗口=物理分辨率，openfl globalToLocal 不扣
+	// letterbox 偏移/缩放（显示对象未变换），直接按 scaleMode 几何换算才是正确映射：
+	//   逻辑坐标 = (窗口像素 - offset) / scale
+	// 桌面窗口=游戏分辨率时 offset=0/scale=1，与本公式等价。
 	static function stageToLogical(sx:Float, sy:Float):FlxPoint
 	{
-		_stagePoint.setTo(sx, sy);
-		FlxG.game.globalToLocal(_stagePoint);
 		var p:FlxPoint = FlxPoint.get();
-		p.x = _stagePoint.x / FlxG.scaleMode.scale.x;
-		p.y = _stagePoint.y / FlxG.scaleMode.scale.y;
+		var sm = FlxG.scaleMode;
+		var off:FlxPoint = sm.offset;
+		var sc:FlxPoint = sm.scale;
+		if (sc.x <= 0 || sc.y <= 0)
+		{
+			// 防御：缩放未初始化时退回旧换算
+			_stagePoint.setTo(sx, sy);
+			FlxG.game.globalToLocal(_stagePoint);
+			p.x = _stagePoint.x;
+			p.y = _stagePoint.y;
+		}
+		else
+		{
+			p.x = (sx - off.x) / sc.x;
+			p.y = (sy - off.y) / sc.y;
+		}
 		return p;
 	}
 
 	static function onTapBegin(e:TouchEvent):Void
 	{
 		// 清理该触点的残留状态（防 TOUCH_END 事件丢失导致键盘键卡住、动画只播一次）
-		var staleKey:String = _touchKey.get(e.touchPointID);
-		if (staleKey != null)
+		var staleKeys:Array<String> = _touchKey.get(e.touchPointID);
+		if (staleKeys != null)
 		{
-			if (injectedKeyCode(staleKey) < 0) _slideReleases.set(staleKey, true);
-			injectKeyUp(staleKey);
+			for (staleKey in staleKeys)
+			{
+				if (injectedKeyCode(staleKey) < 0) _slideReleases.set(staleKey, true);
+				injectKeyUp(staleKey);
+			}
 		}
 		_touchKey.remove(e.touchPointID);
+		_tapConsumed.remove(e.touchPointID); // 新按压：清除消费标记
 
 		var p:FlxPoint = stageToLogical(e.stageX, e.stageY);
 		_tapDown.set(e.touchPointID, p);
@@ -464,11 +514,14 @@ class MobileControls extends FlxSpriteGroup
 	{
 		if (e.touchPointID == _dragID) _dragID = -1;
 		// 滑键：触点抬起释放所在按键（并注入键盘释放）
-		var relKey:String = _touchKey.get(e.touchPointID);
-		if (relKey != null)
+		var relKeys:Array<String> = _touchKey.get(e.touchPointID);
+		if (relKeys != null)
 		{
-			if (injectedKeyCode(relKey) < 0) _slideReleases.set(relKey, true);
-			injectKeyUp(relKey);
+			for (relKey in relKeys)
+			{
+				if (injectedKeyCode(relKey) < 0) _slideReleases.set(relKey, true);
+				injectKeyUp(relKey);
+			}
 		}
 		_touchKey.remove(e.touchPointID);
 		var down:FlxPoint = _tapDown.get(e.touchPointID);
@@ -482,9 +535,16 @@ class MobileControls extends FlxSpriteGroup
 			&& Math.abs(up.x - down.x) + Math.abs(up.y - down.y) <= TAP_MAX_MOVE;
 		down.put();
 		up.put();
-		if (!isTap) return;
-		// 队列里存逻辑坐标（物理/缩放后），消费时再换算到对应控制相机视图
-		_tapQueue.push({id: e.touchPointID, x: up.x, y: up.y, t: now});
+		if (!isTap)
+		{
+			_tapConsumed.remove(e.touchPointID);
+			return;
+		}
+		// 已被即时路径消费（zones 路由/滑键按下命中过 justPressed）的点击不再入队：
+		// 避免同一次点击被延迟二次消费（菜单打开期间积压 → 关后旧点击又弹）
+		if (_tapConsumed.get(e.touchPointID) != true)
+			_tapQueue.push({id: e.touchPointID, x: up.x, y: up.y, t: now});
+		_tapConsumed.remove(e.touchPointID);
 	}
 
 	static function flixelHasTouch(id:Int):Bool
@@ -571,7 +631,8 @@ class MobileControls extends FlxSpriteGroup
 			case 'pause': return pauseZone != null ? [pauseZone] : [];
 			// 左上角 X = 返回桌面（退出游戏），不再充当"返回上一级"
 			case 'exit': return backZone != null ? [backZone] : [];
-			case 'back': return menuMode && padButtons.exists('back') ? padButtons.get('back') : [];
+			// B 键已移除：'back' 不再有虚拟按键命中区（系统返回键/左上角 X 仍可用）
+			case 'back': return [];
 			case 'accept': return menuMode && padButtons.exists('accept') ? padButtons.get('accept') : [];
 		}
 		return padButtons.exists(key) ? padButtons.get(key) : [];
@@ -591,11 +652,20 @@ class MobileControls extends FlxSpriteGroup
 	public function justPressed(key:String):Bool
 	{
 		var normKey:String = normalizeKey(key);
-		// 安卓滑键（stage 级）：仅当 flixel 无触摸托管时启用（避免与 flixel 触摸路径双触发），
-		// 触点滑入/按下该键的瞬间判定为“按下”
-		if (FlxG.touches.list.length == 0 && _slidePresses.exists(normKey))
+		// 安卓滑键（stage 级）：触点滑入/按下该键的瞬间判定为“按下”
+		// （previewMode 排除同 pressed()：防止列表滑动被全局滑键误映射为 ui_* 键）
+		if (FlxG.touches.list.length == 0 && !previewMode && _slidePresses.exists(normKey))
 		{
 			_slidePresses.remove(normKey);
+			// 同步清除该触点的“快速点按”队列残留：同一次点击会在 onTapEnd 时入队，
+			// 若不清理，菜单/子状态打开期间本层暂停消费，关闭后旧点击被 consumeQueuedTap
+			// 再次命中 → “点一次开，关闭后又弹”（Freeplay 的 L/P/C 键两次触发根因）。
+			for (id => keys in _touchKey)
+				if (keys != null && keys.contains(normKey))
+				{
+					_tapConsumed.set(id, true);
+					clearQueuedTap(id);
+				}
 			return true;
 		}
 		var zones:Array<FlxSprite> = zonesFor(normKey);
@@ -613,6 +683,8 @@ class MobileControls extends FlxSpriteGroup
 					if (last != null && last != cur && cur == normKey)
 					{
 						_touchLastKey.set(touch.touchPointID, cur);
+						_tapConsumed.set(touch.touchPointID, true);
+						_slidePresses.remove(normKey); // 滑入已被即时路由消费,清掉滑键残留(防延迟二次消费)
 						clearQueuedTap(touch.touchPointID);
 						return true;
 					}
@@ -629,6 +701,8 @@ class MobileControls extends FlxSpriteGroup
 		{
 			if (touch.justPressed && touchInAny(zones, touch))
 			{
+				_tapConsumed.set(touch.touchPointID, true);
+				_slidePresses.remove(normKey); // 滑键按下已被即时路由消费,清掉残留(防 touches 空帧延迟二次消费)
 				clearQueuedTap(touch.touchPointID);
 				return true;
 			}
@@ -637,6 +711,8 @@ class MobileControls extends FlxSpriteGroup
 			// justPressedTimeInTicks == -1 说明 flixel 从未观察到按下帧（正常按住/点按都有值）
 			if (touch.justReleased && touch.justPressedTimeInTicks == -1 && touchInAny(zones, touch))
 			{
+				_tapConsumed.set(touch.touchPointID, true);
+				_slidePresses.remove(normKey);
 				clearQueuedTap(touch.touchPointID);
 				return true;
 			}
@@ -655,44 +731,75 @@ class MobileControls extends FlxSpriteGroup
 		return null;
 	}
 
-	/** 安卓滑键：逻辑坐标 -> 触点所在按键（与 consumeQueuedTap 同一套 controlCam 视图换算） */
-	static function keyAt(x:Float, y:Float):String
+	/** 安卓滑键：逻辑坐标 -> 触点所在按键集合（重叠按键全部返回；与 consumeQueuedTap 同一套 controlCam 视图换算） */
+	static function keysAt(x:Float, y:Float):Array<String>
 	{
 		var inst:MobileControls = instance;
 		if (inst == null) return null;
+		// 暂停期间（暂停菜单及其子界面，如游玩设置）：全局 instance 仍是游玩垫（暂停仅 visible=false），
+		// 其键区（全屏判定区模式可覆盖整个列表区）会把菜单/列表上的触摸误映射为 note 键并注入键盘；
+		// 而默认键位 note_* 与 ui_* 同键（[W,UP]/[A,LEFT]/[S,DOWN]/[D,RIGHT]）→ 注入的键盘事件
+		// 直接串扰 controls.UI_UP/DOWN/LEFT/RIGHT → 列表滑动手势变成"选中乱跳 + 数值被连续改动"。
+		// 暂停时禁止键区命中：菜单 A 键/虚拟键的点按走 consumeQueuedTap(zones)，不依赖本判定。
+		if (PlayState.instance != null && PlayState.instance.paused) return null;
 		var vx:Float = (x - inst.controlCam.x) / inst.controlCam.zoom + inst.controlCam.viewMarginX;
 		var vy:Float = (y - inst.controlCam.y) / inst.controlCam.zoom + inst.controlCam.viewMarginY;
+		var hit:Array<String> = [];
 		for (key => zones in inst.padButtons)
 		{
 			if (zones == null) continue;
 			for (zone in zones)
 			{
 				if (vx >= zone.x && vx <= zone.x + zone.width && vy >= zone.y && vy <= zone.y + zone.height)
-					return key;
+				{
+					hit.push(key);
+					break;
+				}
 			}
 		}
-		return null;
+		return hit.length == 0 ? null : hit;
 	}
 
 	/** 安卓滑键：触点按下/移动/抬起时更新触点所在按键与滑入滑出事件。
 	 *  有键盘绑定的键由键盘注入负责 justPressed/justReleased（避免双触发），
-	 *  无绑定的键（injectedKeyCode < 0）才记录滑键事件走 instance 路径 */
+	 *  无绑定的键（injectedKeyCode < 0）才记录滑键事件走 instance 路径。
+	 *  多键：触点同时覆盖多个重叠键时，全部注入/记录（叠放一触四键）。 */
 	static function trackSlideKey(id:Int, x:Float, y:Float):Void
 	{
-		var newKey:String = keyAt(x, y);
-		var oldKey:String = _touchKey.get(id);
-		if (newKey == oldKey) return;
-		if (oldKey != null)
+		var newKeys:Array<String> = keysAt(x, y);
+		var oldKeys:Array<String> = _touchKey.get(id);
+		if (oldKeys != null && newKeys != null && oldKeys.length == newKeys.length)
 		{
-			if (injectedKeyCode(oldKey) < 0) _slideReleases.set(oldKey, true);
-			injectKeyUp(oldKey);
+			var same:Bool = true;
+			for (k in oldKeys)
+				if (!newKeys.contains(k)) { same = false; break; }
+			if (same) return;
 		}
-		_touchKey.set(id, newKey);
-		if (newKey != null)
-		{
-			if (injectedKeyCode(newKey) < 0) _slidePresses.set(newKey, true);
-			injectKeyDown(newKey);
-		}
+		else if (oldKeys == null && newKeys == null) return;
+		else if (oldKeys != null && newKeys == null) { /* 滑出全部 */ }
+		else if (oldKeys == null && newKeys != null) { /* 滑入全部 */ }
+
+		// 释放滑出的键
+		if (oldKeys != null)
+			for (oldKey in oldKeys)
+			{
+				if (newKeys == null || !newKeys.contains(oldKey))
+				{
+					if (injectedKeyCode(oldKey) < 0) _slideReleases.set(oldKey, true);
+					injectKeyUp(oldKey);
+				}
+			}
+		// 按下滑入的键
+		if (newKeys != null)
+			for (newKey in newKeys)
+			{
+				if (oldKeys == null || !oldKeys.contains(newKey))
+				{
+					if (injectedKeyCode(newKey) < 0) _slidePresses.set(newKey, true);
+					injectKeyDown(newKey);
+				}
+			}
+		_touchKey.set(id, newKeys);
 	}
 
 	/** 触控按键对应的键盘键码（按键设置里该按键的第一个绑定键，如 note_left -> A） */
@@ -740,11 +847,15 @@ class MobileControls extends FlxSpriteGroup
 	public function pressed(key:String):Bool
 	{
 		var normKey:String = normalizeKey(key);
-		// 安卓滑键（stage 级）：触点当前所在按键视为按住
-		if (FlxG.touches.list.length == 0)
+		// 安卓滑键（stage 级）：触点当前所在按键视为按住（多键：任意命中键即视为按住）。
+		// 仅对"真实操作实例"（registerAsInstance=true）生效：previewMode 实例（设置页
+		// settingsPad / 菜单内嵌 pad）不接管全局滑键 —— 否则停在暂停界面滑动列表时，
+		// 全局 keysAt（instance=游玩垫，含全屏判定区模式）会把列表触点误映射为 note 键，
+		// 导致 settingsPad.pressed('ui_left'/'ui_right') 恒为真 → 菜单数值被连续改动（1.0→1.5 根因）。
+		if (FlxG.touches.list.length == 0 && !previewMode)
 		{
-			for (id => k in _touchKey)
-				if (k == normKey) return true;
+			for (id => keys in _touchKey)
+				if (keys != null && keys.contains(normKey)) return true;
 		}
 		var zones:Array<FlxSprite> = zonesFor(normKey);
 		if (zones == null || zones.length == 0) return false;
@@ -758,7 +869,8 @@ class MobileControls extends FlxSpriteGroup
 	{
 		var normKey:String = normalizeKey(key);
 		// 安卓滑键（stage 级）：触点滑出/抬起该键的瞬间判定为“释放”
-		if (FlxG.touches.list.length == 0 && _slideReleases.exists(normKey))
+		// （previewMode 排除同 pressed()：防止列表滑动被全局滑键误映射为 ui_* 键）
+		if (FlxG.touches.list.length == 0 && !previewMode && _slideReleases.exists(normKey))
 		{
 			_slideReleases.remove(normKey);
 			return true;

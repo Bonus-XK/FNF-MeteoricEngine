@@ -126,7 +126,16 @@ class LoadingState extends MusicBeatState
 		songTitleText.scrollFactor.set();
 		add(songTitleText);
 
-		var diffNameText:String = pendingChartJson != null ? getDiffName(pendingChartJson, pendingSongName != null ? pendingSongName : '') : '';
+		// 难度名：正常取 pendingChartJson；缓存快速路径会先 clearPendingChart（pendingChartJson 已清空），
+		// 此时从当前 SONG/难度反推，避免加载界面难度行显示为空
+		var diffNameText:String = '';
+		if (pendingChartJson != null)
+			diffNameText = getDiffName(pendingChartJson, pendingSongName != null ? pendingSongName : '');
+		else if (PlayState.SONG != null)
+		{
+			var songPath:String = backend.Paths.formatToSongPath(PlayState.SONG.song);
+			diffNameText = getDiffName(backend.Highscore.formatSong(songPath, PlayState.storyDifficulty), songPath);
+		}
 		diffText = new FlxText(0, 318, FlxG.width, diffNameText, 22);
 		diffText.setFormat(Paths.font('future.ttf'), 22, 0xFF33E0FF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		diffText.scrollFactor.set();
@@ -189,14 +198,27 @@ class LoadingState extends MusicBeatState
 		{
 			chartDone = callbacks.add("chart");
 			#if sys
-			// 选歌时已提前开跑的线程直接复用
-			startChartPreload();
-			chartThread = preloadChartThread;
-			preloadChartThread = null;
-			if (chartThread == null)
+			// 谱面解析必须在主线程进行：Thread.create 里的 JSON DOM 解析/convertToPsychV1
+			// 大量分配 hxcpp GC 对象，与主线程 GC 并发会破坏堆 —— SIGILL/SIGSEGV 无日志闪退
+			// （加载期/进曲目期随机出现）。全平台统一为加载界面主线程同步解析。
+			var _syncChartPath:String = Song.resolveChartPath(pendingChartJson, pendingChartFolder);
+			if (_syncChartPath == null)
 			{
 				chartError = '谱面文件不存在：' + pendingChartJson;
 				onChartLoadFailed();
+			}
+			else
+			{
+				try
+				{
+					chartMessage = Song.loadFromFile(_syncChartPath, pendingChartJson == 'events');
+					onChartLoaded();
+				}
+				catch(e:Dynamic)
+				{
+					chartError = Std.string(e);
+					onChartLoadFailed();
+				}
 			}
 			#else
 			chartLoadId++;
@@ -225,22 +247,9 @@ class LoadingState extends MusicBeatState
 		}
 		else chartLoaded = true;
 
-		// 谱面已就绪（缓存命中/重开同曲）且烘焙未完成：直接在加载界面预烘焙音符贴图
-		// （等 shared 库就绪再执行，否则音符贴图解析全部失败）
-		if (ClientPrefs.data.preRenderNotes && PlayState.SONG != null
-			&& (pendingChartJson == null || pendingSongName == PlayState.SONG.song)
-			&& !Note.chartBakesReady())
-		{
-			var cb:Void->Void = callbacks.add('prerender');
-			whenSharedReady(function() {
-				Note.preRenderChartNotes();
-				if (cb != null) cb();
-			});
-		}
-
-		// 谱面已就绪（缓存命中/重开同曲）：加载空闲期预生成音符，进入游戏后直接复用
-		if (PlayState.SONG != null && (pendingChartJson == null || pendingSongName == PlayState.SONG.song))
-			whenSharedReady(function() { startPreGen(); });
+		// 注：预烘焙/预生成由下方 chartDone 之后的统一块注册；这里不再注册，
+		// 避免同步解析（安卓）时 SONG 提前就位导致 startPreGen 重复执行
+		// （第二次重建时谱面 sectionNotes 已被清空，产出 0 音符覆盖正常结果）。
 
 		// 音频加载：后台线程并行解码，不冻结主线程，并且每个文件都计入进度
 		var songToLoad:String = pendingSongName != null ? pendingSongName : (PlayState.SONG != null ? PlayState.SONG.song : null);
@@ -266,33 +275,12 @@ class LoadingState extends MusicBeatState
 	{
 		if (pendingChartJson == null) return;
 		if (preloadChartThread != null && preloadThreadJson == pendingChartJson) return;
-
-		var filePath:String = Song.resolveChartPath(pendingChartJson, pendingChartFolder);
-		if (filePath == null) return;
-
-		var isEvents:Bool = pendingChartJson == 'events';
-		preloadThreadJson = pendingChartJson;
-		chartLoadId++;
-		var myLoadId:Int = chartLoadId;
-		chartMainThread = Thread.current();
-		// 闭包局部持有主线程句柄：LoadingState.destroy() 会把静态 chartMainThread 置空，
-		// 若本线程（大谱面解析可长达数十秒）在 LoadingState 销毁后才完成，直接用静态变量发消息
-		// 会触发线程内空引用 —— 线程异常无法传到主线程崩溃处理器，进程被静默终止（无日志闪退）。
-		// 用局部引用发送：残留消息由主线程轮询的 loadId 守卫丢弃，绝不崩线程。
-		var mainThread:Thread = chartMainThread;
-		preloadChartThread = Thread.create(function()
-		{
-			var result:Dynamic;
-			try
-			{
-				result = {ok: true, loadId: myLoadId, song: Song.loadFromFile(filePath, isEvents)};
-			}
-			catch(e:Dynamic)
-			{
-				result = {ok: false, loadId: myLoadId, error: Std.string(e)};
-			}
-			if (mainThread != null) mainThread.sendMessage(result);
-		});
+		// 全平台禁用谱面后台线程：工作线程内 Song.loadFromFile（JSON 解析 + convertToPsychV1）
+		// 会大量分配 hxcpp GC 对象，与主线程 GC 并发破坏堆 —— SIGILL/SIGSEGV、无日志闪退
+		// （栈顶仅剩 Meteoric 程序体、无法符号化）。安卓早有同款注释并已改主线程同步；
+		// 桌面同款崩溃（加载期/进曲目前后随机出现）。解析由 LoadingState 主线程同步完成，
+		// 进度计入加载条，行为与安卓一致。
+		return;
 	}
 
 	// 选歌确认时提前启动的预载：谱面线程 + 伴奏/人声并行解码
@@ -321,7 +309,11 @@ class LoadingState extends MusicBeatState
 		return files;
 	}
 
-	// 把单个音频文件提交到并行解码池（已在缓存或已在解码则跳过）
+	// 把单个音频文件提交到解码（已在缓存或已在解码则跳过）。
+	// 全平台主线程同步解码：ThreadPool 工作线程解码时分配 hxcpp GC 对象，
+	// 与主线程 GC 并发会破坏堆（PlayState.create 内 String 拼接/音符生成 SIGSEGV，
+	// 表现为"加载时崩溃且无日志"）。安卓早已按此修复；桌面同款崩溃，
+	// 统一同步解码在加载界面完成，进度由 audioPreloads 标记计入。
 	static function decodeSoundAsync(file:String)
 	{
 		if (Paths.currentTrackedSounds.exists(file)) return;
@@ -329,12 +321,15 @@ class LoadingState extends MusicBeatState
 		if (!FileSystem.exists(file)) return;
 
 		audioPreloads.set(file, true);
-		if (audioPool == null)
+		try
 		{
-			audioPool = new ThreadPool(0, 2);
-			audioPool.onComplete.add(audioDecodeComplete);
+			var b:AudioBuffer = AudioBuffer.fromFile(file);
+			audioDecodeComplete({file: file, buffer: b});
 		}
-		audioPool.run(audioDecodeWork, file);
+		catch(e:Dynamic)
+		{
+			audioPreloads.remove(file);
+		}
 	}
 
 	static function audioDecodeWork(state:Dynamic, output:WorkOutput)
@@ -382,16 +377,40 @@ class LoadingState extends MusicBeatState
 				charPreloads.push(name);
 
 		if (charPreloads.length < 1) return;
-		if (imagePool == null)
-		{
-			imagePool = new ThreadPool(0, 2);
-			imagePool.onComplete.add(imageDecodeComplete);
-		}
+		// 全平台主线程同步解码（线程分配破坏 GC 堆问题同上，桌面加载崩溃同因）：
+		// 结果直接写入 Paths.pendingBitmaps，PlayState 创建人物时命中缓存。
 		for (name in charPreloads)
 		{
-			// 人物贴图也算入加载进度：全部解码完成才进入游戏，避免 PlayState 里再同步解码大图
-			charPreloadCallbacks.set(name, callbacks.add('img:$name'));
-			imagePool.run(charDecodeWork, name);
+			try
+			{
+				var characterPath:String = 'characters/' + name + '.json';
+				#if MODS_ALLOWED
+				var p:String = Paths.modFolders(characterPath);
+				if (!FileSystem.exists(p)) p = Paths.getPreloadPath(characterPath);
+				#else
+				var p:String = Paths.getPreloadPath(characterPath);
+				#end
+				if (!FileSystem.exists(p)) continue;
+				var json:Dynamic = haxe.Json.parse(File.getContent(p));
+				var imgKey:String = Reflect.field(json, 'image');
+				if (imgKey == null || imgKey.length < 1) continue;
+				#if MODS_ALLOWED
+				var file:String = Paths.modsImages(imgKey);
+				if (!FileSystem.exists(file))
+					file = Paths.getPath('images/' + imgKey + '.png', IMAGE);
+				#else
+				var file:String = Paths.getPath('images/' + imgKey + '.png', IMAGE);
+				#end
+				if (FileSystem.exists(file))
+				{
+					var bmp:BitmapData = BitmapData.fromFile(file);
+					if (Paths.pendingBitmaps.exists(file))
+						bmp.dispose();
+					else
+						Paths.pendingBitmaps.set(file, bmp);
+				}
+			}
+			catch(e:Dynamic) {}
 		}
 	}
 

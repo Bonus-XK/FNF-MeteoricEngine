@@ -216,20 +216,31 @@ class FreeplayState extends MusicBeatState
 		add(text);
 
 		#if FLX_SOUND_TRAY
+		#if mobile
+		// 移动端 flixel 不建 soundTray（"No need for overlays on mobile"），
+		// 试听灵动岛是本引擎功能：手动创建同款托盘并挂到 FlxG.game（update 由本状态驱动）。
+		if (previewTray == null)
+		{
+			previewTray = new FlxSoundTray();
+			FlxG.game.addChild(previewTray);
+		}
+		#else
 		previewTray = FlxG.game.soundTray;
+		#end
 		#end
 
 		FlxG.mouse.visible = true;
 		super.create();
 
 		#if mobile
-		// 用 virtualpad 的 C / L / P 键替代原来的按钮：C=游玩设置，L=脚本管理，P=回放
+		// 用 virtualpad 的 T / C / L / P 键替代原来的按钮：T=试听，C=游玩设置，L=脚本管理，P=回放
 		if (objects.MobileControls.instance != null)
 		{
 			var pad:objects.MobileControls = objects.MobileControls.instance;
 			pad.addMenuButton('replay', 'P', FlxG.width - objects.MobileControls.BTN_W * 2 - 20 - 12, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
 			pad.addMenuButton('script', 'L', FlxG.width - objects.MobileControls.BTN_W * 3 - 20 - 24, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
 			pad.addMenuButton('gameplay', 'C', FlxG.width - objects.MobileControls.BTN_W * 4 - 20 - 36, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
+			pad.addMenuButton('preview', 'T', FlxG.width - objects.MobileControls.BTN_W * 5 - 20 - 48, FlxG.height - objects.MobileControls.BTN_H - 20, 0xFFAAAAAA);
 		}
 		#end
 
@@ -341,6 +352,13 @@ class FreeplayState extends MusicBeatState
 	var lastSelectionTime:Int = 0;      // 最近一次切歌的 Lib.getTimer() 时间戳
 	override function update(elapsed:Float)
 	{
+		#if mobile
+		#if FLX_SOUND_TRAY
+		// 移动端托盘由本状态驱动（FlxGame 无引用不会 update）
+		if (previewTray != null && previewTray.active)
+			previewTray.update(FlxG.elapsed * 1000);
+		#end
+		#end
 		// StoryMode 式行滑动：每帧平滑逼近目标位置（不重建文本，滚动流畅）。
 		// 目标在窗口内的行正常滑动（含滑入）；滑出的行滑到窗口边界（标题下沿/面板底）即隐藏
 		var titleBound:Float = 135;
@@ -580,6 +598,16 @@ class FreeplayState extends MusicBeatState
 				persistentUpdate = false;
 				openSubState(new GameplayChangersSubstate());
 			}
+			// T 键：试听当前选中曲目（与桌面 SPACE 同行为；同曲再按 = 播放/暂停切换）
+			if (objects.MobileControls.instance.justPressed('preview'))
+			{
+				#if PRELOAD_ALL
+				if (previewActive && instPlaying == curSelected)
+					togglePreviewPlayPause();
+				else
+					startPreview();
+				#end
+			}
 		}
 		#end
 
@@ -670,6 +698,16 @@ class FreeplayState extends MusicBeatState
 		// 兜底：离开状态时若仍在试听，停止并收平灵动岛（回调/音频不悬挂到下一状态）
 		#if PRELOAD_ALL
 		if (previewActive) stopPreview(false); else clearPreviewTray();
+		#end
+		#if mobile
+		#if FLX_SOUND_TRAY
+		// 移走本状态自建的灵动岛托盘（FlxSoundTray 是 openfl Sprite，无 destroy）
+		if (previewTray != null)
+		{
+			FlxG.game.removeChild(previewTray);
+			previewTray = null;
+		}
+		#end
 		#end
 		FlxG.mouse.visible = false;
 		super.destroy();

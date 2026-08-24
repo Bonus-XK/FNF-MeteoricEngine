@@ -6,6 +6,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.input.touch.FlxTouch;
 import flixel.math.FlxMath;
+import flixel.math.FlxPoint;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
@@ -24,6 +25,7 @@ class MobileControlsSubState extends MusicBeatSubstate
 	var curMode:Int = 0;
 	var preview:MobileControls = null;
 	var dragging:String = null;
+	var dragID:Int = -1; // 发起拖动的触点 ID：多指时只跟随该触点，防其他手指抢动
 
 	var modeText:FlxText;
 	var leftArrowRect:FlxSprite;
@@ -98,9 +100,12 @@ class MobileControlsSubState extends MusicBeatSubstate
 		resetBtn.visible = false;
 		resetLabel.visible = false;
 
-		backBtn = makeBtn(0, 0, 110, 110, null);
-		var backLabel:FlxText = makeLabel(backBtn, 'X');
-		backLabel.alpha = 0.7;
+		// 与主菜单 BackButton 同款磨砂玻璃圆（替换原半透明方块）；makeGlassCircleBtn 不自挂,需 add
+		backBtn = objects.MobileControls.makeGlassCircleBtn(0, 0, 110, '');
+		add(backBtn);
+		var backLabel:FlxText = objects.MobileControls.makeGlassCircleLabel(backBtn, 'X');
+		add(backLabel);
+		backLabel.alpha = 0.9;
 	}
 
 	function makeBtn(x:Float, y:Float, w:Float, h:Float, label:String):FlxSprite
@@ -134,7 +139,14 @@ class MobileControlsSubState extends MusicBeatSubstate
 
 	inline function touchInLogical(touch:FlxTouch, x:Float, y:Float, w:Float, h:Float):Bool
 	{
-		return touch.x >= x && touch.x <= x + w && touch.y >= y && touch.y <= y + h;
+		// 必须按本状态相机换算视图坐标：暂停路径经 openCamSubState 打开时 cameras[0]=camOther，
+		// 裸 touch.x/y 是默认相机视图坐标（非 camOther）→ 全部命中错位（点 ◀差 90px、落点超出画布）。
+		var p:FlxPoint = FlxPoint.get();
+		var cam:FlxCamera = (cameras != null && cameras.length > 0) ? cameras[0] : FlxG.camera;
+		touch.getPositionInCameraView(cam, p);
+		var hit:Bool = p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+		p.put();
+		return hit;
 	}
 
 	function uiTapped(rect:FlxSprite):Bool
@@ -154,7 +166,11 @@ class MobileControlsSubState extends MusicBeatSubstate
 	function rebuildPreview():Void
 	{
 		if (preview != null) preview.destroy();
-		preview = new MobileControls(false, FlxG.camera, curMode);
+		// 预览 pad 渲染/判定必须与界面同层：暂停路径经 openCamSubState 打开时
+		// 本子状态 cameras[0] = camOther，而 FlxG.camera 是游戏相机（暂停时 zoom/scroll
+		// 非默认）→ 预览被盖住/判定错乱；主菜单路径 cameras[0]=默认相机，行为不变。
+		var previewCam:FlxCamera = (cameras != null && cameras.length > 0) ? cameras[0] : FlxG.camera;
+		preview = new MobileControls(false, previewCam, curMode);
 		add(preview);
 		updateUI();
 	}
@@ -237,42 +253,82 @@ class MobileControlsSubState extends MusicBeatSubstate
 	{
 		super.update(elapsed);
 
-		// 自定义模式：拖动方向键
+		// 自定义模式：拖动方向键（只跟随发起拖动的触点；拖动期间冻结 UI 点击，防误触）
 		if (curMode == MobileControls.MODE_CUSTOM && preview != null)
 		{
-			for (touch in FlxG.touches.list)
+			if (dragging == null)
 			{
-				if (touch.justPressed && dragging == null)
+				for (touch in FlxG.touches.list)
 				{
+					if (!touch.justPressed) continue;
+					// 命中判定：重叠按键全部记录，选"中心距离触点最近"的键拖动。
+					// （此前按 CUSTOM_ORDER 顺序取先命中者：叠放后想拖的键总是被压在
+					//   底下的键抢走 → 表现为"拖不过去/被弹开"）
+					var bestKey:String = null;
+					var bestDist:Float = 1e30;
 					for (key in MobileControls.CUSTOM_ORDER)
 					{
 						var zones:Array<FlxSprite> = preview.padButtons.get(key);
 						if (zones == null || zones.length == 0) continue;
 						for (zone in zones)
-							if (touchInLogical(touch, zone.x, zone.y, zone.width, zone.height))
-								dragging = key;
+						{
+							if (!touchInLogical(touch, zone.x, zone.y, zone.width, zone.height)) continue;
+							var cx:Float = zone.x + zone.width / 2;
+							var cy:Float = zone.y + zone.height / 2;
+							var p:FlxPoint = FlxPoint.get();
+							var cam:FlxCamera = (cameras != null && cameras.length > 0) ? cameras[0] : FlxG.camera;
+							touch.getPositionInCameraView(cam, p);
+							var d:Float = (p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy);
+							p.put();
+							if (d < bestDist) { bestDist = d; bestKey = key; }
+						}
 					}
-				}
-				if (dragging != null && touch.pressed)
-				{
-					var zones:Array<FlxSprite> = preview.padButtons.get(dragging);
-					if (zones != null && zones.length > 0)
+					if (bestKey != null)
 					{
-						zones[0].x = FlxMath.bound(touch.x - MobileControls.BTN_W / 2, 0, FlxG.width - MobileControls.BTN_W);
-						zones[0].y = FlxMath.bound(touch.y - MobileControls.BTN_H / 2, 0, FlxG.height - MobileControls.BTN_H);
+						dragging = bestKey;
+						dragID = touch.touchPointID;
+					}
+					break;
+				}
+			}
+			else
+			{
+				for (touch in FlxG.touches.list)
+				{
+					if (touch.touchPointID != dragID) continue;
+					if (touch.pressed)
+					{
+						var zones:Array<FlxSprite> = preview.padButtons.get(dragging);
+						if (zones != null && zones.length > 0)
+						{
+							// 拖动跟随同样按本状态相机视图坐标（暂停入口 camOther）
+							var p:FlxPoint = FlxPoint.get();
+							var cam:FlxCamera = (cameras != null && cameras.length > 0) ? cameras[0] : FlxG.camera;
+							touch.getPositionInCameraView(cam, p);
+							zones[0].x = FlxMath.bound(p.x - MobileControls.BTN_W / 2, 0, FlxG.width - MobileControls.BTN_W);
+							zones[0].y = FlxMath.bound(p.y - MobileControls.BTN_H / 2, 0, FlxG.height - MobileControls.BTN_H);
+							p.put();
+						}
+					}
+					if (touch.justReleased)
+					{
+						dragging = null;
+						dragID = -1;
 					}
 				}
-				if (touch.justReleased && dragging != null)
-					dragging = null;
 			}
 			updatePosTexts();
 		}
 
-		if (uiTapped(leftArrowRect)) changeMode(-1);
-		if (uiTapped(rightArrowRect)) changeMode(1);
-		if (uiTapped(resetBtn)) resetPositions();
-		if (uiTapped(exitBtn)) { saveAndExit(); return; }
-		if (uiTapped(backBtn)) { saveAndExit(); return; }
+		// 拖动期间不响应 UI 点击：防止拖动路径扫过"保存并退出/恢复默认/切换布局"时误触发
+		if (dragging == null)
+		{
+			if (uiTapped(leftArrowRect)) changeMode(-1);
+			if (uiTapped(rightArrowRect)) changeMode(1);
+			if (uiTapped(resetBtn)) resetPositions();
+			if (uiTapped(exitBtn)) { saveAndExit(); return; }
+			if (uiTapped(backBtn)) { saveAndExit(); return; }
+		}
 
 		#if android
 		if (FlxG.android.justReleased.BACK) { saveAndExit(); return; }

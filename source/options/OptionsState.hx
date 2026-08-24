@@ -41,6 +41,10 @@ class OptionsState extends MusicBeatState
 	var mouseLockY:Float = 0;
 	var holdTime:Float = 0;
 	var quitting:Bool = false;
+	#if mobile
+	var menuPad:objects.MobileControls; // 右下角虚拟 A 确认键（拖动选中后按 A 打开分类子页）
+	#end
+	var nextAccept:Int = 5;        // 进入界面先忽略确认键，防开界面时按住的 A 误触发
 
 	function openSelectedSubstate(label:String) {
 		switch(label) {
@@ -122,8 +126,18 @@ class OptionsState extends MusicBeatState
 		add(backBtn.spr);
 		add(backBtn.label);
 
+		#if mobile
+		// 右下角虚拟 A 确认键（menuMode pad，不注册全局 instance）：拖动选中后按 A 打开分类子页
+		menuPad = new objects.MobileControls(false, FlxG.camera, -1, true);
+		add(menuPad);
+		#end
+
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(120, 672, 1040, '滚轮 / 方向键 选择 · Enter / 点击 打开 · 点击 < 返回', 16);
+		var hintText:String = '滚轮 / 方向键 选择 · Enter / 点击 打开 · 点击 < 返回';
+		#if mobile
+		hintText = '滑动选择 · A 确认打开 · < 返回';
+		#end
+		var hint:FlxText = new FlxText(120, 672, 1040, hintText, 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 		hint.scrollFactor.set();
 		add(hint);
@@ -139,6 +153,9 @@ class OptionsState extends MusicBeatState
 	override function closeSubState() {
 		super.closeSubState();
 		FlxG.mouse.visible = true;
+		#if mobile
+		if (menuPad != null) menuPad.visible = true;
+		#end
 		ClientPrefs.saveSettings();
 	}
 
@@ -150,7 +167,15 @@ class OptionsState extends MusicBeatState
 
 		// 子界面（按键设置等）打开期间，本层不再响应输入，
 		// 防止进入瞬间的点击/按键被父层再次消费（如重复打开子界面、误触发绑定）
-		if (subState != null) return;
+		if (subState != null)
+		{
+			#if mobile
+			// 隐藏本页 A 键：子界面（尤其移动触控布局编辑）拖动按钮时，
+			// 右下角多余的 A 键会与"保存并退出"等按钮重叠、极易误触
+			if (menuPad != null) menuPad.visible = false;
+			#end
+			return;
+		}
 
 		if (!quitting)
 		{
@@ -182,6 +207,7 @@ class OptionsState extends MusicBeatState
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
+			// ---- 滚轮（全平台：桌面鼠标滚轮 / 手机触屏合成滚轮 45px/格，Freeplay 同款）----
 			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
 
 			if (wheelStep != 0)
@@ -190,14 +216,27 @@ class OptionsState extends MusicBeatState
 				changeSelection(wheelStep);
 			}
 
+			// 点击判定：桌面沿用 justPressed；触屏抬起且未滑动才算点击（拖动滚动列表时不误触）
+			var clickPressed:Bool = FlxG.mouse.justPressed;
+			var acceptPressed:Bool = controls.ACCEPT;
+			#if mobile
+			clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
+			// 确认键：右下角虚拟 A（拖到目标行后按 A 打开子页）；与 BaseOptionsMenu 同款冷却防误触
+			if (menuPad != null && menuPad.justPressed('accept'))
+				acceptPressed = true;
+			#end
+
 			backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-			if (FlxG.mouse.justPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
+			if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 			{
 				mouseActive = true;
 				goBack();
 				return;
 			}
 
+			#if !mobile
+			// 桌面：点击行 = 选中；点击已选中行 = 打开（Psych 原版交互）。
+			// 手机：点击行无反应（取消点选），打开只由 A 键触发。
 			if (FlxG.mouse.justPressed)
 			{
 				var clickID:Int = getHoveredOptionID();
@@ -211,16 +250,34 @@ class OptionsState extends MusicBeatState
 					}
 					else if (clickID == curSelected)
 					{
-						// 点击已选中分类：直接进入（触屏友好，与主菜单一致）
+						// 点击已选中分类：直接进入
 						openSelectedSubstate(options[curSelected]);
 					}
 				}
 			}
+			#end
 
-			if (controls.ACCEPT) openSelectedSubstate(options[curSelected]);
+			#if mobile
+			if (nextAccept > 0)
+			{
+				nextAccept--;
+				acceptPressed = false;
+			}
+			#end
+
+			if (acceptPressed) openSelectedSubstate(options[curSelected]);
 			else if (controls.BACK) goBack();
 		}
 	}
+
+	#if mobile
+	/** 移动端系统返回键：返回主菜单（与右上角返回键一致） */
+	override public function onAndroidBack():Bool
+	{
+		goBack();
+		return true;
+	}
+	#end
 
 	function takeKeyboardControl()
 	{
@@ -237,7 +294,17 @@ class OptionsState extends MusicBeatState
 		if (onPlayState)
 		{
 			StageData.loadDirectory(PlayState.SONG);
-			LoadingState.loadAndSwitchState(new PlayState());
+			// 重进曲目必须携带谱面参数走 loadSongAndSwitchState：
+			// loadAndSwitchState 不带 pendingChartJson，会沿用上一局运行时 SONG 静态对象，
+			// 而其 sectionNotes 已被 buildChartNotes 释放置 null（大谱面内存大关）→ 重进生成空谱面（箭头全部消失）
+			var songPath:String = backend.Paths.formatToSongPath(PlayState.SONG.song);
+			if (!LoadingState.loadSongAndSwitchState(new PlayState(), songPath,
+				backend.Highscore.formatSong(songPath, PlayState.storyDifficulty), songPath,
+				true, PlayState.isStoryMode ? new states.StoryMenuState() : new states.FreeplayState()))
+			{
+				// 谱面文件异常缺失时的兜底：退回无参数路径（保持原行为，不阻断返回）
+				LoadingState.loadAndSwitchState(new PlayState());
+			}
 			FlxG.sound.music.volume = 0;
 		}
 		else MusicBeatState.switchState(new MainMenuState());

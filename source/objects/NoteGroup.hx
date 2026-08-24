@@ -27,29 +27,10 @@ class NoteGroup extends FlxTypedGroup<Note>
 	// 从池中弹出一个音符并复生为 target；无可用实例时新建
 	public function spawnNote(target:CastNote):Note
 	{
-		var n:Note;
-		if (pool.length > 0)
-		{
-			n = pool.pop();
-			if (n.botQueued)
-			{
-				// 排期未处理的对象不可复用（否则队列处理会命中新生命）；放回并新建——绝不循环
-				pool.push(n);
-				n = new Note(0, 0, null, false, false);
-				members.push(n);
-				length++;
-			}
-			else
-			{
-				n.exists = true;
-				n.alive = true; // kill() 会置 alive=false，复用前必须复活
-			}
-		}
-		else
-		{
-			n = new Note(0, 0, null, false, false);
-		}
-		// 池化/新建统一：重新加回组（invalidateNote 会 remove；不复归绝不入组——不可见且不被判定）
+		// 安卓：禁用对象池复用——回收复用路径（recycleNote）多次被证实与 hxcpp GC
+		// 交互异常（8月17 可用构建=经典直建路径，无池化）。每音符全新构造，
+		// 与备份版本行为一致，牺牲少量对象创建开销换取稳定性。
+		var n:Note = new Note(0, 0, null, false, false);
 		members.push(n);
 		length++;
 		return n.recycleNote(target);

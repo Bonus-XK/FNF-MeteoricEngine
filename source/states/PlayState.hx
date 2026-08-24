@@ -195,7 +195,12 @@ class PlayState extends MusicBeatState
 	public var boyfriend:Character = null;
 
 	public var notes:NoteGroup;
+	// 安卓走"直建 Note 对象"最稳定管线（8月17 实测可用）；桌面走 CastNote 轻量管线
+	#if android
+	public var unspawnNotes:Array<Note> = [];
+	#else
 	public var unspawnNotes:Array<CastNote> = [];
+	#end
 	public var eventNotes:Array<EventNote> = [];
 	public var cachedEventsData:Array<Dynamic> = null;   // 谱面 events 文件数据缓存（快速重开用，避免重复读盘）
 	public var cachedEventNotes:Array<EventNote> = [];   // 已修正偏移与提前触发的事件缓存（快速重开用）
@@ -299,6 +304,7 @@ class PlayState extends MusicBeatState
 	public var replayMode:Bool = false;             // 本局是否为回放
 	public static var queuedReplay:Replay = null;   // 待进入的回放数据（结算/选歌界面设置）
 	public static var carryReplay:Replay = null;    // 暂停/死亡/重开时保留的回放数据（完整重开经 create 重新消费）
+	public static var autoOpenPause:Bool = false;   // 从全屏设置页返回：重载曲目后自动挂起在暂停菜单
 	var recordingReplay:Bool = false;               // 本局是否在录制
 	var currentReplay:Replay = null;                // 本局录制数据
 	var replayHitSeqs:Map<Int, String> = null;      // 回放：应命中的音符（chartSeq -> 事件类型/评分）
@@ -580,6 +586,7 @@ class PlayState extends MusicBeatState
 		{
 			if(SONG.gfVersion == null || SONG.gfVersion.length < 1) SONG.gfVersion = 'gf'; //Fix for the Chart Editor
 		gf = new Character(0, 0, SONG.gfVersion);
+	
 			startCharacterPos(gf);
 			gf.scrollFactor.set(0.95, 0.95);
 			gfGroup.add(gf);
@@ -686,16 +693,18 @@ class PlayState extends MusicBeatState
 		startingSong = true;
 		
 		#if LUA_ALLOWED
-		for (notetype in noteTypes)
-			startLuasNamed('custom_notetypes/' + notetype + '.lua');
+		// 路径在谱面生成期（buildChartNotes）已拼好并共享；此处零字符串拼接。
+		// （create 后期 GC 可能已回收来自谱面 JSON 的原始字符串——晚期拼接会读到悬垂串崩掉）
+		for (ntLua in noteTypeLuaPaths)
+			startLuasNamed(ntLua);
 
 		for (event in eventsPushed)
 			startLuasNamed('custom_events/' + event + '.lua');
 		#end
 
 		#if HSCRIPT_ALLOWED
-		for (notetype in noteTypes)
-			startHScriptsNamed('custom_notetypes/' + notetype + '.hx');
+		for (ntHx in noteTypeHxPaths)
+			startHScriptsNamed(ntHx);
 
 		for (event in eventsPushed)
 			startHScriptsNamed('custom_events/' + event + '.hx');
@@ -1443,6 +1452,8 @@ class PlayState extends MusicBeatState
 
 	var debugNum:Int = 0;
 	private var noteTypes:Array<String> = [];
+	private var noteTypeLuaPaths:Array<String> = [];
+	private var noteTypeHxPaths:Array<String> = [];
 	private var eventsPushed:Array<String> = [];
 	private function generateSong(dataPath:String):Void
 	{
@@ -1507,6 +1518,9 @@ class PlayState extends MusicBeatState
 	// 与 create 期生成完全同一套参数（stageUI / BPM / songSpeed / playbackRate），失败时回退创建期生成。
 	public static function preGenerateChart():Bool
 	{
+		#if android
+		return false; // 安卓：使用 create 期直建 Note 管线（8月17 实测可用），禁用预生成
+		#end
 		if (SONG == null) return false;
 		var songPath:String = Paths.formatToSongPath(SONG.song);
 		// 每次加载都重建：上一轮预生成一定已被 create 消费；残留数据直接覆盖，防止跨曲/跨难度误用
@@ -1537,8 +1551,11 @@ class PlayState extends MusicBeatState
 				case "constant":
 					songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
 			}
-			var res:PreGenResult = buildChartNotes(SONG, Note.getBotplayPlan(), false,
-				{ songSpeed: songSpeed }, ClientPrefs.getGameplaySetting('songspeed'));
+			// 在深拷贝上构建：buildChartNotes 会清空 source 的 sectionNotes（内存大关），
+			// 必须作用于副本，保证共享 SONG 数据完整（重解析/快速重开/回溯依赖它）
+			var buildSrc:SwagSong = Song.copySong(SONG);
+			var res:PreGenResult = buildChartNotes(buildSrc, Note.getBotplayPlan(), false,
+				{ songSpeed: songSpeed }, ClientPrefs.getGameplaySetting('songspeed'), true);
 			res.notes.sort(sortByTime);
 			preGenNotes = res.notes;
 			preGenNoteTypes = res.noteTypes;
@@ -1561,7 +1578,7 @@ class PlayState extends MusicBeatState
 	// H-Slice 移植：只生成轻量 CastNote 结构（位打包 + 堆叠 density 合并），不创建 FlxSprite 对象；
 	// 15 万级谱面的解析从"建 15 万个重对象"降为"建约 1.5 万条结构体"，解析卡顿的主要来源被移除。
 	static function buildChartNotes(song:SwagSong, botplayPlan:Array<Array<Float>>, isPhigrosStyle:Bool,
-			createdFrom:Dynamic, playbackRate:Float):PreGenResult
+			createdFrom:Dynamic, playbackRate:Float, clearSections:Bool = false):PreGenResult
 	{
 		var noteTypes:Array<String> = [];
 		var totalNotes:Int = 0;
@@ -1620,25 +1637,24 @@ class PlayState extends MusicBeatState
 							totalNotes++;
 							if (botLaneCounts != null) botLaneCounts[daNoteData]++;
 						}
-						if (merged.holdLength != null && merged.holdLength < songNotes[2])
+						if (merged.holdLength < songNotes[2])
 							merged.holdLength = songNotes[2];
 						continue;
 					}
 				}
-				var swagNote:CastNote = {
-					strumTime: daStrumTime,
-					noteData: daNoteData,
-					chartSeq: chartSeqCounter++,
-					density: 1,
-					holdLength: songNotes[2] != null ? songNotes[2] : 0,
-					noteType: null,
-					multSpeed: 1,
-					cmpSpam: null,
-					offs: null,
-					noAnimation: false,
-					noMissAnimation: false,
-					blockHit: false
-				};
+				var swagNote:CastNote = new CastNote();
+				swagNote.strumTime = daStrumTime;
+				swagNote.noteData = daNoteData;
+				swagNote.chartSeq = chartSeqCounter++;
+				swagNote.density = 1;
+				swagNote.holdLength = songNotes[2] != null ? songNotes[2] : 0;
+				swagNote.noteType = null;
+				swagNote.multSpeed = 1;
+				swagNote.cmpSpam = null;
+				swagNote.offs = null;
+				swagNote.noAnimation = false;
+				swagNote.noMissAnimation = false;
+				swagNote.blockHit = false;
 				if (gottaHitNote) swagNote.noteData |= 1 << 8; // mustHit
 				// Psych 1.0.4 gfNote 判定：gf 段落中，与 mustHitSection 同方向的列由 GF 演奏
 				if (section.gfSection == true && gottaHitNote == section.mustHitSection)
@@ -1650,7 +1666,9 @@ class PlayState extends MusicBeatState
 					typeStr = noteType;
 				else if (noteType != null)
 					typeStr = ChartingState.noteTypeList[noteType]; //Backward compatibility + Week 7 charts
-				swagNote.noteType = typeStr;
+				// 固化拷贝：来自 JSON DOM 的字符串在 GC 后可能悬垂（安卓 hxcpp 实测），
+				// 这里生成全新字符串对象并立即被 noteTypes/类字段引用
+				swagNote.noteType = ('' + typeStr);
 
 				if (typeStr == 'Alt Animation') swagNote.noteData |= 1 << 12; // altAnim
 				if (typeStr == 'No Animation') swagNote.noteData |= 1 << 13; // noAnim & noMissAnim
@@ -1672,7 +1690,7 @@ class PlayState extends MusicBeatState
 					if (botLaneCounts != null) botLaneCounts[daNoteData] += Std.int(swagNote.density);
 				}
 
-				if (!noteTypes.contains(typeStr)) noteTypes.push(typeStr);
+				if (!noteTypes.contains(typeStr)) noteTypes.push('' + typeStr);
 			}
 		}
 
@@ -1681,7 +1699,7 @@ class PlayState extends MusicBeatState
 		{
 			unspawnNotes.push(swagNote);
 
-			var susLength:Float = swagNote.holdLength != null ? swagNote.holdLength : 0;
+			var susLength:Float = swagNote.holdLength;
 			if (Math.isNaN(susLength)) susLength = 0.0;
 			swagNote.holdLength = susLength;
 			susLength /= stepCrochet;
@@ -1694,20 +1712,19 @@ class PlayState extends MusicBeatState
 			{
 				for (susNote in 0...floorSus + 1)
 				{
-					var sustainNote:CastNote = {
-						strumTime: swagNote.strumTime + (stepCrochet * susNote),
-						noteData: swagNote.noteData,
-						chartSeq: chartSeqCounter++,
-						density: swagNote.density,
-						holdLength: 0,
-						noteType: swagNote.noteType,
-						multSpeed: 1,
-						cmpSpam: null,
-						offs: swagNote.offs, // 长条与箭头同簇展开（保持视觉一一对应）
-						noAnimation: swagNote.noAnimation,
-						noMissAnimation: swagNote.noMissAnimation,
-						blockHit: swagNote.blockHit
-					};
+					var sustainNote:CastNote = new CastNote();
+					sustainNote.strumTime = swagNote.strumTime + (stepCrochet * susNote);
+					sustainNote.noteData = swagNote.noteData;
+					sustainNote.chartSeq = chartSeqCounter++;
+					sustainNote.density = swagNote.density;
+					sustainNote.holdLength = 0;
+					sustainNote.noteType = swagNote.noteType;
+					sustainNote.multSpeed = 1;
+					sustainNote.cmpSpam = null;
+					sustainNote.offs = swagNote.offs; // 长条与箭头同簇展开（保持视觉一一对应）
+					sustainNote.noAnimation = swagNote.noAnimation;
+					sustainNote.noMissAnimation = swagNote.noMissAnimation;
+					sustainNote.blockHit = swagNote.blockHit;
 					sustainNote.noteData |= 1 << 9;  // isHold
 					if (susNote == floorSus) sustainNote.noteData |= 1 << 10; // isHoldEnd
 					unspawnNotes.push(sustainNote);
@@ -1717,14 +1734,27 @@ class PlayState extends MusicBeatState
 
 		unspawnNotes.sort(sortByTime);
 
-		// 内存大关：原始谱面 DOM（2.26M 级音符的 JSON 对象 ≈ 1-2GB）在生成 CastNotes 后立即释放。
-		// 分段结构（mustHitSection/gfSection/altAnim 等）保留供舞台/事件/拍点逻辑引用；
-		// 图编辑器等需要音符原文的场景从磁盘重新读取（ChartingState 自带加载），不受影响。
-		if (song.notes != null)
+		// 内存大关：只有对【副本】构建时才允许清空（clearSections=true）；
+		// 共享的 PlayState.SONG/谱面缓存永不在此被清空（否则重解析=0 音符空轨道）。
+		if (clearSections && song.notes != null)
 			for (sec in song.notes)
 				if (sec != null) sec.sectionNotes = null;
 
 		return { notes: unspawnNotes, noteTypes: noteTypes, totalNotes: totalNotes, botLaneCounts: botLaneCounts };
+	}
+
+	// 谱面生成期即拼接完整脚本路径（create 后期才拼接会读到 GC 后悬垂的字符串）
+	inline function rebuildNoteTypePaths():Void
+	{
+		noteTypeLuaPaths = [];
+		noteTypeHxPaths = [];
+		for (nt in noteTypes)
+		{
+			if (nt == null || nt.length < 1) continue;
+			var path:String = 'custom_notetypes/' + nt;
+			noteTypeLuaPaths.push(path + '.lua');
+			noteTypeHxPaths.push(path + '.hx');
+		}
 	}
 
 	private function generateChartNotes(loadPhase:Bool):Void
@@ -1734,6 +1764,8 @@ class PlayState extends MusicBeatState
 		if (botplayPlan != null) botLaneCounts = [0, 0, 0, 0];
 		var songData = SONG;
 		noteTypes = [];
+		noteTypeLuaPaths = [];
+		noteTypeHxPaths = [];
 		eventsPushed = [];
 		var chartSeqCounter:Int = 0;
 
@@ -1765,6 +1797,101 @@ class PlayState extends MusicBeatState
 				eventNotes.push(event);
 		}
 
+		#if android
+		// ===== 安卓最稳定管线：备份式直建 Note 对象（8月17 实机验证可用）=====
+		// 不使用 CastNote/对象池/回收；音符在生成期直接创建，noteSpawn 按时间插入。
+		for (section in noteData)
+		{
+			for (songNotes in section.sectionNotes)
+			{
+				var daStrumTime:Float = songNotes[0];
+				var daNoteData:Int = Std.int(songNotes[1] % 4);
+				// Psych 1.0.4 格式：列号直接决定方向（<4 玩家、>=4 对手）。
+				// 谱面在加载时已由 convertToPsychV1 转成该格式（mustHitSection 已烘焙进列号），
+				// 与桌面 buildChartNotes 语义一致；旧逻辑再加 mustHitSection 翻转会把
+				// 对手段（mustHitSection=false + 列 4-7）翻成玩家 → 对手箭头全跑到玩家侧。
+				var gottaHitNote:Bool = (songNotes[1] < 4);
+
+				var oldNote:Note;
+				if (unspawnNotes.length > 0)
+					oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
+				else
+					oldNote = null;
+
+				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, false, false, null);
+				swagNote.chartSeq = chartSeqCounter++;
+				swagNote.mustPress = gottaHitNote;
+				swagNote.sustainLength = songNotes[2];
+				swagNote.gfNote = (section.gfSection == true && songNotes[1] < 4);
+				swagNote.noteType = songNotes[3];
+				if (!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]];
+
+				swagNote.scrollFactor.set();
+
+				var susLength:Float = swagNote.sustainLength;
+				susLength = susLength / Conductor.stepCrochet;
+				unspawnNotes.push(swagNote);
+
+				var floorSus:Int = Math.floor(susLength);
+				if (botplayPlan != null && gottaHitNote)
+				{
+					botLaneCounts[daNoteData]++;
+					if (floorSus > 0) botLaneCounts[daNoteData] += floorSus + 1;
+				}
+				if (floorSus > 0)
+				{
+					for (susNote in 0...floorSus + 1)
+					{
+						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
+						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, false, null);
+						sustainNote.chartSeq = chartSeqCounter++;
+						sustainNote.mustPress = gottaHitNote;
+						sustainNote.gfNote = (section.gfSection == true && songNotes[1] < 4);
+						sustainNote.noteType = swagNote.noteType;
+						sustainNote.scrollFactor.set();
+						swagNote.tail.push(sustainNote);
+						sustainNote.parent = swagNote;
+						unspawnNotes.push(sustainNote);
+
+						sustainNote.correctionOffset = swagNote.height / 2;
+						if (!PlayState.isPixelStage)
+						{
+							if (oldNote.isSustainNote)
+							{
+								oldNote.scale.y *= Note.SUSTAIN_SIZE / oldNote.frameHeight;
+								oldNote.scale.y /= playbackRate;
+								oldNote.updateHitbox();
+							}
+							if (ClientPrefs.data.downScroll && !isPhigrosStyle)
+								sustainNote.correctionOffset = 0;
+						}
+						else if (oldNote.isSustainNote)
+						{
+							oldNote.scale.y /= playbackRate;
+							oldNote.updateHitbox();
+						}
+
+						if (sustainNote.mustPress) sustainNote.x += FlxG.width / 2;
+						else if (ClientPrefs.data.middleScroll)
+						{
+							sustainNote.x += 310;
+							if (daNoteData > 1) sustainNote.x += FlxG.width / 2 + 25;
+						}
+					}
+				}
+
+				if (swagNote.mustPress) swagNote.x += FlxG.width / 2;
+				else if (ClientPrefs.data.middleScroll)
+				{
+					swagNote.x += 310;
+					if (daNoteData > 1) swagNote.x += FlxG.width / 2 + 25;
+				}
+
+				if (!noteTypes.contains(swagNote.noteType)) noteTypes.push(swagNote.noteType);
+				if (gottaHitNote) totalNotes++;
+			}
+		}
+		#else
 		var consumedPreGen:Bool = loadPhase && preGenNotes != null && preGenSong == Paths.formatToSongPath(SONG.song);
 		if (consumedPreGen)
 		{
@@ -1774,20 +1901,26 @@ class PlayState extends MusicBeatState
 			preGenSong = null;
 			noteTypes = preGenNoteTypes;
 			preGenNoteTypes = null;
+			rebuildNoteTypePaths();
 			totalNotes = preGenTotalNotes;
 			if (botplayPlan != null) botLaneCounts = preGenBotLaneCounts;
 			preGenBotLaneCounts = null;
 		}
 		else
 		{
-			// 兜底：预生成不可用（快速重开/预生成失败）时生成轻量 CastNote（与预生成同一路径）
-			var res:PreGenResult = buildChartNotes(SONG, botplayPlan, isPhigrosStyle,
-				{ songSpeed: songSpeed }, playbackRate);
+			// 兜底：预生成不可用（快速重开/预生成失败）时生成轻量 CastNote（与预生成同一路径）。
+			// 同样在副本上构建：共享 SONG 的 sectionNotes 必须保持完整（本函数会被
+			// 快速重开/回溯再次调用，清空共享数据会导致后续重解析产出 0 音符）
+			var buildSrc2:SwagSong = Song.copySong(SONG);
+			var res:PreGenResult = buildChartNotes(buildSrc2, botplayPlan, isPhigrosStyle,
+				{ songSpeed: songSpeed }, playbackRate, true);
 			unspawnNotes = res.notes;
 			noteTypes = res.noteTypes;
+			rebuildNoteTypePaths();
 			totalNotes = res.totalNotes;
 			if (botplayPlan != null) botLaneCounts = res.botLaneCounts;
 		}
+		#end
 		if (loadPhase)
 		{
 			for (event in songData.events) //Event Notes
@@ -1805,7 +1938,11 @@ class PlayState extends MusicBeatState
 					break;
 				}
 		}
+		#if android
+		unspawnNotes.sort(sortByTime);
+		#else
 		if (!consumedPreGen) unspawnNotes.sort(sortByTime);
+		#end
 		generatedMusic = true;
 	}
 
@@ -2084,7 +2221,9 @@ class PlayState extends MusicBeatState
 			#if mobile
 			// 恢复游戏触控板
 			if (objects.MobileControls.instance != null)
+			{
 				objects.MobileControls.instance.visible = true;
+			}
 			#end
 		}
 
@@ -2155,12 +2294,31 @@ class PlayState extends MusicBeatState
 	{
 		var t:Float = spawnTime * playbackRate;
 		if (songSpeed < 1) t /= songSpeed;
-		if (target.multSpeed != null && target.multSpeed < 1) t /= target.multSpeed;
+		if (target.multSpeed < 1) t /= target.multSpeed;
 		return t;
 	}
 
 	function noteSpawn():Void
 	{
+		#if android
+		// ===== 安卓：备份式按时间插入（直建 Note 管线配套）=====
+		if (unspawnNotes.length > 0)
+		{
+			var time:Float = spawnTime * playbackRate;
+			if (songSpeed < 1) time /= songSpeed;
+			if (unspawnNotes[0].multSpeed < 1) time /= unspawnNotes[0].multSpeed;
+			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
+			{
+				var dunceNote:Note = unspawnNotes[0];
+				notes.insert(0, dunceNote);
+				dunceNote.spawned = true;
+				callOnLuas('onSpawnNote', [notes.members.indexOf(dunceNote), dunceNote.noteData, dunceNote.noteType, dunceNote.isSustainNote, dunceNote.strumTime]);
+				callOnHScript('onSpawnNote', [dunceNote]);
+				unspawnNotes.splice(0, 1);
+			}
+		}
+		return;
+		#end
 		if (currentSpawnId >= unspawnNotes.length)
 		{
 			spamSpawn();
@@ -2225,17 +2383,16 @@ class PlayState extends MusicBeatState
 		while (currentSpawnId < unspawnNotes.length && processed < spawnBudget)
 		{
 			if (limitNotes > 0 && limitCount >= limitNotes) break;
-			var target:CastNote = unspawnNotes[currentSpawnId];
+			var target:Dynamic = unspawnNotes[currentSpawnId];
 			if (target.strumTime - fixedPosition > spawnWindowFor(target)) break;
 
 			// 挤压音符（H-Slice 谱面字段 cmpSpam）：运行时展开，不预建
 			if (target.cmpSpam != null)
 			{
-				spamNotes.push({
-					remaining: Std.isOfType(target.cmpSpam[0], Float) ? target.cmpSpam[0] : Std.parseFloat(Std.string(target.cmpSpam[0])),
-					density: Std.isOfType(target.cmpSpam[1], Float) ? target.cmpSpam[1] : Std.parseFloat(Std.string(target.cmpSpam[1])),
-					seedNote: target
-				});
+				spamNotes.push(new SpamNoteData(
+					Std.isOfType(target.cmpSpam[0], Float) ? target.cmpSpam[0] : Std.parseFloat(Std.string(target.cmpSpam[0])),
+					Std.isOfType(target.cmpSpam[1], Float) ? target.cmpSpam[1] : Std.parseFloat(Std.string(target.cmpSpam[1])),
+					target));
 				target.cmpSpam = null;
 				spamSpawn();
 				limitCount = limitNotes > 0 ? notes.countLiving() : limitCount;
@@ -2306,7 +2463,7 @@ class PlayState extends MusicBeatState
 
 	/** 实例化一个音符（对象池复用）并触发 onSpawnNote 回调。
 	 *  堆叠合并组（offs != null）在此展开：后台一条 CastNote，画面与原版一致（N 个独立视觉箭头）。 */
-	function spawnOne(target:CastNote):Note
+	function spawnOne(target:Dynamic):Note
 	{
 				// ===== 表面不压缩 + 渲染可控：合并簇=1 条 CastNote（后台已压缩），
 	// 展开为 up to MAX_CLUSTER_VISUALS 颗**均匀采样**的视觉箭头（覆盖 0→全跨度，视觉密度与原版一致），
@@ -2339,20 +2496,19 @@ class PlayState extends MusicBeatState
 		}
 		for (i in 0...picks.length)
 		{
-			var sub:CastNote = {
-				strumTime: base.strumTime + picks[i],
-				noteData: base.noteData,
-				chartSeq: base.chartSeq,
-				density: 1,
-				holdLength: base.holdLength,
-				noteType: base.noteType,
-				multSpeed: base.multSpeed,
-				cmpSpam: null,
-				offs: null,
-				noAnimation: true,     // 纯视觉：不做角色动画
-				noMissAnimation: true,
-				blockHit: true         // 不参与按键判定（防 keysCheck 误命中）
-			};
+			var sub:CastNote = new CastNote();
+			sub.strumTime = base.strumTime + picks[i];
+			sub.noteData = base.noteData;
+			sub.chartSeq = base.chartSeq;
+			sub.density = 1;
+			sub.holdLength = base.holdLength;
+			sub.noteType = base.noteType;
+			sub.multSpeed = base.multSpeed;
+			sub.cmpSpam = null;
+			sub.offs = null;
+			sub.noAnimation = true;     // 纯视觉：不做角色动画
+			sub.noMissAnimation = true;
+			sub.blockHit = true;         // 不参与按键判定（防 keysCheck 误命中）
 			lastNote = spawnOne(sub);
 			lastNote.ignoreNote = true; // 不计分/不 Miss/不触发命中
 		}
@@ -2372,6 +2528,7 @@ class PlayState extends MusicBeatState
 		}
 
 		var lane:Int = dunceNote.noteData + (dunceNote.mustPress ? 4 : 0);
+
 
 		// 重叠隐藏（hideOverlapped > 0）：与同轨上一可见音符间距过近时隐藏（渲染裁剪）
 		var hide:Float = ClientPrefs.data.hideOverlapped;
@@ -2464,7 +2621,15 @@ class PlayState extends MusicBeatState
 		// 自愈：paused 卡死但没有打开任何子界面（如 PauseSubState 构造中途异常、
 		// Lua 拦截 onPause 后遗留）时解锁，避免“暂停界面显示不出来”却把游戏冻结住。
 		if (paused && subState == null && !isDead && !chartingMode)
-			paused = false;
+		{
+			_pausedSelfHealFrames++;
+			if (_pausedSelfHealFrames >= 3)
+			{
+				_pausedSelfHealFrames = 0;
+				paused = false;
+			}
+		}
+		else _pausedSelfHealFrames = 0;
 
 		FlxG.camera.followLerp = 0;
 		if(!inCutscene && !paused) {
@@ -2567,7 +2732,10 @@ class PlayState extends MusicBeatState
 		if (startingSong)
 		{
 			if (startedCountdown && Conductor.songPosition >= 0)
+			{
+		
 				startSong();
+			}
 			else if(!startedCountdown)
 				Conductor.songPosition = -Conductor.crochet * 5;
 		}
@@ -2822,7 +2990,9 @@ class PlayState extends MusicBeatState
 		#if mobile
 		// 暂停时隐藏游戏触控板，避免暂停界面还显示游戏方向键
 		if (objects.MobileControls.instance != null)
+		{
 			objects.MobileControls.instance.visible = false;
+		}
 		#end
 		// 防“暂停键判定两次”：此时 flixel 输入还未被 onStateSwitch 重置，
 		// 捕获打开暂停的按键是否仍按住 → 传给暂停菜单锁定确认，直到该键物理松开
@@ -3246,6 +3416,7 @@ class PlayState extends MusicBeatState
 
 
 	public var transitioning = false;
+	var _pausedSelfHealFrames:Int = 0; // 暂停自愈延迟帧(防误判正常关闭,见update注释)
 	public function endSong()
 	{
 
@@ -3650,7 +3821,21 @@ class PlayState extends MusicBeatState
 		#end
 
 		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong;
-		startCountdown();
+		// 从全屏设置页（自定义界面/调整延迟与Combo）返回：重载后的曲目先挂起在暂停菜单，
+		// 玩家"返回游戏"后才开始倒计时（避免暂停期间倒计时/音乐在后台继续跑）
+		if (autoOpenPause)
+		{
+			autoOpenPause = false;
+			var autoPause:PauseSubState = new PauseSubState(0, 0);
+			autoPause.closeCallback = function() {
+				if (PlayState.instance != null && !PlayState.instance.startedCountdown)
+					PlayState.instance.startCountdown();
+			};
+			paused = true;
+			openSubState(autoPause);
+		}
+		else
+			startCountdown();
 	}
 
 	// 快速重开：参照完整重开（resetState → create）重新加载默认角色

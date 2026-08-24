@@ -30,16 +30,16 @@ class DiscordClient
 			onDisconnected: onDisconnected
 		});
 		trace("Discord Client started.");
+		// process() 由主线程每帧调用（Main ENTER_FRAME → DiscordClient.tick），
+		// 不再放守护线程：子线程里的 DiscordRpc.process / trace / 回调会分配 hxcpp GC 对象，
+		// 与主线程 GC 并发破坏堆（SIGILL/SIGSEGV 无日志闪退，加载期/游戏期随机出现）。
+	}
 
-		var localID:String = clientID;
-		while (localID == clientID)
-		{
-			DiscordRpc.process();
-			sleep(2);
-			//trace('Discord Client Update $localID');
-		}
-
-		//DiscordRpc.shutdown();
+	/** 主线程每帧调用：处理 Discord RPC 事件（替代原守护线程循环） */
+	public static function tick():Void
+	{
+		if (!isInitialized) return;
+		DiscordRpc.process();
 	}
 
 	public static function check()
@@ -99,11 +99,16 @@ class DiscordClient
 
 	public static function initialize()
 	{
-		
-		var DiscordDaemon = sys.thread.Thread.create(() ->
+		// 直接在主线程启动（原守护线程删除）：DiscordRpc.start 一次性调用 + trace 均在主线程，
+		// 回调由主线程 tick() 逐帧处理，子线程不再存在 → 无 GC 并发破坏堆风险
+		try
 		{
 			new DiscordClient();
-		});
+		}
+		catch(e:Dynamic)
+		{
+			trace('Discord init failed: ' + e);
+		}
 		trace("Discord Client initialized");
 		isInitialized = true;
 	}
