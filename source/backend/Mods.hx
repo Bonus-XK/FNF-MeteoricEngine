@@ -223,8 +223,11 @@ class Mods
 			!ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
 			{
 				added.push(folder);
-				list.push([folder, true]); //i like it false by default. -bb //Well, i like it True! -Shadow Mario (2022)
-				//Shadow Mario (2023): What the fuck was bb thinking
+				// 新发现的 mod 文件夹默认【关闭】：
+				// 若默认启用，装进来的半成品/缺资源 mod 会立刻被加载，
+				// 在 TitleState/PlayState 因缺失贴图（如 spritemap）崩溃，
+				// 也会把 loadTopMod 的 currentModDirectory 顶到新 mod 上（"上一个模组失效"）。
+				list.push([folder, false]);
 			}
 		}
 

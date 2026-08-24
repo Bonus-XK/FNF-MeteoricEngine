@@ -1,4 +1,5 @@
 package substates;
+import backend.WheelScroll;
 
 import backend.Highscore;
 
@@ -9,6 +10,7 @@ import openfl.Lib;
 
 class ResultsSubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 安全布局常量（与暂停界面同一套风格） =====
 	static final LAYOUT_Y:Float = 120;       // 整体下移，让内容垂直居中
 	static final TITLE_Y:Float = 22 + LAYOUT_Y - 35;  // 标题比面板高一些
@@ -293,11 +295,12 @@ class ResultsSubState extends MusicBeatSubstate
 			}
 
 			#if !mobile
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+			if (wheelStep != 0)
 			{
 				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'));
-				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelection(wheelStep);
 			}
 			#end
 

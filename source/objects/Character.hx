@@ -1,6 +1,9 @@
 package objects;
 
 import animateatlas.AtlasFrameMaker;
+#if flxanimate
+import flxanimate.PsychFlxAnimate;
+#end
 
 import flixel.util.FlxSort;
 
@@ -29,6 +32,9 @@ typedef CharacterFile = {
 	var flip_x:Bool;
 	var no_antialiasing:Bool;
 	var healthbar_colors:Array<Int>;
+	// Psych 0.7.3 字段
+	var vocals_file:String;
+	@:optional var _editor_isPlayer:Null<Bool>;
 }
 
 typedef AnimArray = {
@@ -65,6 +71,13 @@ class Character extends FlxSprite
 	public var positionArray:Array<Float> = [0, 0];
 	public var cameraPosition:Array<Float> = [0, 0];
 
+	// Atlas（Adobe Animate 2020 spritemap1）支持：与 Psych 0.7 一致，FlxAnimate 运行时渲染
+	#if flxanimate
+	public var isAnimateAtlas:Bool = false;
+	public var atlas:PsychFlxAnimate;
+	public var lastPlayedAnimName:String = '';
+	#end
+
 	public var hasMissAnimations:Bool = false;
 
 	//Used on Character Editor
@@ -73,6 +86,7 @@ class Character extends FlxSprite
 	public var noAntialiasing:Bool = false;
 	public var originalFlipX:Bool = false;
 	public var healthColorArray:Array<Int> = [255, 0, 0];
+	public var vocalsFile:String = ''; //Psych 0.7.3 split vocals：角色专属人声音轨（Voices-Player/Voices-Opponent）
 
 	public static var DEFAULT_CHARACTER:String = 'bf'; //In case a character is missing, it will use BF on its place
 	public function new(x:Float, y:Float, ?character:String = 'bf', ?isPlayer:Bool = false)
@@ -123,12 +137,46 @@ class Character extends FlxSprite
 				#end
 					useAtlas = true;
 
+				// 2020 格式（spritemap1.json 存在）→ FlxAnimate（Psych 0.7 官方方案）；
+				// 旧格式（spritemap.json）→ animateatlas（原有路径）
+				#if flxanimate
+				var is2020Atlas:Bool = false;
+				#if MODS_ALLOWED
+				is2020Atlas = FileSystem.exists(Paths.modFolders('images/' + json.image + '/spritemap1.json'));
+				if (!is2020Atlas)
+				{
+					// 与 useAtlas 检测同款：getPath 返回文件系统路径（shared/内置），用 FileSystem 检查
+					var sp1Find:String = Paths.getPath('images/' + json.image + '/spritemap1.json', TEXT);
+					is2020Atlas = FileSystem.exists(sp1Find) || Assets.exists(sp1Find);
+				}
+				#else
+				is2020Atlas = Assets.exists(Paths.getPath('images/' + json.image + '/spritemap1.json', TEXT));
+				#end
+				isAnimateAtlas = useAtlas && is2020Atlas;
+				#end
+
 				if(!useAtlas)
-					frames = Paths.getAtlas(json.image);
+					frames = Paths.getMultiAtlas(json.image.split(',')); //Psych 1.0.4：多图集角色（pico-playable 等）
+				#if flxanimate
+				else if (isAnimateAtlas)
+				{
+					atlas = new PsychFlxAnimate();
+					atlas.showPivot = false;
+					try
+					{
+						Paths.loadAnimateAtlas(atlas, json.image);
+					}
+					catch (e:Dynamic)
+					{
+						trace('Could not load atlas ' + json.image + ': ' + Std.string(e));
+					}
+				}
+				#end
 				else
 					frames = AtlasFrameMaker.construct(json.image);
 
 				imageFile = json.image;
+				vocalsFile = json.vocals_file != null ? json.vocals_file : '';
 				if(json.scale != 1) {
 					jsonScale = json.scale;
 					setGraphicSize(Std.int(width * jsonScale));
@@ -160,10 +208,23 @@ class Character extends FlxSprite
 						var animFps:Int = anim.fps;
 						var animLoop:Bool = !!anim.loop; //Bruh
 						var animIndices:Array<Int> = anim.indices;
-						if(animIndices != null && animIndices.length > 0) {
-							animation.addByIndices(animAnim, animName, animIndices, "", animFps, animLoop);
-						} else {
-							animation.addByPrefix(animAnim, animName, animFps, animLoop);
+						#if flxanimate
+						if (isAnimateAtlas)
+						{
+							// Psych 0.7：动画名 = SD 符号完整路径（addBySymbol）
+							if(animIndices != null && animIndices.length > 0)
+								atlas.anim.addBySymbolIndices(animAnim, animName, animIndices, animFps, animLoop);
+							else
+								atlas.anim.addBySymbol(animAnim, animName, animFps, animLoop);
+						}
+						else
+						#end
+						{
+							if(animIndices != null && animIndices.length > 0) {
+								animation.addByIndices(animAnim, animName, animIndices, "", animFps, animLoop);
+							} else {
+								animation.addByPrefix(animAnim, animName, animFps, animLoop);
+							}
 						}
 
 						if(anim.offsets != null && anim.offsets.length > 1) {
@@ -173,6 +234,9 @@ class Character extends FlxSprite
 				} else {
 					quickAnimAdd('idle', 'BF idle dance');
 				}
+				#if flxanimate
+				if(isAnimateAtlas) copyAtlasValues();
+				#end
 				//trace('Loaded file to character ' + curCharacter);
 		}
 		originalFlipX = flipX;
@@ -217,63 +281,133 @@ class Character extends FlxSprite
 
 	override function update(elapsed:Float)
 	{
-		if(!debugMode && animation.curAnim != null)
+		#if flxanimate
+		if (isAnimateAtlas) atlas.update(elapsed);
+		#end
+
+		if (debugMode || isAnimationNull())
 		{
-			if(heyTimer > 0)
-			{
-				heyTimer -= elapsed * PlayState.instance.playbackRate;
-				if(heyTimer <= 0)
-				{
-					if(specialAnim && animation.curAnim.name == 'hey' || animation.curAnim.name == 'cheer')
-					{
-						specialAnim = false;
-						dance();
-					}
-					heyTimer = 0;
-				}
-			}
-			else if(specialAnim && animation.curAnim.finished)
-			{
-				specialAnim = false;
-				dance();
-			}
-			else if (animation.curAnim.name.endsWith('miss') && animation.curAnim.finished)
-			{
-				dance();
-				animation.finish();
-			}
-
-			switch(curCharacter)
-			{
-				case 'pico-speaker':
-					if(animationNotes.length > 0 && Conductor.songPosition > animationNotes[0][0])
-					{
-						var noteData:Int = 1;
-						if(animationNotes[0][1] > 2) noteData = 3;
-
-						noteData += FlxG.random.int(0, 1);
-						playAnim('shoot' + noteData, true);
-						animationNotes.shift();
-					}
-					if(animation.curAnim.finished) playAnim(animation.curAnim.name, false, false, animation.curAnim.frames.length - 3);
-			}
-
-			if (animation.curAnim.name.startsWith('sing'))
-				holdTimer += elapsed;
-			else if(isPlayer)
-				holdTimer = 0;
-
-			if (!isPlayer && holdTimer >= Conductor.stepCrochet * (0.0011 / (FlxG.sound.music != null ? FlxG.sound.music.pitch : 1)) * singDuration)
-			{
-				dance();
-				holdTimer = 0;
-			}
-
-			if(animation.curAnim.finished && animation.getByName(animation.curAnim.name + '-loop') != null)
-				playAnim(animation.curAnim.name + '-loop');
+			super.update(elapsed);
+			return;
 		}
+
+		if(heyTimer > 0)
+		{
+			heyTimer -= elapsed * (PlayState.instance != null ? PlayState.instance.playbackRate : 1.0);
+			if(heyTimer <= 0)
+			{
+				var animName:String = getAnimationName();
+				if(specialAnim && (animName == 'hey' || animName == 'cheer'))
+				{
+					specialAnim = false;
+					dance();
+				}
+				heyTimer = 0;
+			}
+		}
+		else if(specialAnim && isAnimationFinished())
+		{
+			specialAnim = false;
+			dance();
+		}
+		else if (getAnimationName().endsWith('miss') && isAnimationFinished())
+		{
+			dance();
+			finishAnimation();
+		}
+
+		switch(curCharacter)
+		{
+			case 'pico-speaker':
+				if(animationNotes.length > 0 && Conductor.songPosition > animationNotes[0][0])
+				{
+					var noteData:Int = 1;
+					if(animationNotes[0][1] > 2) noteData = 3;
+
+					noteData += FlxG.random.int(0, 1);
+					playAnim('shoot' + noteData, true);
+					animationNotes.shift();
+				}
+				if(isAnimationFinished()) playAnim(getAnimationName(), false, false, getAnimationLength() - 3);
+		}
+
+		if (getAnimationName().startsWith('sing'))
+			holdTimer += elapsed;
+		else if(isPlayer)
+			holdTimer = 0;
+
+		if (!isPlayer && holdTimer >= Conductor.stepCrochet * (0.0011 / (FlxG.sound.music != null ? FlxG.sound.music.pitch : 1)) * singDuration)
+		{
+			dance();
+			holdTimer = 0;
+		}
+
+		var curName:String = getAnimationName();
+		if (isAnimationFinished() && animOffsets.exists('$curName-loop'))
+			playAnim('$curName-loop');
+
 		super.update(elapsed);
 	}
+
+	#if flxanimate
+	inline public function isAnimationNull():Bool
+		return !isAnimateAtlas ? (animation.curAnim == null) : (atlas.anim.curSymbol == null);
+
+	inline public function getAnimationName():String
+	{
+		var name:String = '';
+		if(!isAnimationNull()) name = !isAnimateAtlas ? animation.curAnim.name : lastPlayedAnimName;
+		return (name != null) ? name : '';
+	}
+
+	public function isAnimationFinished():Bool
+	{
+		if (isAnimationNull()) return false;
+		return !isAnimateAtlas ? animation.curAnim.finished : atlas.anim.finished;
+	}
+
+	public function finishAnimation():Void
+	{
+		if (isAnimationNull()) return;
+		if (!isAnimateAtlas) animation.curAnim.finish();
+		else atlas.anim.curFrame = atlas.anim.length - 1;
+	}
+
+	public function getAnimationLength():Int
+	{
+		if (isAnimationNull()) return 0;
+		if (!isAnimateAtlas) return animation.curAnim.frames.length;
+		return atlas.anim.length;
+	}
+	#else
+	inline public function isAnimationNull():Bool
+		return animation.curAnim == null;
+
+	inline public function getAnimationName():String
+	{
+		var name:String = '';
+		if(!isAnimationNull()) name = animation.curAnim.name;
+		return (name != null) ? name : '';
+	}
+
+	public function isAnimationFinished():Bool
+	{
+		if (isAnimationNull()) return false;
+		return animation.curAnim.finished;
+	}
+
+	public function finishAnimation():Void
+	{
+		if (isAnimationNull()) return;
+		animation.curAnim.finish();
+	}
+
+	public function getAnimationLength():Int
+	{
+		if (isAnimationNull()) return 0;
+		return animation.curAnim.frames.length;
+	}
+	#end
 
 	public var danced:Bool = false;
 
@@ -293,7 +427,7 @@ class Character extends FlxSprite
 				else
 					playAnim('danceLeft' + idleSuffix);
 			}
-			else if(animation.getByName('idle' + idleSuffix) != null) {
+			else if(animOffsets.exists('idle' + idleSuffix)) {
 					playAnim('idle' + idleSuffix);
 			}
 		}
@@ -302,7 +436,15 @@ class Character extends FlxSprite
 	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
 	{
 		specialAnim = false;
-		animation.play(AnimName, Force, Reversed, Frame);
+		#if flxanimate
+		if (isAnimateAtlas)
+		{
+			atlas.anim.play(AnimName, Force, Reversed, Frame);
+			lastPlayedAnimName = AnimName; // flxanimate 4.0.0 无 lastPlayedAnim，自行记录
+		}
+		else
+		#end
+			animation.play(AnimName, Force, Reversed, Frame);
 
 		var daOffset = animOffsets.get(AnimName);
 		if (animOffsets.exists(AnimName))
@@ -351,7 +493,13 @@ class Character extends FlxSprite
 	private var settingCharacterUp:Bool = true;
 	public function recalculateDanceIdle() {
 		var lastDanceIdle:Bool = danceIdle;
+		#if flxanimate
+		danceIdle = isAnimateAtlas
+			? (animOffsets.exists('danceLeft' + idleSuffix) && animOffsets.exists('danceRight' + idleSuffix))
+			: (animation.getByName('danceLeft' + idleSuffix) != null && animation.getByName('danceRight' + idleSuffix) != null);
+		#else
 		danceIdle = (animation.getByName('danceLeft' + idleSuffix) != null && animation.getByName('danceRight' + idleSuffix) != null);
+		#end
 
 		if(settingCharacterUp)
 		{
@@ -379,4 +527,41 @@ class Character extends FlxSprite
 	{
 		animation.addByPrefix(name, anim, 24, false);
 	}
+
+	#if flxanimate
+	/** Atlas 模式：Character 不画自己，由 atlas 代替绘制（Psych 0.7 方案） */
+	public override function draw()
+	{
+		if (isAnimateAtlas)
+		{
+			copyAtlasValues();
+			atlas.draw();
+			return;
+		}
+		super.draw();
+	}
+
+	public function copyAtlasValues()
+	{
+		@:privateAccess
+		{
+			atlas.cameras = cameras;
+			atlas.scrollFactor = scrollFactor;
+			atlas.scale = scale;
+			atlas.offset = offset;
+			atlas.origin = origin;
+			atlas.x = x;
+			atlas.y = y;
+			atlas.angle = angle;
+			atlas.alpha = alpha;
+			atlas.visible = visible;
+			atlas.flipX = flipX;
+			atlas.flipY = flipY;
+			atlas.shader = shader;
+			atlas.antialiasing = antialiasing;
+			atlas.colorTransform = colorTransform;
+			atlas.color = color;
+		}
+	}
+	#end
 }

@@ -1,4 +1,5 @@
 package states;
+import backend.WheelScroll;
 
 #if MODS_ALLOWED
 import sys.FileSystem;
@@ -11,6 +12,7 @@ import flixel.util.FlxSpriteUtil;
 
 class CreditsState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_L_X:Float = 40;
 	static final PANEL_L_Y:Float = 70;
@@ -259,10 +261,11 @@ class CreditsState extends MusicBeatState
 					}
 
 					// 滚轮：每帧最多 1 格
-					if (FlxG.mouse.wheel != 0)
+					var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+					if (wheelStep != 0)
 					{
 						mouseActive = true;
-						changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+						changeSelection(wheelStep);
 					}
 
 					// 返回按钮：悬停发光，点击返回

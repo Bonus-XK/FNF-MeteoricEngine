@@ -37,6 +37,34 @@ typedef EventNote = {
 	value2:String
 }
 
+// H-Slice 风格轻量音符数据：加载期只建结构体（不建 FlxSprite 对象），
+// 进入游戏后按需通过 NoteGroup 对象池实例化成 Note。
+// noteData 位打包：1-8 位 = 轨道；9 = mustHit；10 = isHold；11 = isHoldEnd；12 = gfNote；
+// 13 = altAnim；14 = noAnim&noMissAnim；15 = blockHit；16 = ignoreNote
+typedef CastNote = {
+	var strumTime:Float;
+	var noteData:Int;
+	@:optional var chartSeq:Int;          // 谱面唯一序号（回放录制/匹配）；Lua 动态音符为 -1
+	@:optional var density:Null<Float>;   // 堆叠合并计数：同一(时间,轨道)合并为一个音符代表的箭头数
+	@:optional var holdLength:Null<Float>;
+	@:optional var noteType:String;
+	@:optional var multSpeed:Null<Float>; // 每音符滚动倍速（默认 1）
+	@:optional var cmpSpam:Array<Dynamic>;// H-Slice 挤压音符扩展 [剩余数, 密度]（展开为连续同轨音符）
+	@:optional var offs:Array<Float>;      // 堆叠合并展开：本组内每个箭头相对基准时间的偏移（ms）
+	                                       //（后台压缩为一条 CastNote；生成时按偏移展开为 N 个视觉箭头，
+	                                       //  画面与未压缩时逐像素一致）
+	// 舞台脚本（PhillyStreets/PhillyBlazin 等）会直接改这些字段；必须初始化默认值
+	@:optional var noAnimation:Bool;
+	@:optional var noMissAnimation:Bool;
+	@:optional var blockHit:Bool;
+}
+
+typedef SpamNoteData = {
+	var remaining:Float;
+	var density:Float;
+	var seedNote:CastNote; // 原始种子（每次展开后 strumTime 递增）
+}
+
 typedef NoteSplashData = {
 	disabled:Bool,
 	texture:String,
@@ -55,6 +83,10 @@ class Note extends FlxSprite
 	public var mustPress:Bool = false;
 	public var noteData:Int = 0;
 	public var chartSeq:Int = -1; // 谱面中的唯一序号（回放录制/匹配用，Lua 动态生成的音符为 -1）
+	public var density:Float = 1; // 堆叠合并计数（H-Slice 性能移植）
+	public var botQueued:Bool = false; // 本帧已入自动命中队列（击杀延时保护，防入队后被同帧击杀丢弃）
+	public var botSched:Bool = false;  // 已在排期队列（生成即登记、待弹出）：排期等待期间免受回收窗击杀
+	public var isSustainEnds:Bool = false; // 长条尾段（也是唯一"holdend"贴图段）
 	public var canBeHit:Bool = false;
 	public var tooLate:Bool = false;
 	public var wasGoodHit:Bool = false;
@@ -91,6 +123,11 @@ class Note extends FlxSprite
 	public static var SUSTAIN_SIZE:Int = 44;
 	public static var swagWidth:Float = 160 * 0.7;
 	public static var colArray:Array<String> = ['purple', 'blue', 'green', 'red'];
+	// H-Slice 移植：池化音符的 prevNote/nextNote 链重建
+	// seqNote[chartSeq] = 存活池中对应序号音符；seqHit[chartSeq] = 已回池音符的 wasGoodHit 快照
+	//（长条子段"上一段是否命中"在上一段被杀/回池后仍能读取，保证链式判定语义不变）
+	public static var seqNote:Array<Note> = [];
+	public static var seqHit:Array<Bool> = [];
 	// 提前渲染的贴图种类：0 箭头 / 1 长条体 / 2 长条尾
 	public static inline var BAKE_NOTE:Int = 0;
 	public static inline var BAKE_HOLD:Int = 1;
@@ -335,8 +372,13 @@ class Note extends FlxSprite
 			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders) rgbShader.enabled = false; // 0.6.3 兼容/关着色器时避免 RGB 渲染成黑
 			else if (bakedKind >= 0) rgbShader.enabled = false; // 提前渲染：颜色已烘焙进贴图，不再叠加 RGB 着色器（叠加会钳制成白色）
-			else rgbShader.enabled = false; // 烘焙失败/未烘焙：RGB 着色器在部分 GPU/GLES 驱动输出全黑 → 关闭用原始贴图（发白为正常外观）
-			trace('NoteInit col=' + noteData + ' baked=' + bakedKind + ' rgbOn=' + (rgbShader != null ? rgbShader.enabled : false));
+			else
+			{
+				// Normal（白色箭头贴图）启用 RGB 着色器染色，解决箭头颜色发白；
+				// Chips 等自带颜色的皮肤保持贴图原色（再叠 shader 会变色）
+				var skinPath:String = getNoteSkinLoadPathCached(texture, '', PlayState.isPixelStage, isSustainNote);
+				rgbShader.enabled = (skinPath.indexOf('chip') < 0);
+			}
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
@@ -429,7 +471,6 @@ class Note extends FlxSprite
 				newRGB.r = arr[0];
 				newRGB.g = arr[1];
 				newRGB.b = arr[2];
-				trace('NoteRGB: pixel=' + PlayState.isPixelStage + ' col=' + noteData + ' r=' + arr[0] + ' g=' + arr[1] + ' b=' + arr[2]);
 			}
 		}
 		return globalRgbShaders[noteData];
@@ -539,6 +580,16 @@ class Note extends FlxSprite
 			{
 				atlas = Paths.getSparrowAtlas(loadPath);
 				noteFramesCache.set(loadPath, atlas);
+			}
+			// 大内存压力下图集可能被缓存层逐出（graphic 非 persist）：强制重读一次再兜底
+			if (atlas == null || atlas.parent == null || atlas.parent.bitmap == null)
+			{
+				try
+				{
+					atlas = Paths.getSparrowAtlas(loadPath, null, true);
+					if (atlas != null) noteFramesCache.set(loadPath, atlas);
+				}
+				catch (e:Dynamic) { atlas = null; }
 			}
 			if (atlas == null)
 			{
@@ -1141,10 +1192,19 @@ class Note extends FlxSprite
 
 	override function update(elapsed:Float)
 	{
-		super.update(elapsed);
-
 		if (PlayState.instance != null && PlayState.instance.rewinding)
 			return; // 回溯中：不更新命中窗口/超时状态，箭头纯视觉倒流
+
+		// 自动游玩捷径（H-Slice 移植）：预演模式命中由 PlayState 的 botHitQueue 统一驱动，
+		// 音符不再逐帧计算判定窗口（5 万级堆叠谱面下省下整段每音符更新开销）
+		if (PlayState.instance != null && PlayState.instance.cpuControlled && !PlayState.instance.replayMode
+			&& PlayState.instance.botplayPlan != null)
+			return;
+		// 视觉副本（blockHit+ignoreNote）：纯渲染用途，无需窗口/超时计算（密集段大头）
+		if (blockHit && ignoreNote && density == 1)
+			return;
+
+		super.update(elapsed);
 
 		if (mustPress)
 		{
@@ -1172,7 +1232,7 @@ class Note extends FlxSprite
 
 			if (strumTime < Conductor.songPosition + (Conductor.safeZoneOffset * earlyHitMult))
 			{
-				if((isSustainNote && prevNote.wasGoodHit) || strumTime <= Conductor.songPosition)
+				if((isSustainNote && prevChainWasGoodHit()) || strumTime <= Conductor.songPosition)
 					wasGoodHit = true;
 			}
 		}
@@ -1181,6 +1241,235 @@ class Note extends FlxSprite
 		{
 			if (alpha > 0.3)
 				alpha = 0.3;
+		}
+	}
+
+	// 池化链判定：上一段（chartSeq-1）若已回池，用被杀瞬间的 wasGoodHit 快照；
+	// 否则读存活实例；动态音符（chartSeq<0）退回指针链。
+	function prevChainWasGoodHit():Bool
+	{
+		if (chartSeq >= 0)
+		{
+			var ps:Int = chartSeq - 1;
+			if (ps >= 0)
+			{
+				if (ps < Note.seqNote.length && Note.seqNote[ps] != null) return Note.seqNote[ps].wasGoodHit;
+				if (ps < Note.seqHit.length) return Note.seqHit[ps];
+				return false;
+			}
+		}
+		return prevNote != null && prevNote.wasGoodHit;
+	}
+
+	// 池化换轨兜底：复生的对象只加载过"第一条生命"所在轨道的动画，
+	// 换轨时 animation.play('blueScroll') 找不到动画会停在 frame 0（紫/左箭头）——补齐全部轨道动画。
+	var _animsEnsured:Bool = false;
+	function ensureAllNoteAnims():Void
+	{
+		if (frames == null) return;
+		if (_animsEnsured) return; // 每个对象只补齐一次（池化复生不再重复 12 次 getByName）
+		_animsEnsured = true;
+		if (PlayState.isPixelStage)
+		{
+			for (col in 0...colArray.length)
+			{
+				if (animation.getByName(colArray[col] + 'Scroll') == null)
+					animation.add(colArray[col] + 'Scroll', [col + 4], 24, true);
+				if (animation.getByName(colArray[col] + 'hold') == null)
+					animation.add(colArray[col] + 'hold', [col], 24, true);
+				if (animation.getByName(colArray[col] + 'holdend') == null)
+					animation.add(colArray[col] + 'holdend', [col + 4], 24, true);
+			}
+			return;
+		}
+		for (col in 0...colArray.length)
+		{
+			if (animation.getByName(colArray[col] + 'Scroll') == null)
+				animation.addByPrefix(colArray[col] + 'Scroll', colArray[col] + '0', 24, true);
+			if (animation.getByName(colArray[col] + 'hold') == null)
+				animation.addByPrefix(colArray[col] + 'hold', colArray[col] + ' hold piece', 24, true);
+			if (animation.getByName(colArray[col] + 'holdend') == null)
+				animation.addByPrefix(colArray[col] + 'holdend', colArray[col] + ' hold end', 24, true);
+		}
+		// NOTE_assets 拼写错误的紫色长条尾帧名兜底（与 loadNoteAnims 一致）
+		if (animation.getByName('purpleholdend') == null)
+			animation.addByPrefix('purpleholdend', 'pruple end hold', 24, true);
+	}
+
+	// H-Slice 移植：从轻量 CastNote 实例化/复生音符（对象池回收复用，避免 15 万级谱面的对象创建/销毁）
+	// 与构造函数行为一致：贴图/烘焙/居中/长条样式全部重建，且可被任意次数复用。
+	public function recycleNote(target:CastNote):Note
+	{
+		wasGoodHit = hitByOpponent = tooLate = false;
+		botQueued = false;
+		botSched = false;
+		canBeHit = flipY = false;
+		hitCausesMiss = false;
+		lowPriority = false;
+		missHealth = 0.0475;
+		hitsound = 'hitsound';
+		hitsoundChartEditor = true;
+		_noteSplashData = null;
+		splashSkin = null;
+		_tail = null;
+		_extraData = null;
+		offsetX = 0;
+		offsetY = 0;
+		offsetAngle = 0;
+		multAlpha = 1;
+		// 构造函数默认值：长条会被置 copyAngle=false 等，复生时必须恢复（否则箭头角度/位置不再更新）
+		copyX = true;
+		copyY = true;
+		copyAngle = true;
+		copyAlpha = true;
+		angle = 0;
+		scrollFactor.set(); // 音符在 camHUD 下应为 (0,0)，与旧生成路径一致
+		// invalidateNote 会置 active=false/visible=false；复生必须复活（否则 Note.update 不执行、
+		// canBeHit/tooLate 永不变，音符无法命中且整组被 kill-late 削没）
+		active = true;
+		visible = true;
+		exists = true;
+		spawned = true;
+
+		density = (target.density != null && target.density > 0) ? target.density : 1;
+		chartSeq = (target.chartSeq != null) ? target.chartSeq : -1;
+		prevNote = null;
+		nextNote = null;
+		parent = null;
+		bakedKind = -1;
+
+		strumTime = target.strumTime + ClientPrefs.data.noteOffset;
+		mustPress = (target.noteData & (1 << 8)) != 0;
+		isSustainNote = (target.noteData & (1 << 9)) != 0;
+		isSustainEnds = (target.noteData & (1 << 10)) != 0;
+		gfNote = (target.noteData & (1 << 11)) != 0;
+		animSuffix = (target.noteData & (1 << 12)) != 0 ? "-alt" : "";
+		noAnimation = noMissAnimation = (target.noteData & (1 << 13)) != 0;
+		blockHit = (target.noteData & (1 << 14)) != 0;
+		ignoreNote = (target.noteData & (1 << 15)) != 0;
+		noteData = target.noteData & 3;
+
+		hitsoundDisabled = isSustainNote;
+
+		// 舞台脚本可能直接改过 CastNote 字段（PhillyStreets/PhillyBlazin）
+		if (target.noAnimation) noAnimation = true;
+		if (target.noMissAnimation) noMissAnimation = true;
+		if (target.blockHit) blockHit = true;
+
+		// 贴图（图集按路径缓存只解析一次；烘焙贴图命中则零解析）。
+		// 先置空 noteType 再赋值，保证复生灵体时类型设置（颜色/贴图/行为）一定重新生效
+		noteType = null;
+		texture = '';
+		var ct:String = target.noteType != null ? target.noteType : '';
+		try {
+			if (ct != null && ct.length > 0) noteType = ct;
+		} catch (e:Dynamic) {}
+
+		sustainLength = target.holdLength != null ? target.holdLength : 0;
+		multSpeed = (target.multSpeed != null) ? target.multSpeed : 1; // set_multSpeed 同步 resize 长条
+
+		// 长条分段样式：尾段直接用 holdend 贴图/动画；非尾段一步到位换 hold（等价于构造时逐段转换）
+		ensureAllNoteAnims(); // 池化换轨：补齐全部轨道动画，避免 play 失败停在左箭头帧
+		correctionOffset = 0;
+		if (!isSustainNote)
+		{
+			if (bakedKind < 0) animation.play(colArray[noteData % colArray.length] + 'Scroll', true);
+		}
+
+		if (isSustainNote)
+		{
+			flipY = ClientPrefs.data.downScroll;
+			alpha = multAlpha = 0.6;
+			copyAngle = false; // 长条不旋转（与构造函数一致）
+			if (bakedKind < 0)
+				animation.play(colArray[noteData % colArray.length] + (isSustainEnds ? 'holdend' : 'hold'));
+			else if (!isSustainEnds && bakedKind != BAKE_HOLD)
+				useBakedSustainBody();
+
+			updateHitbox();
+
+			// 构造路径的 X 居中补偿：长条中线贴合判定键（复生对象不走构造函数，这里显式补齐）
+			if (!PlayState.isPixelStage)
+			{
+				offsetX += width / 2;
+				updateHitbox();
+				offsetX -= width / 2;
+				if (bakedKind >= 0)
+				{
+					var arrowW:Float = 0;
+					if (bakedLoadPath != null)
+						arrowW = Note.bakedArrowRenderWidth.get(bakedLoadPath) != null ? Note.bakedArrowRenderWidth.get(bakedLoadPath) : 0;
+					else
+						arrowW = Note.bakedArrowRenderWidth.get(getNoteSkinLoadPath(texture, '', PlayState.isPixelStage, true)) != null ? Note.bakedArrowRenderWidth.get(getNoteSkinLoadPath(texture, '', PlayState.isPixelStage, true)) : 0;
+					if (arrowW > 0) offsetX += (arrowW - width) / 2;
+				}
+			}
+			else
+			{
+				offsetX += _lastNoteOffX;
+				_lastNoteOffX = (width - 7) * (PlayState.daPixelZoom / 2);
+				offsetX -= _lastNoteOffX;
+			}
+
+			// 非尾段：按节拍拉伸（与构造期生成时逐段应用的公式一致）
+			if (!isSustainEnds)
+			{
+				var h0:Float = height;
+				scale.y = Conductor.stepCrochet / 100 * 1.05;
+				if (PlayState.instance != null) scale.y *= PlayState.instance.songSpeed;
+				if (PlayState.isPixelStage)
+				{
+					scale.y *= 1.19;
+					scale.y *= (6 / h0);
+				}
+				updateHitbox();
+			}
+			else if (PlayState.isPixelStage)
+			{
+				scale.y *= PlayState.daPixelZoom;
+				updateHitbox();
+			}
+
+			correctionOffset = height / 2;
+			if (ClientPrefs.data.downScroll && !PlayState.isPixelStage)
+				correctionOffset = 0;
+		}
+		else
+		{
+			alpha = multAlpha = 1;
+			// 箭头复生：重置缩放（长条生命残留 scale.y≈2 → 箭头被上下拉伸）
+			if (PlayState.isPixelStage) scale.set(PlayState.daPixelZoom, PlayState.daPixelZoom);
+			else scale.set(0.7, 0.7);
+			updateHitbox();
+		}
+		clipRect = null;
+
+		// prevNote/nextNote 链：按 chartSeq 重建（池化后旧 prev 对象已被复用，必须走静态表）
+		var ps:Int = chartSeq - 1;
+		if (chartSeq >= 0)
+		{
+			if (ps >= 0 && ps < Note.seqNote.length)
+			{
+				prevNote = Note.seqNote[ps];
+				if (prevNote != null) prevNote.nextNote = this;
+			}
+			if (chartSeq >= Note.seqNote.length) Note.seqNote.resize(chartSeq + 1);
+			Note.seqNote[chartSeq] = this;
+		}
+		return this;
+	}
+
+	// 池化专用：音符被杀/回池时调用（同步链静态表与快照，阻止新增生命污染旧链）
+	public function invalidatePooled():Void
+	{
+		if (chartSeq >= 0 && chartSeq < Note.seqNote.length)
+		{
+			if (Note.seqNote[chartSeq] == this)
+			{
+				if (chartSeq >= Note.seqHit.length) Note.seqHit.resize(chartSeq + 1);
+				Note.seqHit[chartSeq] = wasGoodHit;
+				Note.seqNote[chartSeq] = null;
+			}
 		}
 	}
 
@@ -1232,8 +1521,9 @@ class Note extends FlxSprite
 	public function clipToStrumNote(myStrum:StrumNote)
 	{
 		var center:Float = myStrum.y + offsetY + Note.swagWidth / 2;
+		// 池化安全：prevNote 指针可能为 null/已被复用（链上段被回收），改用静态链查询
 		if(isSustainNote && (mustPress || !ignoreNote) &&
-			(!mustPress || (wasGoodHit || (prevNote.wasGoodHit && !canBeHit))))
+			(!mustPress || (wasGoodHit || (prevChainWasGoodHit() && !canBeHit))))
 		{
 			var swagRect:FlxRect = clipRect;
 			if(swagRect == null) swagRect = new FlxRect(0, 0, frameWidth, frameHeight);

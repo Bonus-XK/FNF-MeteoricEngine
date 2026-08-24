@@ -25,10 +25,16 @@ class HScript extends SScript
 	public static function initHaxeModuleCode(parent:FunkinLua, code:String)
 	{
 		#if (SScript >= "3.0.0")
-		if(parent.hscript == null)
+		var hs:HScript = try parent.hscript catch (e) null;
+		if(hs == null)
 		{
 			trace('initializing haxe interp for: ${parent.scriptName}');
 			parent.hscript = new HScript(parent, code);
+		}
+		else
+		{
+			// Psych 0.7.3 兼容：后续 runHaxeCode 每次都要执行代码（SScript 4.0.1 的 doString 内部有 try/catch，解析失败不抛）
+			hs.doString(code);
 		}
 		#end
 	}
@@ -46,7 +52,8 @@ class HScript extends SScript
 		if (scriptFile != null && scriptFile.length > 0)
 			origin = scriptFile;
 		preset();
-		execute();
+		// SScript 4.0.1 的 execute() 解析失败会抛异常（runHaxeCode 首段代码语法错时避免 lua panic）
+		try execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
 	}
 
 	override function preset()
@@ -75,6 +82,330 @@ class HScript extends SScript
 		#end
 		set('ShaderFilter', openfl.filters.ShaderFilter);
 		set('StringTools', StringTools);
+
+		// ── SeiunEngine 融合变量（来自 SeiunEngine getDefaultVariables，剔除 MeteoricEngine 缺失的类） ──
+		// Haxe std（Math 用代理对象：Math.PI 等 inline 常量反射不到，方法以值引用生成非内联拷贝）
+		set('Math', {
+			PI: Math.PI,
+			NaN: Math.NaN,
+			POSITIVE_INFINITY: Math.POSITIVE_INFINITY,
+			NEGATIVE_INFINITY: Math.NEGATIVE_INFINITY,
+			abs: Math.abs,
+			ceil: Math.ceil,
+			floor: Math.floor,
+			round: Math.round,
+			min: Math.min,
+			max: Math.max,
+			pow: Math.pow,
+			sqrt: Math.sqrt,
+			sin: Math.sin,
+			cos: Math.cos,
+			tan: Math.tan,
+			atan: Math.atan,
+			atan2: Math.atan2,
+			asin: Math.asin,
+			acos: Math.acos,
+			random: Math.random,
+			log: Math.log,
+			exp: Math.exp,
+			isFinite: Math.isFinite,
+			isNaN: Math.isNaN,
+			ffloor: Math.ffloor,
+			fceil: Math.fceil,
+			fround: Math.fround
+		});
+		set('Std', Std);
+		set('Type', Type);
+		set('Reflect', Reflect);
+		set('Date', Date);
+		set('DateTools', DateTools);
+		set('Lambda', Lambda);
+		set('String', String);
+		set('Array', Array);
+		set('Json', {
+			parse: function(text:String):Dynamic return haxe.format.JsonParser.parse(text),
+			stringify: function(value:Dynamic, ?replacer:Dynamic = null, ?space:String = null):String
+				return haxe.format.JsonPrinter.print(value, replacer, space)
+		});
+		// Flixel（FlxMath 用代理对象：fastCos/fastSin 等 inline 方法以值引用生成非内联拷贝，hscript 反射可用）
+		set('FlxMath', {
+			fastCos: flixel.math.FlxMath.fastCos,
+			fastSin: flixel.math.FlxMath.fastSin,
+			bound: flixel.math.FlxMath.bound,
+			lerp: flixel.math.FlxMath.lerp,
+			inBounds: flixel.math.FlxMath.inBounds,
+			isOdd: flixel.math.FlxMath.isOdd,
+			isEven: flixel.math.FlxMath.isEven,
+			roundDecimal: flixel.math.FlxMath.roundDecimal,
+			dotProduct: flixel.math.FlxMath.dotProduct,
+			vectorLength: flixel.math.FlxMath.vectorLength,
+			distanceBetween: flixel.math.FlxMath.distanceBetween,
+			distanceToPoint: flixel.math.FlxMath.distanceToPoint,
+			distanceToMouse: flixel.math.FlxMath.distanceToMouse,
+			distanceToTouch: flixel.math.FlxMath.distanceToTouch,
+			isDistanceWithin: flixel.math.FlxMath.isDistanceWithin,
+			isDistanceToPointWithin: flixel.math.FlxMath.isDistanceToPointWithin,
+			isDistanceToMouseWithin: flixel.math.FlxMath.isDistanceToMouseWithin
+		});
+		set('FlxText', flixel.text.FlxText);
+		set('FlxSound', flixel.sound.FlxSound);
+		set('FlxGroup', flixel.group.FlxGroup);
+		set('FlxTypedGroup', flixel.group.FlxGroup.FlxTypedGroup);
+		set('FlxSpriteGroup', flixel.group.FlxSpriteGroup);
+		set('FlxStringUtil', flixel.util.FlxStringUtil);
+		set('FlxSpriteUtil', flixel.util.FlxSpriteUtil);
+		set('FlxAtlasFrames', flixel.graphics.frames.FlxAtlasFrames);
+		set('FlxObject', flixel.FlxObject);
+		set('FlxBasic', flixel.FlxBasic);
+		set('FlxButton', flixel.ui.FlxButton);
+		set('FlxBar', flixel.ui.FlxBar);
+		set('FlxRect', flixel.math.FlxRect);
+		set('FlxRandom', flixel.math.FlxRandom);
+		set('FlxTextBorderStyle', flixel.text.FlxText.FlxTextBorderStyle);
+		// Engine 类
+		#if ACHIEVEMENTS_ALLOWED
+		set('Achievements', backend.Achievements);
+		#end
+		#if flxanimate
+		set('FlxAnimate', flxanimate.FlxAnimate);
+		#end
+		set('BGSprite', objects.BGSprite);
+		set('AttachedSprite', objects.AttachedSprite);
+		set('FlxGradient', flixel.util.FlxGradient);
+		set('Mods', backend.Mods);
+		set('MusicBeatState', backend.MusicBeatState);
+		set('MusicBeatSubstate', backend.MusicBeatSubstate);
+		set('FreeplayState', states.FreeplayState);
+		set('StoryMenuState', states.StoryMenuState);
+		set('TitleState', states.TitleState);
+		set('CreditsState', states.CreditsState);
+		set('MainMenuState', states.MainMenuState);
+		set('HScript', HScript);
+		set('CoolUtil', backend.CoolUtil);
+		set('WeekData', backend.WeekData);
+		set('Highscore', backend.Highscore);
+		set('LoadingState', states.LoadingState);
+		set('Application', lime.app.Application);
+		set('Assets', openfl.utils.Assets);
+		set('ColorMatrixFilter', openfl.filters.ColorMatrixFilter);
+		set('Event', openfl.events.Event);
+		// 常量
+		set('X', flixel.util.FlxAxes.X);
+		set('Y', flixel.util.FlxAxes.Y);
+		set('XY', flixel.util.FlxAxes.XY);
+		set('LEFT', flixel.text.FlxText.FlxTextAlign.LEFT);
+		set('CENTER', flixel.text.FlxText.FlxTextAlign.CENTER);
+		set('RIGHT', flixel.text.FlxText.FlxTextAlign.RIGHT);
+		set('OUTLINE', flixel.text.FlxText.FlxTextBorderStyle.OUTLINE);
+		set('OUTLINE_FAST', flixel.text.FlxText.FlxTextBorderStyle.OUTLINE_FAST);
+		set('SHADOW', flixel.text.FlxText.FlxTextBorderStyle.SHADOW);
+		set('NONE', flixel.text.FlxText.FlxTextBorderStyle.NONE);
+		// haxe.ds
+		set('IntMap', haxe.ds.IntMap);
+		set('StringMap', haxe.ds.StringMap);
+		set('ObjectMap', haxe.ds.ObjectMap);
+		set('EnumValueMap', haxe.ds.EnumValueMap);
+		set('HaxeList', haxe.ds.List);
+		set('GenericStack', haxe.ds.GenericStack);
+		set('SortedList', haxe.ds.List);
+		// haxe.io / crypto
+		set('Bytes', haxe.io.Bytes);
+		set('Input', haxe.io.Input);
+		set('Output', haxe.io.Output);
+		set('HaxePath', haxe.io.Path);
+		set('Eof', haxe.io.Eof);
+		set('Base64', haxe.crypto.Base64);
+		set('Md5', haxe.crypto.Md5);
+		set('Sha1', haxe.crypto.Sha1);
+		set('Sha256', haxe.crypto.Sha256);
+		set('Adler32', haxe.crypto.Adler32);
+		set('CrC32', haxe.crypto.Crc32);
+		#if sys
+		set('Sys', Sys);
+		set('File', sys.io.File);
+		set('FileSystem', sys.FileSystem);
+		set('FileInput', sys.io.FileInput);
+		set('FileOutput', sys.io.FileOutput);
+		set('Process', sys.io.Process);
+		#end
+		// openfl.geom
+		set('Matrix', openfl.geom.Matrix);
+		set('Point', openfl.geom.Point);
+		set('Rectangle', openfl.geom.Rectangle);
+		set('ColorTransform', openfl.geom.ColorTransform);
+		set('Transform', openfl.geom.Transform);
+		// openfl.display
+		set('DisplayObject', openfl.display.DisplayObject);
+		set('DisplayObjectContainer', openfl.display.DisplayObjectContainer);
+		set('Sprite', openfl.display.Sprite);
+		set('Stage', openfl.display.Stage);
+		set('Bitmap', openfl.display.Bitmap);
+		set('BitmapData', openfl.display.BitmapData);
+		set('Graphics', openfl.display.Graphics);
+		set('MovieClip', openfl.display.MovieClip);
+		set('Shader', openfl.display.Shader);
+		set('ShaderParameter', openfl.display.ShaderParameter);
+		set('ShaderInput', openfl.display.ShaderInput);
+		set('FPS', openfl.display.FPS);
+		set('fpsVar', Main.fpsVar);
+		// openfl.events
+		set('MouseEvent', openfl.events.MouseEvent);
+		set('KeyboardEvent', openfl.events.KeyboardEvent);
+		set('TouchEvent', openfl.events.TouchEvent);
+		set('FocusEvent', openfl.events.FocusEvent);
+		set('IOErrorEvent', openfl.events.IOErrorEvent);
+		set('SecurityErrorEvent', openfl.events.SecurityErrorEvent);
+		set('ProgressEvent', openfl.events.ProgressEvent);
+		set('HTTPStatusEvent', openfl.events.HTTPStatusEvent);
+		// DataEvent / SampleDataEvent 因 OpenFL 9.2.1 C++ 生成 bug 无法引用，已剔除
+		// 工具函数（移植自 SeiunEngine）
+		set('loadModTextFile', function(path:String):String {
+			#if sys
+			var paths:Array<String> = [];
+			#if MODS_ALLOWED
+			if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+				paths.push(Paths.mods(Mods.currentModDirectory + '/' + path));
+			for (mod in Mods.getGlobalMods())
+				paths.push(Paths.mods(mod + '/' + path));
+			#end
+			paths.push(Paths.getPreloadPath(path));
+			for (p in paths) {
+				if (sys.FileSystem.exists(p))
+					return sys.io.File.getContent(p);
+			}
+			#end
+			return '';
+		});
+		set('parseTextConfig', function(content:String, ?prefix:String = null):Dynamic {
+			var result = {};
+			if (content == null || content.length == 0) return result;
+			var lines = content.split("\n");
+			for (line in lines) {
+				line = StringTools.trim(line);
+				if (line.length == 0 || line.startsWith("#")) continue;
+				var eqIdx = line.indexOf("=");
+				if (eqIdx < 0) continue;
+				var key = StringTools.trim(line.substr(0, eqIdx));
+				var val = StringTools.trim(line.substr(eqIdx + 1));
+				if (prefix != null) {
+					if (!key.startsWith(prefix)) continue;
+					key = key.substr(prefix.length);
+				}
+				Reflect.setField(result, key, val);
+			}
+			return result;
+		});
+		set('version', '0.2.8');
+		set('hscriptVersion', 'SScript 4.0.1');
+		set('screenWidth', FlxG.width);
+		set('screenHeight', FlxG.height);
+
+		// ── Psych 0.7.3 融合变量 ──
+		set('moveCamera', function(isDad:Bool) return PlayState.instance.moveCamera(isDad));
+
+		set('getModSetting', function(saveTag:String, ?modName:String = null) {
+			if(modName == null)
+			{
+				modName = Mods.currentModDirectory;
+				if(modName == null || modName.length < 1)
+				{
+					PlayState.instance.addTextToDebug('getModSetting: Argument #2 is null and script is not inside a packed Mod folder!', FlxColor.RED);
+					return null;
+				}
+			}
+			return LuaUtils.getModSetting(saveTag, modName);
+		});
+
+		// Keyboard & Gamepads
+		set('keyboardJustPressed', function(name:String) return Reflect.getProperty(FlxG.keys.justPressed, name));
+		set('keyboardPressed', function(name:String) return Reflect.getProperty(FlxG.keys.pressed, name));
+		set('keyboardReleased', function(name:String) return Reflect.getProperty(FlxG.keys.justReleased, name));
+
+		set('anyGamepadJustPressed', function(name:String) {
+			var id = flixel.input.gamepad.FlxGamepadInputID.fromStringMap.get(name);
+			if (id == null) return false;
+			return FlxG.gamepads.anyJustPressed(id);
+		});
+		set('anyGamepadPressed', function(name:String) {
+			var id = flixel.input.gamepad.FlxGamepadInputID.fromStringMap.get(name);
+			if (id == null) return false;
+			return FlxG.gamepads.anyPressed(id);
+		});
+		set('anyGamepadReleased', function(name:String) {
+			var id = flixel.input.gamepad.FlxGamepadInputID.fromStringMap.get(name);
+			if (id == null) return false;
+			return FlxG.gamepads.anyJustReleased(id);
+		});
+
+		set('gamepadAnalogX', function(id:Int, ?leftStick:Bool = true)
+		{
+			var controller = FlxG.gamepads.getByID(id);
+			if (controller == null) return 0.0;
+
+			return controller.getXAxis(leftStick ? flixel.input.gamepad.FlxGamepadInputID.LEFT_ANALOG_STICK : flixel.input.gamepad.FlxGamepadInputID.RIGHT_ANALOG_STICK);
+		});
+		set('gamepadAnalogY', function(id:Int, ?leftStick:Bool = true)
+		{
+			var controller = FlxG.gamepads.getByID(id);
+			if (controller == null) return 0.0;
+
+			return controller.getYAxis(leftStick ? flixel.input.gamepad.FlxGamepadInputID.LEFT_ANALOG_STICK : flixel.input.gamepad.FlxGamepadInputID.RIGHT_ANALOG_STICK);
+		});
+		set('gamepadJustPressed', function(id:Int, name:String)
+		{
+			var controller = FlxG.gamepads.getByID(id);
+			if (controller == null) return false;
+
+			return Reflect.getProperty(controller.justPressed, name) == true;
+		});
+		set('gamepadPressed', function(id:Int, name:String)
+		{
+			var controller = FlxG.gamepads.getByID(id);
+			if (controller == null) return false;
+
+			return Reflect.getProperty(controller.pressed, name) == true;
+		});
+		set('gamepadReleased', function(id:Int, name:String)
+		{
+			var controller = FlxG.gamepads.getByID(id);
+			if (controller == null) return false;
+
+			return Reflect.getProperty(controller.justReleased, name) == true;
+		});
+
+		set('keyJustPressed', function(name:String = '') {
+			name = name.toLowerCase();
+			switch(name) {
+				case 'left': return Controls.instance.NOTE_LEFT_P;
+				case 'down': return Controls.instance.NOTE_DOWN_P;
+				case 'up': return Controls.instance.NOTE_UP_P;
+				case 'right': return Controls.instance.NOTE_RIGHT_P;
+				default: return Controls.instance.justPressed(name);
+			}
+			return false;
+		});
+		set('keyPressed', function(name:String = '') {
+			name = name.toLowerCase();
+			switch(name) {
+				case 'left': return Controls.instance.NOTE_LEFT;
+				case 'down': return Controls.instance.NOTE_DOWN;
+				case 'up': return Controls.instance.NOTE_UP;
+				case 'right': return Controls.instance.NOTE_RIGHT;
+				default: return Controls.instance.pressed(name);
+			}
+			return false;
+		});
+		set('keyReleased', function(name:String = '') {
+			name = name.toLowerCase();
+			switch(name) {
+				case 'left': return Controls.instance.NOTE_LEFT_R;
+				case 'down': return Controls.instance.NOTE_DOWN_R;
+				case 'up': return Controls.instance.NOTE_UP_R;
+				case 'right': return Controls.instance.NOTE_RIGHT_R;
+				default: return Controls.instance.justReleased(name);
+			}
+			return false;
+		});
 
 		// Functions & Variables
 		set('setVar', function(name:String, value:Dynamic)
@@ -108,8 +439,14 @@ class HScript extends SScript
 		{
 			#if LUA_ALLOWED
 			for (script in PlayState.instance.luaArray)
-				if(script != null && script.lua != null && !script.closed)
-					Lua_helper.add_callback(script.lua, name, func);
+			{
+				if(script == null || script.lua == null || script.closed) continue;
+				// 防护：被污染的 lua 状态（栈下溢 gettop<0）会导致 lua_pushcclosure 原生崩溃，跳过之
+				var _gt:Int = 0;
+				try { _gt = Lua.gettop(script.lua); } catch (e:Dynamic) { continue; }
+				if (_gt < 0) continue; // 被污染的 lua 状态（栈下溢）跳过，防止 lua_pushcclosure 原生崩溃
+				Lua_helper.add_callback(script.lua, name, func);
+			}
 			#end
 			FunkinLua.customFunctions.set(name, func);
 		});

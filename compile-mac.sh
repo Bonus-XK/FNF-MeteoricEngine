@@ -20,8 +20,70 @@ if [ ! -d "$NEKOPATH" ] || [ ! -f "$NEKOPATH/std.ndll" ]; then
   done
 fi
 
+# ---- 自动关闭旧的游戏进程 ----
+# 构建会替换 app 文件，旧进程持有旧文件句柄会干扰；测试时重复启动也会冲突。
+# 顺带清掉 lime livereload 残留进程（进程名同样是 Meteoric）。
+pkill -f "Meteoric" 2>/dev/null && echo "[pre-build] closed old game process(es)" || true
+sleep 1
+
+# ---- 构建前：备份当前用户 mods（构建会重置 Resources）----
+# 用"上一次构建产物里的 mods"作备份源，这样用户删除的 mod 不会在下次构建时复活；
+# 首次构建（无产物）时回退到 tools/user_mods 快照。
+RES="export/release/macos/bin/Meteoric.app/Contents/Resources"
+if [ -d "$RES/mods" ]; then
+  rm -rf tools/user_mods_prev
+  mkdir -p tools/user_mods_prev
+  cp -R "$RES/mods" tools/user_mods_prev/mods
+  if [ -f "$RES/modsList.txt" ]; then
+    cp "$RES/modsList.txt" tools/user_mods_prev/modsList.txt
+  fi
+  echo "[pre-build] backed up current user mods"
+fi
+
 if [ "$1" = "test" ]; then
-  exec haxelib run lime test macos -release
+  haxelib run lime test macos -release
 else
-  exec haxelib run lime build macos -release
+  haxelib run lime build macos -release
+fi
+
+# ---- 构建后处理：恢复 8月17 稳定版 lime.ndll ----
+# lime 构建流程会重新编译并覆盖 app 里的 lime.ndll（SDLSystem 补丁版），
+# 该版本与 llvm@18 编译的游戏代码不兼容（malloc free 崩溃，根因）。
+# lime build 返回后仍有异步收尾（约 1~2 分钟）会再次覆盖 app 里的 ndll，
+# 所以先等所有 lime/hxcpp 残留进程结束，再恢复稳定版并重签名。
+STABLE_NDLL="tools/lime.ndll.stable"
+APP_NDLL="export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll"
+echo "[post-build] waiting for lime/hxcpp tail processes to finish..."
+for attempt in $(seq 1 30); do
+  if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|test)|hxcpp.*Build" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+sleep 3
+if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
+  cp "$STABLE_NDLL" "$APP_NDLL"
+  sleep 3
+  if cmp -s "$STABLE_NDLL" "$APP_NDLL"; then
+    codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+    echo "[post-build] restored stable lime.ndll + re-signed  (md5: $(md5 -q "$APP_NDLL"))"
+  else
+    echo "[post-build] WARNING: lime.ndll was overwritten again after restore"
+  fi
+fi
+
+# ---- 恢复用户 mods（lime 构建会重置 Resources，用户装过的 mod 会丢）----
+# 先删掉目标 mods 目录再拷贝：cp -R 目标已存在时会嵌套成 mods/mods/，
+# 被 updateModList 扫成名为 "mods" 的假模组（用户看到的"永远有一个 mods 模组"）。
+MODS_SRC="tools/user_mods_prev"
+if [ ! -d "$MODS_SRC/mods" ]; then
+  MODS_SRC="tools/user_mods" # 首次构建回退快照
+fi
+if [ -d "$MODS_SRC/mods" ]; then
+  rm -rf "$RES/mods"
+  cp -R "$MODS_SRC/mods" "$RES/mods"
+  if [ -f "$MODS_SRC/modsList.txt" ]; then
+    cp "$MODS_SRC/modsList.txt" "$RES/modsList.txt"
+  fi
+  echo "[post-build] restored user mods from $MODS_SRC/"
 fi

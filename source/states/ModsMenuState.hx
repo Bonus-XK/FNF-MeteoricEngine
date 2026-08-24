@@ -1,7 +1,9 @@
 package states;
+import backend.WheelScroll;
 
 import backend.WeekData;
 import backend.Mods;
+import backend.ModInstaller;
 
 import openfl.display.BitmapData;
 import openfl.Lib;
@@ -17,6 +19,7 @@ import flixel.util.FlxSpriteUtil;
 
 class ModsMenuState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_L_X:Float = 40;
 	static final PANEL_L_Y:Float = 70;
@@ -71,8 +74,12 @@ class ModsMenuState extends MusicBeatState
 	var downBtn:ModsButton;
 	var allOnBtn:ModsButton;
 	var allOffBtn:ModsButton;
+	var deleteBtn:ModsButton;
 	var buttons:Array<ModsButton> = [];
 	var hasModsUI:Array<FlxSprite> = []; // 有 Mod 时才显示的元素
+
+	/** 打开本界面时 ModInstaller.lastInstallTime 的快照：安装完成时间戳比它新 → 自动刷新列表 */
+	var lastInstallSeen:Float = 0;
 
 	var noModsTxt:FlxText;
 	var noModsSine:Float = 0;
@@ -218,10 +225,12 @@ class ModsMenuState extends MusicBeatState
 		toggleBtn = new ModsButton(772, 540, 170, 44, '启用', function() { toggleSelected(); });
 		upBtn = new ModsButton(952, 540, 96, 44, '上移', function() { moveMod(-1); });
 		downBtn = new ModsButton(1058, 540, 96, 44, '下移', function() { moveMod(1); });
-		allOnBtn = new ModsButton(772, 590, 190, 44, '全部启用', function() { setAllMods(true); });
-		allOffBtn = new ModsButton(972, 590, 190, 44, '全部禁用', function() { setAllMods(false); });
+		allOnBtn = new ModsButton(772, 590, 130, 44, '全部启用', function() { setAllMods(true); });
+		allOffBtn = new ModsButton(912, 590, 130, 44, '全部禁用', function() { setAllMods(false); });
+		deleteBtn = new ModsButton(1052, 590, 130, 44, '删除', function() { deleteSelected(); });
+		deleteBtn.setLabelColor(0xFFFF6B6B); // 危险操作：红色
 
-		buttons = [toggleBtn, upBtn, downBtn, allOnBtn, allOffBtn];
+		buttons = [toggleBtn, upBtn, downBtn, allOnBtn, allOffBtn, deleteBtn];
 		for (btn in buttons)
 		{
 			btn.visible = false;
@@ -237,30 +246,9 @@ class ModsMenuState extends MusicBeatState
 		noModsTxt.scrollFactor.set();
 		add(noModsTxt);
 
-		// ---- 加载 Mod 列表 ----
-		var list:ModsList = Mods.parseList();
-		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
-
-		var i:Int = 0;
-		while (i < modsList.length)
-		{
-			var values:Array<Dynamic> = modsList[i];
-			if(!FileSystem.exists(Paths.mods(values[0])))
-			{
-				modsList.remove(modsList[i]);
-				continue;
-			}
-			mods.push(new ModMetadata(values[0]));
-			i++;
-		}
-
-		if(curSelected >= mods.length) curSelected = 0;
-
-		if(mods.length < 1)
-			bg.color = defaultColor;
-		else
-			bg.color = mods[curSelected].color;
-		intendedColor = bg.color;
+		// ---- 加载 Mod 列表（可被安装检测复用） ----
+		lastInstallSeen = ModInstaller.get().lastInstallTime;
+		rebuildModsList();
 
 		// ---- 底部提示 ----
 		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter / 左右 启用停用 · 点击 < 返回', 16);
@@ -287,6 +275,27 @@ class ModsMenuState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		// 本界面打开期间拖入了新 mod 并安装完成 → 自动刷新列表
+		var instTime:Float = ModInstaller.get().lastInstallTime;
+		if (instTime > lastInstallSeen)
+		{
+			lastInstallSeen = instTime;
+			rebuildModsList(true);
+			changeSelection(0);
+			updateRows();
+			updateInfo();
+			updateButtons();
+			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
+		}
+
+		// 子状态（删除确认框 / 安装界面）打开时冻结本界面输入，
+		// 避免 ESC / 鼠标点击被父界面同时消费（如按 ESC 取消确认框又退出 Mods 菜单）
+		if (subState != null)
+		{
+			super.update(elapsed);
+			return;
+		}
+
 		if(noModsTxt.visible)
 		{
 			noModsSine += 180 * elapsed;
@@ -358,11 +367,13 @@ class ModsMenuState extends MusicBeatState
 				mouseActive = true;
 		}
 
-		if (FlxG.mouse.wheel != 0)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+		if (wheelStep != 0)
 		{
 			mouseActive = true;
 			FlxG.sound.play(Paths.sound('scrollMenu'));
-			changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			changeSelection(wheelStep);
 			updateRows();
 			updateInfo();
 			updateButtons();
@@ -459,6 +470,56 @@ class ModsMenuState extends MusicBeatState
 	}
 
 	// ===== 列表逻辑 =====
+
+	/** 重建 Mod 列表（打开界面时 / 检测到新安装的 mod 时共用）。
+	 *  keepSelection = true 时尽量恢复之前的选中项（按文件夹名匹配）。 */
+	function rebuildModsList(?keepSelection:Bool = false)
+	{
+		var oldSelected:String = null;
+		if (keepSelection && mods.length > 0)
+			oldSelected = mods[curSelected].folder;
+
+		mods = [];
+		modsList = [];
+		var list:ModsList = Mods.parseList();
+		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
+
+		var i:Int = 0;
+		while (i < modsList.length)
+		{
+			var values:Array<Dynamic> = modsList[i];
+			if(!FileSystem.exists(Paths.mods(values[0])))
+			{
+				modsList.remove(modsList[i]);
+				continue;
+			}
+			mods.push(new ModMetadata(values[0]));
+			i++;
+		}
+
+		if (oldSelected != null)
+		{
+			var found:Int = -1;
+			for (j in 0...mods.length)
+			{
+				if (mods[j].folder == oldSelected)
+				{
+					found = j;
+					break;
+				}
+			}
+			if (found >= 0) curSelected = found;
+		}
+		if(curSelected >= mods.length) curSelected = mods.length > 0 ? mods.length - 1 : 0;
+
+		noModsTxt.visible = mods.length < 1;
+		if(mods.length < 1)
+			bg.color = defaultColor;
+		else
+			bg.color = mods[curSelected].color;
+		intendedColor = bg.color;
+	}
+
 	function changeSelection(change:Int = 0)
 	{
 		var noMods:Bool = (mods.length < 1);
@@ -698,6 +759,82 @@ class ModsMenuState extends MusicBeatState
 		updateRows();
 		updateInfo();
 		updateButtons();
+	}
+
+	// ===== 删除 Mod =====
+	function deleteSelected()
+	{
+		if (mods.length < 1) return;
+		mouseActive = true;
+		var folder:String = mods[curSelected].folder;
+		openSubState(new substates.ModsDeleteConfirmSubstate(mods[curSelected].name, function()
+		{
+			doDeleteMod(folder);
+		}));
+	}
+
+	function doDeleteMod(folder:String)
+	{
+		// 1) 删除 mod 目录（不可恢复）
+		try
+		{
+			deleteFolderRecursive(Paths.mods(folder));
+		}
+		catch (e:Dynamic)
+		{
+			trace('删除 Mod 目录失败：' + Std.string(e));
+		}
+
+		// 2) 从内存列表移除
+		var idx:Int = -1;
+		for (i in 0...mods.length)
+		{
+			if (mods[i].folder == folder)
+			{
+				idx = i;
+				break;
+			}
+		}
+		if (idx >= 0)
+		{
+			mods.remove(mods[idx]);
+			modsList.remove(modsList[idx]);
+			// 删除的是选中项（或选中项之前的项）→ 选中"上一个"：
+			// 数组前移后 curSelected 若不回退，会指向"下一个" mod（用户期望上一个）
+			if (idx <= curSelected && curSelected > 0)
+				curSelected--;
+		}
+		if (curSelected >= mods.length) curSelected = mods.length > 0 ? mods.length - 1 : 0;
+
+		// 3) 当前生效 mod 目录指向被删 mod 时清空
+		if (Mods.currentModDirectory == folder) Mods.currentModDirectory = '';
+
+		// 4) 写回 modsList.txt
+		saveTxt();
+
+		// 5) 刷新界面：changeSelection(0) 同步选中框(selectorBar)/滚动/背景色，
+		//    再更新行内容与信息
+		FlxG.sound.play(Paths.sound('confirmMenu'), 0.7);
+		changeSelection(0);
+		updateRows();
+		updateInfo();
+		updateButtons();
+		noModsTxt.visible = mods.length < 1;
+		if (mods.length < 1) bg.color = defaultColor;
+	}
+
+	/** 递归删除目录/文件（只用于 mods/ 下的 mod 目录） */
+	static function deleteFolderRecursive(path:String):Void
+	{
+		if (!FileSystem.exists(path)) return;
+		if (FileSystem.isDirectory(path))
+		{
+			for (entry in FileSystem.readDirectory(path))
+				deleteFolderRecursive(path + '/' + entry);
+			FileSystem.deleteDirectory(path);
+		}
+		else
+			FileSystem.deleteFile(path);
 	}
 
 	function exitMods()

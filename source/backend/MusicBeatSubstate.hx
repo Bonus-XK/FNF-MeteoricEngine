@@ -32,6 +32,9 @@ class MusicBeatSubstate extends FlxSubState
 
 	override function update(elapsed:Float)
 	{
+		#if sys
+		backend.ModInstaller.update(elapsed);
+		#end
 		#if mobile
 		// 安卓返回键 / 虚拟返回键（左上角 X）：默认退出游戏回到桌面；
 		// 子类可重写 onAndroidBack 拦截（如暂停菜单：返回=继续游戏）

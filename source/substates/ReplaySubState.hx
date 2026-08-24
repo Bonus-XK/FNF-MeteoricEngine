@@ -1,4 +1,5 @@
 package substates;
+import backend.WheelScroll;
 
 import backend.Highscore;
 import backend.Replay;
@@ -12,6 +13,7 @@ import states.FreeplayState;
 
 class ReplaySubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量（与自由选歌左侧面板一致） =====
 	static final PANEL_X:Float = 40;
 	static final PANEL_Y:Float = 70;
@@ -248,6 +250,13 @@ class ReplaySubState extends MusicBeatSubstate
 			{
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 				changeSelection(1);
+			}
+			// 鼠标滚轮切换（与 Freeplay 选歌一致：上滚上一个、下滚下一个）
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+			if (wheelStep != 0)
+			{
+				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+				changeSelection(wheelStep);
 			}
 		}
 

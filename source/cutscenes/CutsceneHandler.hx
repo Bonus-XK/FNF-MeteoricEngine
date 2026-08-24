@@ -9,9 +9,12 @@ class CutsceneHandler extends FlxBasic
 	public var finishCallback:Void->Void = null;
 	public var finishCallback2:Void->Void = null;
 	public var onStart:Void->Void = null;
+	public var skipCallback:Void->Void = null; //Psych 1.0.4：长按跳过过场时调用
 	public var endTime:Float = 0;
 	public var objects:Array<FlxSprite> = [];
 	public var music:String = null;
+	final _timeToSkip:Float = 1;
+	var holdingTime:Float = 0;
 	public function new()
 	{
 		super();
@@ -41,10 +44,28 @@ class CutsceneHandler extends FlxBasic
 		}
 
 		cutsceneTime += elapsed;
-		if(endTime <= cutsceneTime)
+
+		// Psych 1.0.4：长按 accept 跳过过场（skipCallback 为空时退化为直接完成，兼容老场景）
+		if(cutsceneTime > 0.1)
 		{
-			finishCallback();
-			if(finishCallback2 != null) finishCallback2();
+			if(Controls.instance.pressed('accept'))
+				holdingTime = Math.max(0, Math.min(_timeToSkip, holdingTime + elapsed));
+			else if (holdingTime > 0)
+				holdingTime = Math.max(0, holdingTime - elapsed * 3);
+		}
+
+		if(endTime <= cutsceneTime || holdingTime >= _timeToSkip)
+		{
+			if(holdingTime >= _timeToSkip)
+			{
+				if(skipCallback != null) skipCallback();
+				else finishCallback();
+			}
+			else
+			{
+				finishCallback();
+				if(finishCallback2 != null) finishCallback2();
+			}
 
 			for (spr in objects)
 			{

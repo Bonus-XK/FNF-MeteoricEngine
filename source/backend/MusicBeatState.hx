@@ -55,6 +55,9 @@ class MusicBeatState extends FlxUIState
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		#if sys
+		backend.ModInstaller.update(elapsed);
+		#end
 		#if mobile
 		// 安卓返回键 / 虚拟返回键（左上角 X）：默认退出游戏回到桌面；
 		// 子类可重写 onAndroidBack 拦截（例如 PlayState 游玩中改为打开暂停菜单）

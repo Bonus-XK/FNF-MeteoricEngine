@@ -144,7 +144,8 @@ class FunkinLua {
 		set('rating', 0);
 		set('ratingName', '');
 		set('ratingFC', '');
-		set('version', Main.meVersion.trim());
+		set('version', '0.7.3'); // Psych 0.7 模组兼容：模组用 version:find('7.3') 检测引擎版本来开关 shader 特效
+		set('meVersion', Main.meVersion.trim());
 
 		set('inGameOver', false);
 		set('mustHitSection', false);
@@ -1007,6 +1008,8 @@ class FunkinLua {
 			var spr:FlxSprite = LuaUtils.getObjectDirectly(obj, false);
 			if(spr != null) spr.makeGraphic(width, height, CoolUtil.colorFromString(color));
 		});
+		// FlxAnimate 兼容函数（makeFlxAnimateSprite / addAnimationBySymbol 等）
+		// 由 FlxAnimateFunctions 注册（Psych 0.7 官方实现，FlxAnimate 运行时渲染）
 		Lua_helper.add_callback(lua, "addAnimationByPrefix", function(obj:String, name:String, prefix:String, framerate:Int = 24, loop:Bool = true) {
 			var obj:Dynamic = LuaUtils.getObjectDirectly(obj, false);
 			if(obj != null && obj.animation != null)
@@ -1453,6 +1456,7 @@ class FunkinLua {
 		#if desktop DiscordClient.addLuaCallbacks(lua); #end
 		#if (HSCRIPT_ALLOWED && SScript >= "3.0.0") HScript.implement(this); #end
 		ReflectionFunctions.implement(this);
+		#if flxanimate FlxAnimateFunctions.implement(this); #end
 		TextFunctions.implement(this);
 		ExtraFunctions.implement(this);
 		CustomSubstate.implement(this);

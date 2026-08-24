@@ -1,4 +1,5 @@
 package options;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
@@ -6,6 +7,7 @@ import openfl.Lib;
 
 class BaseOptionsMenu extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_L_X:Float = 40;
 	static final PANEL_L_Y:Float = 70;
@@ -353,10 +355,12 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 		}
 
-		if (FlxG.mouse.wheel != 0)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+		if (wheelStep != 0)
 		{
 			mouseActive = true;
-			changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			changeSelection(wheelStep);
 		}
 
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);

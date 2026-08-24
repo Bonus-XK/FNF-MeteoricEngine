@@ -2995,6 +2995,8 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 	private function saveLevel()
 	{
 		if(_song.events != null && _song.events.length > 1) _song.events.sort(sortByTime);
+		// Psych 1.0.4 格式标记：绝对列号（<4 玩家 / >=4 对手），加载时不再重复转换
+		_song.format = 'psych_v1';
 		var json = {
 			"song": _song
 		};

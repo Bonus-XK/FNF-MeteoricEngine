@@ -5,6 +5,7 @@ import backend.Highscore;
 import backend.Song;
 
 import flixel.util.FlxSpriteUtil;
+import flixel.system.ui.FlxSoundTray;
 
 import openfl.Lib;
 
@@ -55,13 +56,15 @@ class FreeplayState extends MusicBeatState
 	var intendedRating:Float = 0;
 
 	var songRows:Array<MenuText> = [];
+	var rowTargets:Array<Float> = []; // 每行目标 y（StoryMode 式平滑滑动；Float 避免 MenuText.targetY 的 Int 截断）
 	var songIcon:HealthIcon;
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween;
-	var scrollIndex:Int = 0;
 	var mouseActive:Bool = true;  // 鼠标跟随是否激活（键盘操作时冻结，鼠标移动/点击时恢复）
 	var mouseLockX:Float = 0;      // 键盘接管时记录的鼠标位置
 	var mouseLockY:Float = 0;
+	var wheelThrottleUntil:Int = 0; // 滚轮快速滚动节流截止（期间跳过颜色渐变/声音，避免每格全量重活卡顿）
+	var wheelNextStepTime:Int = 0; // 滚轮跳格最小间隔（限制快速滚动速度）
 
 	var backBtn:BackButton;
 	// 0.6.3 模组兼容：Freeplay 歌曲颜色表（旧版模组 Lua 通过
@@ -142,13 +145,16 @@ class FreeplayState extends MusicBeatState
 		rightTitle.antialiasing = ClientPrefs.data.antialiasing;
 		add(rightTitle);
 
-		// ---- 歌曲行（静态行：切换时只移动高亮条，行本身不整列滑动） ----
-		for (r in 0...ROWS_VISIBLE)
+		// ---- 歌曲行（StoryMode 式：每首一个 MenuText，滚动时整列平滑滑动，不重建文本） ----
+		for (i in 0...songs.length)
 		{
-			var row:MenuText = new MenuText(LIST_X, LIST_Y + (r * ROW_GAP), '', true, 30);
+			var row:MenuText = new MenuText(LIST_X, LIST_Y + (i - curSelected) * ROW_GAP, songs[i].songName, true, 30);
 			row.isMenuItem = false;
-			row.ID = r;
-			row.visible = false;
+			row.ID = i;
+			rowTargets.push(LIST_Y + (i - curSelected) * ROW_GAP); // 目标位置（update 平滑逼近）
+			row.visible = true;
+			row.alpha = (i == curSelected) ? 1 : 0.55;
+			row.color = (i == curSelected) ? FlxColor.WHITE : 0xFFB8B8C8;
 			add(row);
 			songRows.push(row);
 		}
@@ -198,7 +204,7 @@ class FreeplayState extends MusicBeatState
 		changeSelection();
 
 		#if PRELOAD_ALL
-		var leText:String = "空格 试听 · CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
+		var leText:String = "Enter 进入歌曲 · 空格 试听/暂停 · ESC 停止试听 · CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
 		var size:Int = 16;
 		#else
 		var leText:String = "<!>未完全加载文件！CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
@@ -208,6 +214,10 @@ class FreeplayState extends MusicBeatState
 		text.setFormat(Paths.font("future.ttf"), size, FlxColor.WHITE, CENTER);
 		text.scrollFactor.set();
 		add(text);
+
+		#if FLX_SOUND_TRAY
+		previewTray = FlxG.game.soundTray;
+		#end
 
 		FlxG.mouse.visible = true;
 		super.create();
@@ -323,8 +333,34 @@ class FreeplayState extends MusicBeatState
 	var instPlaying:Int = -1;
 	public static var vocals:FlxSound = null;
 	var holdTime:Float = 0;
+
+	// ===== 试听播放器（灵动岛）状态 =====
+	var previewActive:Bool = false;     // 试听进行中（与 instPlaying 同生共死）
+	var previewTray:FlxSoundTray = null; // FlxG.game.soundTray 缓存
+	var previewRestartPending:Bool = false; // 切歌后延迟重启试听（滚轮连滚去抖）
+	var lastSelectionTime:Int = 0;      // 最近一次切歌的 Lib.getTimer() 时间戳
 	override function update(elapsed:Float)
 	{
+		// StoryMode 式行滑动：每帧平滑逼近目标位置（不重建文本，滚动流畅）。
+		// 目标在窗口内的行正常滑动（含滑入）；滑出的行滑到窗口边界（标题下沿/面板底）即隐藏
+		var titleBound:Float = 135;
+		var bottomBound:Float = 600;
+		for (i in 0...songRows.length)
+		{
+			var row:MenuText = songRows[i];
+			var targetIn:Bool = rowTargets[i] >= titleBound && rowTargets[i] <= bottomBound;
+			if (targetIn)
+			{
+				row.visible = true;
+				row.y = FlxMath.lerp(row.y, rowTargets[i], FlxMath.bound(elapsed * 14, 0, 1));
+			}
+			else if (row.visible)
+			{
+				row.y = FlxMath.lerp(row.y, rowTargets[i], FlxMath.bound(elapsed * 14, 0, 1));
+				if (row.y < titleBound || row.y > bottomBound)
+					row.visible = false; // 滑出窗口：到边界即消失，不再越界显示
+			}
+		}
 		if (FlxG.sound.music.volume < 0.7)
 		{
 			FlxG.sound.music.volume += 0.5 * FlxG.elapsed;
@@ -352,7 +388,10 @@ class FreeplayState extends MusicBeatState
 		var shiftMult:Int = 1;
 		if(FlxG.keys.pressed.SHIFT) shiftMult = 3;
 
-		var accepted:Bool = controls.ACCEPT;
+		// 进入曲目只绑定 Enter（SPACE 已交给试听/暂停，引擎默认 accept=[SPACE, ENTER] 会误触发进入）；
+		// 手柄玩家保留 ACCEPT（A/START），鼠标/触屏点击歌曲行仍可进入
+		var accepted:Bool = FlxG.keys.justPressed.ENTER
+			|| (controls.controllerMode && controls.ACCEPT);
 
 		if(songs.length > 1)
 		{
@@ -407,8 +446,29 @@ class FreeplayState extends MusicBeatState
 			if(FlxG.mouse.wheel != 0)
 			{
 				mouseActive = true;
-				FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
-				changeSelection(shiftMult * (FlxG.mouse.wheel > 0 ? -1 : 1), false);
+				var wheelDelta:Int = Std.int(FlxG.mouse.wheel);
+				var steps:Int = Std.int(Math.abs(wheelDelta));
+				if (steps < 1) steps = 1;
+				if (steps > 2) steps = 2; // 单次最多跳 2 格：快速滚动（delta 3~5）不会飞
+				var dir:Int = wheelDelta > 0 ? -1 : 1;
+				var now:Int = Lib.getTimer();
+				// 滚动间隔节流：< 70ms 内的连续 wheel 事件不再跳格（事件高频时自然放慢，
+				// 配合单次上限，快速滚动约为每 70ms 2 格 ≈ 28 格/秒）
+				if (now >= wheelNextStepTime)
+				{
+					if (now < wheelThrottleUntil)
+					{
+						// 快速连续滚动：静默跳格（跳过颜色渐变——渐变会被下一格立即 cancel，纯浪费）
+						changeSelection(shiftMult * dir * steps, false, true);
+					}
+					else
+					{
+						FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
+						changeSelection(shiftMult * dir * steps, false);
+					}
+					wheelNextStepTime = now + 70;
+				}
+				wheelThrottleUntil = now + 150;
 			}
 
 			if (!controls.controllerMode)
@@ -424,6 +484,9 @@ class FreeplayState extends MusicBeatState
 				}
 
 				var hoveredID:Int = getHoveredSongID();
+
+				// 灵动岛展开时鼠标在岛范围内 → 屏蔽对下层歌曲行的点击（岛内交互由托盘自身处理）
+				var overIsland:Bool = (previewTray != null && previewTray.previewActive && previewTray.isOverPanel());
 
 				// 鼠标离开键盘接管位置超过阈值 → 恢复鼠标跟随（防轻微抖动误触发）
 				if (!mouseActive)
@@ -444,7 +507,7 @@ class FreeplayState extends MusicBeatState
 					MusicBeatState.switchState(new MainMenuState());
 				}
 
-				if (hoveredID >= 0 && clickPressed)
+				if (hoveredID >= 0 && clickPressed && !overIsland)
 				{
 					mouseActive = true;
 					if (hoveredID != curSelected)
@@ -456,7 +519,7 @@ class FreeplayState extends MusicBeatState
 					// （原实现点击已选中的行无任何反应，也没有"点击进入游戏"的路径）
 					accepted = true;
 				}
-				if (FlxG.mouse.overlaps(diffText) && clickPressed)
+				if (FlxG.mouse.overlaps(diffText) && clickPressed && !overIsland)
 				{
 					mouseActive = true;
 					if (FlxG.mouse.x < diffText.x + (diffText.width / 2))
@@ -481,12 +544,29 @@ class FreeplayState extends MusicBeatState
 
 		if (controls.BACK)
 		{
-			persistentUpdate = false;
-			if(colorTween != null) {
-				colorTween.cancel();
+			// 试听中按 ESC（BACK 键之一）：只停止试听并收起灵动岛，不退出界面；
+			// BACKSPACE/手柄 BACK 仍直接退出。
+			#if PRELOAD_ALL
+			var escStopsPreview:Bool = previewActive && FlxG.keys.justPressed.ESCAPE;
+			#else
+			var escStopsPreview:Bool = false;
+			#end
+			if (escStopsPreview)
+			{
+				stopPreview();
 			}
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			MusicBeatState.switchState(new MainMenuState());
+			else
+			{
+				persistentUpdate = false;
+				#if PRELOAD_ALL
+				if (previewActive) stopPreview(); // 恢复菜单音乐 freakyMenu
+				#end
+				if(colorTween != null) {
+					colorTween.cancel();
+				}
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				MusicBeatState.switchState(new MainMenuState());
+			}
 		}
 
 		// 脚本管理/回放/游玩设置改为 virtualpad 的 L / P / C 键触发
@@ -517,32 +597,28 @@ class FreeplayState extends MusicBeatState
 		}
 		else if(FlxG.keys.justPressed.SPACE)
 		{
-			if(instPlaying != curSelected)
+			#if PRELOAD_ALL
+			if (previewActive && instPlaying == curSelected)
 			{
-				Lib.application.window.title = "FNF':Meteoric Engine - Select Song: " + curSelected;
-				#if PRELOAD_ALL
-				destroyFreeplayVocals();
-				FlxG.sound.music.volume = 0;
-				Mods.currentModDirectory = songs[curSelected].folder;
-				var previewSong:String = Paths.formatToSongPath(songs[curSelected].songName);
-				// 试听不解析谱面（避免大谱面卡顿），直接用歌名播放音频
-				if (Song.voicesFileExists(previewSong))
-					vocals = new FlxSound().loadEmbedded(Paths.voices(previewSong));
-				else
-					vocals = new FlxSound();
-
-				FlxG.sound.list.add(vocals);
-				FlxG.sound.playMusic(Paths.inst(previewSong), 0.7);
-				vocals.play();
-				vocals.persist = true;
-				vocals.looped = true;
-				vocals.volume = 0.7;
-				instPlaying = curSelected;
-				#end
+				// 同一首歌再按空格：播放/暂停切换（灵动岛图标同步）
+				togglePreviewPlayPause();
 			}
+			else
+			{
+				startPreview();
+			}
+			#end
 		}
 
-		else if (accepted)
+		// 切歌后 180ms 无新的切歌 → 自动重启试听（滚轮连滚情形下去抖，避免每格重载音频）
+		// 独立 if 判断，解除与下方 accepted/RESET 的 else-if 耦合
+		if (previewRestartPending && (Lib.getTimer() - lastSelectionTime) >= 180)
+		{
+			previewRestartPending = false;
+			if (previewActive) startPreview();
+		}
+
+		if (accepted)
 		{
 			persistentUpdate = false;
 			var songLowercase:String = Paths.formatToSongPath(songs[curSelected].songName);
@@ -567,6 +643,9 @@ class FreeplayState extends MusicBeatState
 				colorTween.cancel();
 			}
 
+			#if PRELOAD_ALL
+			if (previewActive) stopPreview(false); // 不恢复菜单音乐：PlayState 将加载自己的音乐
+			#end
 			FlxG.sound.music.volume = 0;
 
 			destroyFreeplayVocals();
@@ -588,6 +667,10 @@ class FreeplayState extends MusicBeatState
 
 	override function destroy()
 	{
+		// 兜底：离开状态时若仍在试听，停止并收平灵动岛（回调/音频不悬挂到下一状态）
+		#if PRELOAD_ALL
+		if (previewActive) stopPreview(false); else clearPreviewTray();
+		#end
 		FlxG.mouse.visible = false;
 		super.destroy();
 	}
@@ -600,6 +683,104 @@ class FreeplayState extends MusicBeatState
 		vocals = null;
 	}
 
+	// ===== 试听播放器（灵动岛）= 空格试听功能与 -/+ 音量条融合 =====
+	#if PRELOAD_ALL
+	/** 开始试听当前选中曲目，并把音量托盘展开为播放器岛 */
+	function startPreview():Void
+	{
+		previewRestartPending = false;
+		if (previewActive && instPlaying == curSelected) return;
+
+		destroyFreeplayVocals();
+		FlxG.sound.music.volume = 0;
+		Mods.currentModDirectory = songs[curSelected].folder;
+		var previewSong:String = Paths.formatToSongPath(songs[curSelected].songName);
+		// 试听不解析谱面（避免大谱面卡顿），直接用歌名播放音频
+		if (Song.voicesFileExists(previewSong))
+			vocals = new FlxSound().loadEmbedded(Paths.voices(previewSong));
+		else
+			vocals = new FlxSound();
+
+		FlxG.sound.list.add(vocals);
+		FlxG.sound.playMusic(Paths.inst(previewSong), 0.7);
+		vocals.play();
+		vocals.persist = true;
+		vocals.looped = true;
+		vocals.volume = 0.7;
+		instPlaying = curSelected;
+		previewActive = true;
+		Lib.application.window.title = "FNF':Meteoric Engine - Select Song: " + curSelected;
+
+		// 灵动岛：展开为播放器并注入交互回调
+		if (previewTray != null)
+		{
+			previewTray.onSeek = seekPreview;
+			previewTray.onTogglePlay = togglePreviewPlayPause;
+			previewTray.onStopPreview = function() stopPreview();
+			previewTray.openPreview(songs[curSelected].songName);
+		}
+	}
+
+	/** 播放/暂停切换（空格或岛内按钮触发，inst 与 vocals 同步） */
+	function togglePreviewPlayPause():Void
+	{
+		if (!previewActive) return;
+		var m:FlxSound = FlxG.sound.music;
+		if (m == null) return;
+		if (m.playing)
+		{
+			m.pause();
+			if (vocals != null) vocals.pause();
+		}
+		else
+		{
+			m.resume();
+			if (vocals != null) vocals.resume();
+		}
+	}
+
+	/** 进度条跳转：inst 与 vocals 同步 seek（毫秒） */
+	function seekPreview(t:Float):Void
+	{
+		var m:FlxSound = FlxG.sound.music;
+		if (m == null || m.length <= 0) return;
+		t = Math.min(Math.max(t, 0), m.length);
+		m.time = t;
+		if (vocals != null && vocals.length > 0)
+			vocals.time = Math.min(t, vocals.length);
+	}
+
+	/**
+	 * 停止试听并收起灵动岛。
+	 * @param restoreMenu true = 恢复菜单音乐 freakyMenu（返回主菜单时）；
+	 *                    false = 直接静音（进入歌曲时，由 PlayState 加载自己的音乐）
+	 */
+	function stopPreview(restoreMenu:Bool = true):Void
+	{
+		if (!previewActive) return;
+		previewActive = false;
+		previewRestartPending = false;
+		instPlaying = -1;
+		destroyFreeplayVocals();
+		if (FlxG.sound.music != null) FlxG.sound.music.stop();
+		if (restoreMenu)
+			FlxG.sound.playMusic(Paths.music('freakyMenu'), 0.7);
+		clearPreviewTray();
+	}
+
+	/** 清除托盘回调并收起为小音量条 */
+	function clearPreviewTray():Void
+	{
+		if (previewTray != null)
+		{
+			previewTray.onSeek = null;
+			previewTray.onTogglePlay = null;
+			previewTray.onStopPreview = null;
+			previewTray.closePreview();
+		}
+	}
+	#end
+
 	function getHoveredSongID():Int
 	{
 		var hoveredID:Int = -1;
@@ -608,7 +789,7 @@ class FreeplayState extends MusicBeatState
 		for (row in songRows)
 		{
 			if (row.visible && mx >= row.x && mx <= row.x + row.width && my >= row.y && my <= row.y + row.height)
-				hoveredID = scrollIndex + row.ID;
+				hoveredID = row.ID;
 		}
 		return hoveredID;
 	}
@@ -637,7 +818,7 @@ class FreeplayState extends MusicBeatState
 		missingTextBG.visible = false;
 	}
 
-	function changeSelection(change:Int = 0, playSound:Bool = true)
+	function changeSelection(change:Int = 0, playSound:Bool = true, instant:Bool = false)
 	{
 		_updateSongLastDifficulty();
 		if(playSound) FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
@@ -650,23 +831,25 @@ class FreeplayState extends MusicBeatState
 		if (curSelected >= songs.length)
 			curSelected = 0;
 
-		// 滚动窗口：只有越过可见区时才整页滚动，平时只移动高亮条
-		if (curSelected < scrollIndex)
-			scrollIndex = curSelected;
-		else if (curSelected > scrollIndex + ROWS_VISIBLE - 1)
-			scrollIndex = curSelected - ROWS_VISIBLE + 1;
-
 		var newColor:Int = songs[curSelected].color;
 		if(newColor != intendedColor) {
-			if(colorTween != null) {
-				colorTween.cancel();
+			if(instant) {
+				// 快速滚动（滚轮连续）：直接设色，跳过 1 秒渐变——渐变会被下一格 cancel，纯开销
+				if(colorTween != null) { colorTween.cancel(); colorTween = null; }
+				bg.color = newColor;
+				intendedColor = newColor;
 			}
-			intendedColor = newColor;
-			colorTween = FlxTween.color(bg, 1, bg.color, intendedColor, {
-				onComplete: function(twn:FlxTween) {
-					colorTween = null;
+			else {
+				if(colorTween != null) {
+					colorTween.cancel();
 				}
-			});
+				intendedColor = newColor;
+				colorTween = FlxTween.color(bg, 1, bg.color, intendedColor, {
+					onComplete: function(twn:FlxTween) {
+						colorTween = null;
+					}
+				});
+			}
 		}
 
 		refreshRows();
@@ -689,30 +872,32 @@ class FreeplayState extends MusicBeatState
 		changeDiff();
 		_updateSongLastDifficulty();
 
+		// 试听中切歌：延迟 180ms 自动切换到新曲试听（滚轮连滚下去抖，避免每格重载音频）
+		if (previewActive && instPlaying != curSelected)
+		{
+			previewRestartPending = true;
+			lastSelectionTime = Lib.getTimer();
+		}
+
 		callUIScripts('onChangeSelection', [curSelected, songs[curSelected].songName]);
 	}
 
 	function refreshRows()
 	{
-		for (r in 0...ROWS_VISIBLE)
+		// StoryMode 式：行文本固定（创建时已设），滚动只更新目标位置与样式，不重建文本。
+		// 窗口边界：上方不越过"选择歌曲"标题下沿（135），下方不越过左窗口（面板）底部（600）。
+		// 目标在窗口内的行显示（含滑入动画）；滑出的行保持显示，由 update 逐帧裁剪到边界后隐藏。
+		var titleBound:Float = 135;   // "选择歌曲"标题（y=100 字号26）下沿
+		var bottomBound:Float = 600;  // 面板底（640）- 行高（~40）
+		for (i in 0...songRows.length)
 		{
-			var idx:Int = scrollIndex + r;
-			var row:MenuText = songRows[r];
-
-			if (idx >= songs.length)
-			{
-				row.visible = false;
-				continue;
-			}
-
-			var meta:SongMetadata = songs[idx];
-			var isSel:Bool = (idx == curSelected);
-
-			row.visible = true;
-			row.text = meta.songName;
-			row.updateHitbox();
+			var row:MenuText = songRows[i];
+			rowTargets[i] = LIST_Y + (i - curSelected) * ROW_GAP;
+			var isSel:Bool = (i == curSelected);
 			row.alpha = isSel ? 1 : 0.55;
 			row.color = isSel ? FlxColor.WHITE : 0xFFB8B8C8;
+			if (rowTargets[i] >= titleBound && rowTargets[i] <= bottomBound)
+				row.visible = true; // 常驻/滑入（滑入动画由 update 的 lerp 提供）
 		}
 
 		// ---- 大图标跟随选中曲目 ----
@@ -728,14 +913,13 @@ class FreeplayState extends MusicBeatState
 		songTitleText.text = songs[curSelected].songName;
 		songTitleText.updateHitbox();
 
-		var barY:Float = LIST_Y - 3 + ((curSelected - scrollIndex) * ROW_GAP);
+		// 选中行恒居中于 LIST_Y → 高亮条固定，不再逐格 tween
 		selectorBar.visible = (songs.length > 0);
+		selectorBar.y = LIST_Y - 3;
 		if(selectorTween != null) {
 			selectorTween.cancel();
 			selectorTween = null;
 		}
-		if(selectorBar.y != barY)
-			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
 	}
 
 	inline private function _updateSongLastDifficulty()

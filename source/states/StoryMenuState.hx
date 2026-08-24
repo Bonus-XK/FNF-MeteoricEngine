@@ -1,4 +1,5 @@
 package states;
+import backend.WheelScroll;
 
 import backend.WeekData;
 import backend.Highscore;
@@ -31,6 +32,7 @@ import substates.ResetScoreSubState;
  */
 class StoryMenuState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	public static var weekCompleted:Map<String, Bool> = new Map<String, Bool>();
 
 	// ===== 难度选择器固定位置（逻辑坐标，1280x720） =====
@@ -334,10 +336,11 @@ class StoryMenuState extends MusicBeatState
 				FlxG.sound.play(Paths.sound('scrollMenu'));
 			}
 
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+			if (wheelStep != 0)
 			{
 				FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
-				changeWeek(-FlxG.mouse.wheel);
+				changeWeek(wheelStep);
 				changeDifficulty();
 			}
 

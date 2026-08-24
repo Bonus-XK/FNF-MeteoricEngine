@@ -1,4 +1,5 @@
 package states;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import objects.AchievementPopup;
@@ -13,6 +14,7 @@ import openfl.Lib;
 
 class MainMenuState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_L_X:Float = 40;
 	static final PANEL_L_Y:Float = 70;
@@ -307,8 +309,9 @@ class MainMenuState extends MusicBeatState
 			{
 				selectItem();
 			}
+
 			#if desktop
-			else if (controls.justPressed('debug_1'))
+			if (controls.justPressed('debug_1'))
 			{
 				selectedSomethin = true;
 				MusicBeatState.switchState(new MasterEditorMenu());
@@ -432,11 +435,12 @@ class MainMenuState extends MusicBeatState
 		}
 
 		// 滚轮控制：上滚上一个、下滚下一个
-		if (FlxG.mouse.wheel != 0)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+		if (wheelStep != 0)
 		{
 			mouseActive = true;
 			FlxG.sound.play(Paths.sound('scrollMenu'));
-			changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			changeSelection(wheelStep);
 		}
 
 		// 返回按钮：悬停高亮，点击返回标题界面

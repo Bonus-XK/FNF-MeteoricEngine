@@ -1,4 +1,5 @@
 package substates;
+import backend.WheelScroll;
 
 import backend.Mods;
 import objects.BackButton;
@@ -20,6 +21,7 @@ typedef ScriptEntry =
 
 class ScriptManagerSubstate extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量（磨砂圆角风格，与游玩设置/暂停界面一致） =====
 	static final TITLE_Y:Float = 22;
 	static final PANEL_X:Float = 160;
@@ -355,10 +357,12 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+			if (wheelStep != 0)
 			{
 				mouseActive = true;
-				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelection(wheelStep);
 			}
 
 			backBtn.setHovered(mousePos.x, mousePos.y);

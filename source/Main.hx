@@ -233,6 +233,13 @@ class Main extends Sprite
 	}
 	#end
 
+	#if sys
+	// ---------- 拖入 zip / 文件夹安装 mod ----------
+	// 闭包存为字段：传给 lime C++ 事件（onDropFile）的 Haxe 闭包若没有本侧强引用，
+	// 会被 GC 回收导致 C++ 侧悬垂（malloc free 崩溃）。
+	var _dropHandler:String->Void;
+	#end
+
 	private function setupGame():Void
 	{
 		var stageWidth:Int = Lib.current.stage.stageWidth;
@@ -260,6 +267,23 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		var flxGame = new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen);
 		addChild(flxGame);
+
+		#if sys
+		// ---- 拖入 zip / 文件夹安装 mod（SDL 拖放 → lime window.onDropFile → ModInstaller） ----
+		// 闭包存字段（_dropHandler）：lime C++ 事件持有时 Haxe 侧无引用会被 GC 回收 → 悬垂 free 崩溃
+		_dropHandler = function(file:String)
+		{
+			backend.ModInstaller.get().onDropFile(file);
+		};
+		try
+		{
+			stage.window.onDropFile.add(_dropHandler);
+		}
+		catch (e:Dynamic)
+		{
+			trace('onDropFile hook failed: ' + Std.string(e));
+		}
+		#end
 
 		#if mobile
 		// 移动端：显示尺寸变化（旋转、系统栏隐藏/显示）有时不触发 stage RESIZE，

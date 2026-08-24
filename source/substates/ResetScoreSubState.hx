@@ -1,4 +1,5 @@
 package substates;
+import backend.WheelScroll;
 
 import backend.WeekData;
 import backend.Highscore;
@@ -10,6 +11,7 @@ import flixel.util.FlxSpriteUtil;
 
 class ResetScoreSubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	var bg:FlxSprite;
 	var alphabetArray:Array<MenuText> = [];
 	var icon:HealthIcon;
@@ -99,7 +101,8 @@ class ResetScoreSubState extends MusicBeatSubstate
 			updateOptions();
 		}
 
-		if (FlxG.mouse.wheel != 0)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+		if (wheelStep != 0)
 		{
 			FlxG.sound.play(Paths.sound('scrollMenu'), 1);
 			onYes = !onYes;
@@ -162,7 +165,7 @@ class ResetScoreSubState extends MusicBeatSubstate
 
 	override function destroy()
 	{
-		FlxG.mouse.visible = false;
+		// 不能隐藏鼠标：从 Freeplay/StoryMenu 打开，关闭后父状态负责鼠标显隐
 		super.destroy();
 	}
 }

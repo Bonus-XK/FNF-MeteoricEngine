@@ -1,4 +1,5 @@
 package options;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import states.MainMenuState;
@@ -8,6 +9,7 @@ import flixel.util.FlxSpriteUtil;
 
 class OptionsState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_X:Float = 220;
 	static final PANEL_Y:Float = 110;
@@ -19,7 +21,7 @@ class OptionsState extends MusicBeatState
 	static final ROWS_VISIBLE:Int = #if mobile 8 #else 7 #end;
 
 	var options:Array<String> = [
-		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '按键设置', '调整延迟与Combo', '自定义界面'
+		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '性能', '按键设置', '调整延迟与Combo', '自定义界面'
 		#if mobile
 		, '移动触控'
 		#end
@@ -56,6 +58,8 @@ class OptionsState extends MusicBeatState
 				openSubState(new options.GameplaySettingsSubState());
 			case '判定':
 				openSubState(new options.JudgmentSettingsSubState());
+			case '性能':
+				openSubState(new options.PerformanceSubState());
 			case '按键设置':
 				openSubState(new options.ControlsSubState());
 			case '自定义界面':
@@ -178,10 +182,12 @@ class OptionsState extends MusicBeatState
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+			if (wheelStep != 0)
 			{
 				mouseActive = true;
-				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelection(wheelStep);
 			}
 
 			backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);

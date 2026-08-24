@@ -7,6 +7,7 @@ import backend.MusicBeatState;
 
 import objects.Note.EventNote;
 import objects.Character;
+import objects.Note;
 
 enum Countdown
 {
@@ -66,6 +67,7 @@ class BaseStage extends FlxBasic
 	public function createPost() {}
 	//public function update(elapsed:Float) {}
 	public function countdownTick(count:Countdown, num:Int) {}
+	public function startSong() {}
 
 	// FNF steps, beats and sections
 	public var curBeat:Int = 0;
@@ -88,8 +90,11 @@ class BaseStage extends FlxBasic
 
 	// Things to replace FlxGroup stuff and inject sprites directly into the state
 	function add(object:FlxBasic) game.add(object);
-	function remove(object:FlxBasic) game.remove(object);
+	function remove(object:FlxBasic, splice:Bool = false) game.remove(object, splice);
 	function insert(position:Int, object:FlxBasic) game.insert(position, object);
+
+	function moveCameraSection() if(onPlayState) PlayState.instance.moveCameraSection();
+	function moveCamera(isDad:Bool) if(onPlayState) PlayState.instance.moveCamera(isDad);
 	
 	public function addBehindGF(obj:FlxBasic) insert(members.indexOf(game.gfGroup), obj);
 	public function addBehindBF(obj:FlxBasic) insert(members.indexOf(game.boyfriendGroup), obj);
@@ -117,11 +122,12 @@ class BaseStage extends FlxBasic
 	}
 
 	//precache functions
-	public function precacheImage(key:String) precache(key, 'image');
-	public function precacheSound(key:String) precache(key, 'sound');
-	public function precacheMusic(key:String) precache(key, 'music');
+	public function precacheImage(key:String) precacheAsset(key, 'image');
+	public function precacheSound(key:String) precacheAsset(key, 'sound');
+	public function precacheMusic(key:String) precacheAsset(key, 'music');
 
-	public function precache(key:String, type:String)
+	// private：避免与 Weekend 1 场景的无参 precache() 冲突（Psych 1.0.4 同款设计）
+	private function precacheAsset(key:String, type:String)
 	{
 		if(onPlayState)
 			PlayState.instance.precacheList.set(key, type);
@@ -140,8 +146,10 @@ class BaseStage extends FlxBasic
 	// overrides
 	function startCountdown() if(onPlayState) return PlayState.instance.startCountdown(); else return false;
 	function endSong() if(onPlayState)return PlayState.instance.endSong(); else return false;
-	function moveCameraSection() if(onPlayState) moveCameraSection();
-	function moveCamera(isDad:Bool) if(onPlayState) moveCamera(isDad);
+	public function goodNoteHit(note:Note) {}
+	public function opponentNoteHit(note:Note) {}
+	public function noteMiss(note:Note) {}
+	public function noteMissPress(direction:Int) {}
 	inline private function get_paused() return game.paused;
 	inline private function get_songName() return game.songName;
 	inline private function get_isStoryMode() return PlayState.isStoryMode;

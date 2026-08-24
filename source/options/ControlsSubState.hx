@@ -1,4 +1,5 @@
 package options;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import backend.InputFormatter;
@@ -13,6 +14,7 @@ import flixel.input.gamepad.FlxGamepadInputID;
 
 class ControlsSubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_X:Float = 120;
 	static final PANEL_Y:Float = 70;
@@ -430,10 +432,12 @@ class ControlsSubState extends MusicBeatSubstate
 			if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 		}
 
-		if (FlxG.mouse.wheel != 0)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+		if (wheelStep != 0)
 		{
 			mouseActive = true;
-			changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+			changeSelection(wheelStep);
 		}
 
 		// 模式标签悬停（鼠标移动才判定）

@@ -9,6 +9,8 @@ class ShaderFunctions
 	public static function implement(funk:FunkinLua)
 	{
 		var lua = funk.lua;
+		// Psych 0.7 的 setDropShadow（本引擎未实现 drop shadow 渲染，空操作避免模组脚本报错）
+		funk.addLocalCallback("setDropShadow", function(obj:String, ?dist:Float = 0, ?ang:Float = 0, ?str:Float = 0, ?x:Float = 0, ?y:Float = 0, ?thr:Float = 0, ?aa:Float = 0, ?r:Float = 0, ?g:Float = 0, ?b:Float = 0) { return false; });
 		// shader shit
 		funk.addLocalCallback("initLuaShader", function(name:String, ?glslVersion:Int = 120) {
 			if(!ClientPrefs.data.shaders) return false;

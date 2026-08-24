@@ -897,6 +897,8 @@ class CharacterEditorState extends MusicBeatState
 			char.frames = AtlasFrameMaker.construct(char.imageFile);
 		} else if(Paths.fileExists('images/' + char.imageFile + '.txt', TEXT)) {
 			char.frames = Paths.getPackerAtlas(char.imageFile);
+		} else if(Paths.fileExists('images/' + char.imageFile + '.json', TEXT)) {
+			char.frames = Paths.getAsepriteAtlas(char.imageFile); //Aseprite .JSON 支持（Psych 0.7.3）
 		} else {
 			char.frames = Paths.getSparrowAtlas(char.imageFile);
 		}

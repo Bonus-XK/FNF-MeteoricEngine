@@ -4,6 +4,7 @@ import backend.WeekData;
 import backend.Highscore;
 
 import flixel.input.keyboard.FlxKey;
+import flixel.graphics.FlxGraphic;
 import flixel.graphics.frames.FlxAtlasFrames;
 import flixel.graphics.frames.FlxFrame;
 import flixel.group.FlxGroup;
@@ -324,7 +325,12 @@ class TitleState extends MusicBeatState
 		// titleText.screenCenter(X);
 		add(titleText);
 
-		var logo:FlxSprite = new FlxSprite().loadGraphic(Paths.image('logo'));
+		var logo:FlxSprite = new FlxSprite();
+		// 强制 CPU 位图（allowGPU=false）：模组清理后 GPU 纹理缓存可能处于失效态（非空但不可用），
+		// CPU 位图路径不经过 GPU 纹理，规避 FlxImageFrame 空引用崩溃
+		var logoGraphic:FlxGraphic = Paths.imageFresh('logo');
+		if (logoGraphic != null && logoGraphic.bitmap != null)
+			logo.loadGraphic(logoGraphic);
 		logo.antialiasing = ClientPrefs.data.antialiasing;
 		logo.screenCenter();
 		// add(logo);
@@ -339,7 +345,11 @@ class TitleState extends MusicBeatState
 		blackScreen = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		credGroup.add(blackScreen);
 
-		ngSpr = new FlxSprite(0, FlxG.height * 0.50).loadGraphic(Paths.image('newgrounds_logo'));
+		// 模组卸载/内存清理后贴图可能丢失：缺失或位图失效时不加载图形（保留空 sprite，不崩溃、不显示）
+		ngSpr = new FlxSprite(0, FlxG.height * 0.50);
+		var ngGraphic:FlxGraphic = Paths.imageFresh('newgrounds_logo'); // 强制全新加载（规避模组重启后的缓存失效态）
+		if (ngGraphic != null && ngGraphic.bitmap != null)
+			ngSpr.loadGraphic(ngGraphic);
 		add(ngSpr);
 		ngSpr.visible = false;
 		ngSpr.alpha = 0;

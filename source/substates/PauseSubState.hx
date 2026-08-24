@@ -1,10 +1,12 @@
 package substates;
+import backend.WheelScroll;
 
 import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
 
 import flixel.addons.transition.FlxTransitionableState;
+import flixel.input.keyboard.FlxKey;
 import flixel.math.FlxPoint;
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
@@ -15,9 +17,11 @@ import states.StoryMenuState;
 import states.FreeplayState;
 import options.OptionsState;
 import openfl.Lib;
+import openfl.events.KeyboardEvent;
 
 class PauseSubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 安全布局常量 =====
 	// 所有文本一律左侧排版，右缘不依赖缩放/窗口计算，彻底避开右侧截断问题
 	static final SAFE_MARGIN:Float = 72;      // 面板内文本左边距
@@ -71,6 +75,16 @@ class PauseSubState extends MusicBeatSubstate
 	var mouseLockX:Float = 0;      // 键盘接管时记录的鼠标位置
 	var mouseLockY:Float = 0;
 
+	// ===== 暂停键防双击（“按一下暂停键被判定为两下 → 暂停界面闪现回播放”）=====
+	// 根因：'pause'(ENTER/ESC) 与 'accept'(SPACE/ENTER) 键位重叠；并且打开暂停子界面时
+	// flixel 会重置输入状态（onStateSwitch），若暂停键仍被按住，OS 自动重复的 keydown
+	// 会把 JUST_PRESSED 重新武装——同一物理按键被判定为两次：第一次打开暂停，
+	// 第二次立刻被菜单当作“确认”关闭，表现为暂停界面一闪而过。
+	// 修复：打开瞬间由 PlayState 捕获“暂停键是否仍按住”（此刻输入尚未重置），
+	// 传入本界面 → 锁定 ACCEPT，直到该键被物理松开（stage 原始 KEY_UP 监听，
+	// 不受 flixel 输入重置影响）。控制器不受影响（其保护由 cantUnpause 承担）。
+	var lockPauseAccept:Bool = false;
+
 	#if mobile
 	var touchDownRow:Int = -1;    // 触屏点选：按下时所在的行
 	var touchDownID:Int = -1;     // 触屏点选：触摸点 ID
@@ -82,9 +96,14 @@ class PauseSubState extends MusicBeatSubstate
 
 	public static var songName:String = '';
 
-	public function new(x:Float, y:Float)
+	public function new(x:Float, y:Float, ?pauseKeyHeld:Bool = false)
 	{
 		super();
+		lockPauseAccept = pauseKeyHeld;
+
+		// 监听暂停键的物理松开（stage 原始事件，绕开 flixel 输入重置后的状态失真）
+		if (Lib.current.stage != null)
+			Lib.current.stage.addEventListener(KeyboardEvent.KEY_UP, onPauseKeyUp);
 
 		// 固定渲染在专用相机上：zoom=1、scroll=(0,0)，不受游戏相机缩放影响
 		var pauseCam:FlxCamera = (PlayState.instance != null && PlayState.instance.camOther != null) ? PlayState.instance.camOther : FlxG.camera;
@@ -431,11 +450,13 @@ class PauseSubState extends MusicBeatSubstate
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+			if (wheelStep != 0)
 			{
 				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'));
-				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelection(wheelStep);
 			}
 
 			if (hoveredID >= 0 && clickPressed)
@@ -477,7 +498,14 @@ class PauseSubState extends MusicBeatSubstate
 				}
 		}
 
-		if (accepted && (cantUnpause <= 0 || !controls.controllerMode))
+		// 防“暂停键判定两次”：打开暂停的同一物理按键（ENTER/ESC）在本帧残留或长按
+		// 重复事件中会被再次判为“确认”，导致暂停菜单打开即关闭的闪现。
+		// 锁定期间（暂停键未物理松开）忽略一切确认来源，松开后恢复正常。
+		if (lockPauseAccept)
+			accepted = false;
+
+		// 确认前必须经过短暂冷却（对键盘同样生效）：同帧残留的保护网
+		if (accepted && cantUnpause <= 0)
 		{
 			if (menuItems == difficultyChoices)
 			{
@@ -649,10 +677,34 @@ class PauseSubState extends MusicBeatSubstate
 
 	override function destroy()
 	{
+		// 移除 stage 原始键盘监听，避免对象泄漏后仍被回调
+		if (Lib.current.stage != null)
+			Lib.current.stage.removeEventListener(KeyboardEvent.KEY_UP, onPauseKeyUp);
 		FlxG.mouse.visible = false;
 		if (pauseMusic != null) pauseMusic.destroy();
 
 		super.destroy();
+	}
+
+	/** 当前暂停键的键盘绑定（用户自定义键位），缺失时回退默认 [ENTER, ESCAPE] */
+	public static function getPauseKeys():Array<FlxKey>
+	{
+		if (ClientPrefs.keyBinds != null && ClientPrefs.keyBinds.get('pause') != null)
+			return ClientPrefs.keyBinds.get('pause');
+		return [FlxKey.ENTER, FlxKey.ESCAPE];
+	}
+
+	/** 暂停键被物理松开 → 解除确认锁定（原始事件，不受 flixel 输入重置影响） */
+	private function onPauseKeyUp(event:KeyboardEvent):Void
+	{
+		for (key in getPauseKeys())
+		{
+			if ((key : Int) == event.keyCode)
+			{
+				lockPauseAccept = false;
+				break;
+			}
+		}
 	}
 
 	function changeSelection(change:Int = 0):Void

@@ -440,4 +440,68 @@ class LuaUtils
 		}
 		return PlayState.instance.camGame;
 	}
+
+	// Psych 0.7.3 移植：读取 mod 的 data/settings.json 中保存的模组设置（未保存的用默认值补全）
+	public static function getModSetting(saveTag:String, ?modName:String = null)
+	{
+		#if MODS_ALLOWED
+		if(FlxG.save.data.modSettings == null) FlxG.save.data.modSettings = new Map<String, Dynamic>();
+
+		var settings:Map<String, Dynamic> = FlxG.save.data.modSettings.get(modName);
+		var path:String = Paths.mods('$modName/data/settings.json');
+		if(sys.FileSystem.exists(path))
+		{
+			if(settings == null || !settings.exists(saveTag))
+			{
+				if(settings == null) settings = new Map<String, Dynamic>();
+				var data:String = sys.io.File.getContent(path);
+				try
+				{
+					var parsedJson:Dynamic = tjson.TJSON.parse(data);
+					for (i in 0...parsedJson.length)
+					{
+						var sub:Dynamic = parsedJson[i];
+						if(sub != null && sub.save != null && !settings.exists(sub.save))
+						{
+							if(sub.type != 'keybind' && sub.type != 'key')
+							{
+								if(sub.value != null)
+								{
+									settings.set(sub.save, sub.value);
+								}
+							}
+							else
+							{
+								settings.set(sub.save, {keyboard: (sub.keyboard != null ? sub.keyboard : 'NONE'), gamepad: (sub.gamepad != null ? sub.gamepad : 'NONE')});
+							}
+						}
+					}
+					FlxG.save.data.modSettings.set(modName, settings);
+				}
+				catch(e:Dynamic)
+				{
+					var errorTitle = 'Mod name: ' + Mods.currentModDirectory;
+					var errorMsg = 'An error occurred: $e';
+					#if windows
+					lime.app.Application.current.window.alert(errorMsg, errorTitle);
+					#end
+					trace('$errorTitle - $errorMsg');
+				}
+			}
+		}
+		else
+		{
+			FlxG.save.data.modSettings.remove(modName);
+			#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+			PlayState.instance.addTextToDebug('getModSetting: $path could not be found!', FlxColor.RED);
+			#end
+			return null;
+		}
+
+		if(settings == null) return null;
+		return settings.get(saveTag);
+		#else
+		return null;
+		#end
+	}
 }

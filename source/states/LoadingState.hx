@@ -275,6 +275,11 @@ class LoadingState extends MusicBeatState
 		chartLoadId++;
 		var myLoadId:Int = chartLoadId;
 		chartMainThread = Thread.current();
+		// 闭包局部持有主线程句柄：LoadingState.destroy() 会把静态 chartMainThread 置空，
+		// 若本线程（大谱面解析可长达数十秒）在 LoadingState 销毁后才完成，直接用静态变量发消息
+		// 会触发线程内空引用 —— 线程异常无法传到主线程崩溃处理器，进程被静默终止（无日志闪退）。
+		// 用局部引用发送：残留消息由主线程轮询的 loadId 守卫丢弃，绝不崩线程。
+		var mainThread:Thread = chartMainThread;
 		preloadChartThread = Thread.create(function()
 		{
 			var result:Dynamic;
@@ -286,7 +291,7 @@ class LoadingState extends MusicBeatState
 			{
 				result = {ok: false, loadId: myLoadId, error: Std.string(e)};
 			}
-			chartMainThread.sendMessage(result);
+			if (mainThread != null) mainThread.sendMessage(result);
 		});
 	}
 

@@ -1,4 +1,5 @@
 package options;
+import backend.WheelScroll;
 
 import objects.MenuText;
 import objects.BackButton;
@@ -19,6 +20,7 @@ import shaders.RGBPalette.RGBShaderReference;
 
 class NotesSubState extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量 =====
 	static final PANEL_L_X:Float = 40;
 	static final PANEL_L_Y:Float = 70;
@@ -343,7 +345,8 @@ class NotesSubState extends MusicBeatSubstate
 		}
 
 		// 滚轮切换音符（触屏上手指拖动也会合成滚轮事件，拖动调色/滚动时不切换选中音符）
-		if (FlxG.mouse.wheel != 0 && holdingOnObj == null)
+		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+		if (wheelStep != 0 && holdingOnObj == null)
 		{
 			#if mobile
 			var wheelClick:Bool = !Main.touchWasDragging();
@@ -354,7 +357,7 @@ class NotesSubState extends MusicBeatSubstate
 			{
 				mouseActive = true;
 				hexTypeNum = -1;
-				changeSelectionNote(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelectionNote(wheelStep);
 			}
 		}
 

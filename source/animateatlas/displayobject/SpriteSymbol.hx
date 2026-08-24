@@ -80,8 +80,9 @@ class SpriteSymbol extends Sprite {
 
 			for (i in 0...layer.Frames.length) {
 				var frame = layer.Frames[i];
+				// 用帧的真实 index 作键（2020 格式帧号不连续，数组下标会错位导致帧元素丢失）
 				for (j in 0...frame.duration) {
-					map.set(i + j, frame);
+					map.set(frame.index + j, frame);
 				}
 			}
 
@@ -347,10 +348,12 @@ class SpriteSymbol extends Sprite {
 			var layer = getLayerData(i);
 			var frameDates:Array<LayerFrameData> = (layer == null ? [] : layer.Frames);
 			var numFrameDates:Int = (frameDates != null) ? frameDates.length : 0;
-			var layerNumFrames:Int = (numFrameDates != 0) ? frameDates[0].index : 0;
-
+			// 用"最后一帧的结束位置"计算层长度：2020 格式帧号不连续（有空洞），
+			// 旧逻辑（第一帧 index + Σduration）在空洞时会把动画算短导致尾部帧缺失
+			var layerNumFrames:Int = 0;
 			for (j in 0...numFrameDates) {
-				layerNumFrames += frameDates[j].duration;
+				var end:Int = frameDates[j].index + frameDates[j].duration;
+				if (end > layerNumFrames) layerNumFrames = end;
 			}
 
 			if (layerNumFrames > numFrames) {

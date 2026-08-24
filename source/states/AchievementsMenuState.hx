@@ -1,4 +1,5 @@
 package states;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import backend.Achievements;
@@ -7,6 +8,7 @@ import openfl.Lib;
 
 class AchievementsMenuState extends MusicBeatState
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	#if ACHIEVEMENTS_ALLOWED
 	// ===== 布局常量（与自由选歌/制作人员界面一致） =====
 	static final PANEL_L_X:Float = 40;
@@ -288,10 +290,11 @@ class AchievementsMenuState extends MusicBeatState
 				}
 
 				// 滚轮：每帧最多 1 格
-				if (FlxG.mouse.wheel != 0)
+				var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+				if (wheelStep != 0)
 				{
 					mouseActive = true;
-					changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+					changeSelection(wheelStep);
 				}
 
 				// 返回按钮：悬停发光，点击返回

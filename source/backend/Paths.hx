@@ -291,12 +291,13 @@ class Paths
 		return file;
 	}
 
-	inline static public function voices(song:String):Any
+	inline static public function voices(song:String, postfix:String = null):Any
 	{
 		#if html5
 		return 'songs:assets/songs/${formatToSongPath(song)}/Voices.$SOUND_EXT';
 		#else
 		var songKey:String = '${formatToSongPath(song)}/Voices';
+		if(postfix != null) songKey += '-' + postfix;
 		var voices = returnSound('songs', songKey);
 		return voices;
 		#end
@@ -325,6 +326,33 @@ class Paths
 		pendingBitmaps = [];
 	}
 
+	// 强制全新加载：完全绕过 currentTrackedAssets 缓存（模组重启后缓存可能持有销毁/失效状态——
+	// bitmap 非空但帧集合/GPU 资源已死，CPU 参数无法挽救缓存命中）。返回全新的 CPU 位图对象。
+	static public function imageFresh(key:String, ?library:String = null):FlxGraphic
+	{
+		var file:String = null;
+		#if MODS_ALLOWED
+		file = modsImages(key);
+		if (file == null || !FileSystem.exists(file))
+		#end
+			file = getPath('images/$key.png', IMAGE, library);
+		try
+		{
+			if (OpenFlAssets.exists(file, IMAGE))
+			{
+				var bd:BitmapData = OpenFlAssets.getBitmapData(file);
+				if (bd != null) return FlxGraphic.fromBitmapData(bd);
+			}
+			if (FileSystem.exists(file))
+			{
+				var bd2:BitmapData = BitmapData.fromFile(file);
+				if (bd2 != null) return FlxGraphic.fromBitmapData(bd2);
+			}
+		}
+		catch (e:Dynamic) {}
+		return null;
+	}
+
 	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
 		var bitmap:BitmapData = null;
@@ -334,8 +362,15 @@ class Paths
 		file = modsImages(key);
 		if (currentTrackedAssets.exists(file))
 		{
-			localTrackedAssets.push(file);
-			return currentTrackedAssets.get(file);
+			var cached:FlxGraphic = currentTrackedAssets.get(file);
+			// 模组卸载/内存清理后位图可能已被销毁（destroy 会置空 bitmap）：失效则移除缓存并重新加载
+			// 注意：不能用 bitmap.readable 判活——cacheOnGPU 的有效位图不可读会被误判失效导致图标消失
+			if (cached != null && cached.bitmap != null)
+			{
+				localTrackedAssets.push(file);
+				return cached;
+			}
+			currentTrackedAssets.remove(file);
 		}
 		else if (pendingBitmaps.exists(file))
 		{
@@ -350,8 +385,13 @@ class Paths
 			file = getPath('images/$key.png', IMAGE, library);
 			if (currentTrackedAssets.exists(file))
 			{
-				localTrackedAssets.push(file);
-				return currentTrackedAssets.get(file);
+				var cached:FlxGraphic = currentTrackedAssets.get(file);
+				if (cached != null && cached.bitmap != null)
+				{
+					localTrackedAssets.push(file);
+					return cached;
+				}
+				currentTrackedAssets.remove(file);
 			}
 			else if (pendingBitmaps.exists(file))
 			{
@@ -476,18 +516,71 @@ class Paths
 		return false;
 	}
 
+	// Psych 1.0.4：多图集角色（image 字段逗号分隔，如 pico-playable）合并为一个 FlxAtlasFrames
+	// （flixel 5.x 无 addAtlas，用 pushFrame 手动合并）
+	static public function getMultiAtlas(keys:Array<String>, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	{
+		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim());
+		if(keys.length > 1)
+		{
+			var combined:FlxAtlasFrames = new FlxAtlasFrames(parentFrames.parent);
+			for (frame in parentFrames.frames) combined.pushFrame(frame);
+			for (i in 1...keys.length)
+			{
+				var extraFrames:FlxAtlasFrames = Paths.getAtlas(keys[i].trim(), parentFolder);
+				if(extraFrames != null)
+					for (frame in extraFrames.frames) combined.pushFrame(frame);
+			}
+			return combined;
+		}
+		return parentFrames;
+	}
+
 	// less optimized but automatic handling
 	static public function getAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
-		#if MODS_ALLOWED
-		if(FileSystem.exists(modsXml(key)) || FileSystem.exists(getPath('images/$key.xml', library)) || OpenFlAssets.exists(getPath('images/$key.xml', library), TEXT))
-		#else
-		if(FileSystem.exists(getPath('images/$key.xml', library)) || OpenFlAssets.exists(getPath('images/$key.xml', library)))
-		#end
+		var useMod:Bool = false;
+		var imageLoaded:FlxGraphic = image(key, library, true);
+
+		var myXml:Dynamic = getPath('images/$key.xml', TEXT, library, true);
+		if(OpenFlAssets.exists(myXml) #if MODS_ALLOWED || (FileSystem.exists(myXml) && (useMod = true)) #end )
 		{
-			return getSparrowAtlas(key, library);
+			#if MODS_ALLOWED
+			return FlxAtlasFrames.fromSparrow(imageLoaded, (useMod ? File.getContent(myXml) : atlasData(myXml)));
+			#else
+			return FlxAtlasFrames.fromSparrow(imageLoaded, atlasData(myXml));
+			#end
+		}
+		else
+		{
+			// Aseprite .JSON / TexturePacker 图集支持（Psych 0.7.3 兼容）
+			var myJson:Dynamic = getPath('images/$key.json', TEXT, library, true);
+			if(OpenFlAssets.exists(myJson) #if MODS_ALLOWED || (FileSystem.exists(myJson) && (useMod = true)) #end )
+			{
+				#if MODS_ALLOWED
+				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (useMod ? File.getContent(myJson) : atlasData(myJson)));
+				#else
+				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, atlasData(myJson));
+				#end
+			}
 		}
 		return getPackerAtlas(key, library);
+	}
+
+	// Aseprite .JSON 图集（显式调用，供角色编辑器等使用）
+	inline static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	{
+		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
+		#if MODS_ALLOWED
+		var jsonExists:Bool = false;
+
+		var json:String = modsImagesJson(key);
+		if(FileSystem.exists(json)) jsonExists = true;
+
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? File.getContent(json) : atlasData(getPath('images/$key.json', library))));
+		#else
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, atlasData(getPath('images/$key.json', library)));
+		#end
 	}
 
 	// 返回图集描述内容：文件系统里存在的路径直接读内容，内部资源路径原样交给 openfl Assets
@@ -619,6 +712,10 @@ class Paths
 		return modFolders('images/' + key + '.png');
 	}
 
+	inline static public function modsImagesJson(key:String) {
+		return modFolders('images/' + key + '.json');
+	}
+
 	inline static public function modsXml(key:String) {
 		return modFolders('images/' + key + '.xml');
 	}
@@ -655,6 +752,70 @@ class Paths
 				return fileToCheck;
 		}
 		return mods(key);
+	}
+	#end
+
+	#if flxanimate
+	/** Psych 0.7 兼容：FlxAnimate 加载（支持 mods 文件系统，走 loadAtlasEx 内容加载） */
+	public static function loadAnimateAtlas(spr:flxanimate.PsychFlxAnimate, folderOrImg:Dynamic, spriteJson:Dynamic = null, animationJson:Dynamic = null)
+	{
+		var changedAnimJson = false;
+		var changedAtlasJson = false;
+		var changedImage = false;
+
+		if(spriteJson != null)
+		{
+			changedAtlasJson = true;
+			spriteJson = File.getContent(spriteJson);
+		}
+
+		if(animationJson != null)
+		{
+			changedAnimJson = true;
+			animationJson = File.getContent(animationJson);
+		}
+
+		if(Std.isOfType(folderOrImg, String))
+		{
+			var originalPath:String = folderOrImg;
+			for (i in 0...10)
+			{
+				var st:String = '$i';
+				if(i == 0) st = '';
+
+				if(!changedAtlasJson)
+				{
+					spriteJson = getTextFromFile('images/$originalPath/spritemap$st.json');
+					if(spriteJson != null)
+					{
+						changedImage = true;
+						changedAtlasJson = true;
+						folderOrImg = image('$originalPath/spritemap$st');
+						break;
+					}
+				}
+				else if(FileSystem.exists('images/$originalPath/spritemap$st.png'))
+				{
+					changedImage = true;
+					folderOrImg = 'images/$originalPath/spritemap$st.png';
+					break;
+				}
+			}
+
+			if(!changedImage)
+			{
+				changedImage = true;
+				folderOrImg = image(originalPath);
+			}
+
+			if(!changedAnimJson)
+			{
+				changedAnimJson = true;
+				animationJson = getTextFromFile('images/$originalPath/Animation.json');
+			}
+		}
+
+		spr.loadAtlasEx(folderOrImg, spriteJson, animationJson);
 	}
 	#end
 }

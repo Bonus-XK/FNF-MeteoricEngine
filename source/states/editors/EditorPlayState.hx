@@ -327,12 +327,8 @@ class EditorPlayState extends MusicBeatSubstate
 				if(daStrumTime < startPos) continue;
 
 				var daNoteData:Int = Std.int(songNotes[1] % 4);
-				var gottaHitNote:Bool = section.mustHitSection;
-
-				if (songNotes[1] > 3)
-				{
-					gottaHitNote = !section.mustHitSection;
-				}
+				// Psych 1.0.4 格式：列号直接决定方向（旧版谱面已由 Song.convertToPsychV1 转换）
+				var gottaHitNote:Bool = (songNotes[1] < 4);
 
 				var oldNote:Note;
 				if (unspawnNotes.length > 0)
@@ -343,7 +339,8 @@ class EditorPlayState extends MusicBeatSubstate
 				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, this);
 				swagNote.mustPress = gottaHitNote;
 				swagNote.sustainLength = songNotes[2];
-				swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
+				if (Math.isNaN(swagNote.sustainLength)) swagNote.sustainLength = 0.0;
+				swagNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection);
 				swagNote.noteType = songNotes[3];
 				if(!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]]; //Backward compatibility + compatibility with Week 7 charts
 
@@ -362,7 +359,7 @@ class EditorPlayState extends MusicBeatSubstate
 
 						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, this);
 						sustainNote.mustPress = gottaHitNote;
-						sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
+						sustainNote.gfNote = swagNote.gfNote;
 						sustainNote.noteType = swagNote.noteType;
 						sustainNote.scrollFactor.set();
 						swagNote.tail.push(sustainNote);

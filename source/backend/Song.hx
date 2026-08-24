@@ -34,6 +34,7 @@ typedef SwagSong =
 
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
+	@:optional var format:String;
 }
 
 class Song
@@ -116,7 +117,8 @@ class Song
 			gameOverEnd: song.gameOverEnd,
 			disableNoteRGB: song.disableNoteRGB,
 			arrowSkin: song.arrowSkin,
-			splashSkin: song.splashSkin
+			splashSkin: song.splashSkin,
+			format: song.format
 		};
 
 		if (song.notes != null)
@@ -187,6 +189,39 @@ class Song
 		}
 	}
 
+	// Psych 1.0.4 谱面格式转换：把旧版（0.6/0.7 系，轨道列号 + mustHitSection 翻转语义）谱面
+	// 转换成 psych_v1 格式（绝对列号：<4 玩家、>=4 对手），列号直接决定方向。
+	// format 字段标记为 'psych_v1'/'psych_v1_convert' 的谱面（1.0.4 保存/转换产物）不再重复转换。
+	static var legacyNoteTypes:Array<String> = ['', 'Alt Animation', 'Hey!', 'Hurt Note', 'GF Sing', 'No Animation'];
+	public static function convertToPsychV1(songJson:Dynamic)
+	{
+		if(songJson.events == null) onLoadJson(songJson);
+
+		var sectionsData:Array<SwagSection> = songJson.notes;
+		if(sectionsData == null) return;
+
+		for (section in sectionsData)
+		{
+			// sectionBeats 缺失/NaN 时补默认（1.0.4 兼容：旧谱面常用 lengthInSteps 代替）
+			var beats:Null<Float> = cast section.sectionBeats;
+			if (beats == null || Math.isNaN(beats))
+			{
+				section.sectionBeats = 4;
+				if(Reflect.hasField(section, 'lengthInSteps')) Reflect.deleteField(section, 'lengthInSteps');
+			}
+
+			for (note in section.sectionNotes)
+			{
+				var gottaHitNote:Bool = (note[1] < 4) ? section.mustHitSection : !section.mustHitSection;
+				note[1] = (note[1] % 4) + (gottaHitNote ? 0 : 4);
+
+				// Week7 / 0.1-0.3 老谱面：noteType 是数字索引
+				if(!Std.isOfType(note[3], String))
+					note[3] = legacyNoteTypes[note[3]];
+			}
+		}
+	}
+
 	public function new(song, notes, bpm)
 	{
 		this.song = song;
@@ -242,6 +277,11 @@ class Song
 	// 纯读盘 + 解析（不碰缓存、不碰舞台目录），供后台线程调用
 	public static function loadFromFile(filePath:String, isEvents:Bool):SwagSong
 	{
+		// 谱面已解析且缓存未失效（mtime 不变）：数据是纯读的，从缓存深拷贝一份即可，
+		// 避免重复读盘 + JSON 解析（42MB / 226 万音符级谱面，重复解析还会让后台线程长时间
+		// 活过 LoadingState 生命周期，是"退出重进同曲闪退"的间接诱因）；语义与 loadFromJson 缓存命中一致
+		var cachedHit:SwagSong = getCachedChart(chartCacheKey(filePath));
+		if (cachedHit != null) return copySong(cachedHit);
 		var rawJson = null;
 		#if (sys && !android)
 		rawJson = File.getContent(filePath).trim();
@@ -264,22 +304,33 @@ class Song
 		var songJson:Dynamic = parseJSONshit(rawJson);
 		onLoadJson(songJson);
 
+		// Psych 1.0.4 谱面格式：format 为 psych_v1 的谱面列号已是绝对方向（<4 玩家 / >=4 对手），
+		// 直接使用；旧版谱面（0.6/0.7 系轨道列号 + mustHitSection 翻转）转换后再用，
+		// 否则 generateSong 的列号判定会把方向搞反（GF 段落/对手音符错乱、自定义 note 变普通）。
+		var chartFmt:String = songJson.format != null ? Std.string(songJson.format) : '';
+		if(chartFmt.length < 1 || !chartFmt.startsWith('psych_v1'))
+		{
+			songJson.format = 'psych_v1_convert';
+			convertToPsychV1(songJson);
+		}
+
 		// 后台线程解析完成后也写入缓存（纯数据深拷贝），下次再选同一首谱面直接命中、不再解析
 		cacheChart(chartCacheKey(filePath), copySong(songJson));
 		return songJson;
 	}
 
 	// 检查歌曲的人声文件是否存在（mod 目录优先）
-	public static function voicesFileExists(songName:String):Bool
+	public static function voicesFileExists(songName:String, ?postfix:String = null):Bool
 	{
 		var songPath:String = Paths.formatToSongPath(songName);
+		var vocalName:String = 'Voices' + (postfix != null && postfix.length > 0 ? '-' + postfix : '');
 		#if MODS_ALLOWED
-		if(FileSystem.exists(Paths.modsSounds('songs', songPath + '/Voices'))) return true;
+		if(FileSystem.exists(Paths.modsSounds('songs', songPath + '/' + vocalName))) return true;
 		#end
 		#if (sys && !android)
-		return FileSystem.exists('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT);
+		return FileSystem.exists('assets/songs/' + songPath + '/' + vocalName + '.' + Paths.SOUND_EXT);
 		#else
-		return Assets.exists('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT, SOUND);
+		return Assets.exists('assets/songs/' + songPath + '/' + vocalName + '.' + Paths.SOUND_EXT, SOUND);
 		#end
 	}
 
@@ -317,17 +368,356 @@ class Song
 		return songJson;
 	}
 
+	// ===== 大谱面快速解析（零 DOM）：直接字节扫描 sectionNotes 数字矩阵 =====
+	// 用于 42MB / 2.26M 音符级谱面：haxe.Json/TJSON 会把每颗音符做成对象树（1.5-2GB 峰值），
+	// 本路径只产出引擎需要的扁平结构，解析耗时/内存下降 1-2 个数量级。失败返回 null 走通用解析。
+	#if sys
+	static function fastNumAt(text:String, pos:Int):Float
+	{
+		var start:Int = pos;
+		while (pos < text.length)
+		{
+			var c:Int = text.charCodeAt(pos);
+			if ((c >= 48 && c <= 57) || c == 45 || c == 46 || c == 43 || c == 101 || c == 69) pos++;
+			else break;
+		}
+		if (pos <= start) return 0;
+		return Std.parseFloat(text.substr(start, pos - start));
+	}
+
+	static function fastStrAt(text:String, pos:Int):String
+	{
+		if (pos >= text.length || text.charAt(pos) != '"') return null;
+		pos++;
+		var start:Int = pos;
+		while (pos < text.length)
+		{
+			var c:String = text.charAt(pos);
+			if (c == '\\') { pos++; continue; }
+			if (c == '"') break;
+			pos++;
+		}
+		return text.substr(start, pos - start);
+	}
+
+	// 字符串读取结束位置（越过闭合引号）
+	static function fastStrAtEnd(text:String, pos:Int):Int
+	{
+		if (pos >= text.length || text.charAt(pos) != '"') return pos;
+		pos++;
+		while (pos < text.length)
+		{
+			var c:String = text.charAt(pos);
+			if (c == '\\') { pos++; continue; }
+			if (c == '"') return pos + 1;
+			pos++;
+		}
+		return pos;
+	}
+
+	static inline function fastSkip(text:String, pos:Int):Int
+	{
+		while (pos < text.length)
+		{
+			var c:Int = text.charCodeAt(pos);
+			if (c == 32 || c == 10 || c == 13 || c == 9 || c == 44) pos++;
+			else break;
+		}
+		return pos;
+	}
+
+	static function fastValAfter(text:String, key:String, pos:Int):Int
+	{
+		var idx:Int = text.indexOf('"' + key + '"', pos);
+		if (idx < 0) return -1;
+		idx = text.indexOf(':', idx);
+		if (idx < 0) return -1;
+		return fastSkip(text, idx + 1);
+	}
+
+	static function fastScanSectionNotes(secText:String):Array<Dynamic>
+	{
+		var arr:Array<Dynamic> = [];
+		var mustHit:Bool = fastReadBoolAfter(secText, 'mustHitSection', true);
+		var idx:Int = fastValAfter(secText, 'sectionNotes', 0);
+		if (idx < 0 || idx >= secText.length || secText.charAt(idx) != '[') return arr;
+		var len:Int = secText.length;
+		var pos:Int = idx + 1;
+		var guard:Int = 0;
+		while (pos < len && guard < 3000000)
+		{
+			guard++;
+			pos = fastSkip(secText, pos);
+			if (pos >= len || secText.charAt(pos) == ']') break;
+			if (secText.charAt(pos) != '[') { pos++; continue; }
+			pos++;
+			// 类型化 4 槽（t/d/s/typeCode）：避免 2.26M 动态盒装数组的 ~1GB 内存
+			var note:Array<Float> = [0, 0, 0, 0];
+			var slot:Int = 0;
+			for (f in 0...4)
+			{
+				pos = fastSkip(secText, pos);
+				if (pos >= len) break;
+				var c:String = secText.charAt(pos);
+				if (c == '"')
+				{
+					var sv:String = fastStrAt(secText, pos);
+					// 类型字符串映射为 legacy 数字码（0=空；1-5=默认类型表；未知类型→回退解析）
+					var tc:Float = 0;
+					if (sv == 'Alt Animation') tc = 1;
+					else if (sv == 'Hey!') tc = 2;
+					else if (sv == 'Hurt Note') tc = 3;
+					else if (sv == 'GF Sing') tc = 4;
+					else if (sv == 'No Animation') tc = 5;
+					else throw 'unknown noteType: ' + sv;
+					note[slot] = tc;
+					pos = fastSkip(secText, fastStrAtEnd(secText, pos));
+				}
+				else if (c >= '0' && c <= '9' || c == '-' || c == '.')
+				{
+					note[slot] = fastNumAt(secText, pos);
+					// 数字读取后必须推进 pos（fastNumAt 是纯函数；否则同位置重复读，整行错位）
+					while (pos < len)
+					{
+						var c2:Int = secText.charCodeAt(pos);
+						if ((c2 >= 48 && c2 <= 57) || c2 == 45 || c2 == 46 || c2 == 43 || c2 == 101 || c2 == 69) pos++;
+						else break;
+					}
+					pos = fastSkip(secText, pos);
+					if (slot == 1)
+					{
+						// 列转换（与 convertToPsychV1 一致）：<4 且 mustHitSection → 玩家(0-3)；否则对手(4-7)
+						var colR:Float = note[1];
+						if (colR != colR) colR = 0;
+						var colI:Int = Std.int(colR) % 4;
+						var gottaHit:Bool = (Std.int(colR) < 4) ? mustHit : !mustHit;
+						note[1] = colI + (gottaHit ? 0 : 4);
+					}
+				}
+				else
+				{
+					// null / 未知字段：跳到下一个逗号或 ]（否则整行错位，后续音符全部丢失）
+					while (pos < len && secText.charAt(pos) != ',' && secText.charAt(pos) != ']') pos++;
+					pos = fastSkip(secText, pos);
+					continue;
+				}
+				slot++;
+				if (pos < len && secText.charAt(pos) == ']') { pos++; break; }
+			}
+			arr.push(note);
+		}
+		return arr;
+	}
+
+	// 大括号深度匹配（跳过字符串与转义）
+	static function fastFindObjEnd(text:String, start:Int):Int
+	{
+		var depth:Int = 0;
+		var inStr:Bool = false;
+		var i:Int = start;
+		while (i < text.length)
+		{
+			var c:String = text.charAt(i);
+			if (inStr)
+			{
+				if (c == '\\') { i++; }
+				else if (c == '"') inStr = false;
+			}
+			else
+			{
+				if (c == '"') inStr = true;
+				else if (c == '{') depth++;
+				else if (c == '}') { depth--; if (depth == 0) return i; }
+			}
+			i++;
+		}
+		return -1;
+	}
+
+	static function fastParseSong(rawJson:String):SwagSong
+	{
+		var song:Dynamic = {};
+		// 元数据必须从"歌对象内部"读取：外层信封也是 "song" 键（{"song":{...}}），
+		// 直接匹配会把 { 当字符串读 → 歌名为空/角色错乱
+		var inSong:Int = 0;
+		var envIdx:Int = rawJson.indexOf('"song"');
+		if (envIdx >= 0)
+		{
+			var braceIdx:Int = rawJson.indexOf('{', envIdx);
+			if (braceIdx >= 0) inSong = braceIdx + 1;
+		}
+		Reflect.setField(song, 'song', fastReadStringAfter2(rawJson, 'song', '', inSong));
+		Reflect.setField(song, 'bpm', fastReadNumberAfter2(rawJson, 'bpm', 120.0, inSong));
+		Reflect.setField(song, 'speed', fastReadNumberAfter2(rawJson, 'speed', 1.0, inSong));
+		Reflect.setField(song, 'player1', fastReadStringAfter2(rawJson, 'player1', 'bf', inSong));
+		Reflect.setField(song, 'player2', fastReadStringAfter2(rawJson, 'player2', 'dad', inSong));
+		Reflect.setField(song, 'gfVersion', fastReadStringAfter2(rawJson, 'gfVersion', 'gf', inSong));
+		Reflect.setField(song, 'stage', fastReadStringAfter2(rawJson, 'stage', 'stage', inSong));
+		Reflect.setField(song, 'needsVoices', fastReadBoolAfter2(rawJson, 'needsVoices', true, inSong));
+		Reflect.setField(song, 'validScore', fastReadBoolAfter2(rawJson, 'validScore', false, inSong));
+		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(rawJson, 'arrowSkin', null, inSong));
+		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(rawJson, 'splashSkin', null, inSong));
+		Reflect.setField(song, 'format', 'psych_v1'); // 列已内联转换，跳过 convertToPsychV1
+
+		var notesIdx:Int = rawJson.indexOf('"notes"');
+		if (notesIdx < 0) return null;
+		var arrStart:Int = rawJson.indexOf('[', notesIdx);
+		if (arrStart < 0) return null;
+
+		var notes:Array<Dynamic> = [];
+		var pos:Int = arrStart + 1;
+		var len:Int = rawJson.length;
+		var secCount:Int = 0;
+		while (pos < len && secCount < 4096)
+		{
+			pos = fastSkip(rawJson, pos);
+			if (pos >= len || rawJson.charAt(pos) == ']') break;
+			if (rawJson.charAt(pos) != '{') { pos++; continue; }
+			var secStart:Int = pos;
+			var end:Int = fastFindObjEnd(rawJson, secStart);
+			if (end < 0) break;
+			var secText:String = rawJson.substr(secStart, end - secStart + 1);
+			var sec:SwagSection = {
+				sectionNotes: fastScanSectionNotes(secText),
+				sectionBeats: fastReadNumberAfter(secText, 'sectionBeats', 4),
+				typeOfSection: 0,
+				mustHitSection: fastReadBoolAfter(secText, 'mustHitSection', true),
+				gfSection: fastReadBoolAfter(secText, 'gfSection', false),
+				bpm: fastReadNumberAfter(secText, 'bpm', 0),
+				changeBPM: fastReadBoolAfter(secText, 'changeBPM', false),
+				altAnim: fastReadBoolAfter(secText, 'altAnim', false)
+			};
+			notes.push(sec);
+			secCount++;
+			pos = end + 1;
+		}
+		Reflect.setField(song, 'notes', notes);
+
+		// 自检：大谱面 18 字节/音符级密度，解析总数远低于期望视为解析失败 → 回退通用路径
+		var totalParsed:Int = 0;
+		for (n in notes)
+		{
+			var sn2:Array<Dynamic> = n.sectionNotes;
+			if (sn2 != null) totalParsed += sn2.length;
+		}
+		trace('[FASTPARSE] sections=' + notes.length + ' notes=' + totalParsed + ' rawLen=' + rawJson.length);
+		if (rawJson.length > 4000000 && totalParsed < Std.int(rawJson.length / 60))
+			throw 'fast parse too small: ' + totalParsed;
+
+		// events：量小，取子串用 haxe.Json（避免手写完整事件解析）
+		var evIdx:Int = rawJson.indexOf('"events"');
+		if (evIdx >= 0)
+		{
+			var evArrStart:Int = rawJson.indexOf('[', evIdx);
+			if (evArrStart >= 0)
+			{
+				var evEnd:Int = fastFindObjEnd(rawJson, evArrStart); // 数组内对象深度匹配
+				var evEnd2:Int = rawJson.indexOf(']', evArrStart);
+				var evText:String = null;
+				if (evEnd2 > evArrStart) evText = rawJson.substr(evArrStart, evEnd2 - evArrStart + 1);
+				try
+				{
+					if (evText != null) Reflect.setField(song, 'events', haxe.Json.parse(evText));
+				}
+				catch (e:Dynamic) {}
+			}
+		}
+		if (!Reflect.hasField(song, 'events')) Reflect.setField(song, 'events', []);
+
+		return cast song;
+	}
+
+	static function fastReadNumberAfter2(text:String, key:String, fallback:Float, from:Int):Float
+	{
+		var i:Int = fastValAfter(text, key, from);
+		if (i < 0) return fallback;
+		if (i < text.length && (text.charAt(i) >= '0' && text.charAt(i) <= '9' || text.charAt(i) == '-' || text.charAt(i) == '.'))
+			return fastNumAt(text, i);
+		return fallback;
+	}
+
+	static function fastReadNumberAfter(text:String, key:String, fallback:Float):Float
+	{
+		var i:Int = fastValAfter(text, key, 0);
+		if (i < 0) return fallback;
+		if (i < text.length && (text.charAt(i) >= '0' && text.charAt(i) <= '9' || text.charAt(i) == '-' || text.charAt(i) == '.'))
+			return fastNumAt(text, i);
+		return fallback;
+	}
+
+	static function fastReadBoolAfter2(text:String, key:String, fallback:Bool, from:Int):Bool
+	{
+		var i:Int = fastValAfter(text, key, from);
+		if (i < 0) return fallback;
+		if (text.substr(i, 4) == 'true') return true;
+		if (text.substr(i, 5) == 'false') return false;
+		return fallback;
+	}
+
+	static function fastReadStringAfter2(text:String, key:String, fallback:String, from:Int):String
+	{
+		var i:Int = fastValAfter(text, key, from);
+		if (i < 0) return fallback;
+		if (i < text.length && text.charAt(i) == '"') return fastStrAt(text, i);
+		return fallback;
+	}
+
+	static function fastReadBoolAfter(text:String, key:String, fallback:Bool):Bool
+	{
+		var i:Int = fastValAfter(text, key, 0);
+		if (i < 0) return fallback;
+		if (text.substr(i, 4) == 'true') return true;
+		if (text.substr(i, 5) == 'false') return false;
+		return fallback;
+	}
+
+	static function fastReadStringAfter(text:String, key:String, fallback:String):String
+	{
+		var i:Int = fastValAfter(text, key, 0);
+		if (i < 0) return fallback;
+		if (i < text.length && text.charAt(i) == '"') return fastStrAt(text, i);
+		return fallback;
+	}
+	#end
+
 	public static function parseJSONshit(rawJson:String):SwagSong
 	{
 		var songJson:Dynamic = null;
+		// 快路径：自定义紧凑扫描器（仅 >4MB 大谱面，零 DOM 分配；
+		// 小谱面保持通用解析，避免边角回归）。失败自动回退通用路径。
+		#if sys
+		if (rawJson.length > 4000000)
+		{
+			try
+			{
+				var fast:SwagSong = fastParseSong(rawJson);
+				if (fast != null)
+					return fast;
+			}
+			catch (e:Dynamic) {}
+		}
+		#end
 		try
 		{
-			songJson = Reflect.field(haxe.Json.parse(rawJson), 'song');
+			var parsed:Dynamic = haxe.Json.parse(rawJson);
+			songJson = Reflect.field(parsed, 'song');
+			// 旧格式 chart（Psych 0.6 系 / 部分模组）：歌曲元数据在顶层，
+			// "song" 字段只是歌名 String —— 此时直接用整个 JSON 作为歌曲对象，
+			// 否则后续 onLoadJson 对 String 做字段赋值会报 "Invalid field: gfVersion"
+			if (songJson == null || Std.isOfType(songJson, String))
+				songJson = parsed;
 		}
 		catch(e:Dynamic)
 		{
 			// 极少数旧谱面带注释/非标准 JSON：回退到 tjson 兼容解析
-			songJson = Reflect.field(TJSON.parse(rawJson), 'song');
+			try
+			{
+				var parsed2:Dynamic = TJSON.parse(rawJson);
+				songJson = Reflect.field(parsed2, 'song');
+				if (songJson == null || Std.isOfType(songJson, String))
+					songJson = parsed2;
+			}
+			catch(e2:Dynamic) {}
 		}
 		return cast songJson;
 	}

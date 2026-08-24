@@ -26,6 +26,7 @@ class GameOverSubstate extends MusicBeatSubstate
 	public static var deathSoundName:String = 'fnf_loss_sfx';
 	public static var loopSoundName:String = 'gameOver';
 	public static var endSoundName:String = 'gameOverEnd';
+	public static var deathDelay:Float = 0; //Psych 1.0.4：死亡后延迟打开 Game Over 界面（Weekend 1 用）
 
 	public static var instance:GameOverSubstate;
 
@@ -34,6 +35,7 @@ class GameOverSubstate extends MusicBeatSubstate
 		deathSoundName = 'fnf_loss_sfx';
 		loopSoundName = 'gameOver';
 		endSoundName = 'gameOverEnd';
+		deathDelay = 0;
 
 		var _song = PlayState.SONG;
 		if(_song != null)

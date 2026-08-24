@@ -67,6 +67,20 @@ class SaveVariables {
 	@:keep public var comboStacking:Bool = false;
 	@:keep public var comboStackMigrated:Bool = false;
 	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
+	// ===== H-Slice 移植：音符管线性能设置 =====
+	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）
+	@:keep public var ghostDensity:Bool = true;     // 合并模式：true=计数合并（保分数/命中量）；false=直接丢弃重复
+	@:keep public var ghostRange:Float = 15;        // 合并窗口（毫秒）：同轨时间差 ≤ 该值的箭头视为堆叠
+	@:keep public var optimizeSpawnNote:Bool = true;// 已过出生窗口的音符不再生成（跳时间时静默消费，不判 Miss）
+	@:keep public var bulkSkip:Bool = true;         // 快速跳谱：二分跳过大段已过音符（重开/跳时间的核心优化）
+	@:keep public var fastSort:Bool = false;        // 可见音符快速排序（绘制顺序）；默认关闭保持与旧版一致
+	@:keep public var limitNotes:Int = 0;           // 场上音符对象上限（0=不限；堆叠谱防爆）
+	@:keep public var hideOverlapped:Float = 0;     // 重叠隐藏间距（0=关闭）：同轨过近音符隐藏后段（渲染裁剪）
+	@:keep public var spawnNoteEvent:Bool = true;   // 生成时触发 onSpawnNote 回调（关闭后可省去 15 万级回调开销）
+	// ===== 自动游玩命中排期（性能页可调） =====
+	@:keep public var botplayScheduledHits:Bool = true; // 生成即排期命中（大谱面自动游玩 100% 覆盖的架构开关）
+	@:keep public var botplayPopMargin:Int = 6;         // 排期弹出提前余量（毫秒）：弹出窗 = 帧步长 + 余量，须 ≥ 回收窗
+	@:keep public var botplayKillWindow:Int = 6;        // 自动游玩未命中回收窗（毫秒）：越小柱子越贴判定线，太小会与弹出竞态
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
 	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
 	public var gameplaySettings:Map<String, Dynamic> = [

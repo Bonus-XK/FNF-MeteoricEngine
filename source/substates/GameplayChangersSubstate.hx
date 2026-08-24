@@ -1,4 +1,5 @@
 package substates;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import flixel.math.FlxPoint;
@@ -6,6 +7,7 @@ import flixel.util.FlxSpriteUtil;
 
 class GameplayChangersSubstate extends MusicBeatSubstate
 {
+	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
 	// ===== 布局常量（磨砂圆角风格，与暂停/结算界面一致） =====
 	static final TITLE_Y:Float = 22;
 	static final PANEL_X:Float = 200;
@@ -355,11 +357,13 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 				if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
 			}
 
-			if (FlxG.mouse.wheel != 0)
+			var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
+
+			if (wheelStep != 0)
 			{
 				mouseActive = true;
 				FlxG.sound.play(Paths.sound('scrollMenu'));
-				changeSelection(FlxG.mouse.wheel > 0 ? -1 : 1);
+				changeSelection(wheelStep);
 			}
 
 			backBtn.setHovered(mousePos.x, mousePos.y);
@@ -611,7 +615,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 
 	override function destroy()
 	{
-		FlxG.mouse.visible = false;
+		// 注意：不能在这里隐藏鼠标！本界面从 Freeplay/StoryMenu/暂停菜单打开，
+		// 关闭时父状态 closeSubState() 会先设 FlxG.mouse.visible = true，
+		// 若在 destroy 里再设 false，会晚于父状态执行（同帧 tryUpdate 流程），
+		// 导致返回 Freeplay 后鼠标丢失。鼠标显隐由父状态（菜单/游戏）负责。
 		super.destroy();
 	}
 }
