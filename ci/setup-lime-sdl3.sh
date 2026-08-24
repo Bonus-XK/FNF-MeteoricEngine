@@ -13,8 +13,11 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 LIME_DIR=/tmp/lime-full
 
-# GitHub 加速前缀（环境变量可覆盖；设为空 = 直连）
-GH_PROXY="${GH_PROXY:-https://gh.xmly.dev/}"
+# GitHub 加速前缀：仅显式设置时生效（未设置/为空 = 直连）。
+# 注意必须用 ${VAR-} 而非 ${VAR:-...}：CI 里显式 `GH_PROXY=""` 要能强制直连，
+# `${VAR:-default}` 会把空值替换回默认（此前默认 gh.xmly.dev 且代理失效 →
+# 全部 git clone/下载套上死代理前缀而失败）。托管 runner 直连 github.com 最快。
+GH_PROXY="${GH_PROXY-}"
 
 # gitlab.freedesktop.org 的 HTTP/2 流不稳定（PROTOCOL_ERROR/early EOF），强制 HTTP/1.1
 git config --global http.version HTTP/1.1 2>/dev/null || true
