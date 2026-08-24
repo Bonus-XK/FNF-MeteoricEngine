@@ -119,10 +119,11 @@ fetch_lib_url() { # $1=目标目录  $2=URL
   return 1
 }
 
-# cairo/pixman 改用 GitHub 官方 release 镜像（cairographics.org 在 CI 上持续断流/10 次失败；
-# freedesktop gitlab 亦不可用），github.com 走 proxy_url 加速与中断重试。
-fetch_lib_url "$LIME_DIR/project/lib/cairo"  "$(proxy_url https://github.com/freedesktop/cairo/releases/download/1.18.2/cairo-1.18.2.tar.xz)"
-fetch_lib_url "$LIME_DIR/project/lib/pixman" "$(proxy_url https://github.com/freedesktop/pixman/releases/download/pixman-0.46.4/pixman-0.46.4.tar.gz)"
+# cairo/pixman 官方发布源是 gitlab.freedesktop.org（GitHub 无官方仓库/release）。
+# 托管 runner 上代理已强制关闭（GH_PROXY 默认直连），直连 gitlab archive 下载。
+# 若 gitlab 直连断流（本地网络曾出现），改用镜像时替换这里两行 URL 即可。
+fetch_lib_url "$LIME_DIR/project/lib/cairo"  "https://gitlab.freedesktop.org/cairo/cairo/-/archive/1.18.2/cairo-1.18.2.tar.xz"
+fetch_lib_url "$LIME_DIR/project/lib/pixman" "https://gitlab.freedesktop.org/pixman/pixman/-/archive/pixman-0.46.4/pixman-0.46.4.tar.gz"
 
 echo "==> [4/6] 获取 SDL3 release-3.2.8 源码并替换"
 curl -sL "$(proxy_url https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.8.tar.gz)" -o /tmp/sdl3.tar.gz
