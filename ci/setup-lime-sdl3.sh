@@ -97,33 +97,37 @@ fetch_lib "$LIME_DIR/project/lib/efsw"      "$(proxy_url https://github.com/Spar
 # cairo/pixman 用官方发布站 cairographics.org 的 release 压缩包下载
 # （gitlab.freedesktop.org 直连在本机网络下持续断流，不可用）
 # curl -C - 断点续传 + tar 完整性校验，中断后从断点继续
-fetch_lib_url() { # $1=目标目录  $2=URL
-  local dir="$1" url="$2" i extracted
+fetch_lib_url() { # $1=目标目录  $2..=URL 列表（按序尝试，断点续传+tar 校验）
+  local dir="$1"; shift
+  local url i extracted
   rm -rf "$dir" /tmp/fetchlib-tar
   mkdir -p /tmp/fetchlib-tar
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    if curl -sL -C - --max-time 1200 "$url" -o /tmp/fetchlib-tar/lib.tar \
-       && tar tf /tmp/fetchlib-tar/lib.tar > /dev/null 2>&1; then
-      tar xf /tmp/fetchlib-tar/lib.tar -C /tmp/fetchlib-tar
-      extracted=$(find /tmp/fetchlib-tar -mindepth 1 -maxdepth 1 -type d | head -1)
-      if [ -n "$extracted" ]; then
-        mv "$extracted" "$dir"
-        echo "已下载: $url"
-        return 0
+  for url in "$@"; do
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      if curl -sL -C - --max-time 1200 "$url" -o /tmp/fetchlib-tar/lib.tar \
+         && tar tf /tmp/fetchlib-tar/lib.tar > /dev/null 2>&1; then
+        tar xf /tmp/fetchlib-tar/lib.tar -C /tmp/fetchlib-tar
+        extracted=$(find /tmp/fetchlib-tar -mindepth 1 -maxdepth 1 -type d | head -1)
+        if [ -n "$extracted" ]; then
+          mv "$extracted" "$dir"
+          echo "已下载: $url"
+          return 0
+        fi
       fi
-    fi
-    echo "下载 $url 中断（第 $i 次），5 秒后续传..."
-    sleep 5
+      echo "下载 $url 中断（第 $i 次），5 秒后续传..."
+      sleep 5
+    done
+    echo "源失效，切换备选源..."
   done
-  echo "下载 $url 最终失败"
+  echo "下载（全部源）最终失败"
   return 1
 }
 
-# cairo/pixman 官方发布源是 gitlab.freedesktop.org（GitHub 无官方仓库/release）。
-# 托管 runner 上代理已强制关闭（GH_PROXY 默认直连），直连 gitlab archive 下载。
-# 若 gitlab 直连断流（本地网络曾出现），改用镜像时替换这里两行 URL 即可。
-fetch_lib_url "$LIME_DIR/project/lib/cairo"  "https://gitlab.freedesktop.org/cairo/cairo/-/archive/1.18.2/cairo-1.18.2.tar.xz"
-fetch_lib_url "$LIME_DIR/project/lib/pixman" "https://gitlab.freedesktop.org/pixman/pixman/-/archive/pixman-0.46.4/pixman-0.46.4.tar.gz"
+# cairo/pixman 使用项目实际绑定的版本：cairo 1.18.2、pixman 0.46.4（cairographics.org/releases 列表核实）。
+# 官方发布站单源（已验证 200 OK；gitlab archive 匿名 302 需登录，弃用）。
+# fetch_lib_url 支持多 URL：今后加镜像时直接在后面追加参数字符串即可自动切换。
+fetch_lib_url "$LIME_DIR/project/lib/cairo"  "https://www.cairographics.org/releases/cairo-1.18.2.tar.xz"
+fetch_lib_url "$LIME_DIR/project/lib/pixman" "https://www.cairographics.org/releases/pixman-0.46.4.tar.gz"
 
 echo "==> [4/6] 获取 SDL3 release-3.2.8 源码并替换"
 curl -sL "$(proxy_url https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.8.tar.gz)" -o /tmp/sdl3.tar.gz
