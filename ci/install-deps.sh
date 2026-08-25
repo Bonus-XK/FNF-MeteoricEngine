@@ -32,6 +32,11 @@ install tjson 1.4.0
 install hscript 2.6.0
 install actuate 1.9.0
 install flxanimate 4.0.0  # 本机激活版本（PsychFlxAnimate 引用 flxanimate.frames/data/FlxAnimate API）
+# extension-androidtools：安卓原生工具（Toast/权限/外部存储目录），Project.xml if=android
+# 其 haxelib.json 依赖声明 lime>=8.3，而项目固定 lime 8.2.2 —— 管道喂 'n' 拒绝依赖侧升级，避免交互卡死
+yes n | haxelib install extension-androidtools 2.2.2 2>/dev/null || yes n | haxelib install extension-androidtools 2.2.2
+# flxanimate 服务器版 4.0.0 使用 Haxe 4.3 语法(?11/\$nullCoalesce)，CI 用 Haxe 4.2.5 需降级补丁
+python3 ci/flxanimate-compat.py
 # lime tools 编译所需（CI 需从源码编译 tools.n）
 install format 3.8.0
 install hxp 1.3.1
