@@ -31,7 +31,9 @@ if not base:
     sys.exit(1)
 
 patch_file(os.path.join(base, "flxanimate", "animate", "FlxElement.hx"), [
-    ("element.SI.FF ?? 0;", "element.SI.FF == null ? 0 : element.SI.FF;"),
+    # SI.FF 是 Int 类型：不能与 null 比较（"null can't be used as basic type Int"）。
+    # 直接恢复本地旧版写法 `element.SI.FF;`（本机 4.2.5 编译通过的形态，无需兜底值）。
+    ("element.SI.FF ?? 0;", "element.SI.FF;"),
 ])
 
 patch_file(os.path.join(base, "flxanimate", "data", "MacroAnimationData.hx"), [
