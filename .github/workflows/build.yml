@@ -183,6 +183,14 @@ jobs:
           # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
           haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
 
+      - name: 嵌入 exe 图标（wine + rcedit；lime 仅在 Windows 宿主注入 exe 图标，交叉编译需后处理）
+        run: |
+          sudo apt-get install -y --no-install-recommends wine64
+          curl -sL https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -o /tmp/rcedit.exe
+          wine64 /tmp/rcedit.exe "$PWD/export/release/windows/bin/Meteoric.exe" --set-icon "$PWD/art/icon.ico"
+          wine64 /tmp/rcedit.exe "$PWD/export/32bit/windows/bin/Meteoric.exe" --set-icon "$PWD/art/icon.ico"
+          echo "图标已嵌入 -> $(ls -la export/release/windows/bin/Meteoric.exe export/32bit/windows/bin/Meteoric.exe | tr '\n' ' ')"
+
       - name: 上传 x64
         uses: actions/upload-artifact@v5
         with:
