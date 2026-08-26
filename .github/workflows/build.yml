@@ -140,7 +140,7 @@ jobs:
   # ---------- Windows x64 + x86 ----------
   windows:
     name: Windows (x64 + x86)
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     timeout-minutes: 120
     steps:
       - name: 检出代码
@@ -155,10 +155,10 @@ jobs:
           path: $HOME/haxelib
           key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
 
-      - name: 安装 mingw-w64 交叉工具链（Linux 原生 + 官方 x86_64/i686）
+      - name: 安装 mingw-w64 交叉工具链（与本地开发环境一致）
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64
+          brew install mingw-w64
+          echo "$(brew --prefix mingw-w64)/bin" >> "$GITHUB_PATH"
           x86_64-w64-mingw32-g++ --version | head -1
           i686-w64-mingw32-g++ --version | head -1
 
@@ -185,6 +185,17 @@ jobs:
             GH_PROXY="" bash ci/setup-lime-sdl3.sh
           fi
 
+      - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
+          cp ci/hxcpp-mac-cross/BuildTool.hx "$HXCPP_DIR/tools/hxcpp/BuildTool.hx"
+          cp ci/hxcpp-mac-cross/mingw-toolchain.xml "$HXCPP_DIR/toolchain/mingw-toolchain.xml"
+          cd "$HXCPP_DIR"
+          haxe -cp tools/hxcpp -neko hxcpp.n -main BuildTool -D neko_v1 -debug
+          ls -la hxcpp.n
+
       - name: 重建 lime Windows ndll（x64 + x86 手动 hxcpp，避免 -arch x86 bug）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
@@ -200,10 +211,7 @@ jobs:
             -Drebuild=1 -Dlime-native -Dmingw
 
       - name: 构建 Windows x64
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          haxelib run lime build windows -release -mingw
+        run: ./compile-windows.sh
 
       - name: 构建 Windows x86
         run: |
@@ -211,14 +219,6 @@ jobs:
           export NEKOPATH="$HOME/neko"
           # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
           haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
-
-      - name: 嵌入 exe 图标（wine + rcedit；lime 仅在 Windows 宿主注入 exe 图标，交叉编译需后处理）
-        run: |
-          sudo apt-get install -y --no-install-recommends wine64
-          curl -sL https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -o /tmp/rcedit.exe
-          wine64 /tmp/rcedit.exe "$PWD/export/release/windows/bin/Meteoric.exe" --set-icon "$PWD/art/icon.ico"
-          wine64 /tmp/rcedit.exe "$PWD/export/32bit/windows/bin/Meteoric.exe" --set-icon "$PWD/art/icon.ico"
-          echo "图标已嵌入 -> $(ls -la export/release/windows/bin/Meteoric.exe export/32bit/windows/bin/Meteoric.exe | tr '\n' ' ')"
 
       - name: 上传 x64
         uses: actions/upload-artifact@v5

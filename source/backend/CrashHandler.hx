@@ -7,7 +7,7 @@ import haxe.io.Path;
 import sys.io.File;
 import sys.FileSystem;
 
-#if (cpp && !android)
+#if (cpp && !android && !windows)
 @:cppFileCode('
 #include <signal.h>
 #include <execinfo.h>
@@ -18,6 +18,8 @@ import sys.FileSystem;
 #include <dlfcn.h>
 #include <stdint.h>
 #include <sys/ucontext.h>
+// 注：POSIX 专用（execinfo/dlopen/ucontext），mingw-w64 无 execinfo.h，
+// Windows 目标不编译此原生信号处理器（保持 Haxe 层游戏内报错界面）。
 
 static void meteoric_native_sig_handler(int sig, siginfo_t* si, void* uctx) {
 	uint64_t rip = 0, rbp = 0;
@@ -101,13 +103,13 @@ class CrashHandler
 		// 安卓/桌面都启用游戏内崩溃界面；HTML5 不支持这个事件
 		openfl.Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 		#end
-		// 原生信号处理器：SIGSEGV/SIGABRT/SIGILL/SIGBUS 落盘 native_stack.txt（符号化调用栈）
-		#if (cpp && !android)
+		// 原生信号处理器：SIGSEGV/SIGABRT/SIGILL/SIGBUS 落盘 native_stack.txt（符号化调用栈；POSIX 专用，Windows 跳过）
+		#if (cpp && !android && !windows)
 		installNativeHandlers();
 		#end
 	}
 
-	#if (cpp && !android)
+	#if (cpp && !android && !windows)
 	public static function installNativeHandlers():Void
 	{
 		untyped __cpp__("meteoric_install_native_handlers()");
