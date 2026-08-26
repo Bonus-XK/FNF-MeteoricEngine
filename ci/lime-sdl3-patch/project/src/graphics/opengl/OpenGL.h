@@ -76,7 +76,7 @@
 //#define LIME_GLES3_API
 #include <windows.h>
 #ifndef NATIVE_TOOLKIT_SDL_ANGLE
-#include <gl/GL.h>
+#include <GL/gl.h>
 #endif
 
 // SDL3 的 SDL_opengl_glext.h 已自带 GLsizeiptrARB（khronos_ssize_t），不再手动 typedef
