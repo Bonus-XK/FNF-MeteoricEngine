@@ -543,6 +543,8 @@ class PauseSubState extends MusicBeatSubstate
 						var name:String = PlayState.SONG.song;
 						var poop = Highscore.formatSong(name, curSelected);
 						PlayState.SONG = Song.loadFromJson(poop, name);
+						// 登记新难度谱面身份：游玩期剥离 SONG.notes 后仍可恢复
+						PlayState.registerChartSource(poop, name, name);
 						PlayState.storyDifficulty = curSelected;
 						// 更换难度后不再继续回放，退回普通游玩
 						PlayState.queuedReplay = null;
@@ -634,6 +636,11 @@ class PauseSubState extends MusicBeatSubstate
 					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;
 					PlayState.seenCutscene = false;
+
+					// 冻结本 State（与 endSong 结算路径一致）：0.6s 转场期间不再驱动
+					// PlayState.update（Lua onUpdate / holdCover 同步等），避免在半撕裂窗口
+					// 继续执行脚本；FlxState.tryUpdate 保证转场子状态照常更新。
+					PlayState.instance.persistentUpdate = false;
 
 					Mods.loadTopMod();
 					if(PlayState.isStoryMode) {

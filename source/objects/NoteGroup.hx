@@ -2,6 +2,7 @@ package objects;
 
 import haxe.ds.ArraySort;
 import objects.Note.CastNote;
+import backend.ClientPrefs;
 
 /**
  * H-Slice 移植：音符对象池 + 批处理组。
@@ -30,10 +31,22 @@ class NoteGroup extends FlxTypedGroup<Note>
 		// 安卓：禁用对象池复用——回收复用路径（recycleNote）多次被证实与 hxcpp GC
 		// 交互异常（8月17 可用构建=经典直建路径，无池化）。每音符全新构造，
 		// 与备份版本行为一致，牺牲少量对象创建开销换取稳定性。
+		// ===== 对象池已停用（Meteoric Fix 续：24-08-25 崩溃战止损）=====
+		// 池化复用在本包被证实引发原生崩溃（首次命中读 Note 字段即 SIGSEGV，
+		// last_stage=goodNoteHit:after-stages），且此前长条几何两轮回归同源。
+		// 恢复"每音符全新构造 + recycleNote 填充"（与备份版本行为一致）——
+		// 内存大头（DOM 释放/CastNote 代理/GPU 缓存/流式音频/曲终释放）全部保留。
 		var n:Note = new Note(0, 0, null, false, false);
 		members.push(n);
 		length++;
 		return n.recycleNote(target);
+	}
+
+	// 长条重构：PlayState.spawnHoldTail 把已构造好的段 Note 直接注册进组
+	public function addNoteObject(n:Note):Void
+	{
+		members.push(n);
+		length++;
 	}
 
 	// 池化回收：击杀 + 移出组 + 回池（所有"杀音符"路径统一走这里，禁止直接 destroy）
@@ -47,7 +60,7 @@ class NoteGroup extends FlxTypedGroup<Note>
 		remove(n, true); // 第二参数 = Splice：真移除（remove(obj,false) 会在数组里留 null！）
 		n.active = false;
 		n.visible = false;
-		if (pool.length < 2048) pool.push(n);
+		// 对象池已停用（见 spawnNote 注释）：击杀音符直接移除，不再入池
 	}
 
 	override function update(elapsed:Float)

@@ -51,6 +51,29 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('长条按压覆盖', //Name
+			'命中长条时在判定线上显示按压覆盖动画（QT 模组 NoteHoldCover 原生移植，可关闭）', //Description
+			'holdCover',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('运行时贴图密排列', //Name
+			'把 ≤160px 的小贴图打包进运行时共享图集（减少纹理数量与绘制批次；实验性，若出现贴图错乱请关闭）', //Description
+			'runtimePack',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('背景图分辨率', //Name
+			'独立大背景图（舞台/菜单背景等）的缩放比例，0.5 = 50%（大幅省内存，背景略降清晰度）', //Description
+			'backgroundScale',
+			'float');
+		addOption(option);
+		option.minValue = 0.25;
+		option.maxValue = 1.0;
+		option.displayFormat = '%v%';
+		option.scrollSpeed = 0.05;
+		option.onChange = null;
+
 		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
 		var option:Option = new Option('帧率',
 			'调整游戏的帧率上限',

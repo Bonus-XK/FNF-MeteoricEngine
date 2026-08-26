@@ -414,7 +414,7 @@ class MenuScript
 			}
 
 			if(args == null) args = [];
-			for(arg in args) Convert.toLua(lua, arg);
+			for(arg in args) if(!Convert.toLua(lua, arg)) Lua.pushnil(lua); // [Meteoric 修复] 失败补压 nil
 			var status:Int = Lua.pcall(lua, args.length, 1, 0);
 
 			if(status != Lua.LUA_OK)
@@ -437,7 +437,7 @@ class MenuScript
 	public function set(variable:String, data:Dynamic)
 	{
 		if(lua == null) return;
-		Convert.toLua(lua, data);
+		if(!Convert.toLua(lua, data)) Lua.pushnil(lua); // [Meteoric 修复] 失败补压 nil，保持栈平衡
 		Lua.setglobal(lua, variable);
 	}
 

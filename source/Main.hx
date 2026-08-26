@@ -391,6 +391,9 @@ class Main extends Sprite
 		
 		#if CRASH_HANDLER
 		CrashHandler.init();
+		#elseif (cpp && !android)
+		// 非 release 构建也安装原生信号处理器（栈落盘 native_stack.txt；Haxe 异常界面不启用）
+		CrashHandler.installNativeHandlers();
 		#end
 
 		#if desktop

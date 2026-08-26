@@ -1489,47 +1489,62 @@ class FunkinLua {
 	//main
 	public var lastCalledFunction:String = '';
 	public static var lastCalledScript:FunkinLua = null;
+
+	// LuaJIT 嵌套 pcall 防护（Meteoric Fix 续）：
+	// lldb 实测栈——外层 Lua 回调执行中，Haxe 侧再次 callOnScripts → 嵌套 lua_pcall
+	// → lj_state_growstack → lj_alloc_realloc 堆损坏 → SIGSEGV（blissful-erect 命中瞬间）。
+	// Lua 回调执行期间的一切 Lua 再入调用直接跳过（返回 Function_Continue），消除嵌套 pcall。
+	public static var luaCallDepth:Int = 0;
+
 	public function call(func:String, args:Array<Dynamic>):Dynamic {
 		#if LUA_ALLOWED
 		if(closed) return Function_Continue;
+		if (luaCallDepth > 0) return Function_Continue; // 重入防护：跳过嵌套调用
 
+		luaCallDepth++;
+		var callResult:Dynamic = Function_Continue;
 		lastCalledFunction = func;
 		lastCalledScript = this;
 		try {
-			if(lua == null) return Function_Continue;
+			if(lua != null)
+			{
+				Lua.getglobal(lua, func);
+				var type:Int = Lua.type(lua, -1);
 
-			Lua.getglobal(lua, func);
-			var type:Int = Lua.type(lua, -1);
+				if (type != Lua.LUA_TFUNCTION) {
+					if (type > Lua.LUA_TNIL)
+						luaTrace("ERROR (" + func + "): attempt to call a " + LuaUtils.typeToString(type) + " value", false, false, FlxColor.RED);
 
-			if (type != Lua.LUA_TFUNCTION) {
-				if (type > Lua.LUA_TNIL)
-					luaTrace("ERROR (" + func + "): attempt to call a " + LuaUtils.typeToString(type) + " value", false, false, FlxColor.RED);
+					Lua.pop(lua, 1);
+				}
+				else
+				{
+					for (arg in args) if(!Convert.toLua(lua, arg)) Lua.pushnil(lua); // [Meteoric 修复] 失败补压 nil，保持 pcall 实参数量一致
+					var status:Int = Lua.pcall(lua, args.length, 1, 0);
 
-				Lua.pop(lua, 1);
-				return Function_Continue;
+					// Checks if it's not successful, then show a error.
+					if (status != Lua.LUA_OK) {
+						var error:String = getErrorMessage(status);
+						luaTrace("ERROR (" + func + "): " + error, false, false, FlxColor.RED);
+					}
+					else
+					{
+						// If successful, pass and then return the result.
+						var result:Dynamic = cast Convert.fromLua(lua, -1);
+						if (result == null) result = Function_Continue;
+						callResult = result;
+
+						Lua.pop(lua, 1);
+						if(closed) stop();
+					}
+				}
 			}
-
-			for (arg in args) Convert.toLua(lua, arg);
-			var status:Int = Lua.pcall(lua, args.length, 1, 0);
-
-			// Checks if it's not successful, then show a error.
-			if (status != Lua.LUA_OK) {
-				var error:String = getErrorMessage(status);
-				luaTrace("ERROR (" + func + "): " + error, false, false, FlxColor.RED);
-				return Function_Continue;
-			}
-
-			// If successful, pass and then return the result.
-			var result:Dynamic = cast Convert.fromLua(lua, -1);
-			if (result == null) result = Function_Continue;
-
-			Lua.pop(lua, 1);
-			if(closed) stop();
-			return result;
 		}
 		catch (e:Dynamic) {
 			trace(e);
 		}
+		luaCallDepth--;
+		return callResult;
 		#end
 		return Function_Continue;
 	}
@@ -1540,7 +1555,9 @@ class FunkinLua {
 			return;
 		}
 
-		Convert.toLua(lua, data);
+		// [Meteoric 修复] 不支持的类型经 Convert.toLua 失败时不压栈：
+		// 必须补压 nil，否则 setglobal 会弹掉栈上的错误槽位（栈下溢 → LuaJIT 堆损坏）
+		if(!Convert.toLua(lua, data)) Lua.pushnil(lua);
 		Lua.setglobal(lua, variable);
 		#end
 	}

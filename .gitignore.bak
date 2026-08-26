@@ -19,8 +19,3 @@ export/*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-### Meteoric
-# 本地工具/构建辅助（lime.ndll.stable、用户 mods 备份等）不入库
-tools/
-# macOS 垃圾文件
-.DS_Store

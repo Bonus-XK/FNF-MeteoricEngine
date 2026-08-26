@@ -279,12 +279,26 @@ class Character extends FlxSprite
 		}
 	}
 
+	#if flxanimate
+	override function destroy()
+	{
+		// 2020 图集角色：atlas 是独立字段（未 add 进场景），若不显式销毁，
+		// 其 graphic（图集 FlxGraphic）useCount 永不为 0 → clearUnusedMemory 常跳过
+		// → 退出对局后所有 2020 角色图集内存泄漏（PlayState→菜单 220MB 残留的根因）
+		if (atlas != null)
+		{
+			atlas.destroy();
+			atlas = null;
+		}
+		super.destroy();
+	}
+	#end
+
 	override function update(elapsed:Float)
 	{
 		#if flxanimate
 		if (isAnimateAtlas) atlas.update(elapsed);
 		#end
-
 		if (debugMode || isAnimationNull())
 		{
 			super.update(elapsed);
@@ -439,7 +453,14 @@ class Character extends FlxSprite
 		#if flxanimate
 		if (isAnimateAtlas)
 		{
-			atlas.anim.play(AnimName, Force, Reversed, Frame);
+			// Force=true：atlas 动画必须从指定帧重新播放。
+			// flxanimate 4.0.0 的 play() 在 Force=false 且动画未 finished 时不会重置
+			// curFrame（其内部 Force 判定在 curInstance 赋值之后求值，恒 false）；
+			// 典型回归：qtDance 在 create 时被 dance() 自动播放，从曲首起就推进
+			// 整段长舞时间轴，等到 222 拍显形时已播到后半段（final dance），
+			// playAnim('qtDance','idle') 因不重启而继续后半段 → 播完停成静态待机。
+			atlas.anim.play(AnimName, true, Reversed, Frame);
+			atlas.update(0); // Psych 1.0.4：play 后立即解析首帧（否则首帧延迟一帧/可能不显示）
 			lastPlayedAnimName = AnimName; // flxanimate 4.0.0 无 lastPlayedAnim，自行记录
 		}
 		else

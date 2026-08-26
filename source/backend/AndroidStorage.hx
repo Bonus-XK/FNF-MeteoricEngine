@@ -17,6 +17,13 @@ class AndroidStorage
 	public static function root():String
 	{
 		if (_useFallbackRoot) return fallbackRoot();
+		return publicRoot();
+	}
+
+	/** 公共根目录 /sdcard/.meteoric（与当前是否处于回退模式无关）：
+	 *  崩溃日志必须落在玩家公认的 .meteoric/crash，不能因回退模式而跑到应用专属目录 */
+	public static function publicRoot():String
+	{
 		if (_root == null)
 		{
 			try

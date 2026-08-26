@@ -149,6 +149,25 @@ class StrumNote extends FlxSprite
 		else
 		{
 			frames = Paths.getSparrowAtlas(texture);
+			// 防御：图集解析失败（资源缺失/缓存失效）时回退默认音符皮肤，再不行用 1px 占位
+			// —— 绝不因空 frames 崩溃（Tacotorial Normal 曾在此空指针）
+			if (frames == null || frames.frames == null || frames.frames.length < 1)
+			{
+				trace('[StrumNote] sparrow atlas failed: ' + texture + ', fallback to default skin');
+				if (texture != 'noteSkins/NOTE_assets')
+				{
+					frames = Paths.getSparrowAtlas('noteSkins/NOTE_assets');
+				}
+				if (frames == null || frames.frames == null || frames.frames.length < 1)
+				{
+					makeGraphic(4, 4, 0xFF000000);
+					animation.add('static', [0]);
+					animation.add('pressed', [0], 12, false);
+					animation.add('confirm', [0], 24, false);
+					return;
+				}
+				texture = 'noteSkins/NOTE_assets';
+			}
 			// 无 shader（移动端/关 shaders）：仅对"灰毛胚帧"（arrow* static / * press / * confirm）逐帧做
 			// CPU 矩阵染色（与音符烘焙同算法）→ 静态/按下/确认均显示该列箭头色；
 			// 彩色动画帧（green/blue/purple/red 音符素材）保持原样。

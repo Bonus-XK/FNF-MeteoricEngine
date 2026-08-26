@@ -80,6 +80,10 @@ class PsychFlxAnimate extends OriginalFlxAnimate
 
 	override function destroy()
 	{
+		// 先释放 graphic 引用：set_graphic(null) 会递减 FlxGraphic useCount。
+		// 该库的 super.destroy() 已知可能中途抛异常（catch 兜底），若抛异常发生在
+		// FlxSprite.destroy 的 graphic=null 之前，useCount 会永久卡住 → 贴图泄漏。
+		try { graphic = null; } catch (e:Dynamic) {}
 		try
 		{
 			super.destroy();

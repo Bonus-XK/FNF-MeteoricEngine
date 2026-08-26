@@ -22,12 +22,29 @@ class SaveVariables {
 	@:keep public var CustomFadeText:Bool = true;
 	@:keep public var autoPause:Bool = true;
 	@:keep public var antialiasing:Bool = true;
+	@:keep public var holdCover:Bool = true; // 长条按压覆盖（QT 模组 NoteHoldCover.lua 原生移植）
+	@:keep public var runtimePack:Bool = false; // 运行时贴图密排列（≤160px 小贴图打包进共享图集，减少纹理/绘制批次；实验性，默认关闭）
 	@:keep public var noteSkin:String = 'Default';
 	@:keep public var splashSkin:String = 'Psych';
 	@:keep public var splashAlpha:Float = 0.6;
 	@:keep public var lowQuality:Bool = false;
 	@:keep public var shaders:Bool = true;
-	@:keep public var cacheOnGPU:Bool = #if !switch false #else true #end; //From Stilic
+	// 桌面默认开启：释放 CPU 位图副本（大图集如 GF_assets 8000×6000≈192MB 只留 GPU 纹理，
+	// 小谱面 300MB 的主要来源）；移动端/GLES 保持 false（稳定性）
+	@:keep public var cacheOnGPU:Bool = #if desktop true #elseif switch true #else false #end; //From Stilic
+	// 图集降采样（Meteoric Fix 续）：>2048px 大图集缩到该比例（默认桌面 50%），极大压纹理内存
+	// （GF_assets 192MB→48MB）；小图（图标/HUD）不缩。1.0 = 关闭降采样
+	// 图集降采样：实测对 sparrow/title 图集产生帧坐标失配（标题黑屏/文字错乱），
+	// 已撤回——默认 100%（不降采样）；若未来重做需逐图集校准帧偏移
+	@:keep public var textureScale:Float = 1.0;
+	// 角色图集专属降采样（Meteoric Fix 续）：仅对 flxanimate 2020 角色图集（spritemap1）降采样，
+	// sparrow/title/舞台/音符图集完全不碰（上次全局限缩放导致标题黑屏/文字错乱）。
+	@:keep public var characterTextureScale:Float = #if desktop 0.5 #else 1.0 #end;
+	// 独立背景图降采样（Meteoric 内存优化，实验性）：仅作用于 >1600px 且非图集的独立大图。
+	// ⚠ 注意：舞台/菜单以原始像素绝对坐标摆放精灵（如 makeLuaSprite(x=-973,y=-1076)），
+	// 位图缩小后精灵渲染尺寸减半但坐标不变 → 布局大错位。因此**默认 1.0（关闭）**，
+	// 需要时在设置里手动开启并自行确认布局（或后续做“位置同比例补偿”的完整方案）。
+	@:keep public var backgroundScale:Float = 1.0;
 	@:keep public var framerate:Int = 120;
 	@:keep public var camZooms:Bool = true;
 	@:keep public var hideHud:Bool = false;
@@ -66,6 +83,10 @@ class SaveVariables {
 	@:keep public var checkForUpdates:Bool = true;
 	@:keep public var comboStacking:Bool = false;
 	@:keep public var comboStackMigrated:Bool = false;
+	@:keep public var gpuCacheMigrated:Bool = false; // GPU 缓存旧默认迁移标记（一次性）
+	@:keep public var texScaleMigrated:Bool = false;  // 图集降采样撤回迁移标记（一次性：把已写盘 0.5 复位为 1.0）
+	@:keep public var bgScaleMigrated:Bool = false;   // 背景图降采样撤回迁移标记（一次性：把已写盘 0.5 复位为 1.0）
+	@:keep public var gpuCacheForceOnMigrated:Bool = false; // GPU 缓存强制开启迁移（一次性；参考对话“开/关都炸”根因=Convert 栈下溢，已修复）
 	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
 	// ===== H-Slice 移植：音符管线性能设置 =====
 	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）
@@ -247,6 +268,53 @@ class ClientPrefs {
 		if (data != null) data.hideHud = savedHideHud;
 	}
 
+	// haxe.Json 往返后把 Map 类型的设置字段还原为真正的 Haxe Map。
+	// 判定：真正的 Haxe Map 通过 Std.isOfType(hud, Map)（hxcpp 对 Map 有专门识别）；
+	// haxe.Json.parse 出的匿名对象 / 数组 / 字符串等一律重建为 Map（[k => [x, y]] 形式）。
+	static function normalizeLoadedMaps():Void
+	{
+		if (data == null) return;
+		var hud:Dynamic = data.hudLayout;
+		if (hud == null)
+		{
+			data.hudLayout = [];
+			return;
+		}
+		var isRealMap:Bool = false;
+		try
+		{
+			// 真 Map：get() 不抛异常（无键返回 null）；数组也要排除（Array 无 get，也会抛）
+			if (!Std.isOfType(hud, Array))
+			{
+				hud.get('__meteoric_probe__');
+				isRealMap = true;
+			}
+		}
+		catch (e:Dynamic) {}
+		if (isRealMap) return;
+
+		var m:Map<String, Array<Float>> = [];
+		try
+		{
+			for (k in Reflect.fields(hud))
+			{
+				var v:Dynamic = Reflect.field(hud, k);
+				var arr:Array<Float> = [0, 0];
+				if (Std.isOfType(v, Array))
+				{
+					var items:Array<Dynamic> = cast v;
+					if (items.length >= 1) arr[0] = Std.parseFloat(Std.string(items[0]));
+					if (items.length >= 2) arr[1] = Std.parseFloat(Std.string(items[1]));
+					if (Math.isNaN(arr[0])) arr[0] = 0;
+					if (Math.isNaN(arr[1])) arr[1] = 0;
+				}
+				m.set(k, arr);
+			}
+		}
+		catch (e:Dynamic) {}
+		data.hudLayout = m;
+	}
+
 	public static function loadPrefs() {
 		if(data == null) data = new SaveVariables();
 		if(defaultData == null) defaultData = new SaveVariables();
@@ -283,6 +351,12 @@ class ClientPrefs {
 		#if android
 		}
 		#end
+		// haxe.Json 的 Map 往返修复：Map 序列化成 JSON 对象（{"note":[0,0],...}），
+		// parse 后是"匿名对象"而非 Haxe Map，直接赋给 Map 字段后运行时 .exists()/.get()
+		// 全部抛 Null Object Reference。安卓 meoptions（haxe.Json）在玩家保存过一次设置后
+		// 必然触发：下次启动进任何曲目都在 100% 后黑屏闪退（自定义 HUD 布局 hudLayout 即此问题）。
+		// 这里把所有这类 Map 字段统一还原为真正的 Haxe Map。
+		normalizeLoadedMaps();
 		savedHideHud = data.hideHud;
 
 		// 判定选项旧值迁移：'新版' -> 'KE 判定'，'旧判定' -> 'PE 判定'
@@ -294,6 +368,48 @@ class ClientPrefs {
 		{
 			data.comboStackMigrated = true;
 			if (data.comboStacking) data.comboStacking = false;
+			saveSettings();
+		}
+
+		// GPU 缓存旧默认迁移：桌面旧默认 false（CPU 位图 + GPU 纹理双份，大图集 192MB×2）→
+		// 新默认 true 只留 GPU 纹理（小谱面 300MB 的主要来源）。只迁移一次，之后尊重用户手动选择。
+		if (!data.gpuCacheMigrated)
+		{
+			data.gpuCacheMigrated = true;
+			#if desktop
+			if (!data.cacheOnGPU) data.cacheOnGPU = true;
+			#end
+			saveSettings();
+		}
+
+		// 图集降采样撤回迁移：本会话曾把 textureScale 写盘为 0.5（标题黑屏/文字错乱回归），
+		// 一次性复位为 1.0（100% 原分辨率）
+		if (!data.texScaleMigrated)
+		{
+			data.texScaleMigrated = true;
+			if (data.textureScale < 1) data.textureScale = 1.0;
+			saveSettings();
+		}
+
+		// 背景图降采样撤回迁移：本会话曾把 backgroundScale 写盘为 0.5（舞台/菜单绝对坐标
+		// 与位图缩放不同步 → 布局大错位），一次性复位为 1.0（关闭降采样）
+		if (!data.bgScaleMigrated)
+		{
+			data.bgScaleMigrated = true;
+			if (data.backgroundScale < 1) data.backgroundScale = 1.0;
+			saveSettings();
+		}
+
+		// GPU 缓存强制开启迁移（一次性）：历史会话用户因崩溃关闭了 cacheOnGPU，
+		// 而崩溃根因（Convert.toLua 栈下溢 → LuaJIT 堆损坏）已在本会话修复。
+		// 贴图 CPU 副本是内存大头（blissful 701MB→GPU-only 后 ~400MB），强制回开一次；
+		// 用户仍可在 设置→图像 手动关闭。
+		if (!data.gpuCacheForceOnMigrated)
+		{
+			data.gpuCacheForceOnMigrated = true;
+			#if desktop
+			data.cacheOnGPU = true;
+			#end
 			saveSettings();
 		}
 		

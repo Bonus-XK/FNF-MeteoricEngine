@@ -44,6 +44,11 @@ typedef EventNote = {
 // 类型化类（非匿名结构）：hxcpp 下字段为静态访问，避免 anon 动态字段表（Anon::__Field）
 // 在 GC/线程场景被回收导致 UAF（安卓 Blazin 进曲 SIGSEGV 根因）。
 // 字段默认值语义与原 @:optional 一致：未赋值=null/false（调用处已有 null 判断）。
+// ============================================================================
+// ↓↓↓ 旧实现（直接字段版 CastNote）：平行数组代理出问题时，删除下方"新实现"
+//     类，恢复本注释块即可 100% 回退（字段名/读写点完全一致，无需改任何调用处）
+// ============================================================================
+/*
 class CastNote
 {
 	public var strumTime:Float;
@@ -61,6 +66,9 @@ class CastNote
 	public var noAnimation:Bool = false;
 	public var noMissAnimation:Bool = false;
 	public var blockHit:Bool = false;
+	// 脚本可改的旋转属性（对齐 PE 0.6.3/0.7.3 的 Note：模组常用 unspawnNotes[i].angle = x 旋转箭头）
+	public var angle:Float = 0;        // 固定旋转角度（0 = 未设置，出生后走滚动方向公式）
+	public var offsetAngle:Float = 0;  // 附加角度（每帧公式：angle = 方向-90 + strumAngle + offsetAngle）
 
 	public function new()
 	{
@@ -74,6 +82,131 @@ class CastNote
 		cmpSpam = null;
 		offs = null;
 	}
+}
+*/
+// ============================================================================
+// 新实现（Meteoric Fix 续：Flocc 级 400MB 内存目标）：单索引对象 + 静态平行数组。
+// 每个 CastNote 实例只携带一个槽位号 idx（对象 ~24-32B），14 个字段全部经
+// getter/setter 代理读到/写入共享平行数组 —— 2.26M 音符从 ~330MB 降到 ~70MB。
+// API 完全不变：unspawnNotes[i].strumTime/.angle/etc（引擎内部、Lua、HScript、
+// Reflect 访问）全部照常工作；唯一代价是每字段一次静态数组访问。
+// 生命周期：buildChartNotes() 开始时 resetPacked()（谱面生产者唯一入口）；
+// 游玩期 spawnOne 展开的临时子音符追加槽位，随下一曲重置。
+// ============================================================================
+class CastNote
+{
+	public static var __slotCount:Int = 0;
+	static var __strumTime:Array<Float> = [];
+	static var __noteData:Array<Int> = [];
+	static var __chartSeq:Array<Int> = [];
+	static var __density:Array<Float> = [];
+	static var __holdLength:Array<Float> = [];
+	static var __noteType:Array<String> = [];
+	static var __multSpeed:Array<Float> = [];
+	static var __cmpSpam:Array<Dynamic> = [];    // 元素 = Array<Dynamic> | null
+	static var __offs:Array<Dynamic> = [];       // 元素 = Array<Float> | null
+	static var __noAnimation:Array<Bool> = [];
+	static var __noMissAnimation:Array<Bool> = [];
+	static var __blockHit:Array<Bool> = [];
+	static var __angle:Array<Float> = [];
+	static var __offsetAngle:Array<Float> = [];
+
+	// 新谱面开始构建时调用：清空上一曲的全部平行数组（旧 CastNote 对象随 unspawnNotes
+	// 一并丢弃；任何旧引用（spamNotes 等）在 KillNotes/create 已清空，不会读到新数据）
+	public static function resetPacked():Void
+	{
+		__slotCount = 0;
+		__strumTime = []; __noteData = []; __chartSeq = []; __density = []; __holdLength = [];
+		__noteType = []; __multSpeed = []; __cmpSpam = []; __offs = [];
+		__noAnimation = []; __noMissAnimation = []; __blockHit = [];
+		__angle = []; __offsetAngle = [];
+	}
+
+	public var idx:Int;
+
+	public function new()
+	{
+		idx = __slotCount++;
+		ensure(idx);
+	}
+
+	// 槽位预填充默认值：保证任何"先读后写"都不会读到未初始化内存（写前读会得到构造函数默认值）
+	static inline function ensure(i:Int):Void
+	{
+		while (__strumTime.length <= i)
+		{
+			__strumTime.push(0);
+			__noteData.push(0);
+			__chartSeq.push(-1);
+			__density.push(1);
+			__holdLength.push(0);
+			__noteType.push(null);
+			__multSpeed.push(1);
+			__cmpSpam.push(null);
+			__offs.push(null);
+			__noAnimation.push(false);
+			__noMissAnimation.push(false);
+			__blockHit.push(false);
+			__angle.push(0);
+			__offsetAngle.push(0);
+		}
+	}
+
+	public var strumTime(get, set):Float;
+	inline function get_strumTime():Float return __strumTime[idx];
+	inline function set_strumTime(v:Float):Float return __strumTime[idx] = v;
+
+	public var noteData(get, set):Int;
+	inline function get_noteData():Int return __noteData[idx];
+	inline function set_noteData(v:Int):Int return __noteData[idx] = v;
+
+	public var chartSeq(get, set):Int;
+	inline function get_chartSeq():Int return __chartSeq[idx];
+	inline function set_chartSeq(v:Int):Int return __chartSeq[idx] = v;
+
+	public var density(get, set):Float;
+	inline function get_density():Float return __density[idx];
+	inline function set_density(v:Float):Float return __density[idx] = v;
+
+	public var holdLength(get, set):Float;
+	inline function get_holdLength():Float return __holdLength[idx];
+	inline function set_holdLength(v:Float):Float return __holdLength[idx] = v;
+
+	public var noteType(get, set):String;
+	inline function get_noteType():String return __noteType[idx];
+	inline function set_noteType(v:String):String return __noteType[idx] = v;
+
+	public var multSpeed(get, set):Float;
+	inline function get_multSpeed():Float return __multSpeed[idx];
+	inline function set_multSpeed(v:Float):Float return __multSpeed[idx] = v;
+
+	public var cmpSpam(get, set):Array<Dynamic>;
+	inline function get_cmpSpam():Array<Dynamic> return __cmpSpam[idx];
+	inline function set_cmpSpam(v:Array<Dynamic>):Array<Dynamic> return __cmpSpam[idx] = v;
+
+	public var offs(get, set):Array<Float>;
+	inline function get_offs():Array<Float> return __offs[idx];
+	inline function set_offs(v:Array<Float>):Array<Float> return __offs[idx] = v;
+
+	public var noAnimation(get, set):Bool;
+	inline function get_noAnimation():Bool return __noAnimation[idx];
+	inline function set_noAnimation(v:Bool):Bool return __noAnimation[idx] = v;
+
+	public var noMissAnimation(get, set):Bool;
+	inline function get_noMissAnimation():Bool return __noMissAnimation[idx];
+	inline function set_noMissAnimation(v:Bool):Bool return __noMissAnimation[idx] = v;
+
+	public var blockHit(get, set):Bool;
+	inline function get_blockHit():Bool return __blockHit[idx];
+	inline function set_blockHit(v:Bool):Bool return __blockHit[idx] = v;
+
+	public var angle(get, set):Float;
+	inline function get_angle():Float return __angle[idx];
+	inline function set_angle(v:Float):Float return __angle[idx] = v;
+
+	public var offsetAngle(get, set):Float;
+	inline function get_offsetAngle():Float return __offsetAngle[idx];
+	inline function set_offsetAngle(v:Float):Float return __offsetAngle[idx] = v;
 }
 
 class SpamNoteData
@@ -143,6 +276,21 @@ class Note extends FlxSprite
 	public var earlyHitMult:Float = 1;
 	public var lateHitMult:Float = 1;
 	public var lowPriority:Bool = false;
+
+	// 脚本可修改 Angle（对齐 PE 0.6.3 行为；0.7.3/1.0.4 的 followStrumNote 每帧重算会覆盖脚本写入）：
+	// 外部/脚本写入 angle 时自动关闭 copyAngle 接管旋转；引擎内部写入
+	// （recycleNote 复生复位 / followStrumNote 每帧公式）经 _engineAngleWrite 标记绕过，
+	// 保证 0.7.3 滚动方向公式与复生复位不受任何影响。
+	var _engineAngleWrite:Bool = false;
+
+	override public function set_angle(Value:Float):Float
+	{
+		var wasCopy:Bool = copyAngle;
+		var ret:Float = super.set_angle(Value);
+		if (!_engineAngleWrite && wasCopy)
+			copyAngle = false; // 脚本设定 → 接管旋转：followStrumNote 不再每帧覆盖
+		return ret;
+	}
 
 	public static var SUSTAIN_SIZE:Int = 44;
 	public static var swagWidth:Float = 160 * 0.7;
@@ -1031,7 +1179,8 @@ class Note extends FlxSprite
 		#end
 		if (bmp == null)
 		{
-			var g:FlxGraphic = Paths.image(loadPath, null, false);
+			// allowPack=false：音符皮肤会被原始尺寸分割成帧，绝不参与运行时密排列
+			var g:FlxGraphic = Paths.image(loadPath, null, false, true, -1, false);
 			if (g != null && g.bitmap != null && g.bitmap.readable) bmp = g.bitmap;
 		}
 		if (bmp == null)
@@ -1343,21 +1492,40 @@ class Note extends FlxSprite
 		_extraData = null;
 		offsetX = 0;
 		offsetY = 0;
-		offsetAngle = 0;
+		offsetAngle = target.offsetAngle;
 		multAlpha = 1;
 		// 构造函数默认值：长条会被置 copyAngle=false 等，复生时必须恢复（否则箭头角度/位置不再更新）
 		copyX = true;
 		copyY = true;
 		copyAngle = true;
 		copyAlpha = true;
+		_engineAngleWrite = true; // 引擎复位：不触发"脚本接管旋转"逻辑
 		angle = 0;
+		_engineAngleWrite = false;
 		scrollFactor.set(); // 音符在 camHUD 下应为 (0,0)，与旧生成路径一致
-		// invalidateNote 会置 active=false/visible=false；复生必须复活（否则 Note.update 不执行、
+		// invalidateNote 会置 active=false/visible=false 且 kill()（alive=false/exists=false）；
+		// 复生必须复活（否则 Note.update 不执行、forEachAlive 跳过——
 		// canBeHit/tooLate 永不变，音符无法命中且整组被 kill-late 削没）
+		alive = true;
 		active = true;
 		visible = true;
 		exists = true;
 		spawned = true;
+
+		// ===== 池化复用：构造函数状态归零（防止上一生命残留污染下一生命）=====
+		noteWasHit = false;
+		eventName = '';
+		eventLength = 0;
+		eventVal1 = '';
+		eventVal2 = '';
+		earlyHitMult = 1;
+		lateHitMult = 1;
+		moves = false;
+		flipX = false;
+		color = 0xffffff;
+		blend = openfl.display.BlendMode.NORMAL;
+		shader = null;
+		antialiasing = ClientPrefs.data.antialiasing;
 
 		density = (target.density > 0) ? target.density : 1;
 		chartSeq = target.chartSeq;
@@ -1388,6 +1556,23 @@ class Note extends FlxSprite
 		// 先置空 noteType 再赋值，保证复生灵体时类型设置（颜色/贴图/行为）一定重新生效
 		noteType = null;
 		texture = '';
+		// RGB 着色器启用状态按当前设置重建（构造函数同款判定：disableNoteRGB/0.6.3 兼容/
+		// 关着色器/移动端强制原色；上一生命可能把它关掉，复生后必须恢复）
+		if (rgbShader != null)
+		{
+			var useRGB:Bool = !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
+			if (!useRGB || ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders)
+				rgbShader.enabled = false;
+			else
+			{
+				#if mobile
+				rgbShader.enabled = false;
+				#else
+				var skinPath:String = getNoteSkinLoadPathCached(texture, '', PlayState.isPixelStage, isSustainNote);
+				rgbShader.enabled = (skinPath.indexOf('chip') < 0);
+				#end
+			}
+		}
 		var ct:String = target.noteType != null ? target.noteType : '';
 		try {
 			if (ct != null && ct.length > 0) noteType = ct;
@@ -1413,6 +1598,19 @@ class Note extends FlxSprite
 				animation.play(colArray[noteData % colArray.length] + (isSustainEnds ? 'holdend' : 'hold'));
 			else if (!isSustainEnds && bakedKind != BAKE_HOLD)
 				useBakedSustainBody();
+
+			// 池化几何归零（构造函数同款基准）：复用对象可能带上一生命残留——
+			// 箭头生命 scale=(0.7,0.7)、像素长条 _lastNoteOffX 累积；不归零会
+			// 导致长条宽度错误/偏离箭头中线（Monster 截图：“长条不在主箭头中间”）
+			// 构造基准：非烘焙 scale=1；烘焙 = setGraphicSize(width*0.7)（与箭头同宽）
+			if (bakedKind >= 0)
+			{
+				setGraphicSize(Std.int(width * 0.7));
+				if (isSustainEnds) scale.y = 1; // 构造期 lastScaleY=1（新鲜对象）
+			}
+			else
+				scale.set(1, 1);
+			_lastNoteOffX = 0;
 
 			updateHitbox();
 
@@ -1458,9 +1656,35 @@ class Note extends FlxSprite
 				updateHitbox();
 			}
 
+			// 前段链式拉伸（构造函数 600-616 同款）：本段生成时把上一段长条拉到本段起点，
+			// 否则段间出现缝隙（“断尾”）或长度错误（“尾部拉长”）。池化下 prevNote 指针
+			// 在函数末尾才重建，这里用静态链 Note.seqNote[chartSeq-1]（音符按时间序生成，
+			// 前段必已就位）。
+			{
+				var psP:Int = chartSeq - 1;
+				var prevS:Note = (psP >= 0 && psP < Note.seqNote.length) ? Note.seqNote[psP] : null;
+				if (prevS != null && prevS.isSustainNote)
+				{
+					if (prevS.bakedKind >= 0)
+						prevS.useBakedSustainBody();
+					else
+						prevS.animation.play(colArray[prevS.noteData % colArray.length] + 'hold');
+					prevS.scale.y *= Conductor.stepCrochet / 100 * 1.05;
+					if (PlayState.instance != null) prevS.scale.y *= PlayState.instance.songSpeed;
+					if (PlayState.isPixelStage)
+					{
+						prevS.scale.y *= 1.19;
+						prevS.scale.y *= (6 / height);
+					}
+					prevS.updateHitbox();
+				}
+			}
+
 			correctionOffset = height / 2;
 			if (ClientPrefs.data.downScroll && !PlayState.isPixelStage)
 				correctionOffset = 0;
+			// 构造函数同款：长条早侧窗口放宽为零（避免复用残留 1.0）
+			earlyHitMult = 0;
 		}
 		else
 		{
@@ -1471,6 +1695,11 @@ class Note extends FlxSprite
 			updateHitbox();
 		}
 		clipRect = null;
+
+		// 脚本对未出生音符设定的固定角度（unspawnNotes[i].angle）带进 Note：
+		// set_angle 会自动把 copyAngle 置 false → 脚本角度接管旋转，不再被每帧公式覆盖
+		if (target.angle != 0)
+			angle = target.angle;
 
 		// prevNote/nextNote 链：按 chartSeq 重建（池化后旧 prev 对象已被复用，必须走静态表）
 		var ps:Int = chartSeq - 1;
@@ -1526,7 +1755,12 @@ class Note extends FlxSprite
 			_dirSin = Math.sin(angleRad);
 		}
 		if (copyAngle)
+		{
+			// 引擎每帧公式：经标记写入，避免 set_angle 把 copyAngle 关掉（关掉后公式自身失效）
+			_engineAngleWrite = true;
 			angle = strumDirection - 90 + strumAngle + offsetAngle;
+			_engineAngleWrite = false;
+		}
 
 		if(copyAlpha)
 			alpha = strumAlpha * multAlpha;

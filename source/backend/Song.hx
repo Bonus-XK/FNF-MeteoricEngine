@@ -59,14 +59,64 @@ class Song
 
 	// 谱面解析缓存：按实际文件路径 + 修改时间校验，命中时直接返回深拷贝，
 	// 避免重复读盘与重复 JSON 解析（Freeplay 预览/确认、暂停换歌、故事模式等）。
+	// 内存大关（Meteoric Fix 续）：LRU 上限从 8 收紧到 2 —— 大谱面（42MB/226 万音符级）
+	// 每份缓存都是完整 DOM 深拷贝，8 份常驻可吃掉数 GB；2 份足够覆盖"当前曲 + 上一曲/events"，
+	// 换曲/重开走重新解析是低频路径，代价可接受。
 	static var chartCache:Map<String, SwagSong> = [];
 	static var chartCacheOrder:Array<String> = [];
-	inline static var CHART_CACHE_MAX:Int = 8;
+	inline static var CHART_CACHE_MAX:Int = 2;
 
 	public static function clearChartCache()
 	{
 		chartCache = [];
 		chartCacheOrder = [];
+	}
+
+	// ===== 游玩期谱面 DOM 释放（Meteoric Fix 续）=====
+	// PlayState 生成完音符序列后调用：把每个 section 的逐音符数组（大谱面数百 MB 级 DOM）
+	// 替换为空数组，只保留 section 元数据（sectionBeats/mustHitSection/bpm 等运行时需要）。
+	// 原始数据仍在 chartCache（LRU 2）内，重开/回溯/开编谱前由 PlayState.reloadChartSourceIfNeeded()
+	// 从缓存恢复完整 SONG，不影响任何流程正确性。
+	public static function stripSectionNotes(song:SwagSong):Void
+	{
+		if (song == null || song.notes == null) return;
+		for (sec in song.notes)
+			if (sec != null && sec.sectionNotes != null && sec.sectionNotes.length > 0)
+				sec.sectionNotes = []; // 每 section 独立空数组：不共享常量，杜绝编辑器 push 污染
+	}
+
+	// ===== 游玩期谱面缓存副本释放（Meteoric Fix 续：Flocc 级 1GB → 400MB）=====
+	// 大谱面（JSON > CHART_DOM_KEEP_MAX）进曲生成完成后，把 chartCache 里那份完整 DOM 深拷贝
+	// 也淘汰掉 —— 游玩稳态只剩 CastNote/元数据，不再有任何整份谱面 DOM 常驻。
+	// 重开/回溯/换难度/开编谱走快速字节扫描重新解析（42MB 约 1~2s，用户已确认可接受），
+	// 且 loadFromFile 不再把重解析结果重新塞进缓存（见 loadFromFile 底部注释）。
+	inline static var CHART_DOM_KEEP_MAX:Int = 4000000; // 4MB：普通谱面保留缓存（瞬时重开），大谱面淘汰
+
+	public static function evictChartFromCache(jsonInput:String, ?folder:String):Void
+	{
+		var filePath:String = resolveChartPath(jsonInput, folder);
+		if (filePath == null) return;
+		var key:String = chartCacheKey(filePath);
+		if (chartCache.exists(key))
+		{
+			chartCache.remove(key);
+			chartCacheOrder.remove(key);
+		}
+	}
+
+	// 仅当谱面文件足够大（内存收益显著）才淘汰；小谱面保留缓存换瞬时重开
+	public static function evictLargeChartFromCache(jsonInput:String, ?folder:String):Void
+	{
+		var filePath:String = resolveChartPath(jsonInput, folder);
+		if (filePath == null) return;
+		#if (sys && !android)
+		try
+		{
+			if (FileSystem.stat(filePath).size < CHART_DOM_KEEP_MAX) return;
+		}
+		catch (e:Dynamic) return;
+		#end
+		evictChartFromCache(jsonInput, folder);
 	}
 
 	static function getCachedChart(key:String):SwagSong
@@ -314,7 +364,14 @@ class Song
 		}
 
 		// 后台线程解析完成后也写入缓存（纯数据深拷贝），下次再选同一首谱面直接命中、不再解析
-		cacheChart(chartCacheKey(filePath), copySong(songJson));
+		// 内存大关：大谱面（≥CHART_DOM_KEEP_MAX）绝不入缓存 —— 否则"淘汰→重开→重解析→再入缓存"
+		// 会让完整 DOM 反复常驻，1GB 目标失效。大谱面重开直接走本函数快速重解析（约 1~2s）。
+		var isLargeChart:Bool = false;
+		#if (sys && !android)
+		try { isLargeChart = FileSystem.stat(filePath).size >= CHART_DOM_KEEP_MAX; } catch (e:Dynamic) {}
+		#end
+		if (!isLargeChart)
+			cacheChart(chartCacheKey(filePath), copySong(songJson));
 		return songJson;
 	}
 

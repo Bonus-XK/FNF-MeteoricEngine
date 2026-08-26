@@ -245,7 +245,16 @@ class LoadingState extends MusicBeatState
 			}
 			#end
 		}
-		else chartLoaded = true;
+		else
+		{
+			chartLoaded = true;
+			// 同曲重入（回放/重进）：复用当前静态 SONG，但必须登记本难度谱面身份并清空
+			// 待加载项——否则 getNextState 会因 pendingChartJson 非空 + 缓存未命中
+			// （大谱面已被淘汰）→ 无限新建 LoadingState（100↔700MB 加载死循环）
+			if (PlayState.SONG != null && pendingChartJson != null)
+				PlayState.registerChartSource(pendingChartJson, pendingChartFolder, PlayState.SONG.song);
+			clearPendingChart();
+		}
 
 		// 注：预烘焙/预生成由下方 chartDone 之后的统一块注册；这里不再注册，
 		// 避免同步解析（安卓）时 SONG 提前就位导致 startPreGen 重复执行
@@ -294,9 +303,9 @@ class LoadingState extends MusicBeatState
 	static function getSongAudioFiles(songName:String):Array<String>
 	{
 		var songPath:String = Paths.formatToSongPath(songName);
-		var files:Array<String> = ['assets/songs/' + songPath + '/Inst.' + Paths.SOUND_EXT];
+		var files:Array<String> = [resolveSongAudioPath('assets/songs/' + songPath + '/Inst.' + Paths.SOUND_EXT)];
 		if (Song.voicesFileExists(songName))
-			files.push('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT);
+			files.push(resolveSongAudioPath('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT));
 
 		#if MODS_ALLOWED
 		for (i in 0...files.length)
@@ -307,6 +316,20 @@ class LoadingState extends MusicBeatState
 		}
 		#end
 		return files;
+	}
+
+	// 把相对资源路径解析为与 returnSound 缓存键完全一致的路径：
+	// 安卓上歌曲音频位于外部 .meteoric/assets/songs（APK 资产已复制），相对路径
+	// './assets/...' 不存在（进程 cwd=/）→ 旧代码预解码静默全部跳过 → 真正的解码
+	// 被推迟到 PlayState.create 的黑屏窗口（峰值内存 + 主线程卡顿）。桌面 cwd=资源目录，
+	// 保持相对路径不变（原本就正确，避免回归）。
+	static function resolveSongAudioPath(rel:String):String
+	{
+		#if android
+		var ext:String = backend.AndroidStorage.root() + '/' + rel;
+		if (FileSystem.exists(ext)) return ext;
+		#end
+		return rel;
 	}
 
 	// 把单个音频文件提交到解码（已在缓存或已在解码则跳过）。
@@ -323,12 +346,40 @@ class LoadingState extends MusicBeatState
 		audioPreloads.set(file, true);
 		try
 		{
-			var b:AudioBuffer = AudioBuffer.fromFile(file);
-			audioDecodeComplete({file: file, buffer: b});
+			// 歌曲音频走流式（Vorbis+OpenAL 环形缓冲，不驻留整首 PCM，省 20-40MB/首）
+			var snd:Sound = Paths.streamSongAudio(file);
+			audioStreamComplete({file: file, sound: snd});
 		}
 		catch(e:Dynamic)
 		{
 			audioPreloads.remove(file);
+		}
+	}
+
+	// 流式解码完成回调：写入缓存并触发等待回调（与 audioDecodeComplete 同语义，直接收 Sound）
+	static function audioStreamComplete(message:Dynamic):Void
+	{
+		if (message == null) return;
+		var file:String = Reflect.field(message, 'file');
+		var snd:Sound = Reflect.field(message, 'sound');
+		if (file == null) return;
+
+		audioPreloads.remove(file);
+		if (snd != null)
+		{
+			try
+			{
+				Paths.currentTrackedSounds.set(file, snd);
+				Paths.localTrackedAssets.push(file);
+			}
+			catch(e:Dynamic) {}
+		}
+
+		var cb:Void->Void = audioPreloadCallbacks.get(file);
+		if (cb != null)
+		{
+			audioPreloadCallbacks.remove(file);
+			cb();
 		}
 	}
 
@@ -377,8 +428,9 @@ class LoadingState extends MusicBeatState
 				charPreloads.push(name);
 
 		if (charPreloads.length < 1) return;
-		// 全平台主线程同步解码（线程分配破坏 GC 堆问题同上，桌面加载崩溃同因）：
-		// 结果直接写入 Paths.pendingBitmaps，PlayState 创建人物时命中缓存。
+		// 分片异步解码（主线程每帧 2 张，不阻塞；线程分配破坏 GC 堆问题同上，不使用线程）：
+		// 结果经 Paths.requestImageDecode → tickImageDecode 写入 pendingBitmaps，
+		// PlayState 创建人物时命中缓存（未完成时 image() 会同步兜底，行为不变）。
 		for (name in charPreloads)
 		{
 			try
@@ -402,13 +454,7 @@ class LoadingState extends MusicBeatState
 				var file:String = Paths.getPath('images/' + imgKey + '.png', IMAGE);
 				#end
 				if (FileSystem.exists(file))
-				{
-					var bmp:BitmapData = BitmapData.fromFile(file);
-					if (Paths.pendingBitmaps.exists(file))
-						bmp.dispose();
-					else
-						Paths.pendingBitmaps.set(file, bmp);
-				}
+					Paths.requestImageDecode(file);
 			}
 			catch(e:Dynamic) {}
 		}
@@ -583,6 +629,8 @@ class LoadingState extends MusicBeatState
 	function onChartLoaded()
 	{
 		PlayState.SONG = chartMessage;
+		// 登记谱面身份：PlayState 游玩期会剥离 SONG.notes（省内存），重开/编谱靠此从缓存恢复
+		PlayState.registerChartSource(pendingChartJson, pendingChartFolder, chartMessage.song);
 		chartLoaded = true;
 		clearPendingChart();
 		pendingReturnState = null;
@@ -801,12 +849,13 @@ class LoadingState extends MusicBeatState
 
 		// 有待加载谱面
 		if (pendingChartJson != null)
-		{
-			// 谱面缓存命中：直接使用解析结果
+		{			// 谱面缓存命中：直接使用解析结果
 			var cached:SwagSong = Song.tryLoadFromCache(pendingChartJson, pendingChartFolder);
 			if (cached != null)
 			{
 				PlayState.SONG = cached;
+				// 登记谱面身份（同上：供 PlayState 剥离后恢复）
+				PlayState.registerChartSource(pendingChartJson, pendingChartFolder, cached.song);
 				clearPendingChart();
 				// 缓存快速进入也按当前谱面舞台设置资源库，避免舞台贴图解析到 shared 而消失
 				StageData.loadDirectory(PlayState.SONG);
@@ -829,6 +878,18 @@ class LoadingState extends MusicBeatState
 						return target;
 					}
 				}
+			}
+			// 同曲重入兜底：当前静态 SONG 就是目标曲目（回放/重进）且缓存未命中
+			// （大谱面被淘汰）→ 直接复用当前 SONG（PlayState.create 会按需重解析恢复），
+			// 不再新建 LoadingState，杜绝 100↔700MB 加载死循环
+			if (PlayState.SONG != null && pendingSongName != null
+				&& Paths.formatToSongPath(pendingSongName) == Paths.formatToSongPath(PlayState.SONG.song))
+			{
+				PlayState.registerChartSource(pendingChartJson, pendingChartFolder, PlayState.SONG.song);
+				clearPendingChart();
+				if (stopMusic && FlxG.sound.music != null)
+					FlxG.sound.music.stop();
+				return target;
 			}
 			return new LoadingState(target, stopMusic, directory);
 		}

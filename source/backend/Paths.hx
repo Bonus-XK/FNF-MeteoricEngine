@@ -16,6 +16,8 @@ import openfl.system.System;
 import openfl.geom.Rectangle;
 
 import lime.utils.Assets;
+import lime.media.AudioBuffer;
+import lime.media.vorbis.VorbisFile;
 import flash.media.Sound;
 
 #if sys
@@ -65,6 +67,8 @@ class Paths
 	public static function clearUnusedMemory(?doGC:Bool = true) {
 		// clear non local assets in the tracked assets list
 		for (key in currentTrackedAssets.keys()) {
+			// 运行时密排列条目共享图集位图：绝不能随单条目销毁（会毁掉整张共享图集）
+			if (packedEntries.exists(key)) continue;
 			// if it is not currently contained within the used local assets
 			if (!localTrackedAssets.contains(key) && !dumpExclusions.contains(key)) {
 				var obj = currentTrackedAssets.get(key);
@@ -72,7 +76,7 @@ class Paths
 				if (obj != null) {
 					// 安全守卫：仍在被场上精灵引用的贴图绝不销毁（销毁后这些精灵会直接变透明/空白）
 					if (obj.useCount > 0) {
-						localTrackedAssets.push(key); // 视为本局仍在用，跳过本次清理
+						if (!localTrackedAssets.contains(key)) localTrackedAssets.push(key); // 视为本局仍在用，跳过本次清理（去重）
 						continue;
 					}
 					// remove the key from all cache maps
@@ -112,18 +116,196 @@ class Paths
 		}
 
 		// clear all sounds that are cached
+		var removedSoundKeys:Array<String> = [];
 		for (key in currentTrackedSounds.keys()) {
 			if (!localTrackedAssets.contains(key)
 			&& !dumpExclusions.contains(key) && key != null) {
 				//trace('test: ' + dumpExclusions, key);
 				Assets.cache.clear(key);
 				currentTrackedSounds.remove(key);
+				removedSoundKeys.push(key);
 			}
 		}
+		// 流式歌曲音频（Inst/Voices）：仅对"本次真正从缓存移除"的 Sound 退役其 VorbisFile 句柄
+		// （当前曲的流式条目在 localTrackedAssets 中，必须保留）。句柄延迟一轮才 clear() ——
+		// 旧播放通道（SoundChannel→AudioSource）在那时必已 stop/dispose，绝不在流读取中被释放。
+		for (key in removedSoundKeys)
+			if (streamedVorbis.exists(key))
+			{
+				retiredVorbis.push(streamedVorbis.get(key));
+				streamedVorbis.remove(key);
+			}
 		// flags everything to be cleared out next unused memory clear
 		localTrackedAssets = [];
 		#if !html5 openfl.Assets.cache.clear("songs"); #end
 		dispatchMemoryClean();
+	}
+
+	// ===== Meteoric：主线程维护（周期清理 / 分片异步解码 / 运行时密排列）=====
+	// 所有功能均在主线程执行（工作线程分配 hxcpp GC 对象会与主线程 GC 并发破坏堆，
+	// 见 LoadingState/discord 注释），因此“异步”= 每帧分片解码（不阻塞、无线程）。
+
+	static var _periodicCleanAcc:Float = 0;
+	static inline var PERIODIC_CLEAN_INTERVAL:Float = 60;
+
+	/** 每帧从 MusicBeatState.update 调用：分片解码 + 每 60s 清理未用贴图/声音 */
+	public static function tickMaintenance(elapsed:Float):Void
+	{
+		tickImageDecode(2);
+		_periodicCleanAcc += elapsed;
+		if (_periodicCleanAcc >= PERIODIC_CLEAN_INTERVAL)
+		{
+			_periodicCleanAcc = 0;
+			cleanUnusedAssetsPeriodic();
+		}
+	}
+
+	/** 周期清理：仅释放 useCount=0 且不在 localTrackedAssets 的贴图 + 未用声音（当前状态资源受保护） */
+	public static function cleanUnusedAssetsPeriodic():Void
+	{
+		// 贴图：与 clearUnusedMemory 同守卫，但不强制 System.gc（游玩中做 GC 会卡帧）
+		clearUnusedMemory(false);
+		// 声音：不清 localTrackedAssets（当前曲/界面资源保留），只清无引用条目
+		var removedSoundKeys:Array<String> = [];
+		for (key in currentTrackedSounds.keys())
+		{
+			if (!localTrackedAssets.contains(key) && !dumpExclusions.contains(key) && key != null)
+			{
+				Assets.cache.clear(key);
+				currentTrackedSounds.remove(key);
+				removedSoundKeys.push(key);
+			}
+		}
+		for (key in removedSoundKeys)
+			if (streamedVorbis.exists(key))
+			{
+				retiredVorbis.push(streamedVorbis.get(key));
+				streamedVorbis.remove(key);
+			}
+		dispatchMemoryClean();
+	}
+
+	// ---- 异步图片加载（主线程分片）：解码结果进 pendingBitmaps，image() 消费 ----
+	static var imageDecodeQueue:Array<String> = [];
+	static var imageDecodeQueued:Map<String, Bool> = [];
+	/** 请求异步解码一张图（已缓存/已排队/已解码则忽略） */
+	public static function requestImageDecode(file:String):Void
+	{
+		if (file == null || file.length < 1) return;
+		if (currentTrackedAssets.exists(file)) return;
+		if (pendingBitmaps.exists(file)) return;
+		if (imageDecodeQueued.exists(file)) return;
+		imageDecodeQueued.set(file, true);
+		imageDecodeQueue.push(file);
+	}
+	/** 每帧最多解码 maxPerFrame 张（主线程分片，不阻塞） */
+	static function tickImageDecode(maxPerFrame:Int):Void
+	{
+		var n:Int = 0;
+		while (imageDecodeQueue.length > 0 && n < maxPerFrame)
+		{
+			var file:String = imageDecodeQueue.shift();
+			imageDecodeQueued.remove(file);
+			if (currentTrackedAssets.exists(file) || pendingBitmaps.exists(file)) continue;
+			try
+			{
+				var bmp:BitmapData = BitmapData.fromFile(file);
+				if (bmp != null)
+				{
+					if (pendingBitmaps.exists(file))
+						bmp.dispose();
+					else
+						pendingBitmaps.set(file, bmp);
+				}
+			}
+			catch (e:Dynamic) {}
+			n++;
+		}
+	}
+
+	// ===== 内存明细导出（诊断用）=====
+	// 已达成目标后移除；如后续需要，可用当前 diff 恢复或重新加回。
+
+	// ---- 运行时贴图密排列（小贴图 → 运行时图集，减少纹理数/绘制批次）----
+	// 范围：仅非图集、≤160px、且消费方经 imageFrame 绘制（FlxSprite.loadGraphic）的贴图；
+	// 排除 icons/（HealthIcon 用 graphic.width 分割）、pixelUI/（StrumNote 分割）、
+	// 音符皮肤与角色/图集（调用方 allowPack=false 或前缀排除）。
+	static inline var PACK_MAX_SIZE:Int = 160;
+	static inline var PACK_ATLAS_SIZE:Int = 1024;
+	static var packAtlases:Array<FlxGraphic> = [];
+	static var packCursorX:Int = 0;
+	static var packCursorY:Int = 0;
+	static var packShelfH:Int = 0;
+	static var packedEntries:Map<String, Bool> = [];
+
+	static function shouldPackSmall(key:String, w:Int, h:Int, allowPack:Bool):Bool
+	{
+		if (!allowPack) return false;
+		if (!ClientPrefs.data.runtimePack) return false;
+		if (ClientPrefs.data.cacheOnGPU) return false;
+		if (w < 8 || h < 8 || w > PACK_MAX_SIZE || h > PACK_MAX_SIZE) return false;
+		var lk:String = key.toLowerCase();
+		if (lk.indexOf('icons/') == 0 || lk.indexOf('pixelui/') == 0) return false;
+		if (lk.indexOf('noteskin') != -1 || lk.indexOf('character') != -1) return false;
+		return true;
+	}
+
+	static function packedGraphicFromAtlas(atlasBitmap:BitmapData, file:String, rect:FlxRect):FlxGraphic
+	{
+		// Cache=false：不注册进 FlxG.bitmap._cache（共享位图，绝不随单条目销毁）；
+		// 由调用方放入 currentTrackedAssets，清理函数对 packed 条目一律跳过。
+		var g:FlxGraphic = FlxGraphic.fromBitmapData(atlasBitmap, false, file, false);
+		g.persist = true;
+		g.destroyOnNoUse = false;
+		@:privateAccess
+		{
+			var img = g.imageFrame;
+			var fr = img.frames[0];
+			fr.frame = FlxRect.get(rect.x, rect.y, rect.width, rect.height);
+			fr.sourceSize.set(rect.width, rect.height);
+			fr.offset.set(0, 0);
+		}
+		packedEntries.set(file, true);
+		return g;
+	}
+
+	static function packImageIntoAtlas(bitmap:BitmapData, file:String):FlxGraphic
+	{
+		var w:Int = bitmap.width, h:Int = bitmap.height;
+		while (true)
+		{
+			var cur:BitmapData = (packAtlases.length > 0) ? packAtlases[packAtlases.length - 1].bitmap : null;
+			if (cur != null)
+			{
+				// 当前行放得下 → 直接放
+				if (packCursorX + w <= cur.width && packCursorY + h <= cur.height)
+				{
+					cur.draw(bitmap, new openfl.geom.Matrix(1, 0, 0, 1, packCursorX, packCursorY));
+					var g:FlxGraphic = packedGraphicFromAtlas(cur, file, FlxRect.get(packCursorX, packCursorY, w, h));
+					packCursorX += w;
+					if (h > packShelfH) packShelfH = h;
+					return g;
+				}
+				// 换行
+				if (packCursorY + packShelfH + h <= cur.height)
+				{
+					packCursorY += packShelfH;
+					packCursorX = 0;
+					packShelfH = 0;
+					continue;
+				}
+			}
+			// 新建图集
+			var atlasBitmap:BitmapData = new BitmapData(PACK_ATLAS_SIZE, PACK_ATLAS_SIZE, true, 0);
+			var owner:FlxGraphic = FlxGraphic.fromBitmapData(atlasBitmap, false, 'runtimePackAtlas' + packAtlases.length, false);
+			owner.persist = true;
+			owner.destroyOnNoUse = false;
+			packAtlases.push(owner);
+			packCursorX = 0;
+			packCursorY = 0;
+			packShelfH = 0;
+		}
+		return null;
 	}
 
 	static public var currentLevel:String;
@@ -353,7 +535,7 @@ class Paths
 		return null;
 	}
 
-	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxGraphic
+	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true, ?allowScale:Bool = true, ?scaleTo:Float = -1, ?allowPack:Bool = true):FlxGraphic
 	{
 		var bitmap:BitmapData = null;
 		var file:String = null;
@@ -367,7 +549,7 @@ class Paths
 			// 注意：不能用 bitmap.readable 判活——cacheOnGPU 的有效位图不可读会被误判失效导致图标消失
 			if (cached != null && cached.bitmap != null)
 			{
-				localTrackedAssets.push(file);
+				if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file); // 去重：高频 mod 调用不再膨胀数组
 				return cached;
 			}
 			currentTrackedAssets.remove(file);
@@ -388,7 +570,7 @@ class Paths
 				var cached:FlxGraphic = currentTrackedAssets.get(file);
 				if (cached != null && cached.bitmap != null)
 				{
-					localTrackedAssets.push(file);
+					if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file); // 去重
 					return cached;
 				}
 				currentTrackedAssets.remove(file);
@@ -416,7 +598,47 @@ class Paths
 
 		if (bitmap != null)
 		{
-			localTrackedAssets.push(file);
+			if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file); // 去重
+			// 图集降采样（Meteoric Fix 续）：>2048px 大图缩到 ClientPrefs.data.textureScale（桌面默认 50%）。
+			// 各图集消费者（flxanimate 2020 spritemap / sparrow XML）同步缩放帧坐标；旧格式
+			// AtlasFrameMaker 走 BitmapData.fromFile 不经此处（保持原分辨率，零回归）。
+			var texScale:Float = (scaleTo >= 0) ? scaleTo : ClientPrefs.data.textureScale;
+			if (allowScale && texScale < 1 && bitmap.width > 4000)
+			{
+				try
+				{
+					var nw:Int = Std.int(bitmap.width * texScale);
+					var nh:Int = Std.int(bitmap.height * texScale);
+					if (nw > 0 && nh > 0)
+					{
+						var scaled:BitmapData = new BitmapData(nw, nh, bitmap.transparent, 0);
+						scaled.draw(bitmap, new openfl.geom.Matrix(texScale, 0, 0, texScale, 0, 0), null, null, null, false);
+						// 移除资源缓存中的原图，避免 CPU 双份
+						try { OpenFlAssets.cache.removeBitmapData(file); } catch (e:Dynamic) {}
+						bitmap = scaled;
+					}
+				}
+				catch (e:Dynamic) {}
+			}
+			// 独立背景图降采样（Meteoric 内存优化）：非图集（allowPack=true 表明该图不经
+			// 帧坐标消费）、>1600px 的大图按 backgroundScale 缩放（整体位图缩放，无帧坐标问题）
+			if (allowPack && allowScale && ClientPrefs.data.backgroundScale < 1 && bitmap.width > 1600)
+			{
+				try
+				{
+					var bs:Float = ClientPrefs.data.backgroundScale;
+					var nw:Int = Std.int(bitmap.width * bs);
+					var nh:Int = Std.int(bitmap.height * bs);
+					if (nw > 0 && nh > 0)
+					{
+						var scaled:BitmapData = new BitmapData(nw, nh, bitmap.transparent, 0);
+						scaled.draw(bitmap, new openfl.geom.Matrix(bs, 0, 0, bs, 0, 0), null, null, null, false);
+						try { OpenFlAssets.cache.removeBitmapData(file); } catch (e:Dynamic) {}
+						bitmap = scaled;
+					}
+				}
+				catch (e:Dynamic) {}
+			}
 			if (allowGPU && ClientPrefs.data.cacheOnGPU)
 			{
 				// context3D 未就绪（加载界面早期）时 GPU 上传会失败 → 回退 CPU 位图，避免贴图加载失败
@@ -432,6 +654,16 @@ class Paths
 				catch (e:Dynamic)
 				{
 					// GPU 不可用，保持 CPU 位图
+				}
+			}
+			// 运行时贴图密排列：小贴图打包进共享图集（减少纹理/绘制批次；消费方须经 imageFrame 绘制）
+			if (shouldPackSmall(file, bitmap.width, bitmap.height, allowPack))
+			{
+				var packed:FlxGraphic = packImageIntoAtlas(bitmap, file);
+				if (packed != null)
+				{
+					currentTrackedAssets.set(file, packed);
+					return packed;
 				}
 			}
 			var newGraphic:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, file);
@@ -540,7 +772,8 @@ class Paths
 	static public function getAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		var useMod:Bool = false;
-		var imageLoaded:FlxGraphic = image(key, library, true);
+		// allowPack=false：图集加载器绝不参与运行时密排列（帧坐标基于原图，打包会破坏 UV/空指针）
+		var imageLoaded:FlxGraphic = image(key, library, true, true, -1, false);
 
 		var myXml:Dynamic = getPath('images/$key.xml', TEXT, library, true);
 		if(OpenFlAssets.exists(myXml) #if MODS_ALLOWED || (FileSystem.exists(myXml) && (useMod = true)) #end )
@@ -570,7 +803,8 @@ class Paths
 	// Aseprite .JSON 图集（显式调用，供角色编辑器等使用）
 	inline static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
+		// allowPack=false：图集加载器绝不参与运行时密排列
+		var imageLoaded:FlxGraphic = image(key, library, allowGPU, true, -1, false);
 		#if MODS_ALLOWED
 		var jsonExists:Bool = false;
 
@@ -589,10 +823,29 @@ class Paths
 		return FileSystem.exists(path) ? File.getContent(path) : path;
 	}
 
+	// sparrow 图集帧坐标同步缩放（配合 Paths.image 降采样；texScale=1 时 no-op）
+	static function scaleSparrowFrames(frames:FlxAtlasFrames):Void
+	{
+		var texScale:Float = ClientPrefs.data.textureScale;
+		if (texScale >= 1 || frames == null || frames.frames == null) return;
+		for (f in frames.frames)
+		{
+			if (f.frame != null)
+			{
+				f.frame.x *= texScale;
+				f.frame.y *= texScale;
+				f.frame.width *= texScale;
+				f.frame.height *= texScale;
+			}
+			if (f.sourceSize != null) { f.sourceSize.x *= texScale; f.sourceSize.y *= texScale; }
+			if (f.offset != null) { f.offset.x *= texScale; f.offset.y *= texScale; }
+		}
+	}
+
 	inline static public function getSparrowAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		#if MODS_ALLOWED
-		var imageLoaded:FlxGraphic = image(key, allowGPU);
+		var imageLoaded:FlxGraphic = image(key, null, allowGPU, true, -1, false); // allowPack=false：图集贴图不参与密排列
 		var xmlExists:Bool = false;
 
 		var xml:String = modsXml(key);
@@ -600,16 +853,20 @@ class Paths
 			xmlExists = true;
 		}
 
-		return FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (xmlExists ? File.getContent(xml) : atlasData(getPath('images/$key.xml', library))));
+		var spFrames:FlxAtlasFrames = FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library, allowGPU, true, -1, false)), (xmlExists ? File.getContent(xml) : atlasData(getPath('images/$key.xml', library))));
+		scaleSparrowFrames(spFrames);
+		return spFrames;
 		#else
-		return FlxAtlasFrames.fromSparrow(image(key, library, allowGPU), atlasData(getPath('images/$key.xml', library)));
+		var spFrames:FlxAtlasFrames = FlxAtlasFrames.fromSparrow(image(key, library, allowGPU, true, -1, false), atlasData(getPath('images/$key.xml', library)));
+		scaleSparrowFrames(spFrames);
+		return spFrames;
 		#end
 	}
 
 	inline static public function getPackerAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		#if MODS_ALLOWED
-		var imageLoaded:FlxGraphic = image(key, allowGPU);
+		var imageLoaded:FlxGraphic = image(key, null, allowGPU, true, -1, false); // allowPack=false：图集贴图不参与密排列
 		var txtExists:Bool = false;
 		
 		var txt:String = modsTxt(key);
@@ -617,9 +874,9 @@ class Paths
 			txtExists = true;
 		}
 
-		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (txtExists ? File.getContent(txt) : atlasData(getPath('images/$key.txt', library))));
+		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library, allowGPU, true, -1, false)), (txtExists ? File.getContent(txt) : atlasData(getPath('images/$key.txt', library))));
 		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU), atlasData(getPath('images/$key.txt', library)));
+		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU, true, -1, false), atlasData(getPath('images/$key.txt', library)));
 		#end
 	}
 
@@ -632,12 +889,58 @@ class Paths
 	}
 
 	public static var currentTrackedSounds:Map<String, Sound> = [];
+
+	// ===== 歌曲音频流式（Meteoric Fix 续：Flocc 级 1GB → 400MB 的硬件侧一步）=====
+	// Inst/Voices 不再整首解码驻留 PCM（~20-40MB/首），改 Vorbis 流式 + OpenAL 3×48KB 环形缓冲
+	// （~150KB 常驻，声卡/设备侧混音）。仅桌面（lime_vorbis 原生 CFFI 已启用）；
+	// 移动端沿用全量解码管线，保持既有稳定性。
+	static var streamedVorbis:Map<String, VorbisFile> = new Map();     // 本次会话仍在用的流句柄
+	static var retiredVorbis:Array<VorbisFile> = [];                    // 延迟一轮释放的流句柄
+	static function clearRetiredVorbis():Void
+	{
+		for (vf in retiredVorbis)
+			try vf.clear() catch (e:Dynamic) {}
+		retiredVorbis = [];
+	}
+
+	// 歌曲音频流式加载：VorbisFile + AudioBuffer.fromVorbisFile → Sound（流式缓冲）。
+	// 任何一步失败自动回退 Sound.fromFile 全量解码（行为与旧版一致，绝不崩）。
+	public static function streamSongAudio(filePath:String):Sound
+	{
+		#if desktop
+		clearRetiredVorbis();
+		try
+		{
+			var vf:VorbisFile = VorbisFile.fromFile(filePath);
+			if (vf != null)
+			{
+				var buffer:AudioBuffer = AudioBuffer.fromVorbisFile(vf);
+				if (buffer != null)
+				{
+					var snd:Sound = Sound.fromAudioBuffer(buffer);
+					if (snd != null)
+					{
+						streamedVorbis.set(filePath, vf);
+						return snd;
+					}
+				}
+			}
+			trace('[Audio] 流式加载不可用，回退全量解码：' + filePath);
+		}
+		catch (e:Dynamic)
+		{
+			trace('[Audio] 流式加载失败，回退全量解码：' + filePath + ' (' + e + ')');
+		}
+		#end
+		return Sound.fromFile(filePath);
+	}
+
 	public static function returnSound(path:String, key:String, ?library:String) {
 		#if MODS_ALLOWED
 		var file:String = modsSounds(path, key);
 		if(FileSystem.exists(file)) {
 			if(!currentTrackedSounds.exists(file)) {
-				currentTrackedSounds.set(file, Sound.fromFile(file));
+				currentTrackedSounds.set(file, (path == 'songs') ? streamSongAudio(file) : Sound.fromFile(file));
 			}
 			localTrackedAssets.push(key);
 			return currentTrackedSounds.get(file);
@@ -653,7 +956,7 @@ class Paths
 			if(!haxe.io.Path.isAbsolute(fileToLoad)) fileToLoad = './' + fileToLoad;
 			if(FileSystem.exists(fileToLoad))
 			{
-				currentTrackedSounds.set(gottenPath, Sound.fromFile(fileToLoad));
+				currentTrackedSounds.set(gottenPath, (path == 'songs') ? streamSongAudio(fileToLoad) : Sound.fromFile(fileToLoad));
 			}
 			else
 			{
@@ -671,7 +974,7 @@ class Paths
 			}
 			}
 		}
-		localTrackedAssets.push(gottenPath);
+		if (!localTrackedAssets.contains(gottenPath)) localTrackedAssets.push(gottenPath); // 去重
 		return currentTrackedSounds.get(gottenPath);
 	}
 
@@ -790,7 +1093,14 @@ class Paths
 					{
 						changedImage = true;
 						changedAtlasJson = true;
-						folderOrImg = image('$originalPath/spritemap$st');
+						// ATLAS 格式（spritemap1：flxanimate 2020 图集）不参与降采样：
+						// 该渲染器的 limb 尺寸取自帧 rect（w/h），Animation.json 的 M3D/TRP
+						// 亦未随位图缩放；位图+坐标同时×0.5 会使角色缩小且肢体错位。
+						// 保持原分辨率，视觉零回归（影响仅 qt-dance/bf-qt 等大图集的内存）。
+						var atlasFormat:Bool = Std.isOfType(spriteJson, String)
+							&& StringTools.contains(cast spriteJson, '"ATLAS"');
+						var useScale:Float = atlasFormat ? 1.0 : ClientPrefs.data.characterTextureScale;
+						folderOrImg = image('$originalPath/spritemap$st', null, true, true, useScale, false); // allowPack=false：图集贴图不参与密排列
 						break;
 					}
 				}
@@ -815,7 +1125,61 @@ class Paths
 			}
 		}
 
+		// 角色图集降采样（Meteoric Fix 续）：图片已缩（scaleTo=characterTextureScale），
+		// spritemap JSON 帧坐标同步 ×同一比例（仅非 ATLAS 格式；ATLAS 已保持原分辨率）
+		var atlasBypass:Bool = spriteJson != null && Std.isOfType(spriteJson, String)
+			&& StringTools.contains(cast spriteJson, '"ATLAS"');
+		var charScale:Float = atlasBypass ? 1.0 : ClientPrefs.data.characterTextureScale;
+		if (charScale < 1 && spriteJson != null && Std.isOfType(spriteJson, String))
+		{
+			try
+			{
+				var parsed:Dynamic = haxe.Json.parse(cast spriteJson);
+				scaleAtlasJson(parsed, charScale);
+				spriteJson = haxe.Json.stringify(parsed);
+			}
+			catch (e:Dynamic) {}
+		}
+
 		spr.loadAtlasEx(folderOrImg, spriteJson, animationJson);
+	}
+
+	// 2020/旧版 spritemap JSON 帧坐标缩放（frame/spriteSourceSize/sourceSize）
+	static function scaleAtlasJson(d:Dynamic, s:Float):Void
+	{
+		if (d == null) return;
+
+		var frames:Dynamic = Reflect.field(d, 'frames');
+		if (frames == null) return;
+		var apply:Dynamic->Void = function(fr:Dynamic)
+		{
+			var frame:Dynamic = Reflect.field(fr, 'frame');
+			if (frame != null)
+			{
+				Reflect.setField(frame, 'x', Std.int(Reflect.field(frame, 'x') * s));
+				Reflect.setField(frame, 'y', Std.int(Reflect.field(frame, 'y') * s));
+				Reflect.setField(frame, 'w', Math.max(1, Std.int(Reflect.field(frame, 'w') * s)));
+				Reflect.setField(frame, 'h', Math.max(1, Std.int(Reflect.field(frame, 'h') * s)));
+			}
+			var sss:Dynamic = Reflect.field(fr, 'spriteSourceSize');
+			if (sss != null)
+			{
+				Reflect.setField(sss, 'x', Std.int(Reflect.field(sss, 'x') * s));
+				Reflect.setField(sss, 'y', Std.int(Reflect.field(sss, 'y') * s));
+				Reflect.setField(sss, 'w', Math.max(1, Std.int(Reflect.field(sss, 'w') * s)));
+				Reflect.setField(sss, 'h', Math.max(1, Std.int(Reflect.field(sss, 'h') * s)));
+			}
+			var src:Dynamic = Reflect.field(fr, 'sourceSize');
+			if (src != null)
+			{
+				Reflect.setField(src, 'w', Math.max(1, Std.int(Reflect.field(src, 'w') * s)));
+				Reflect.setField(src, 'h', Math.max(1, Std.int(Reflect.field(src, 'h') * s)));
+			}
+		};
+		if (Std.isOfType(frames, Array))
+			for (fr in (cast frames : Array<Dynamic>)) apply(fr);
+		else
+			for (k in Reflect.fields(frames)) apply(Reflect.field(frames, k));
 	}
 	#end
 }

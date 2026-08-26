@@ -58,6 +58,10 @@ class MusicBeatState extends FlxUIState
 		#if sys
 		backend.ModInstaller.update(elapsed);
 		#end
+		// Meteoric：主线程维护（每帧分片异步解码 + 每 60s 清理未用贴图/声音）
+		#if desktop
+		backend.Paths.tickMaintenance(elapsed);
+		#end
 		#if mobile
 		// 安卓返回键 / 虚拟返回键（左上角 X）：默认退出游戏回到桌面；
 		// 子类可重写 onAndroidBack 拦截（例如 PlayState 游玩中改为打开暂停菜单）

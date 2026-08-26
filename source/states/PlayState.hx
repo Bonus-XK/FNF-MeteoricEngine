@@ -18,6 +18,7 @@ import backend.Song;
 import backend.Section;
 import backend.Rating;
 import backend.Replay;
+import backend.CrashHandler;
 
 import flixel.FlxBasic;
 import flixel.FlxObject;
@@ -155,6 +156,18 @@ class PlayState extends MusicBeatState
 	var _npsCount:Int = 0;
 	var _npsTimer:Float = 0;
 
+	// 延迟 GC（Meteoric Fix 续）：进曲 0.5s 后触发一次 System.gc()，回收被剥离的
+	// 谱面 DOM/解析暂存（开局 876→660MB 的 216MB 差值来源）。
+	// 40 帧回归已定位为 CastNote 代理的 Dynamic 分发（已改静态类型），GC 本身无罪；
+	// 若本构建 FPS 仍掉，下一轮把 GC 移到暂停/曲终或彻底移除。
+	var _deferredGC:Bool = false;
+	var _deferredGCTime:Float = 0;
+
+	// 结算拆卸锁（Meteoric Fix 续）：endSong 拆卸人物/判定线后置位；
+	// update() 立即早退（结算转场/关闭回调的窗口期 PlayState 仍会被驱动，
+	// 访问已销毁对象即 NRE）。重试/回退重开重建完成后复位。
+	var _visualsTorn:Bool = false;
+
 	public var playbackRate(default, set):Float = 1;
 
 	public var boyfriendGroup:FlxSpriteGroup;
@@ -173,6 +186,70 @@ class PlayState extends MusicBeatState
 	public static var storyWeek:Int = 0;
 	public static var storyPlaylist:Array<String> = [];
 	public static var storyDifficulty:Int = 1;
+
+	// ===== 游玩期谱面 DOM 释放（Meteoric Fix 续）=====
+	// 桌面进曲后，chartCache 仍持有完整谱面 DOM（LRU 2）；PlayState.SONG 是第二份。
+	// 大谱面游玩时把 SONG 的逐音符数组剥离（保留 section 元数据），重开/回溯/开编谱前
+	// 用下面记录的身份从缓存恢复，玩法零影响、内存最高可省数百 MB。
+	public static var chartJsonInput:String = null; // 谱面 json 输入（含难度后缀，如 bopeebo-hard）
+	public static var chartFolder:String = null;    // 谱面目录（与 loadFromJson 第二参一致）
+	static var chartSongName:String = null;         // 原始歌曲名（SONG.song 原样值，身份校验用）
+	static var chartDataStripped:Bool = false;      // 当前 SONG 的逐音符数组是否已被剥离
+	static var recordedChartFingerprint:String = '';// create 期（剥离前）记录的回放指纹，结算写档用
+
+	// 加载方（LoadingState/PauseSubState）替换 SONG 时必须先登记身份，剥离才有恢复依据
+	public static function registerChartSource(chartJson:String, folder:String, songName:String):Void
+	{
+		chartJsonInput = chartJson;
+		chartFolder = folder;
+		chartSongName = songName;
+		chartDataStripped = false;
+	}
+
+	// SONG 的逐音符数组被剥离后，任何需要完整谱面的入口（重开/回溯/编谱）先从此恢复
+	static function reloadChartSourceIfNeeded():Void
+	{
+		if (!chartDataStripped) return;
+		if (SONG == null || chartJsonInput == null || chartSongName != SONG.song)
+		{
+			// 无登记身份或对象与身份不一致（如 tutorial 兜底）：放弃剥离，避免误恢复
+			chartDataStripped = false;
+			return;
+		}
+		try
+		{
+			var fresh:SwagSong = Song.loadFromJson(chartJsonInput, chartFolder);
+			if (fresh != null)
+				SONG = fresh; // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
+			else
+			{
+				trace('[Memory] 谱面恢复失败（缓存/文件缺失）：' + chartJsonInput);
+				chartDataStripped = false;
+			}
+		}
+		catch (e:Dynamic)
+		{
+			trace('[Memory] 谱面恢复异常：' + e);
+			// 保留剥离标记：下次重开再试（文件丢失属极端异常，不再额外清空）
+		}
+	}
+
+	// create 尾 / 重开收尾共用：剥离 SONG 逐音符 DOM + 淘汰大谱面缓存副本
+	// （Flocc 级：两份 DOM 全释放后，游玩稳态只剩 CastNote + 音频 + 基线，≈400MB）
+	static function releaseSongChartDom():Void
+	{
+		#if desktop
+		if (SONG != null && chartJsonInput != null && chartSongName == SONG.song)
+		{
+			if (!chartDataStripped)
+			{
+				Song.stripSectionNotes(SONG);
+				chartDataStripped = true;
+			}
+			Song.evictLargeChartFromCache(chartJsonInput, chartFolder);
+		}
+		#end
+	}
 
 	public var spawnTime:Float = 2000;
 
@@ -233,6 +310,7 @@ class PlayState extends MusicBeatState
 	public var hudLayout:Map<String, Array<Float>>; // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
 	public var isPhigrosStyle:Bool = false;
 	public var grpNoteSplashes:FlxTypedGroup<NoteSplash>;
+	public var holdCoverHandler:NoteHoldCoverHandler = null; // 原生长条按压覆盖（QT 模组 NoteHoldCover.lua 移植）
 
 	public var camZooming:Bool = false;
 	public var camZoomingMult:Float = 1;
@@ -377,6 +455,10 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		// 上一局结束时 SONG 的逐音符数组可能已被剥离：先恢复完整谱面，
+		// 下面的回放指纹/生成逻辑都依赖完整 DOM
+		reloadChartSourceIfNeeded();
+
 		//trace('Playback Rate: ' + playbackRate);
 		// 进曲目即丢弃上一局的运行时音符图集缓存：其 FlxGraphic 随上次退出被内存清理销毁，
 		// 跨曲目复用会拿到 bitmap=null 的图集导致绘制崩溃（FlxDrawQuadsItem Null Object Reference）
@@ -469,6 +551,10 @@ class PlayState extends MusicBeatState
 
 		if (SONG == null)
 			SONG = Song.loadFromJson('tutorial');
+
+		// 游玩期会剥离 SONG.notes 逐音符数组（省内存）；回放指纹必须在剥离前记录，
+		// 结算写档（endSong）直接复用此值，不再重扫 sectionNotes
+		recordedChartFingerprint = Replay.chartFingerprint(SONG);
 
 		Conductor.mapBPMChanges(SONG);
 		Conductor.bpm = SONG.bpm;
@@ -689,6 +775,32 @@ class PlayState extends MusicBeatState
 		grpNoteSplashes.cameras = [camHUD];
 		notes.cameras = [camHUD];
 
+		// 原生长条按压覆盖（QT 模组 NoteHoldCover.lua 移植）：
+		// 模组自带同名全局脚本时跳过原生创建，避免双份覆盖层；
+		// pixel 阶段模组自带 pixelNoteSplash 图集损坏（XML 指向缺失的 spritesheet.png），不启用。
+		holdCoverHandler = null;
+		if (ClientPrefs.data.holdCover && !isPixelStage)
+		{
+			var hasModNoteHoldCover:Bool = false;
+			#if LUA_ALLOWED
+			for (luaScript in luaArray)
+				if (luaScript != null && luaScript.scriptName.toLowerCase().endsWith('noteholdcover.lua'))
+				{
+					hasModNoteHoldCover = true;
+					break;
+				}
+			#end
+			if (!hasModNoteHoldCover)
+			{
+				holdCoverHandler = new NoteHoldCoverHandler();
+				holdCoverHandler.cameras = [camHUD];
+				add(holdCoverHandler);
+				trace('[NoteHoldCover] 原生覆盖层已启用');
+			}
+			else
+				trace('[NoteHoldCover] 检测到模组自带 NoteHoldCover.lua，跳过原生覆盖层（避免重复）');
+		}
+
 
 		startingSong = true;
 		
@@ -760,6 +872,21 @@ class PlayState extends MusicBeatState
 		#end
 		callOnScripts('onCreatePost');
 
+		// 原生长条按压覆盖：模组自带 NoteHoldCover.lua 且用户关闭开关时，熄灭其脚本开关
+		// （脚本自身用 UpdateBFHoldCover/UpdateDadHoldCover 门控，置 false 后其回调不再显示覆盖层，
+		// 保证设置项对"模组自带脚本"同样生效）
+		#if LUA_ALLOWED
+		if (!ClientPrefs.data.holdCover)
+		{
+			for (luaScript in luaArray)
+				if (luaScript != null && luaScript.scriptName.toLowerCase().endsWith('noteholdcover.lua'))
+				{
+					luaScript.set('UpdateBFHoldCover', false);
+					luaScript.set('UpdateDadHoldCover', false);
+				}
+		}
+		#end
+
 		cacheCountdown();
 		cachePopUpScore();
 		
@@ -777,6 +904,9 @@ class PlayState extends MusicBeatState
 			}
 		}
 
+		// precacheList 仅在 create 内使用：用完即清，避免长曲期间残留键表
+		precacheList.clear();
+
 		super.create();
 		#if mobile
 		add(new objects.MobileControls());
@@ -785,7 +915,17 @@ class PlayState extends MusicBeatState
 		Paths.clearUnusedMemory(false);
 		// 预解码贴图里未被本局消费的（如未出场角色）在此释放，避免残留大图
 		Paths.clearPendingBitmaps();
-		
+
+		// 桌面内存大关：create 全部生成/脚本/HUD 完成后，SONG 逐音符 DOM 已无运行时消费方
+		// （section 元数据保留；重开/回溯/编谱前由 reloadChartSourceIfNeeded 恢复）
+		// 大谱面（Flocc 级）同时淘汰 chartCache 副本 —— 游玩期不保留任何完整谱面 DOM
+		releaseSongChartDom();
+
+		// 进曲 0.5s 后强制回收 DOM/解析暂存（倒计时期间，无音符生成）
+		_deferredGC = true;
+		_deferredGCTime = 0;
+		CrashHandler.mark('PlayState.create:done');
+
 		CustomFadeTransition.nextCamera = camOther;
 		if(eventNotes.length < 1) checkEventNote();
 	}
@@ -1192,11 +1332,11 @@ class PlayState extends MusicBeatState
 
 			startTimer = new FlxTimer().start(Conductor.crochet / 1000 / playbackRate, function(tmr:FlxTimer)
 			{
-				if (gf != null && tmr.loopsLeft % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && gf.animation.curAnim != null && !gf.animation.curAnim.name.startsWith("sing") && !gf.stunned)
+				if (gf != null && tmr.loopsLeft % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && !gf.getAnimationName().startsWith("sing") && !gf.stunned)
 					gf.dance();
-				if (tmr.loopsLeft % boyfriend.danceEveryNumBeats == 0 && boyfriend.animation.curAnim != null && !boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.stunned)
+				if (boyfriend != null && tmr.loopsLeft % boyfriend.danceEveryNumBeats == 0 && !boyfriend.getAnimationName().startsWith('sing') && !boyfriend.stunned)
 					boyfriend.dance();
-				if (tmr.loopsLeft % dad.danceEveryNumBeats == 0 && dad.animation.curAnim != null && !dad.animation.curAnim.name.startsWith('sing') && !dad.stunned)
+				if (dad != null && tmr.loopsLeft % dad.danceEveryNumBeats == 0 && !dad.getAnimationName().startsWith('sing') && !dad.stunned)
 					dad.dance();
 
 				var introAssets:Map<String, Array<String>> = new Map<String, Array<String>>();
@@ -1448,6 +1588,7 @@ class PlayState extends MusicBeatState
 		#end
 		setOnScripts('songLength', songLength);
 		callOnScripts('onSongStart');
+		CrashHandler.mark('PlayState.startSong:music-playing');
 	}
 
 	var debugNum:Int = 0;
@@ -1475,27 +1616,44 @@ class PlayState extends MusicBeatState
 
 		vocals = new FlxSound();
 		opponentVocals = new FlxSound();
-		if (songData.needsVoices)
+		try
 		{
-			// Split vocals：Voices-Player/Voices-Opponent 存在才加载，否则回退旧版 Voices.ogg。
-			// 不能用返回值判空（Paths.returnSound 找不到文件时返回空 Sound 而非 null）。
-			var playerFile:String = (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile;
-			if (Song.voicesFileExists(songData.song, playerFile))
-				vocals.loadEmbedded(Paths.voices(songData.song, playerFile));
-			else if (Song.voicesFileExists(songData.song))
-				vocals.loadEmbedded(Paths.voices(songData.song));
+			if (songData.needsVoices)
+			{
+				// Split vocals：Voices-Player/Voices-Opponent 存在才加载，否则回退旧版 Voices.ogg。
+				// 不能用返回值判空（Paths.returnSound 找不到文件时返回空 Sound 而非 null）。
+				var playerFile:String = (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile;
+				if (Song.voicesFileExists(songData.song, playerFile))
+					vocals.loadEmbedded(Paths.voices(songData.song, playerFile));
+				else if (Song.voicesFileExists(songData.song))
+					vocals.loadEmbedded(Paths.voices(songData.song));
 
-			var oppFile:String = (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile;
-			if (Song.voicesFileExists(songData.song, oppFile))
-				opponentVocals.loadEmbedded(Paths.voices(songData.song, oppFile));
+				var oppFile:String = (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile;
+				if (Song.voicesFileExists(songData.song, oppFile))
+					opponentVocals.loadEmbedded(Paths.voices(songData.song, oppFile));
+			}
+
+			vocals.pitch = playbackRate;
+			opponentVocals.pitch = playbackRate;
+
+			inst = new FlxSound().loadEmbedded(Paths.inst(songData.song));
 		}
-
-		vocals.pitch = playbackRate;
-		opponentVocals.pitch = playbackRate;
+		catch (e:Dynamic)
+		{
+			// 音频加载失败（文件损坏 / 解码器异常 / 设备音频后端异常）：
+			// 降级为静音继续游玩，绝不让音频问题拖垮整局。
+			// （此前无保护：异常会撞上 CrashHandler 的安卓缺陷 → 无弹窗、无日志闪退）
+			trace('[Audio] 歌曲音频加载失败，降级静音继续：' + Std.string(e));
+			try { vocals.loadEmbedded(new openfl.media.Sound()); } catch (e2:Dynamic) {}
+			try { opponentVocals.loadEmbedded(new openfl.media.Sound()); } catch (e2:Dynamic) {}
+			if (inst == null)
+				try { inst = new FlxSound().loadEmbedded(new openfl.media.Sound()); } catch (e2:Dynamic) {}
+			#if android
+			try { extension.androidtools.widget.Toast.makeText('音频加载失败，本局静音', 0); } catch (e2:Dynamic) {}
+			#end
+		}
 		FlxG.sound.list.add(vocals);
 		FlxG.sound.list.add(opponentVocals);
-
-		inst = new FlxSound().loadEmbedded(Paths.inst(songData.song));
 		FlxG.sound.list.add(inst);
 
 		notes = new NoteGroup();
@@ -1513,6 +1671,10 @@ class PlayState extends MusicBeatState
 	static var preGenTotalNotes:Int = 0;
 	static var preGenBotLaneCounts:Array<Int> = null;
 	static var preGenSong:String = null;
+
+	// 长条重构（Meteoric Fix 续）：段 chartSeq 基址 = 箭头总数。
+	// 与旧分配 100% 一致（箭头 0..N-1，段 N..按谱面顺序），旧回放兼容。
+	static var _segmentSeqBase:Int = 0;
 
 	// 加载界面空闲期调用：构建整张谱面的音符对象（含长条段），返回是否成功。
 	// 与 create 期生成完全同一套参数（stageUI / BPM / songSpeed / playbackRate），失败时回退创建期生成。
@@ -1580,6 +1742,9 @@ class PlayState extends MusicBeatState
 	static function buildChartNotes(song:SwagSong, botplayPlan:Array<Array<Float>>, isPhigrosStyle:Bool,
 			createdFrom:Dynamic, playbackRate:Float, clearSections:Bool = false):PreGenResult
 	{
+		// 平行数组代理（Meteoric Fix 续）：本函数是 CastNote 的唯一生产者入口，
+		// 每曲构建前重置上一曲的全部槽位数据（旧对象随 unspawnNotes 丢弃）
+		CastNote.resetPacked();
 		var noteTypes:Array<String> = [];
 		var totalNotes:Int = 0;
 		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
@@ -1708,29 +1873,14 @@ class PlayState extends MusicBeatState
 			{
 				if (floorSus > 0) botLaneCounts[swagNote.noteData & 255] += Std.int((floorSus + 1) * swagNote.density);
 			}
-			if (floorSus > 0)
-			{
-				for (susNote in 0...floorSus + 1)
-				{
-					var sustainNote:CastNote = new CastNote();
-					sustainNote.strumTime = swagNote.strumTime + (stepCrochet * susNote);
-					sustainNote.noteData = swagNote.noteData;
-					sustainNote.chartSeq = chartSeqCounter++;
-					sustainNote.density = swagNote.density;
-					sustainNote.holdLength = 0;
-					sustainNote.noteType = swagNote.noteType;
-					sustainNote.multSpeed = 1;
-					sustainNote.cmpSpam = null;
-					sustainNote.offs = swagNote.offs; // 长条与箭头同簇展开（保持视觉一一对应）
-					sustainNote.noAnimation = swagNote.noAnimation;
-					sustainNote.noMissAnimation = swagNote.noMissAnimation;
-					sustainNote.blockHit = swagNote.blockHit;
-					sustainNote.noteData |= 1 << 9;  // isHold
-					if (susNote == floorSus) sustainNote.noteData |= 1 << 10; // isHoldEnd
-					unspawnNotes.push(sustainNote);
-				}
-			}
+			// ===== 长条重构（Meteoric Fix 续）：不再生成独立段的 CastNote =====
+			// 尾巴在箭头出生时由 PlayState.spawnHoldTail 一次性用构造函数建好：
+			// 几何（居中/宽度/链式拉伸/holdend 圆润收尾）100% 确定；Lua 接口
+			// note.tail / note.parent / isSustainNote / isSustainEnds / sustainLength 保留。
+			// chartSeq 顺序保持不变（箭头 0..N-1，段 N..按谱面顺序），旧回放兼容。
 		}
+		// 段序号基址 = 箭头总数（与旧 chartSeq 分配 100% 一致：箭头先编号，段随后按谱面顺序）
+		_segmentSeqBase = unspawnNotes.length;
 
 		unspawnNotes.sort(sortByTime);
 
@@ -1759,6 +1909,9 @@ class PlayState extends MusicBeatState
 
 	private function generateChartNotes(loadPhase:Bool):Void
 	{
+		// 重开/回溯路径可能带着被剥离的 SONG：先恢复完整逐音符 DOM 再生成
+		reloadChartSourceIfNeeded();
+		// 生成完成后标记 done（原生崩溃时日志簿显示最终到达的阶段）
 		totalNotes = 0;
 		botplayPlan = Note.getBotplayPlan();
 		if (botplayPlan != null) botLaneCounts = [0, 0, 0, 0];
@@ -1944,6 +2097,7 @@ class PlayState extends MusicBeatState
 		if (!consumedPreGen) unspawnNotes.sort(sortByTime);
 		#end
 		generatedMusic = true;
+		CrashHandler.mark('PlayState.generateChartNotes:done');
 	}
 
 	// called only once per different event (Used for precaching)
@@ -2017,16 +2171,30 @@ class PlayState extends MusicBeatState
 	// ---- 自定义界面：HUD 布局偏移 ----
 	public function hudGetOffset(id:String):Array<Float>
 	{
-		if (ClientPrefs.data.hudLayout.exists(id)) return ClientPrefs.data.hudLayout.get(id);
+		// 防御：旧存档/异常数据下 hudLayout 可能是 null 或 haxe.Json 还原的匿名对象
+		// （Map 经 JSON 往返后 .exists()/.get() 会抛 Null Object Reference）——
+		// 任何异常都回退默认 [0,0]，绝不因布局数据拖垮整局
+		var layout:Dynamic = ClientPrefs.data.hudLayout;
+		if (layout != null)
+		{
+			try
+			{
+				if (layout.exists(id)) return cast layout.get(id);
+			}
+			catch (e:Dynamic) {}
+		}
 		var arr:Array<Float> = [0, 0];
-		ClientPrefs.data.hudLayout.set(id, arr);
+		if (layout != null)
+		{
+			try { layout.set(id, arr); } catch (e:Dynamic) {}
+		}
 		return arr;
 	}
 
 	// 重置某个 HUD 元素到默认位置（偏移清零并立即重排）
 	public function hudResetElement(id:String)
 	{
-		ClientPrefs.data.hudLayout.set(id, [0, 0]);
+		try { ClientPrefs.data.hudLayout.set(id, [0, 0]); } catch (e:Dynamic) {}
 		repositionHUD();
 	}
 
@@ -2377,13 +2545,21 @@ class PlayState extends MusicBeatState
 			else clusterVisCap = 12;
 		}
 
+		if (currentSpawnId == 0) CrashHandler.mark('PlayState.noteSpawn:start');
+
 		var spawnBudget:Int = ClientPrefs.data.limitNotes > 0 ? limitNotes + 512 : 8192;
 
 		var processed:Int = 0;
 		while (currentSpawnId < unspawnNotes.length && processed < spawnBudget)
 		{
 			if (limitNotes > 0 && limitCount >= limitNotes) break;
+			// 桌面：静态类型访问 CastNote 平行数组代理（getter 内联，不走 Dynamic __Field 分发；
+			// 安卓保持 Dynamic：unspawnNotes 是 Note 实体数组）
+			#if android
 			var target:Dynamic = unspawnNotes[currentSpawnId];
+			#else
+			var target:CastNote = unspawnNotes[currentSpawnId];
+			#end
 			if (target.strumTime - fixedPosition > spawnWindowFor(target)) break;
 
 			// 挤压音符（H-Slice 谱面字段 cmpSpam）：运行时展开，不预建
@@ -2399,7 +2575,7 @@ class PlayState extends MusicBeatState
 			}
 			else
 			{
-				spawnOne(target);
+				spawnOneWithTail(target);
 				processed++;
 				limitCount++;
 			}
@@ -2463,7 +2639,77 @@ class PlayState extends MusicBeatState
 
 	/** 实例化一个音符（对象池复用）并触发 onSpawnNote 回调。
 	 *  堆叠合并组（offs != null）在此展开：后台一条 CastNote，画面与原版一致（N 个独立视觉箭头）。 */
+	// ===== 长条重构：箭头出生时一次性构建整根尾巴 =====
+	// 段 Note 由构造函数创建（prevNote 逐段链接 → 自动切 hold/链式拉伸/holdend 圆润收尾），
+	// 与安卓直建管线同款；登记 note.tail（Lua 接口）与 seqNote 静态链（判定/回放）。
+	function spawnHoldTail(arrow:Note, target:CastNote):Void
+	{
+		var holdLen:Float = target.holdLength;
+		if (Math.isNaN(holdLen) || holdLen <= 0) return;
+		var stepCrochet:Float = ((60 / SONG.bpm) * 1000) / 4;
+		var floorSus:Int = Math.floor(holdLen / stepCrochet);
+		if (floorSus < 0) floorSus = 0;
+
+		var prev:Note = arrow;
+		var segCount:Int = floorSus + 1;
+		for (i in 0...segCount)
+		{
+			var seg:Note = new Note(target.strumTime + stepCrochet * i, target.noteData & 3,
+				prev, true, false, PlayState.instance);
+			// 字段（与安卓 generateChartNotes 直建路径同款）
+			seg.chartSeq = _segmentSeqBase++;
+			seg.mustPress = (target.noteData & (1 << 8)) != 0;
+			seg.gfNote = (target.noteData & (1 << 11)) != 0;
+			seg.isSustainEnds = (i == segCount - 1);
+			seg.animSuffix = (target.noteData & (1 << 12)) != 0 ? "-alt" : "";
+			seg.noAnimation = seg.noMissAnimation = (target.noteData & (1 << 13)) != 0;
+			seg.blockHit = (target.noteData & (1 << 14)) != 0;
+			seg.ignoreNote = (target.noteData & (1 << 15)) != 0;
+			seg.sustainLength = 0; // 段自身无长度；尾巴长度由箭头 holdLength 表达
+			var ct:String = target.noteType != null ? target.noteType : '';
+			if (ct != null && ct.length > 0) seg.noteType = ct;
+			seg.scrollFactor.set();
+			seg.correctionOffset = seg.height / 2;
+			if (ClientPrefs.data.downScroll && !PlayState.isPixelStage)
+				seg.correctionOffset = 0;
+			// 尾段强制圆润收尾 + 复位高度（构造链可能已把它切成 hold 主体帧）
+			if (seg.isSustainEnds)
+			{
+				seg.animation.play(Note.colArray[seg.noteData % Note.colArray.length] + 'holdend');
+				seg.scale.y = 1;
+				seg.updateHitbox();
+			}
+			// Lua 接口：note.tail / note.parent（懒加载 getter，池化箭头天然干净）
+			arrow.tail.push(seg);
+			seg.parent = arrow;
+			// 池化安全判定链：静态表登记
+			if (seg.chartSeq >= 0)
+			{
+				if (seg.chartSeq >= Note.seqNote.length) Note.seqNote.resize(seg.chartSeq + 1);
+				Note.seqNote[seg.chartSeq] = seg;
+			}
+			prev = seg;
+			notes.addNoteObject(seg);
+		}
+	}
+
+	// 真箭头出生入口：spawn 视觉后整根尾巴（视觉复制/挤压展开不走此入口）
+	function spawnOneWithTail(target:CastNote):Note
+	{
+		var hadOffs:Bool = target.offs != null; // 合并簇：尾巴已在上方 offs 分支挂到 base
+		var n:Note = spawnOne(target);
+		if (!hadOffs && target.holdLength > 0 && target.chartSeq >= 0)
+			spawnHoldTail(n, target);
+		return n;
+	}
+
+	// 桌面：静态类型参数，CastNote 平行数组代理的字段访问全部走内联 getter；
+	// 安卓保留 Dynamic（unspawnNotes 为 Note 实体数组，字段集不同）
+	#if android
 	function spawnOne(target:Dynamic):Note
+	#else
+	function spawnOne(target:CastNote):Note
+	#end
 	{
 				// ===== 表面不压缩 + 渲染可控：合并簇=1 条 CastNote（后台已压缩），
 	// 展开为 up to MAX_CLUSTER_VISUALS 颗**均匀采样**的视觉箭头（覆盖 0→全跨度，视觉密度与原版一致），
@@ -2477,6 +2723,9 @@ class PlayState extends MusicBeatState
 		base.offs = null;
 		// 基准保持 density=簇总颗数（计分）；采样副本 density=1 且不参与判定
 		var lastNote:Note = spawnOne(base);
+		// 长条重构：基准箭头（含 holdLength）的尾巴挂在 base 上（最后一个视觉副本不是锚点）
+		if (base.holdLength > 0 && base.chartSeq >= 0)
+			spawnHoldTail(lastNote, base);
 
 		// 均匀采样：保留首、尾与等距中间点（视觉跨度/密度与原版一致）；
 		// maxVis 由 noteSpawn 按"2s 窗口簇数"动态预算（场上精灵总额控制）
@@ -2598,7 +2847,34 @@ class PlayState extends MusicBeatState
 		{
 			iconP1.swapOldIcon();
 		}*/
+
+		// 拆卸锁：endSong 结算拆卸后（转场/关闭回调窗口期）不再驱动本 State，
+		// 否则会访问已销毁的人物/判定线（Null Object Reference）
+		if (_visualsTorn)
+			return;
+
 		callOnScripts('onUpdate', [elapsed]);
+
+		// 原生长条按压覆盖：每帧同步判定线位置
+		if (holdCoverHandler != null)
+			holdCoverHandler.syncPositions(playerStrums, opponentStrums);
+
+		// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
+		// （blissful-erect 接箭头闪退现场）——按谱面默认配置逐个重建缺失角色，绝不闪退
+		ensureCharactersAlive();
+
+		// 延迟 GC（一次）：进曲 0.5s 后回收已剥离的谱面 DOM/解析暂存（倒计时期间，无音符生成）
+		if (_deferredGC)
+		{
+			_deferredGCTime += elapsed;
+			if (_deferredGCTime >= 0.5)
+			{
+				_deferredGC = false;
+				#if desktop
+				openfl.system.System.gc();
+				#end
+			}
+		}
 
 		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零，同时刷新 Score 栏
 		_npsTimer += elapsed;
@@ -2634,7 +2910,9 @@ class PlayState extends MusicBeatState
 		FlxG.camera.followLerp = 0;
 		if(!inCutscene && !paused) {
 			FlxG.camera.followLerp = FlxMath.bound(elapsed * 2.4 * cameraSpeed * playbackRate / (FlxG.updateFramerate / 60), 0, 1);
-			if(!startingSong && !endingSong && boyfriend.animation.curAnim != null && boyfriend.animation.curAnim.name.startsWith('idle')) {
+			// 防御：mod 脚本/事件/竞态可能把 boyfriend 置空（blissful-erect 接箭头闪退现场），
+			// 待机块永不因角色缺失而崩
+			if(!startingSong && !endingSong && boyfriend != null && boyfriend.getAnimationName().startsWith('idle')) {
 				boyfriendIdleTime += elapsed;
 				if(boyfriendIdleTime >= 0.15) { // Kind of a mercy thing for making the achievement easier to get as it's apparently frustrating to some playerss
 					boyfriendIdled = true;
@@ -2781,7 +3059,7 @@ class PlayState extends MusicBeatState
 				} else {
 					// 回放 v2：按录制时间注入按键（走正常判定路径），并处理长按子段
 					if (replayMode && replayV2) updateReplayInputs();
-					if (boyfriend.animation.curAnim != null && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration && boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.animation.curAnim.name.endsWith('miss')) {
+					if (boyfriend != null && boyfriend.getAnimationName().startsWith('sing') && !boyfriend.getAnimationName().endsWith('miss') && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration) {
 						boyfriend.dance();
 						//boyfriend.animation.curAnim.finish();
 					}
@@ -3007,6 +3285,8 @@ class PlayState extends MusicBeatState
 
 	function openChartEditor()
 	{
+		// 编谱需要完整谱面：若游玩期已剥离 SONG.notes，先从缓存恢复
+		reloadChartSourceIfNeeded();
 		FlxG.camera.followLerp = 0;
 		persistentUpdate = false;
 		paused = true;
@@ -3242,21 +3522,24 @@ class PlayState extends MusicBeatState
 
 				switch(charType) {
 					case 0:
-						if(boyfriend.curCharacter != value2) {
+						if(boyfriend != null && boyfriend.curCharacter != value2) {
 							if(!boyfriendMap.exists(value2)) {
 								addCharacterToList(value2, charType);
 							}
 
 							var lastAlpha:Float = boyfriend.alpha;
 							boyfriend.alpha = 0.00001;
-							boyfriend = boyfriendMap.get(value2);
+							// 防御：角色添加失败（图集缺失等）时保持现角色，绝不把 boyfriend 置 null
+							var newB:Character = boyfriendMap.get(value2);
+							if (newB == null) newB = boyfriend;
+							boyfriend = newB;
 							boyfriend.alpha = lastAlpha;
 							iconP1.changeIcon(boyfriend.healthIcon);
 						}
-						setOnScripts('boyfriendName', boyfriend.curCharacter);
+						if (boyfriend != null) setOnScripts('boyfriendName', boyfriend.curCharacter);
 
 					case 1:
-						if(dad.curCharacter != value2) {
+						if(dad != null && dad.curCharacter != value2) {
 							if(!dadMap.exists(value2)) {
 								addCharacterToList(value2, charType);
 							}
@@ -3264,7 +3547,9 @@ class PlayState extends MusicBeatState
 							var wasGf:Bool = dad.curCharacter.startsWith('gf-') || dad.curCharacter == 'gf';
 							var lastAlpha:Float = dad.alpha;
 							dad.alpha = 0.00001;
-							dad = dadMap.get(value2);
+							var newD:Character = dadMap.get(value2);
+							if (newD == null) newD = dad; // 防御同上
+							dad = newD;
 							if(!dad.curCharacter.startsWith('gf-') && dad.curCharacter != 'gf') {
 								if(wasGf && gf != null) {
 									gf.visible = true;
@@ -3275,7 +3560,7 @@ class PlayState extends MusicBeatState
 							dad.alpha = lastAlpha;
 							iconP2.changeIcon(dad.healthIcon);
 						}
-						setOnScripts('dadName', dad.curCharacter);
+						if (dad != null) setOnScripts('dadName', dad.curCharacter);
 
 					case 2:
 						if(gf != null)
@@ -3288,7 +3573,9 @@ class PlayState extends MusicBeatState
 
 								var lastAlpha:Float = gf.alpha;
 								gf.alpha = 0.00001;
-								gf = gfMap.get(value2);
+								var newG:Character = gfMap.get(value2);
+								if (newG == null) newG = gf; // 防御同上
+								gf = newG;
 								gf.alpha = lastAlpha;
 							}
 							setOnScripts('gfName', gf.curCharacter);
@@ -3451,6 +3738,19 @@ class PlayState extends MusicBeatState
 		inCutscene = false;
 		updateTime = false;
 
+		// 曲终释放（Meteoric Fix 续）：最后音符已全部生成，unspawnNotes + CastNote 平行数组
+		// 成为死重（约 250MB）。结算界面不再需要它们；重开/回溯/换难度/编谱/回放全部经
+		// reloadChartSourceIfNeeded（快扫重解析）恢复，回放指纹已有 create 期存档。
+		// 无条件释放（不设 currentSpawnId 守卫）：谱面尾部可能比音频长（最后音符未生成完
+		// 也照样进结算），守卫会让释放静默失效；重开路径本就会重解析，无一致性风险。
+		unspawnNotes = [];
+		spamNotes = [];
+		CastNote.resetPacked();
+		// seqNote/seqHit 链快照（~20MB 引用）一并释放：曲终无判定，重开/回溯重建
+		Note.seqNote = [];
+		Note.seqHit = [];
+		CrashHandler.mark('PlayState.endSong');
+
 		deathCounter = 0;
 		seenCutscene = false;
 
@@ -3477,7 +3777,8 @@ class PlayState extends MusicBeatState
 			var replayForResults:Replay = null;
 			if (recordingReplay && currentReplay != null && !usedAutoplay)
 			{
-				currentReplay.fingerprint = Replay.chartFingerprint(SONG);
+				// 游玩期 SONG.notes 已被剥离，指纹用 create 期记录值（内容与完整谱面一致）
+				currentReplay.fingerprint = recordedChartFingerprint;
 				currentReplay.score = songScore;
 				currentReplay.misses = songMisses;
 				currentReplay.percent = Math.isNaN(ratingPercent) ? 0 : ratingPercent;
@@ -3504,6 +3805,31 @@ class PlayState extends MusicBeatState
 			if(Math.isNaN(percent)) percent = 0;
 			if(!usedAutoplay)
 				Highscore.saveScore(SONG.song, songScore, storyDifficulty, percent);
+			#end
+
+			// ===== 结算前释放游玩视觉（Meteoric Fix 续：结算时只留场景，人物/判定线/音符移除）=====
+			// 原生贴图（人物/判定线/音符）在此真正归还 OS；结算背景保持原版黑底。
+			// 重试/回放会重建（finishRestart → generateStaticArrows + reloadDefaultCharacters
+			// + generateChartNotes；resetState → 全新 create）。
+			#if desktop
+			// 1. 音符/seq 链（unspawnNotes 已在 endSong 前段释放，这里清理存活音符与池）
+			KillNotes();
+			// 2. 判定线（与 finishRestart 同一套拆法）
+			while (strumLineNotes.length > 0)
+			{
+				var strum:StrumNote = strumLineNotes.members[0];
+				strumLineNotes.remove(strum, true);
+				strum.destroy();
+			}
+			playerStrums.clear();
+			opponentStrums.clear();
+			// 3. 人物（BF/Dad/GF 大贴图）
+			destroyAllCharacters();
+			// 4. 清空本局贴图租约并释放 useCount=0 的贴图（人物/判定线/音符等）
+			Paths.localTrackedAssets = [];
+			Paths.clearUnusedMemory(false);
+			// 5. 上锁：本 State 更新立即暂停（结算转场/关闭回调的窗口期仍会被驱动）
+			_visualsTorn = true;
 			#end
 
 			persistentUpdate = false;
@@ -3721,7 +4047,7 @@ class PlayState extends MusicBeatState
 			currentSpawnId = 0;
 			while (currentSpawnId < unspawnNotes.length)
 			{
-				var rewindNote:Note = spawnOne(unspawnNotes[currentSpawnId++]);
+				var rewindNote:Note = spawnOneWithTail(unspawnNotes[currentSpawnId++]);
 				rewindNote.visible = true;
 				rewindNote.active = true;
 				rewindNote.canBeHit = false;
@@ -3746,6 +4072,17 @@ class PlayState extends MusicBeatState
 			}
 			// 回溯时长按距离自动计算：距离越远回溯越久
 			rewindDuration = FlxMath.bound((rewindFromPos - rewindEndPos) / rewindSpeedMs, rewindMinDuration, rewindMaxDuration);
+			// 若结算拆卸过（_visualsTorn）：回溯前必须重建判定线与人物，
+			// 否则驱动倒流的第一帧就撞到 null（boyfriend.animation → NRE，4# 结算重试崩溃现场）。
+			// 正常回溯（无限轮回/游戏中回退，未拆卸）保持原路径不动。
+			if (_visualsTorn)
+			{
+				generateStaticArrows(0);
+				generateStaticArrows(1);
+				keepStrumsOnRestart = false; // 判定线已重建：后续 finishRestart/startCountdown 走常规重建
+				reloadDefaultCharacters();
+				_visualsTorn = false;
+			}
 			return; // update() 中的回溯逻辑会驱动倒流，结束后调用 finishRestart()
 		}
 		trace('[Rewind] SKIP (pref=' + ClientPrefs.data.rewindOnRestart + ', pos=' + Conductor.songPosition + ')');
@@ -3801,6 +4138,14 @@ class PlayState extends MusicBeatState
 		// 根据内存中的谱面重新生成音符（不重新读盘）
 		generateChartNotes(false);
 
+		// 重开收尾：generateChartNotes 已恢复并消费完整 DOM，这里再次剥离 + 淘汰缓存副本，
+		// 否则快速重开/回退重开后 SONG 与 chartCache 会重新常驻两份大谱面 DOM
+		releaseSongChartDom();
+
+		// 重开同样消费过一块新解析的 DOM：延迟 GC 再触发一次回收
+		_deferredGC = true;
+		_deferredGCTime = 0;
+
 		// 重新加载谱面默认角色（参照不开启快速重开时的完整重开逻辑）
 		reloadDefaultCharacters();
 
@@ -3821,6 +4166,8 @@ class PlayState extends MusicBeatState
 		#end
 
 		Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + curSong;
+		// 重建完成（音符/判定线/人物全部就绪），解锁 update
+		_visualsTorn = false;
 		// 从全屏设置页（自定义界面/调整延迟与Combo）返回：重载后的曲目先挂起在暂停菜单，
 		// 玩家"返回游戏"后才开始倒计时（避免暂停期间倒计时/音乐在后台继续跑）
 		if (autoOpenPause)
@@ -3836,6 +4183,77 @@ class PlayState extends MusicBeatState
 		}
 		else
 			startCountdown();
+	}
+
+	// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
+	// （blissful-erect 接箭头闪退现场——update 若干处直接访问 boyfriend.animation）。
+	// 每帧按谱面默认配置重建缺失角色（map 优先，缓存缺失才 new），绝不因角色缺失闪退。
+	function ensureCharactersAlive():Void
+	{
+		#if desktop
+		if (SONG == null) return;
+		if (boyfriend == null)
+		{
+			var cName:String = (SONG.player1 != null && SONG.player1.length > 0) ? SONG.player1 : 'bf';
+			try
+			{
+				boyfriend = boyfriendMap.get(cName);
+				if (boyfriend == null)
+				{
+					boyfriend = new Character(0, 0, cName, true);
+					boyfriendMap.set(cName, boyfriend);
+				}
+				if (!boyfriendGroup.members.contains(boyfriend))
+				{
+					startCharacterPos(boyfriend);
+					boyfriendGroup.add(boyfriend);
+					startCharacterScripts(boyfriend.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] boyfriend 重建失败：' + e); }
+		}
+		if (dad == null)
+		{
+			var cName:String = (SONG.player2 != null && SONG.player2.length > 0) ? SONG.player2 : 'dad';
+			try
+			{
+				dad = dadMap.get(cName);
+				if (dad == null)
+				{
+					dad = new Character(0, 0, cName);
+					dadMap.set(cName, dad);
+				}
+				if (!dadGroup.members.contains(dad))
+				{
+					startCharacterPos(dad, true);
+					dadGroup.add(dad);
+					startCharacterScripts(dad.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] dad 重建失败：' + e); }
+		}
+		if (gf == null)
+		{
+			var cName:String = (SONG.gfVersion != null && SONG.gfVersion.length > 0) ? SONG.gfVersion : 'gf';
+			try
+			{
+				gf = gfMap.get(cName);
+				if (gf == null)
+				{
+					gf = new Character(0, 0, cName);
+					gfMap.set(cName, gf);
+				}
+				if (!gfGroup.members.contains(gf))
+				{
+					startCharacterPos(gf);
+					gf.scrollFactor.set(0.95, 0.95);
+					gfGroup.add(gf);
+					startCharacterScripts(gf.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] gf 重建失败：' + e); }
+		}
+		#end
 	}
 
 	// 快速重开：参照完整重开（resetState → create）重新加载默认角色
@@ -3987,6 +4405,7 @@ class PlayState extends MusicBeatState
 
 	private function popUpScore(note:Note = null, ?cappedMult:Int = null):Void
 	{
+		CrashHandler.mark('popUpScore:start');
 		// botplay 命中时间由其排期时刻定义（=音符自身 strumTime），帧延迟不影响评级
 		var noteDiff:Float = cpuControlled ? 0 : Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
 		vocals.volume = 1;
@@ -4450,7 +4869,7 @@ class PlayState extends MusicBeatState
 				}
 				#end
 			}
-			else if (boyfriend.animation.curAnim != null && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration && boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.animation.curAnim.name.endsWith('miss'))
+			else if (boyfriend != null && boyfriend.getAnimationName().startsWith('sing') && !boyfriend.getAnimationName().endsWith('miss') && boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration)
 			{
 				boyfriend.dance();
 				//boyfriend.animation.curAnim.finish();
@@ -4641,6 +5060,10 @@ class PlayState extends MusicBeatState
 		var result:Dynamic = callOnLuas('opponentNoteHit', [notes.members.indexOf(note), Math.abs(note.noteData), note.noteType, note.isSustainNote]);
 		if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) callOnHScript('opponentNoteHit', [note]);
 
+		// 原生长条按压覆盖（模组 opponentNoteHit 回调同点触发，轨偏移 +4）
+		if (holdCoverHandler != null && note.isSustainNote)
+			holdCoverHandler.onHit(4 + Std.int(Math.abs(note.noteData)));
+
 		if (!note.isSustainNote)
 		{
 			// 对方推条：开启后对手命中箭头会像玩家一样加血（推条向对方侧移动），但最低保留一点血量，不会被推死
@@ -4745,8 +5168,9 @@ class PlayState extends MusicBeatState
 				if (recordingReplay && !cpuControlled && currentReplay != null && !note.isSustainNote)
 					currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, 'hurt');
 				noteMiss(note);
-				if(!note.noteSplashData.disabled && !note.isSustainNote)
+				if(!note.noteSplashData.disabled && !note.isSustainNote) {
 					spawnNoteSplashOnNote(note);
+				}
 
 				if(!note.noMissAnimation)
 				{
@@ -4824,6 +5248,10 @@ class PlayState extends MusicBeatState
 			var result:Dynamic = callOnLuas('goodNoteHit', [notes.members.indexOf(note), leData, leType, isSus]);
 			if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) callOnHScript('goodNoteHit', [note]);
 
+			// 原生长条按压覆盖（模组 goodNoteHit 回调同点触发）
+			if (holdCoverHandler != null && note.isSustainNote)
+				holdCoverHandler.onHit(Std.int(Math.abs(note.noteData)));
+
 			if (!note.isSustainNote)
 			{
 				notes.invalidateNote(note);
@@ -4883,6 +5311,7 @@ class PlayState extends MusicBeatState
 		// 离开对局后清掉待重开的回放数据，避免影响后续普通对局
 		carryReplay = null;
 		instance = null;
+		holdCoverHandler = null;
 		if (hud != null && hud.judgementField != null && hud.judgementField.parent != null)
 			FlxG.stage.removeChild(hud.judgementField);
 		super.destroy();
@@ -4891,6 +5320,7 @@ class PlayState extends MusicBeatState
 		// （快速重开 restartSongWithoutReload 不销毁本 State，不受影响）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
+		Paths.clearPendingBitmaps(); // 收尾：释放未被消费的预解码贴图（异步分片可能仍未消费完）
 	}
 
 	// 结算权威钳制：命中/进行数不超总音符（池化复用与批处理的帧级噪声不污染结算面板）
@@ -5001,11 +5431,11 @@ class PlayState extends MusicBeatState
 			iconP2.updateHitbox();
 		}
 
-		if (gf != null && curBeat % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && gf.animation.curAnim != null && !gf.animation.curAnim.name.startsWith("sing") && !gf.stunned)
+		if (gf != null && curBeat % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && !gf.getAnimationName().startsWith('sing') && !gf.stunned)
 			gf.dance();
-		if (curBeat % boyfriend.danceEveryNumBeats == 0 && boyfriend.animation.curAnim != null && !boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.stunned)
+		if (boyfriend != null && curBeat % boyfriend.danceEveryNumBeats == 0 && !boyfriend.getAnimationName().startsWith('sing') && !boyfriend.stunned)
 			boyfriend.dance();
-		if (curBeat % dad.danceEveryNumBeats == 0 && dad.animation.curAnim != null && !dad.animation.curAnim.name.startsWith('sing') && !dad.stunned)
+		if (dad != null && curBeat % dad.danceEveryNumBeats == 0 && !dad.getAnimationName().startsWith('sing') && !dad.stunned)
 			dad.dance();
 
 		super.beatHit();
@@ -5102,6 +5532,9 @@ class PlayState extends MusicBeatState
 			newScript.set('boyfriend', boyfriend);
 			newScript.set('gf', gf);
 			newScript.set('camGame', camGame);
+			// 兼容 66mod 舞台脚本（home.hx 等直接访问 camFollow/camHUD）
+			newScript.set('camFollow', camFollow);
+			newScript.set('camHUD', camHUD);
 			@:privateAccess
 			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
 			{

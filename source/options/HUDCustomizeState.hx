@@ -253,9 +253,22 @@ class HUDCustomizeState extends MusicBeatState
 
 	function hudGetOffset(id:String):Array<Float>
 	{
-		if (ClientPrefs.data.hudLayout.exists(id)) return ClientPrefs.data.hudLayout.get(id);
+		// 防御：旧存档/异常数据下 hudLayout 可能是 null 或 haxe.Json 还原的匿名对象，
+		// .exists()/.get() 会抛 Null Object Reference → 回退默认 [0,0]
+		var layout:Dynamic = ClientPrefs.data.hudLayout;
+		if (layout != null)
+		{
+			try
+			{
+				if (layout.exists(id)) return cast layout.get(id);
+			}
+			catch (e:Dynamic) {}
+		}
 		var arr:Array<Float> = [0, 0];
-		ClientPrefs.data.hudLayout.set(id, arr);
+		if (layout != null)
+		{
+			try { layout.set(id, arr); } catch (e:Dynamic) {}
+		}
 		return arr;
 	}
 
@@ -481,7 +494,7 @@ class HUDCustomizeState extends MusicBeatState
 			{
 				// 重置全部元素到游戏默认位置（偏移全部清零）
 				for (e in elements)
-					ClientPrefs.data.hudLayout.set(e, [0, 0]);
+					try { ClientPrefs.data.hudLayout.set(e, [0, 0]); } catch (err:Dynamic) {}
 				repositionHUD();
 				refreshBorders();
 				updateHint();
