@@ -11,6 +11,11 @@
 # ============================================================
 name: 构建（Build）
 
+# 同一分支的工作流按序排队（不前后叠加占用 runner；release 手动触发也保留排队语义）
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
     branches: [master, main]
