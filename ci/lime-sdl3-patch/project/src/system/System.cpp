@@ -5,6 +5,39 @@
 #include <comutil.h>
 #pragma comment(lib, "wbemuuid.lib")
 #include <windows.h>
+
+// mingw-w64（≤ v13，含 Ubuntu 的 10.0.0/GCC 13 包）的 comutil.h 只有
+// _com_util::ConvertStringToBSTR 的声明（MSVC 实现来自 comsupp.lib，mingw 无此库），
+// 本文件 WMI 查询用 _bstr_t("...") 会引用该符号，链接 lime Windows ndll 时报
+// undefined reference；在此补齐实现（与 mingw-w64 v14 头文件内联实现逻辑一致）。
+// v14+ 头文件已提供 inline 实现，用版本宏守卫避免重定义。
+#if defined (__MINGW32__) && (__MINGW64_VERSION_MAJOR < 14)
+namespace _com_util {
+
+	BSTR WINAPI ConvertStringToBSTR (const char* pSrc) {
+
+		if (pSrc == NULL) return NULL;
+
+		int wcSize = ::MultiByteToWideChar (CP_ACP, 0, pSrc, -1, NULL, 0);
+		if (wcSize == 0) return NULL;
+
+		BSTR bstr = ::SysAllocStringLen (NULL, wcSize - 1);
+		if (bstr == NULL) return NULL;
+
+		if (::MultiByteToWideChar (CP_ACP, 0, pSrc, -1, bstr, wcSize) == 0) {
+
+			::SysFreeString (bstr);
+			return NULL;
+
+		}
+
+		return bstr;
+
+	}
+
+}
+#endif
+
 #endif
 
 #include <system/System.h>
