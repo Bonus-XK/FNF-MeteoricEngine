@@ -99,6 +99,35 @@ jobs:
           export ANDROID_SETUP=true
           neko run.n rebuild lime android
 
+      - name: 缓存 Gradle 发行版
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dists-7.4.2-${{ runner.os }}
+
+      - name: 预下载 Gradle 7.4.2 发行版（services.gradle.org 偶发断流：断点续传 + 多重试）
+        run: |
+          set -e
+          # 哈希目录名 = wrapper 对 distributionUrl 的确定性哈希（本机 ~/.gradle 已核实）
+          DIST_DIR="$HOME/.gradle/wrapper/dists/gradle-7.4.2-bin/48ivgl02cpt2ed3fh9dbalvx8"
+          mkdir -p "$DIST_DIR"
+          if [ ! -s "$DIST_DIR/gradle-7.4.2-bin.zip" ]; then
+            echo "==> 预下载 gradle-7.4.2-bin.zip ..."
+            for i in $(seq 1 10); do
+              if curl -fL --connect-timeout 30 --max-time 600 --retry 5 --retry-all-errors --retry-delay 3 \
+                   -C - -o "$DIST_DIR/gradle-7.4.2-bin.zip" \
+                   https://services.gradle.org/distributions/gradle-7.4.2-bin.zip; then
+                echo "==> Gradle 发行版下载成功（第 $i 次尝试）"
+                break
+              fi
+              echo "==> Gradle 下载失败（第 $i 次），5 秒后重试..."
+              sleep 5
+            done
+          fi
+          test -s "$DIST_DIR/gradle-7.4.2-bin.zip"
+          echo "==> Gradle 发行版就绪："
+          ls -la "$DIST_DIR"
+
       - name: 构建 Android APK
         run: ./compile-android.sh
 
