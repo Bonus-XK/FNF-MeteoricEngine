@@ -6,7 +6,7 @@
 
 #ifdef HX_WINDOWS
 // SDL3 移除了 SDL_syswm.h / SDL_GetWindowWMInfo
-#include <Windows.h>
+#include <windows.h>
 #undef CreateWindow
 #endif
 
