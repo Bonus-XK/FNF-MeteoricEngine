@@ -2642,7 +2642,12 @@ class PlayState extends MusicBeatState
 	// ===== 长条重构：箭头出生时一次性构建整根尾巴 =====
 	// 段 Note 由构造函数创建（prevNote 逐段链接 → 自动切 hold/链式拉伸/holdend 圆润收尾），
 	// 与安卓直建管线同款；登记 note.tail（Lua 接口）与 seqNote 静态链（判定/回放）。
+	// 安卓：unspawnNotes 为 Note 实体数组（无 CastNote 代理），参数用 Dynamic
+	#if android
+	function spawnHoldTail(arrow:Note, target:Dynamic):Void
+	#else
 	function spawnHoldTail(arrow:Note, target:CastNote):Void
+	#end
 	{
 		var holdLen:Float = target.holdLength;
 		if (Math.isNaN(holdLen) || holdLen <= 0) return;
@@ -2694,7 +2699,12 @@ class PlayState extends MusicBeatState
 	}
 
 	// 真箭头出生入口：spawn 视觉后整根尾巴（视觉复制/挤压展开不走此入口）
+	// 安卓：unspawnNotes 为 Note 实体数组（无 CastNote 代理），参数用 Dynamic
+	#if android
+	function spawnOneWithTail(target:Dynamic):Note
+	#else
 	function spawnOneWithTail(target:CastNote):Note
+	#end
 	{
 		var hadOffs:Bool = target.offs != null; // 合并簇：尾巴已在上方 offs 分支挂到 base
 		var n:Note = spawnOne(target);
