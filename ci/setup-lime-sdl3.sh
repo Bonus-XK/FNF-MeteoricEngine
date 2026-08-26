@@ -75,7 +75,7 @@ echo "==> [3/6] 对齐定制库版本（pixman/cairo/harfbuzz/openal/curl/efsw�
 # 必须用 --branch 直接拉指定 tag；网络不稳定，失败自动重试
 fetch_lib() { # $1=目标目录  $2=URL（已加速）  $3=tag
   local dir="$1" url="$2" tag="$3" i
-  for i in 1 2 3 4 5; do
+  for i in 1 2 3; do
     rm -rf "$dir"
     if [ -n "$tag" ]; then
       git clone --depth 1 --branch "$tag" "$url" "$dir" 2>/dev/null && return 0
@@ -83,7 +83,7 @@ fetch_lib() { # $1=目标目录  $2=URL（已加速）  $3=tag
       git clone --depth 1 "$url" "$dir" 2>/dev/null && return 0
     fi
     echo "拉取 $url 失败（第 $i 次），5 秒后重试..."
-    sleep 5
+    sleep 3
   done
   echo "拉取 $url 最终失败"
   return 1
@@ -103,8 +103,8 @@ fetch_lib_url() { # $1=目标目录  $2..=URL 列表（按序尝试，断点续�
   rm -rf "$dir" /tmp/fetchlib-tar
   mkdir -p /tmp/fetchlib-tar
   for url in "$@"; do
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-      if curl -sL -C - --max-time 1200 "$url" -o /tmp/fetchlib-tar/lib.tar \
+    for i in 1 2 3 4; do
+      if curl -sL -C - --max-time 300 "$url" -o /tmp/fetchlib-tar/lib.tar \
          && tar tf /tmp/fetchlib-tar/lib.tar > /dev/null 2>&1; then
         tar xf /tmp/fetchlib-tar/lib.tar -C /tmp/fetchlib-tar
         extracted=$(find /tmp/fetchlib-tar -mindepth 1 -maxdepth 1 -type d | head -1)
@@ -115,7 +115,7 @@ fetch_lib_url() { # $1=目标目录  $2..=URL 列表（按序尝试，断点续�
         fi
       fi
       echo "下载 $url 中断（第 $i 次），5 秒后续传..."
-      sleep 5
+      sleep 3
     done
     echo "源失效，切换备选源..."
   done

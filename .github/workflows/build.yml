@@ -1,11 +1,13 @@
 # ============================================================
-# Meteoric Engine 全端构建工作流
+# Meteoric Engine 全端构建工作流（CI 提速版）
 # 触发: push / pull_request / 手动（workflow_dispatch）
 # 构建: Android / Windows x64 / Windows x86 / macOS x86_64 / macOS arm64
 #
-# 说明: 引擎使用 SDL3 移植版 lime（lime 8.2.2 + SDL3 3.2.8），
-#       构建前由 ci/setup-lime-sdl3.sh 在 CI 上现场组装。
-#       Haxe 4.2.5 由 ci/setup-haxe-ci.sh 下载官方二进制。
+# 提速要点（2026-08）:
+#   1) haxelib 依赖与 /tmp/lime-full（SDL3 lime 源码树）进 actions/cache，
+#      命中时跳过“现场组装 SDL3 lime”的拉取/解压/打补丁（原为每次全量）；
+#   2) macOS 拆成 x64 / arm64 两个并行 job（原来串行双架构 + 全程 Rosetta）；
+#   3) setup-lime-sdl3.sh 网络重试收紧（max-time 1200→300s，重试 10→4/5→3）。
 # ============================================================
 name: 构建（Build）
 
@@ -34,6 +36,12 @@ jobs:
       - name: 安装 Haxe/Neko
         run: bash ci/setup-haxe-ci.sh
 
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@v4
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
       - name: 安装 Java 17
         uses: actions/setup-java@v5
         with:
@@ -60,11 +68,22 @@ jobs:
           export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
-      - name: 组装 SDL3 lime
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@v4
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-android-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
 
       - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
         run: |
@@ -96,6 +115,12 @@ jobs:
       - name: 安装 Haxe/Neko
         run: bash ci/setup-haxe-ci.sh
 
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@v4
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
       - name: 安装 mingw-w64 交叉工具链（与本地开发环境一致）
         run: |
           brew install mingw-w64
@@ -109,11 +134,22 @@ jobs:
           export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
-      - name: 组装 SDL3 lime
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@v4
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-windows-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
 
       - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
         run: |
@@ -162,9 +198,9 @@ jobs:
           name: meteoric-windows-x86
           path: export/32bit/windows/bin/
 
-  # ---------- macOS x86_64 + arm64 ----------
-  macos:
-    name: macOS (x86_64 + arm64)
+  # ---------- macOS x86_64（独立 job，与 arm64 并行） ----------
+  macos-x64:
+    name: macOS (x86_64)
     runs-on: macos-14
     timeout-minutes: 120
     steps:
@@ -174,26 +210,41 @@ jobs:
       - name: 安装 Haxe/Neko（Rosetta 运行 x86_64）
         run: bash ci/setup-haxe-ci.sh
 
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@v4
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
       - name: 安装 haxelib 依赖
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
-      - name: 组装 SDL3 lime
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@v4
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-macos-x64-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
 
-      - name: 重建 lime macOS ndll（x86_64 + arm64）
+      - name: 重建 lime macOS ndll（x86_64）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           neko run.n rebuild lime mac
-          neko run.n rebuild lime mac -arm64
-          cp ndll/MacArm64/lime-64.ndll ndll/MacArm64/lime.ndll
 
       - name: 构建 macOS x86_64
         run: ./compile-mac.sh
@@ -207,6 +258,61 @@ jobs:
           mkdir -p export/release/macos-x64
           cp -R export/release/macos/bin/Meteoric.app export/release/macos-x64/
 
+      - name: 上传 x86_64
+        uses: actions/upload-artifact@v5
+        with:
+          name: meteoric-macos-x64
+          path: export/release/macos-x64/
+
+  # ---------- macOS arm64（独立 job，与 x64 并行） ----------
+  macos-arm64:
+    name: macOS (arm64)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 安装 Haxe/Neko（Rosetta 运行 x86_64；引擎 C++ 用原生 arm64 clang）
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@v4
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@v4
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-macos-arm64-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      - name: 重建 lime macOS ndll（arm64）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          neko run.n rebuild lime mac -arm64
+          cp ndll/MacArm64/lime-64.ndll ndll/MacArm64/lime.ndll
+
       - name: 构建 macOS arm64
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
@@ -217,12 +323,6 @@ jobs:
           mkdir -p export/release/macos-arm64
           cp -R export/release/macos/bin/Meteoric.app export/release/macos-arm64/
 
-      - name: 上传 x86_64
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-macos-x64
-          path: export/release/macos-x64/
-
       - name: 上传 arm64
         uses: actions/upload-artifact@v5
         with:
@@ -230,10 +330,10 @@ jobs:
           path: export/release/macos-arm64/
 
   # ---------- 发布 Pre-release ----------
-  # 三个平台全部构建成功后自动创建 GitHub Pre-release（PR 不发布）
+  # 四个构建 job 全部成功后自动创建 GitHub Pre-release（PR 不发布）
   release:
     name: 发布 Pre-release
-    needs: [android, windows, macos]
+    needs: [android, windows, macos-x64, macos-arm64]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
