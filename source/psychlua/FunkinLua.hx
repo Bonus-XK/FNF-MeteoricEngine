@@ -1079,17 +1079,28 @@ class FunkinLua {
 			}
 		});
 		Lua_helper.add_callback(lua, "addLuaSprite", function(tag:String, front:Bool = false) {
-			if(game.modchartSprites.exists(tag)) {
-				var shit:ModchartSprite = game.modchartSprites.get(tag);
-				if(front)
-					LuaUtils.getTargetInstance().add(shit);
+			// 官方 1.0.4 语义：先查状态 variables（makeFlxAnimateSprite 的 ModchartAnimateSprite
+			// 存在这里），再查 modchartSprites（makeLuaSprite）。只查 modchartSprites 会让
+			// FlxAnimate 精灵永远进不了显示/更新列表 → 不显示/不动画（QT obliterated-erect 电锯、音箱）。
+			var mySprite:FlxSprite = null;
+			if (PlayState.instance != null)
+			{
+				mySprite = cast PlayState.instance.variables.get(tag);
+				if (mySprite == null)
+					mySprite = PlayState.instance.modchartSprites.get(tag);
+			}
+			if (mySprite == null) return;
+
+			if (front)
+			{
+				LuaUtils.getTargetInstance().add(mySprite);
+			}
+			else
+			{
+				if (!game.isDead)
+					game.insert(game.members.indexOf(LuaUtils.getLowestCharacterGroup()), mySprite);
 				else
-				{
-					if(!game.isDead)
-						game.insert(game.members.indexOf(LuaUtils.getLowestCharacterGroup()), shit);
-					else
-						GameOverSubstate.instance.insert(GameOverSubstate.instance.members.indexOf(GameOverSubstate.instance.boyfriend), shit);
-				}
+					GameOverSubstate.instance.insert(GameOverSubstate.instance.members.indexOf(GameOverSubstate.instance.boyfriend), mySprite);
 			}
 		});
 		Lua_helper.add_callback(lua, "setGraphicSize", function(obj:String, x:Int, y:Int = 0, updateHitbox:Bool = true) {

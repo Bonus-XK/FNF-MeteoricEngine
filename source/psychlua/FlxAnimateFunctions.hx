@@ -38,8 +38,11 @@ class FlxAnimateFunctions
 			obj.anim.addBySymbol(name, symbol, framerate, loop, matX, matY);
 			if(obj.anim.curSymbol == null)
 			{
-				if(obj.playAnim != null) obj.playAnim(name, true); //is ModchartAnimateSprite
-				else obj.animation.play(name, true);
+				// 官方 1.0.4：静态类型调用（Dynamic 反射调用会被 -dce full 裁掉 playAnim，
+				// 导致 Lua playAnim 走 FlxSprite.animation 分支 → flxanimate 精灵永不播放）
+				var obj2:ModchartAnimateSprite = cast (obj, ModchartAnimateSprite);
+				if(obj2 != null) obj2.playAnim(name, true); //is ModchartAnimateSprite
+				else obj.anim.play(name, true);
 			}
 			return true;
 		});
@@ -64,8 +67,10 @@ class FlxAnimateFunctions
 			obj.anim.addBySymbolIndices(name, symbol, indices, framerate, loop, matX, matY);
 			if(obj.anim.curSymbol == null)
 			{
-				if(obj.playAnim != null) obj.playAnim(name, true); //is ModchartAnimateSprite
-				else obj.animation.play(name, true);
+				// 同上：静态类型调用防止 -dce full 裁掉 playAnim
+				var obj2:ModchartAnimateSprite = cast (obj, ModchartAnimateSprite);
+				if(obj2 != null) obj2.playAnim(name, true); //is ModchartAnimateSprite
+				else obj.anim.play(name, true);
 			}
 			return true;
 		});
