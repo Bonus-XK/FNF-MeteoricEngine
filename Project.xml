@@ -32,7 +32,9 @@
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<!--These window settings apply to all targets-->
-	<window width="1280" height="720" fps="" background="#000000" hardware="true" vsync="false" />
+	<!-- allow-high-dpi：与上游 Psych 1.0.4 一致；SDL3 后端置 SDL_WINDOW_HIGH_PIXEL_DENSITY，
+	     让 OpenGL 帧缓冲按物理像素渲染（Retina/缩放屏不再由系统拉伸低分辨率画面 → 模糊/锯齿） -->
+	<window width="1280" height="720" fps="" background="#000000" hardware="true" vsync="false" allow-high-dpi="true" />
 
 	<!--HTML5-specific-->
 	<window if="html5" resizable="true" />
