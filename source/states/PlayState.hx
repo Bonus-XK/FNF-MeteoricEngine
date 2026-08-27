@@ -5884,6 +5884,8 @@ class PlayState extends MusicBeatState
 
 	#if (!flash && sys)
 	public var runtimeShaders:Map<String, Array<String>> = new Map<String, Array<String>>();
+	// Psych 0.7.3 兼容：mod（FunkinMix 等）的 runHaxeCode 用 game.FlxRuntimeShaderMap 缓存运行时 shader 实例
+	public var FlxRuntimeShaderMap:Map<String, FlxRuntimeShader> = new Map<String, FlxRuntimeShader>();
 	public function createRuntimeShader(name:String):FlxRuntimeShader
 	{
 		if(!ClientPrefs.data.shaders) return new FlxRuntimeShader();

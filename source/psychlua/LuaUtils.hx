@@ -129,6 +129,21 @@ class LuaUtils
 				return retVal;
 		}
 		// 容错：typed 对象上不存在的字段返回 null（防 Mod 脚本拼写错误如 igfVersion 崩溃）
+		// Meteoric：flixel 5.2.2 的 FlxCamera.viewOffsetX/Y/Width/Height 是私有属性
+		// （Psych 0.7.3 时代公开），Lua getProperty 拿不到 → FunkinMix 等 mod 的
+		// uCameraBounds 计算得 nil 而静默中断（相机滤镜白/黑屏）；这里补公开访问
+		if (Std.isOfType(instance, flixel.FlxCamera))
+		{
+			var cam:flixel.FlxCamera = cast instance;
+			@:privateAccess
+			switch(variable)
+			{
+				case 'viewOffsetX': return cam.viewMarginX;
+				case 'viewOffsetY': return cam.viewMarginY;
+				case 'viewOffsetWidth': return cam.viewMarginRight;
+				case 'viewOffsetHeight': return cam.viewMarginBottom;
+			}
+		}
 		try {
 			return Reflect.getProperty(instance, variable);
 		} catch(e:Dynamic) {
