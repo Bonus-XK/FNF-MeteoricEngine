@@ -4057,7 +4057,18 @@ class PlayState extends MusicBeatState
 			currentSpawnId = 0;
 			while (currentSpawnId < unspawnNotes.length)
 			{
+				// 安卓：unspawnNotes 是已构造好的 Note 实体，必须与 noteSpawn 一致直接入组；
+				// 不能走 spawnOneWithTail → notes.spawnNote(target:CastNote)（hxcpp 会把
+				// Dynamic 转类形参置 null，导致 recycleNote 读 target.offsetAngle 时空指针 NRE）
+				#if android
+				var rewindNote:Note = unspawnNotes[currentSpawnId++];
+				notes.insert(0, rewindNote);
+				rewindNote.spawned = true;
+				callOnLuas('onSpawnNote', [notes.members.indexOf(rewindNote), rewindNote.noteData, rewindNote.noteType, rewindNote.isSustainNote, rewindNote.strumTime]);
+				callOnHScript('onSpawnNote', [rewindNote]);
+				#else
 				var rewindNote:Note = spawnOneWithTail(unspawnNotes[currentSpawnId++]);
+				#end
 				rewindNote.visible = true;
 				rewindNote.active = true;
 				rewindNote.canBeHit = false;
@@ -4066,6 +4077,9 @@ class PlayState extends MusicBeatState
 				rewindNote.ignoreNote = false;
 				rewindNote.alpha = 1;
 			}
+			#if android
+			unspawnNotes = []; // 安卓 noteSpawn 按 [0]+splice 消费，回溯期腾空防止回溯帧重复插入
+			#end
 
 			// 回溯终点：最早音符飞出“出生窗口”的位置（保证场上清空），不低于 -rewindOvershoot
 			rewindEndPos = -rewindOvershoot;
