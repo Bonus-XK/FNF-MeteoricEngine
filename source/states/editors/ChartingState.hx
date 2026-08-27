@@ -1,5 +1,12 @@
 package states.editors;
 
+import states.editors.ChartWidgets.EditorButton;
+import states.editors.ChartWidgets.EditorDropdown;
+import states.editors.ChartWidgets.EditorInput;
+import states.editors.ChartWidgets.EditorStepper;
+import states.editors.ChartWidgets.EditorToggle;
+
+
 import flash.geom.Rectangle;
 import tjson.TJSON as Json;
 import haxe.format.JsonParser;
@@ -43,6 +50,8 @@ import openfl.utils.Assets as OpenFlAssets;
 
 import backend.Song;
 import backend.Section;
+import states.editors.ChartExportPrompt;
+import states.editors.content.CneExport;
 import backend.StageData;
 import backend.Paths;
 import backend.Mods;
@@ -117,23 +126,12 @@ class ChartingState extends MusicBeatState
 	static final CONTENT_W:Float = PANEL_W - 32;
 	static final CONTENT_RW:Float = (PANEL_W - 48) / 2;
 
-	var tabGroups:Array<FlxSpriteGroup> = [];
-	var tabBtns:Array<{bg:FlxSprite, txt:FlxText}> = [];
-	var curTab:Int = 0;
-	var lastHoveredTab:Int = -2;
-	var dropdownLayer:FlxSpriteGroup;
-	var allButtons:Array<EditorButton> = [];
-	var allToggles:Array<EditorToggle> = [];
-	var allInputs:Array<EditorInput> = [];
-	var allSteppers:Array<EditorStepper> = [];
-	var allDropdowns:Array<EditorDropdown> = [];
+	var panel:ChartingPanel;
 	var strumTimeInputText:EditorInput;
 	var stepperSusLength:EditorStepper;
 	var noteTypeDropDown:EditorDropdown;
 	var eventDropDown:EditorDropdown;
 	var currentType:Int = 0;
-	var toastText:FlxText;
-	var toastTimer:FlxTimer;
 	var hintTxt:FlxText;
 	var statusTxt:FlxText;
 	var descText:FlxText;
@@ -372,18 +370,10 @@ class ChartingState extends MusicBeatState
 		dummyArrow.antialiasing = ClientPrefs.data.antialiasing;
 		add(dummyArrow);
 
-		// ---- 右面板（Freeplay 设计语言） ----
-		add(makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22));
-		var rightTitle:FlxText = makeText(CONTENT_X, PANEL_Y + 14, CONTENT_W, '编谱设置', 22, 0xFFFFFFFF);
-		add(rightTitle);
-
-		buildTabs();
-		dropdownLayer = new FlxSpriteGroup();
-		add(dropdownLayer);
-
-		toastText = makeText(CONTENT_X, PANEL_Y + PANEL_H - 40, CONTENT_W, '', 13, 0xFFFFFFFF, CENTER);
-		toastText.visible = false;
-		add(toastText);
+		// ---- 右面板（重写版：ChartingPanel 自包含标签页/控件注册/Toast） ----
+		panel = new ChartingPanel();
+		panel.build();
+		add(panel);
 
 		hintTxt = makeText(10, 660, 620, 'W/S 滚动 · A/D 小节 · ↑/↓ 吸附 · ←/→ 量化 · Z/X 缩放 · 空格 播放 · ESC 试玩 · Enter 游玩 · Ctrl+Z 撤销', 12, 0xFF8A8FA8);
 		add(hintTxt);
@@ -417,7 +407,7 @@ class ChartingState extends MusicBeatState
 		zoomTxt.scrollFactor.set();
 		add(zoomTxt);
 
-		changeTab(0);
+		panel.changeTab(0);
 		updateGrid();
 		super.create();
 	}
@@ -437,19 +427,20 @@ class ChartingState extends MusicBeatState
 	var stepperSongSpeed:EditorStepper;
 	function addSongUI():Void
 	{
-		var grp = tabGroups[0];
+		var grp = panel.tabGroups[0];
+		var TAB:Int = 0;
 
 		UI_songTitle = new EditorInput(CONTENT_X, CONTENT_Y, 300, '曲目名称', _song.song, function(text:String)
 		{
 			_song.song = text;
 		});
-		grp.add(UI_songTitle); allInputs.push(UI_songTitle);
+		panel.register(TAB, UI_songTitle);
 
-		var check_voices:EditorToggle = new EditorToggle(CONTENT_X, CONTENT_Y + 52, '需要人声', _song.needsVoices, function()
+		var check_voices:EditorToggle = new EditorToggle(CONTENT_X, CONTENT_Y + 52, '需要人声', _song.needsVoices, function(v:Bool)
 		{
-			_song.needsVoices = check_voices.checked;
+			_song.needsVoices = v;
 		});
-		grp.add(check_voices); allToggles.push(check_voices);
+		panel.register(TAB, check_voices);
 
 		stepperSongBPM = new EditorStepper(CONTENT_X, CONTENT_Y + 98, CONTENT_RW, '歌曲 BPM', _song.bpm, 1, 400, 1, 3, function(v:Float)
 		{
@@ -459,13 +450,13 @@ class ChartingState extends MusicBeatState
 			if (stepperSusLength != null) stepperSusLength.step = Math.ceil(Conductor.stepCrochet / 2);
 			updateGrid();
 		});
-		grp.add(stepperSongBPM); allSteppers.push(stepperSongBPM);
+		panel.register(TAB, stepperSongBPM);
 
 		stepperSongSpeed = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, CONTENT_RW, '歌曲速度', _song.speed, 0.1, 10, 0.1, 2, function(v:Float)
 		{
 			_song.speed = v;
 		});
-		grp.add(stepperSongSpeed); allSteppers.push(stepperSongSpeed);
+		panel.register(TAB, stepperSongSpeed);
 
 		#if MODS_ALLOWED
 		var directories:Array<String> = [Paths.mods('characters/'), Paths.mods(Mods.currentModDirectory + '/characters/'), Paths.getPreloadPath('characters/')];
@@ -505,22 +496,22 @@ class ChartingState extends MusicBeatState
 		{
 			_song.player1 = characters[i];
 			updateHeads();
-		}, dropdownLayer);
-		grp.add(ddPlayer1); allDropdowns.push(ddPlayer1);
+		}, panel.dropdownLayer);
+		panel.register(TAB, ddPlayer1);
 
 		ddGF = new EditorDropdown(CONTENT_X, CONTENT_Y + 206, CONTENT_RW, '女友', characters, Std.int(Math.max(0, characters.indexOf(_song.gfVersion))), function(i:Int)
 		{
 			_song.gfVersion = characters[i];
 			updateHeads();
-		}, dropdownLayer);
-		grp.add(ddGF); allDropdowns.push(ddGF);
+		}, panel.dropdownLayer);
+		panel.register(TAB, ddGF);
 
 		ddPlayer2 = new EditorDropdown(CONTENT_X, CONTENT_Y + 260, CONTENT_RW, '玩家 2', characters, Std.int(Math.max(0, characters.indexOf(_song.player2))), function(i:Int)
 		{
 			_song.player2 = characters[i];
 			updateHeads();
-		}, dropdownLayer);
-		grp.add(ddPlayer2); allDropdowns.push(ddPlayer2);
+		}, panel.dropdownLayer);
+		panel.register(TAB, ddPlayer2);
 
 		#if MODS_ALLOWED
 		var directories:Array<String> = [Paths.mods('stages/'), Paths.mods(Mods.currentModDirectory + '/stages/'), Paths.getPreloadPath('stages/')];
@@ -561,31 +552,31 @@ class ChartingState extends MusicBeatState
 		stageDropDown = new EditorDropdown(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 152, CONTENT_RW, '舞台', stages, Std.int(Math.max(0, stages.indexOf(_song.stage))), function(i:Int)
 		{
 			_song.stage = stages[i];
-		}, dropdownLayer);
-		grp.add(stageDropDown); allDropdowns.push(stageDropDown);
+		}, panel.dropdownLayer);
+		panel.register(TAB, stageDropDown);
 
 		var y:Float = CONTENT_Y + 314;
 		var saveButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '保存', function()
 		{
 			saveLevel();
 		}, 13, true);
-		grp.add(saveButton); allButtons.push(saveButton);
+		panel.register(TAB, saveButton);
 
 		var reloadSong:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '重新加载音频', function()
 		{
 			currentSongName = Paths.formatToSongPath(UI_songTitle.field.text);
 			loadSong();
 			updateWaveform();
-			showToast('音频已重新加载');
+			panel.showToast('音频已重新加载');
 		}, 13);
-		grp.add(reloadSong); allButtons.push(reloadSong);
+		panel.register(TAB, reloadSong);
 
 		y += 44;
 		var saveEventsBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '保存事件', function()
 		{
 			saveEvents();
 		}, 13);
-		grp.add(saveEventsBtn); allButtons.push(saveEventsBtn);
+		panel.register(TAB, saveEventsBtn);
 
 		var reloadSongJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '重新加载 JSON', function()
 		{
@@ -594,7 +585,7 @@ class ChartingState extends MusicBeatState
 			},
 			null, ignoreWarnings));
 		}, 13);
-		grp.add(reloadSongJson); allButtons.push(reloadSongJson);
+		panel.register(TAB, reloadSongJson);
 
 		y += 44;
 		var loadAutosaveBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '加载自动保存', function()
@@ -602,7 +593,7 @@ class ChartingState extends MusicBeatState
 			PlayState.SONG = Song.parseJSONshit(FlxG.save.data.autosave);
 			MusicBeatState.resetState();
 		}, 13);
-		grp.add(loadAutosaveBtn); allButtons.push(loadAutosaveBtn);
+		panel.register(TAB, loadAutosaveBtn);
 
 		var loadEventJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '加载事件', function()
 		{
@@ -619,9 +610,9 @@ class ChartingState extends MusicBeatState
 				_song.events = events.events;
 				changeSection(curSec);
 			}
-			else showToast('未找到事件文件');
+			else panel.showToast('未找到事件文件');
 		}, 13);
-		grp.add(loadEventJson); allButtons.push(loadEventJson);
+		panel.register(TAB, loadEventJson);
 
 		y += 44;
 		var clear_notes:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '清空音符', function()
@@ -631,71 +622,72 @@ class ChartingState extends MusicBeatState
 					_song.notes[sec].sectionNotes = [];
 				}
 				updateGrid();
-				showToast('全部音符已清空');
+				panel.showToast('全部音符已清空');
 			}, null, ignoreWarnings));
 		}, 13, true);
-		grp.add(clear_notes); allButtons.push(clear_notes);
+		panel.register(TAB, clear_notes);
 
 		var clear_events:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '清空事件', function()
 		{
 			openSubState(new Prompt('将清空全部事件，是否继续？', 0, clearEvents, null, ignoreWarnings));
 		}, 13, true);
-		grp.add(clear_events); allButtons.push(clear_events);
+		panel.register(TAB, clear_events);
 	}
 
 	function addSectionUI():Void
 	{
-		var grp = tabGroups[1];
+		var grp = panel.tabGroups[1];
+		var TAB:Int = 1;
 
 		stepperBeats = new EditorStepper(CONTENT_X, CONTENT_Y, CONTENT_RW, '小节拍数', getSectionBeats(), 1, 16, 1, 1, function(v:Float)
 		{
 			_song.notes[curSec].sectionBeats = v;
 			reloadGridLayer();
 		});
-		grp.add(stepperBeats); allSteppers.push(stepperBeats);
+		panel.register(TAB, stepperBeats);
 
 		stepperSectionBPM = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, CONTENT_RW, '小节 BPM', _song.notes[curSec].bpm, 0, 999, 1, 1, function(v:Float)
 		{
 			_song.notes[curSec].bpm = v;
 			updateGrid();
 		});
-		grp.add(stepperSectionBPM); allSteppers.push(stepperSectionBPM);
+		panel.register(TAB, stepperSectionBPM);
 
-		check_mustHitSection = new EditorToggle(CONTENT_X, CONTENT_Y + 54, 'Must Hit 小节', _song.notes[curSec].mustHitSection, function()
+		check_mustHitSection = new EditorToggle(CONTENT_X, CONTENT_Y + 54, 'Must Hit 小节', _song.notes[curSec].mustHitSection, function(v:Bool)
 		{
-			_song.notes[curSec].mustHitSection = check_mustHitSection.checked;
+			_song.notes[curSec].mustHitSection = v;
 			updateGrid();
 			updateHeads();
 		});
-		grp.add(check_mustHitSection); allToggles.push(check_mustHitSection);
+		panel.register(TAB, check_mustHitSection);
 
-		check_gfSection = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 54, 'GF 小节', _song.notes[curSec].gfSection, function()
+		check_gfSection = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 54, 'GF 小节', _song.notes[curSec].gfSection, function(v:Bool)
 		{
-			_song.notes[curSec].gfSection = check_gfSection.checked;
+			_song.notes[curSec].gfSection = v;
 			updateGrid();
 			updateHeads();
 		});
-		grp.add(check_gfSection); allToggles.push(check_gfSection);
+		panel.register(TAB, check_gfSection);
 
-		check_changeBPM = new EditorToggle(CONTENT_X, CONTENT_Y + 104, '本小节换速', _song.notes[curSec].changeBPM, function()
+		check_changeBPM = new EditorToggle(CONTENT_X, CONTENT_Y + 104, '本小节换速', _song.notes[curSec].changeBPM, function(v:Bool)
 		{
-			_song.notes[curSec].changeBPM = check_changeBPM.checked;
+			_song.notes[curSec].changeBPM = v;
 			Conductor.mapBPMChanges(_song);
 			updateGrid();
 		});
-		grp.add(check_changeBPM); allToggles.push(check_changeBPM);
+		panel.register(TAB, check_changeBPM);
 
-		check_altAnim = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 104, 'Alt 动画', _song.notes[curSec].altAnim, function()
+		check_altAnim = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 104, 'Alt 动画', _song.notes[curSec].altAnim, function(v:Bool)
 		{
-			_song.notes[curSec].altAnim = check_altAnim.checked;
+			_song.notes[curSec].altAnim = v;
 		});
-		grp.add(check_altAnim); allToggles.push(check_altAnim);
+		panel.register(TAB, check_altAnim);
 
 		check_notesSec = new EditorToggle(CONTENT_X, CONTENT_Y + 154, '音符', true);
-		grp.add(check_notesSec); allToggles.push(check_notesSec);
+		panel.register(TAB, check_notesSec);
 
 		check_eventsSec = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 154, '事件', true);
-		grp.add(check_eventsSec); allToggles.push(check_eventsSec);
+		panel.register(TAB, check_eventsSec);
 
 		var y:Float = CONTENT_Y + 198;
 		var copyButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '复制本节', function()
@@ -724,15 +716,15 @@ class ChartingState extends MusicBeatState
 					notesCopied.push([strumTime, -1, copiedEventArray]);
 				}
 			}
-			showToast('本节已复制');
+			panel.showToast('本节已复制');
 		}, 13);
-		grp.add(copyButton); allButtons.push(copyButton);
+		panel.register(TAB, copyButton);
 
 		var pasteButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '粘贴本节', function()
 		{
 			if(notesCopied == null || notesCopied.length < 1)
 			{
-				showToast('剪贴板为空');
+				panel.showToast('剪贴板为空');
 				return;
 			}
 
@@ -769,9 +761,9 @@ class ChartingState extends MusicBeatState
 				}
 			}
 			updateGrid();
-			showToast('已粘贴到本节');
+			panel.showToast('已粘贴到本节');
 		}, 13);
-		grp.add(pasteButton); allButtons.push(pasteButton);
+		panel.register(TAB, pasteButton);
 
 		y += 44;
 		var clearSectionButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '清空本节', function()
@@ -797,9 +789,9 @@ class ChartingState extends MusicBeatState
 			}
 			updateGrid();
 			updateNoteUI();
-			showToast('本节已清空');
+			panel.showToast('本节已清空');
 		}, 13, true);
-		grp.add(clearSectionButton); allButtons.push(clearSectionButton);
+		panel.register(TAB, clearSectionButton);
 
 		var swapSection:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '交换轨道', function()
 		{
@@ -810,13 +802,13 @@ class ChartingState extends MusicBeatState
 				_song.notes[curSec].sectionNotes[i] = note;
 			}
 			updateGrid();
-			showToast('轨道已交换');
+			panel.showToast('轨道已交换');
 		}, 13);
-		grp.add(swapSection); allButtons.push(swapSection);
+		panel.register(TAB, swapSection);
 
 		y += 44;
 		stepperCopy = new EditorStepper(CONTENT_X, y, 130, '往前几节', 1, -999, 999, 1, 0);
-		grp.add(stepperCopy); allSteppers.push(stepperCopy);
+		panel.register(TAB, stepperCopy);
 
 		var copyLastButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '复制前 N 节', function()
 		{
@@ -851,9 +843,9 @@ class ChartingState extends MusicBeatState
 				}
 			}
 			updateGrid();
-			showToast('已复制上一节');
+			panel.showToast('已复制上一节');
 		}, 13);
-		grp.add(copyLastButton); allButtons.push(copyLastButton);
+		panel.register(TAB, copyLastButton);
 
 		y += 44;
 		var duetButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '二重奏', function()
@@ -877,9 +869,9 @@ class ChartingState extends MusicBeatState
 			}
 
 			updateGrid();
-			showToast('已生成二重奏');
+			panel.showToast('已生成二重奏');
 		}, 13);
-		grp.add(duetButton); allButtons.push(duetButton);
+		panel.register(TAB, duetButton);
 
 		var mirrorButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '镜像翻转', function()
 		{
@@ -892,14 +884,15 @@ class ChartingState extends MusicBeatState
 				note[1] = boob;
 			}
 			updateGrid();
-			showToast('已镜像翻转');
+			panel.showToast('已镜像翻转');
 		}, 13);
-		grp.add(mirrorButton); allButtons.push(mirrorButton);
+		panel.register(TAB, mirrorButton);
 	}
 
 	function addNoteUI():Void
 	{
-		var grp = tabGroups[2];
+		var grp = panel.tabGroups[2];
+		var TAB:Int = 2;
 
 		strumTimeInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, '音符时间 (毫秒)', '0', function(text:String)
 		{
@@ -911,7 +904,7 @@ class ChartingState extends MusicBeatState
 				updateGrid();
 			}
 		}, true);
-		grp.add(strumTimeInputText); allInputs.push(strumTimeInputText);
+		panel.register(TAB, strumTimeInputText);
 
 		stepperSusLength = new EditorStepper(CONTENT_X, CONTENT_Y + 54, 300, '长条长度 (毫秒)', 0, 0, Conductor.stepCrochet * 64, Math.ceil(Conductor.stepCrochet / 2), 0, function(v:Float)
 		{
@@ -921,7 +914,7 @@ class ChartingState extends MusicBeatState
 				updateGrid();
 			}
 		});
-		grp.add(stepperSusLength); allSteppers.push(stepperSusLength);
+		panel.register(TAB, stepperSusLength);
 
 		var key:Int = 0;
 		while (key < noteTypeList.length) {
@@ -962,8 +955,8 @@ class ChartingState extends MusicBeatState
 				curSelectedNote[3] = curNoteTypes[currentType];
 				updateGrid();
 			}
-		}, dropdownLayer);
-		grp.add(noteTypeDropDown); allDropdowns.push(noteTypeDropDown);
+		}, panel.dropdownLayer);
+		panel.register(TAB, noteTypeDropDown);
 
 		var delBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 168, CONTENT_RW, 34, '删除选中', function()
 		{
@@ -976,7 +969,7 @@ class ChartingState extends MusicBeatState
 				updateNoteUI();
 			}
 		}, 13, true);
-		grp.add(delBtn); allButtons.push(delBtn);
+		panel.register(TAB, delBtn);
 
 		var hint:FlxText = makeText(CONTENT_X, CONTENT_Y + 230, CONTENT_W, '点击网格放置音符
 拖拽向下拉出长条
@@ -988,7 +981,8 @@ Alt+点击：更换类型 · Q/E：调整长条
 
 	function addEventsUI():Void
 	{
-		var grp = tabGroups[3];
+		var grp = panel.tabGroups[3];
+		var TAB:Int = 3;
 
 		#if LUA_ALLOWED
 		var eventPushedMap:Map<String, Bool> = new Map<String, Bool>();
@@ -1038,8 +1032,8 @@ Alt+点击：更换类型 · Q/E：调整长条
 				curSelectedNote[1][curEventSelected][0] = eventStuff[i][0];
 				updateGrid();
 			}
-		}, dropdownLayer);
-		grp.add(eventDropDown); allDropdowns.push(eventDropDown);
+		}, panel.dropdownLayer);
+		panel.register(TAB, eventDropDown);
 
 		value1InputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 140, '值 1', '', function(text:String)
 		{
@@ -1052,7 +1046,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 				}
 			}
 		});
-		grp.add(value1InputText); allInputs.push(value1InputText);
+		panel.register(TAB, value1InputText);
 
 		value2InputText = new EditorInput(CONTENT_X + 160, CONTENT_Y + 54, 140, '值 2', '', function(text:String)
 		{
@@ -1065,7 +1059,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 				}
 			}
 		});
-		grp.add(value2InputText); allInputs.push(value2InputText);
+		panel.register(TAB, value2InputText);
 
 		var btnY:Float = CONTENT_Y + 112;
 		var removeButton:EditorButton = new EditorButton(CONTENT_X, btnY, 70, 34, '删除', function()
@@ -1092,7 +1086,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 				updateNoteUI();
 			}
 		}, 12, true);
-		grp.add(removeButton); allButtons.push(removeButton);
+		panel.register(TAB, removeButton);
 
 		var addButton:EditorButton = new EditorButton(CONTENT_X + 80, btnY, 70, 34, '添加', function()
 		{
@@ -1106,19 +1100,19 @@ Alt+点击：更换类型 · Q/E：调整长条
 				updateNoteUI();
 			}
 		}, 12);
-		grp.add(addButton); allButtons.push(addButton);
+		panel.register(TAB, addButton);
 
 		var moveLeftButton:EditorButton = new EditorButton(CONTENT_X + 160, btnY, 70, 34, '上一个', function()
 		{
 			changeEventSelected(-1);
 		}, 12);
-		grp.add(moveLeftButton); allButtons.push(moveLeftButton);
+		panel.register(TAB, moveLeftButton);
 
 		var moveRightButton:EditorButton = new EditorButton(CONTENT_X + 240, btnY, 70, 34, '下一个', function()
 		{
 			changeEventSelected(1);
 		}, 12);
-		grp.add(moveRightButton); allButtons.push(moveRightButton);
+		panel.register(TAB, moveRightButton);
 
 		selectedEventText = new FlxText(CONTENT_X, CONTENT_Y + 160, CONTENT_W, '选中事件：无', 12);
 		selectedEventText.setFormat(Paths.font('future.ttf'), 12, 0xFFD7D7E0, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -1164,121 +1158,122 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 	var stepperRate:EditorStepper;
 	var stepperCopy:EditorStepper;
 	function addChartingUI() {
-		var grp = tabGroups[4];
+		var grp = panel.tabGroups[4];
+		var TAB:Int = 4;
 
-		metronome = new EditorToggle(CONTENT_X, CONTENT_Y, '节拍器', FlxG.save.data.chart_metronome == true, function()
+		metronome = new EditorToggle(CONTENT_X, CONTENT_Y, '节拍器', FlxG.save.data.chart_metronome == true, function(v:Bool)
 		{
-			FlxG.save.data.chart_metronome = metronome.checked;
+			FlxG.save.data.chart_metronome = v;
 			FlxG.save.flush();
 		});
-		grp.add(metronome); allToggles.push(metronome);
+		panel.register(TAB, metronome);
 
-		disableAutoScrolling = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, '禁用自动滚动', FlxG.save.data.chart_noAutoScroll == true, function()
+		disableAutoScrolling = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, '禁用自动滚动', FlxG.save.data.chart_noAutoScroll == true, function(v:Bool)
 		{
-			FlxG.save.data.chart_noAutoScroll = disableAutoScrolling.checked;
+			FlxG.save.data.chart_noAutoScroll = v;
 			FlxG.save.flush();
 		});
-		grp.add(disableAutoScrolling); allToggles.push(disableAutoScrolling);
+		panel.register(TAB, disableAutoScrolling);
 
 		metronomeStepper = new EditorStepper(CONTENT_X, CONTENT_Y + 44, CONTENT_RW, '节拍器 BPM', _song.bpm, 1, 1500, 5, 1, null);
-		grp.add(metronomeStepper); allSteppers.push(metronomeStepper);
+		panel.register(TAB, metronomeStepper);
 
 		metronomeOffsetStepper = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 44, CONTENT_RW, '偏移 (毫秒)', 0, 0, 1000, 25, 1, null);
-		grp.add(metronomeOffsetStepper); allSteppers.push(metronomeOffsetStepper);
+		panel.register(TAB, metronomeOffsetStepper);
 
 		#if desktop
-		waveformUseInstrumental = new EditorToggle(CONTENT_X, CONTENT_Y + 98, '伴奏波形', FlxG.save.data.chart_waveformInst == true, function()
+		waveformUseInstrumental = new EditorToggle(CONTENT_X, CONTENT_Y + 98, '伴奏波形', FlxG.save.data.chart_waveformInst == true, function(v:Bool)
 		{
 			if (waveformUseVoices != null) waveformUseVoices.setChecked(false, false);
 			FlxG.save.data.chart_waveformVoices = false;
-			FlxG.save.data.chart_waveformInst = waveformUseInstrumental.checked;
+			FlxG.save.data.chart_waveformInst = v;
 			FlxG.save.flush();
 			updateWaveform();
 		});
-		grp.add(waveformUseInstrumental); allToggles.push(waveformUseInstrumental);
+		panel.register(TAB, waveformUseInstrumental);
 
-		waveformUseVoices = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, '人声波形', FlxG.save.data.chart_waveformVoices == true, function()
+		waveformUseVoices = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, '人声波形', FlxG.save.data.chart_waveformVoices == true, function(v:Bool)
 		{
 			if (waveformUseInstrumental != null) waveformUseInstrumental.setChecked(false, false);
 			FlxG.save.data.chart_waveformInst = false;
-			FlxG.save.data.chart_waveformVoices = waveformUseVoices.checked;
+			FlxG.save.data.chart_waveformVoices = v;
 			FlxG.save.flush();
 			updateWaveform();
 		});
-		grp.add(waveformUseVoices); allToggles.push(waveformUseVoices);
+		panel.register(TAB, waveformUseVoices);
 		#end
 
-		check_vortex = new EditorToggle(CONTENT_X, CONTENT_Y + 148, 'Vortex 编辑器', FlxG.save.data.chart_vortex == true, function()
+		check_vortex = new EditorToggle(CONTENT_X, CONTENT_Y + 148, 'Vortex 编辑器', FlxG.save.data.chart_vortex == true, function(v:Bool)
 		{
-			FlxG.save.data.chart_vortex = check_vortex.checked;
+			FlxG.save.data.chart_vortex = v;
 			vortex = FlxG.save.data.chart_vortex;
 			reloadGridLayer();
 		});
-		grp.add(check_vortex); allToggles.push(check_vortex);
+		panel.register(TAB, check_vortex);
 
-		mouseScrollingQuant = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 148, '鼠标量化滚动', FlxG.save.data.mouseScrollingQuant == true, function()
+		mouseScrollingQuant = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 148, '鼠标量化滚动', FlxG.save.data.mouseScrollingQuant == true, function(v:Bool)
 		{
-			FlxG.save.data.mouseScrollingQuant = mouseScrollingQuant.checked;
+			FlxG.save.data.mouseScrollingQuant = v;
 			mouseQuant = FlxG.save.data.mouseScrollingQuant;
 			FlxG.save.flush();
 		});
-		grp.add(mouseScrollingQuant); allToggles.push(mouseScrollingQuant);
+		panel.register(TAB, mouseScrollingQuant);
 
-		check_warnings = new EditorToggle(CONTENT_X, CONTENT_Y + 198, '忽略进度警告', FlxG.save.data.ignoreWarnings == true, function()
+		check_warnings = new EditorToggle(CONTENT_X, CONTENT_Y + 198, '忽略进度警告', FlxG.save.data.ignoreWarnings == true, function(v:Bool)
 		{
-			FlxG.save.data.ignoreWarnings = check_warnings.checked;
+			FlxG.save.data.ignoreWarnings = v;
 			ignoreWarnings = FlxG.save.data.ignoreWarnings;
 			FlxG.save.flush();
 		});
-		grp.add(check_warnings); allToggles.push(check_warnings);
+		panel.register(TAB, check_warnings);
 
 		stepperRate = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 198, CONTENT_RW, '播放速度', playbackSpeed, 0.5, 3, 0.05, 2, function(v:Float)
 		{
 			playbackSpeed = v;
 		});
-		grp.add(stepperRate); allSteppers.push(stepperRate);
+		panel.register(TAB, stepperRate);
 
-		check_mute_inst = new EditorToggle(CONTENT_X, CONTENT_Y + 252, '静音伴奏 (编辑中)', false, function()
+		check_mute_inst = new EditorToggle(CONTENT_X, CONTENT_Y + 252, '静音伴奏 (编辑中)', false, function(v:Bool)
 		{
-			var vol:Float = check_mute_inst.checked ? 0 : 1;
+			var vol:Float = v ? 0 : 1;
 			if (FlxG.sound.music != null) FlxG.sound.music.volume = vol;
 		});
-		grp.add(check_mute_inst); allToggles.push(check_mute_inst);
+		panel.register(TAB, check_mute_inst);
 
-		check_mute_vocals = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 252, '静音人声 (编辑中)', false, function()
+		check_mute_vocals = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 252, '静音人声 (编辑中)', false, function(v:Bool)
 		{
 			if(vocals != null) {
-				var vol:Float = check_mute_vocals.checked ? 0 : 1;
+				var vol:Float = v ? 0 : 1;
 				vocals.volume = vol;
 			}
 		});
-		grp.add(check_mute_vocals); allToggles.push(check_mute_vocals);
+		panel.register(TAB, check_mute_vocals);
 
-		playSoundBf = new EditorToggle(CONTENT_X, CONTENT_Y + 302, 'BF 音符音效', FlxG.save.data.chart_playSoundBf == true, function()
+		playSoundBf = new EditorToggle(CONTENT_X, CONTENT_Y + 302, 'BF 音符音效', FlxG.save.data.chart_playSoundBf == true, function(v:Bool)
 		{
-			FlxG.save.data.chart_playSoundBf = playSoundBf.checked;
+			FlxG.save.data.chart_playSoundBf = v;
 			FlxG.save.flush();
 		});
-		grp.add(playSoundBf); allToggles.push(playSoundBf);
+		panel.register(TAB, playSoundBf);
 
-		playSoundDad = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 302, 'Dad 音符音效', FlxG.save.data.chart_playSoundDad == true, function()
+		playSoundDad = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 302, 'Dad 音符音效', FlxG.save.data.chart_playSoundDad == true, function(v:Bool)
 		{
-			FlxG.save.data.chart_playSoundDad = playSoundDad.checked;
+			FlxG.save.data.chart_playSoundDad = v;
 			FlxG.save.flush();
 		});
-		grp.add(playSoundDad); allToggles.push(playSoundDad);
+		panel.register(TAB, playSoundDad);
 
 		instVolume = new EditorStepper(CONTENT_X, CONTENT_Y + 352, CONTENT_RW, '伴奏音量', 1, 0, 1, 0.1, 1, function(v:Float)
 		{
 			if (FlxG.sound.music != null) FlxG.sound.music.volume = v;
 		});
-		grp.add(instVolume); allSteppers.push(instVolume);
+		panel.register(TAB, instVolume);
 
 		voicesVolume = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 352, CONTENT_RW, '人声音量', 1, 0, 1, 0.1, 1, function(v:Float)
 		{
 			if (vocals != null) vocals.volume = v;
 		});
-		grp.add(voicesVolume); allSteppers.push(voicesVolume);
+		panel.register(TAB, voicesVolume);
 	}
 
 	var gameOverCharacterInputText:EditorInput;
@@ -1289,47 +1284,54 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 	var noteSplashesInputText:EditorInput;
 	function addDataUI()
 	{
-		var grp = tabGroups[5];
+		var grp = panel.tabGroups[5];
+		var TAB:Int = 5;
 
 		gameOverCharacterInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, '游戏结束角色', _song.gameOverChar != null ? _song.gameOverChar : '', function(text:String) { _song.gameOverChar = text; });
-		grp.add(gameOverCharacterInputText); allInputs.push(gameOverCharacterInputText);
+		panel.register(TAB, gameOverCharacterInputText);
 
 		gameOverSoundInputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 300, '死亡音效 (sounds/)', _song.gameOverSound != null ? _song.gameOverSound : '', function(text:String) { _song.gameOverSound = text; });
-		grp.add(gameOverSoundInputText); allInputs.push(gameOverSoundInputText);
+		panel.register(TAB, gameOverSoundInputText);
 
 		gameOverLoopInputText = new EditorInput(CONTENT_X, CONTENT_Y + 108, 300, '结束循环音乐 (music/)', _song.gameOverLoop != null ? _song.gameOverLoop : '', function(text:String) { _song.gameOverLoop = text; });
-		grp.add(gameOverLoopInputText); allInputs.push(gameOverLoopInputText);
+		panel.register(TAB, gameOverLoopInputText);
 
 		gameOverEndInputText = new EditorInput(CONTENT_X, CONTENT_Y + 162, 300, '结束重试音乐 (music/)', _song.gameOverEnd != null ? _song.gameOverEnd : '', function(text:String) { _song.gameOverEnd = text; });
-		grp.add(gameOverEndInputText); allInputs.push(gameOverEndInputText);
+		panel.register(TAB, gameOverEndInputText);
 
 		var check_disableNoteRGB:EditorToggle;
-		check_disableNoteRGB = new EditorToggle(CONTENT_X, CONTENT_Y + 222, '禁用音符 RGB', _song.disableNoteRGB == true, function()
+		check_disableNoteRGB = new EditorToggle(CONTENT_X, CONTENT_Y + 222, '禁用音符 RGB', _song.disableNoteRGB == true, function(v:Bool)
 		{
-			_song.disableNoteRGB = check_disableNoteRGB.checked;
+			_song.disableNoteRGB = v;
 			updateGrid();
 		});
-		grp.add(check_disableNoteRGB); allToggles.push(check_disableNoteRGB);
+		panel.register(TAB, check_disableNoteRGB);
 
 		noteSkinInputText = new EditorInput(CONTENT_X, CONTENT_Y + 276, 250, '音符皮肤', _song.arrowSkin != null ? _song.arrowSkin : '', function(text:String) { _song.arrowSkin = text; });
-		grp.add(noteSkinInputText); allInputs.push(noteSkinInputText);
+		panel.register(TAB, noteSkinInputText);
 
 		var reloadNotesButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 278, 160, 34, '应用音符皮肤', function() {
 			_song.arrowSkin = noteSkinInputText.field.text;
 			updateGrid();
-			showToast('音符皮肤已应用');
+			panel.showToast('音符皮肤已应用');
 		}, 12);
-		grp.add(reloadNotesButton); allButtons.push(reloadNotesButton);
+		panel.register(TAB, reloadNotesButton);
 
 		noteSplashesInputText = new EditorInput(CONTENT_X, CONTENT_Y + 330, 250, '溅射皮肤', _song.splashSkin != null ? _song.splashSkin : '', function(text:String) { _song.splashSkin = text; });
-		grp.add(noteSplashesInputText); allInputs.push(noteSplashesInputText);
+		panel.register(TAB, noteSplashesInputText);
 
 		var reloadSplashButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 332, 160, 34, '应用溅射皮肤', function() {
 			_song.splashSkin = noteSplashesInputText.field.text;
 			updateGrid();
-			showToast('溅射皮肤已应用');
+			panel.showToast('溅射皮肤已应用');
 		}, 12);
-		grp.add(reloadSplashButton); allButtons.push(reloadSplashButton);
+		panel.register(TAB, reloadSplashButton);
+
+		var exportBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 386, CONTENT_W, 34, '导出谱面…', function()
+		{
+			openExportPrompt();
+		}, 13);
+		panel.register(TAB, exportBtn);
 	}
 
 	function loadSong():Void
@@ -1447,47 +1449,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 	{
 		curStep = recalculateSteps();
 
-		// ---- UI 交互（标签页按钮 + 组件点击） ----
-		var mx:Float = FlxG.mouse.screenX;
-		var my:Float = FlxG.mouse.screenY;
-
-		var hoveredTab:Int = -1;
-		for (i in 0...tabBtns.length)
-		{
-			var b = tabBtns[i];
-			var hover:Bool = mx >= b.bg.x && mx <= b.bg.x + b.bg.width && my >= b.bg.y && my <= b.bg.y + b.bg.height;
-			if (hover) hoveredTab = i;
-		}
-		if (hoveredTab != lastHoveredTab)
-		{
-			lastHoveredTab = hoveredTab;
-			for (i in 0...tabBtns.length)
-			{
-				redrawBox(tabBtns[i].bg, 74, 30, 10, (i == curTab || i == hoveredTab) ? 0x30FFFFFF : 0x1CFFFFFF, (i == curTab || i == hoveredTab) ? 0x8CFFFFFF : 0x45FFFFFF);
-				tabBtns[i].txt.color = (i == curTab) ? 0xFFFFFFFF : (i == hoveredTab ? 0xFFE0E0E8 : 0xFFB8B8C8);
-			}
-		}
-		if (FlxG.mouse.justPressed && hoveredTab >= 0 && hoveredTab != curTab)
-		{
-			FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
-			changeTab(hoveredTab);
-		}
-
-		var typing:Bool = false;
-		for (input in allInputs) if (input.field.hasFocus) { typing = true; break; }
-
-		var openDropdown:EditorDropdown = null;
-		for (d in allDropdowns) if (d.open) { openDropdown = d; break; }
-
-		if (openDropdown != null)
-		{
-			openDropdown.updateOpen();
-		}
-		else if (!typing)
-		{
-			updateWidgets(mx, my);
-		}
-
+		panel.updatePanel(FlxG.mouse.screenX, FlxG.mouse.screenY);
 
 		if(FlxG.sound.music.time < 0) {
 			FlxG.sound.music.pause();
@@ -1583,7 +1545,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		}
 
 		var blockInput:Bool = false;
-		for (input in allInputs) {
+		for (tab in panel.tabInputs) for (input in tab) {
 			if(input.field.hasFocus) {
 				ClientPrefs.toggleVolumeKeys(false);
 				blockInput = true;
@@ -1593,7 +1555,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 
 		if(!blockInput) {
 			ClientPrefs.toggleVolumeKeys(true);
-			for (dropDownMenu in allDropdowns) {
+			for (tab in panel.tabDropdowns) for (dropDownMenu in tab) {
 				if(dropDownMenu.open) {
 					blockInput = true;
 					break;
@@ -1665,9 +1627,9 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 			if (FlxG.keys.justPressed.TAB)
 			{
 				if (FlxG.keys.pressed.SHIFT)
-					changeTab((curTab + tabGroups.length - 1) % tabGroups.length);
+					panel.changeTab((panel.curTab + panel.tabGroups.length - 1) % panel.tabGroups.length);
 				else
-					changeTab((curTab + 1) % tabGroups.length);
+					panel.changeTab((panel.curTab + 1) % panel.tabGroups.length);
 			}
 
 			if (FlxG.keys.justPressed.SPACE)
@@ -1880,11 +1842,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 				}
 			}
 		} else if (FlxG.keys.justPressed.ENTER) {
-			for (i in 0...allInputs.length) {
-				if(allInputs[i].field.hasFocus) {
-					allInputs[i].field.hasFocus = false;
-				}
-			}
+			panel.blurAllInputs();
 		}
 
 		strumLineNotes.visible = quant.visible = vortex;
@@ -3040,6 +2998,126 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		}
 	}
 
+	function openExportPrompt():Void
+	{
+		ClientPrefs.toggleVolumeKeys(false);
+		openSubState(new ChartExportPrompt(function(choice:Int)
+		{
+			ClientPrefs.toggleVolumeKeys(true);
+			switch (choice)
+			{
+				case 0: exportChartV1();
+				case 1: exportChartOld();
+				case 2: exportChartCne();
+			}
+		}));
+	}
+
+	function saveFileDialog(fileName:String, content:String):Void
+	{
+		_file = new FileReference();
+		_file.addEventListener(Event.COMPLETE, onSaveComplete);
+		_file.addEventListener(Event.CANCEL, onSaveCancel);
+		_file.addEventListener(IOErrorEvent.IO_ERROR, onSaveError);
+		_file.save(content, fileName);
+	}
+
+	function exportChartV1():Void
+	{
+		// Psych 1.0.4 新格式（与现有「保存」一致）
+		saveFileDialog(Paths.formatToSongPath(_song.song) + '.json', haxe.Json.stringify({song: _song}, "\t"));
+	}
+
+	function exportChartOld():Void
+	{
+		// Psych 0.6.3 旧版兼容格式（移植自 Seiun convertToOldFormat）
+		saveFileDialog(Paths.formatToSongPath(_song.song) + '.json', haxe.Json.stringify({song: convertToOldFormat(_song)}, "\t"));
+	}
+
+	function exportChartCne():Void
+	{
+		// Codename Engine (CNE) 谱面（移植自 Seiun CneExport）
+		saveFileDialog(Paths.formatToSongPath(_song.song) + '.json', CneExport.psychToCne(_song));
+	}
+
+	/**
+	 * Psych 1.0.4 新格式谱面 → 0.6.3 旧版兼容格式（深拷贝 + 字段整理 + note data 翻转 + noteType 数字索引）。
+	 * 移植自 Seiun Engine NewChartingState.convertToOldFormat。
+	 */
+	function convertToOldFormat(song:SwagSong):SwagSong
+	{
+		var legacyNoteTypes:Array<String> = ['', 'Alt Animation', 'Hey!', 'Hurt Note', 'GF Sing', 'No Animation'];
+		var oldSong:SwagSong = Reflect.copy(song);
+		oldSong.notes = song.notes.copy();
+		for (i in 0...oldSong.notes.length)
+		{
+			var srcSec = song.notes[i];
+			var dstSec:SwagSection = Reflect.copy(srcSec);
+			dstSec.sectionNotes = srcSec.sectionNotes.copy();
+			for (j in 0...dstSec.sectionNotes.length)
+				dstSec.sectionNotes[j] = srcSec.sectionNotes[j].copy();
+			oldSong.notes[i] = dstSec;
+		}
+		oldSong.events = song.events.copy();
+		for (i in 0...oldSong.events.length)
+		{
+			oldSong.events[i] = song.events[i].copy();
+			var evt:Array<Dynamic> = oldSong.events[i];
+			if (evt.length > 1 && evt[1] != null)
+			{
+				evt[1] = evt[1].copy();
+				for (j in 0...evt[1].length)
+				{
+					var sub:Array<Dynamic> = evt[1][j];
+					if (sub != null) evt[1][j] = sub.copy();
+				}
+			}
+		}
+
+		// ── 确保旧引擎必需的字段 ──
+		if (oldSong.gfVersion == null || oldSong.gfVersion.length == 0)
+			oldSong.gfVersion = 'gf';
+		Reflect.setField(oldSong, 'player3', oldSong.gfVersion);
+		Reflect.setField(oldSong, 'validScore', true);
+		if (oldSong.arrowSkin == null) oldSong.arrowSkin = '';
+		if (oldSong.splashSkin == null) oldSong.splashSkin = 'noteSplashes';
+
+		// ── 移除新格式特有字段（旧引擎不认识） ──
+		for (field in ['format', 'offset', 'gameOverChar', 'gameOverSound', 'gameOverLoop', 'gameOverEnd', 'disableNoteRGB'])
+		{
+			if (Reflect.hasField(oldSong, field))
+				Reflect.deleteField(oldSong, field);
+		}
+
+		// ── note data 布局转换 + noteType 字符串→数字索引 ──
+		for (sec in oldSong.notes)
+		{
+			for (note in sec.sectionNotes)
+			{
+				if (note[1] < 0) continue;
+				if (!sec.mustHitSection)
+				{
+					if (note[1] >= 4) note[1] -= 4;
+					else if (note[1] <= 3) note[1] += 4;
+				}
+				if (note.length > 3 && Std.isOfType(note[3], String) && note[3] != null && note[3].length > 0)
+				{
+					var typeIndex:Int = legacyNoteTypes.indexOf(note[3]);
+					note[3] = (typeIndex >= 0) ? typeIndex : 0;
+				}
+				else if (note.length <= 3)
+					note.push(0);
+				else
+					note[3] = 0;
+			}
+		}
+
+		if (oldSong.events == null)
+			oldSong.events = [];
+
+		return oldSong;
+	}
+
 	function onSaveComplete(_):Void
 	{
 		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
@@ -3081,17 +3159,6 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		return val != null ? val : 4;
 	}
 
-	// ===================== 现代 UI 辅助 =====================
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
-	{
-		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
-		if (border != null)
-			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
-		spr.scrollFactor.set();
-		return spr;
-	}
-
 	function makeText(x:Float, y:Float, w:Float, text:String, size:Int, ?color:Int = 0xFFD7D7E0, ?align:FlxTextAlign = LEFT, ?font:String = 'future.ttf'):FlxText
 	{
 		var t:FlxText = new FlxText(x, y, w, text, size);
@@ -3102,635 +3169,6 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		return t;
 	}
 
-	function redrawBox(spr:FlxSprite, w:Int, h:Int, radius:Float, fill:Int, border:Int):Void
-	{
-		spr.pixels.fillRect(spr.pixels.rect, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
-		if (border != 0)
-			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
-		spr.dirty = true;
-	}
-
-	function buildTabs():Void
-	{
-		var tabLabels:Array<String> = ['歌曲', '小节', '音符', '事件', '编曲', '数据'];
-		for (i in 0...tabLabels.length)
-		{
-			var btnBg:FlxSprite = new FlxSprite(PANEL_X + 12 + i * 76, PANEL_Y + 52).makeGraphic(74, 30, FlxColor.TRANSPARENT);
-			btnBg.antialiasing = ClientPrefs.data.antialiasing;
-			btnBg.scrollFactor.set();
-			redrawBox(btnBg, 74, 30, 10, 0x1CFFFFFF, 0x45FFFFFF);
-			add(btnBg);
-			var btnTxt:FlxText = makeText(PANEL_X + 12 + i * 76, PANEL_Y + 58, 74, tabLabels[i], 13, 0xFFB8B8C8, CENTER);
-			add(btnTxt);
-			tabBtns.push({bg: btnBg, txt: btnTxt});
-		}
-		for (i in 0...tabLabels.length)
-		{
-			var grp:FlxSpriteGroup = new FlxSpriteGroup();
-			grp.visible = false;
-			grp.active = false;
-			add(grp);
-			tabGroups.push(grp);
-		}
-	}
-
-	function changeTab(t:Int):Void
-	{
-		if (t < 0 || t >= tabGroups.length) return;
-		curTab = t;
-		for (i in 0...tabGroups.length)
-		{
-			tabGroups[i].visible = (i == t);
-			tabGroups[i].active = (i == t);
-		}
-		blurAllInputs();
-		for (d in allDropdowns) if (d.open) d.close();
-		refreshTabButtons();
-	}
-
-	function refreshTabButtons():Void
-	{
-		for (i in 0...tabBtns.length)
-		{
-			var active:Bool = (i == curTab);
-			redrawBox(tabBtns[i].bg, 74, 30, 10, active ? 0x38FFFFFF : 0x1CFFFFFF, active ? 0x8CFFFFFF : 0x45FFFFFF);
-			tabBtns[i].txt.color = active ? 0xFFFFFFFF : 0xFFB8B8C8;
-		}
-	}
-
-	function showToast(msg:String):Void
-	{
-		toastText.text = msg;
-		toastText.visible = true;
-		toastText.alpha = 1;
-		if (toastTimer != null) toastTimer.cancel();
-		toastTimer = new FlxTimer().start(2.2, function(_)
-		{
-			FlxTween.tween(toastText, {alpha: 0}, 0.4, {onComplete: function(_) toastText.visible = false});
-		});
-	}
-
-	function blurAllInputs():Void
-	{
-		for (i in allInputs) i.field.hasFocus = false;
-	}
-
-	function updateWidgets(mx:Float, my:Float):Void
-	{
-		var clicked:Bool = FlxG.mouse.justPressed;
-
-		for (b in allButtons)
-		{
-			b.setHovered(b.over(mx, my));
-			if (clicked && b.over(mx, my) && b.onClick != null)
-			{
-				FlxG.sound.play(Paths.sound('scrollMenu'), 0.2);
-				b.onClick();
-			}
-		}
-		for (t in allToggles)
-		{
-			t.setHovered(t.over(mx, my));
-			if (clicked && t.over(mx, my)) t.toggle();
-		}
-		for (s in allSteppers)
-		{
-			s.setHovered(s.overMinus(mx, my), s.overPlus(mx, my));
-			if (clicked)
-			{
-				if (s.overMinus(mx, my)) s.stepBy(-1, FlxG.keys.pressed.SHIFT);
-				else if (s.overPlus(mx, my)) s.stepBy(1, FlxG.keys.pressed.SHIFT);
-			}
-		}
-		for (d in allDropdowns)
-		{
-			d.setHovered(d.over(mx, my));
-			if (clicked && d.over(mx, my))
-			{
-				for (other in allDropdowns) if (other != d && other.open) other.close();
-				d.toggle();
-			}
-		}
-	}
-}
-
-class EditorButton extends FlxSpriteGroup
-{
-	public var onClick:Void->Void;
-	public var enabled:Bool = true;
-	public var hovered:Bool = false;
-	public var bg:FlxSprite;
-	public var label:FlxText;
-	var accent:Bool;
-	var w:Float;
-	var h:Float;
-
-	public function new(x:Float, y:Float, w:Float, h:Float, text:String, ?onClick:Void->Void, ?size:Int = 14, ?accent:Bool = false)
-	{
-		super(x, y);
-		this.onClick = onClick;
-		this.accent = accent;
-		this.w = w;
-		this.h = h;
-
-		bg = new FlxSprite(0, 0).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		bg.scrollFactor.set();
-		redraw();
-		add(bg);
-
-		label = new FlxText(0, 0, Std.int(w), text, size);
-		label.setFormat(Paths.font('future.ttf'), size, accent ? 0xFFFFFFFF : 0xFFD7D7E0, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		label.borderSize = 1.2;
-		label.scrollFactor.set();
-		label.antialiasing = ClientPrefs.data.antialiasing;
-		label.y = (h - label.height) / 2;
-		add(label);
-	}
-
-	public function over(mx:Float, my:Float):Bool
-	{
-		return mx >= x && mx <= x + w && my >= y && my <= y + h;
-	}
-
-	public function setHovered(v:Bool):Void
-	{
-		if (hovered == v) return;
-		hovered = v;
-		redraw();
-	}
-
-	function redraw():Void
-	{
-		bg.pixels.fillRect(bg.pixels.rect, FlxColor.TRANSPARENT);
-		var fill:Int = hovered ? 0x36FFFFFF : (accent ? 0x2EFFFFFF : 0x1CFFFFFF);
-		var border:Int = hovered ? 0x8CFFFFFF : (accent ? 0x66FFFFFF : 0x45FFFFFF);
-		FlxSpriteUtil.drawRoundRect(bg, 0, 0, w, h, 10, 10, fill, {color: border, thickness: 1.5});
-		bg.dirty = true;
-	}
-}
-
-class EditorToggle extends FlxSpriteGroup
-{
-	public var checked:Bool;
-	public var onChange:Void->Void;
-	public var label:FlxText;
-	var box:FlxSprite;
-	var checkTxt:FlxText;
-	var hovered:Bool = false;
-	var hitW:Float = 220;
-
-	public function new(x:Float, y:Float, text:String, initial:Bool, ?onChange:Void->Void, ?labelW:Float = 200)
-	{
-		super(x, y);
-		this.onChange = onChange;
-		checked = initial;
-
-		box = new FlxSprite(0, 0).makeGraphic(22, 22, FlxColor.TRANSPARENT);
-		box.antialiasing = ClientPrefs.data.antialiasing;
-		box.scrollFactor.set();
-		add(box);
-
-		checkTxt = new FlxText(1, -1, 22, '✓', 15);
-		checkTxt.setFormat(Paths.font('future.ttf'), 15, 0xFFFFFFFF, CENTER);
-		checkTxt.scrollFactor.set();
-		checkTxt.visible = checked;
-		add(checkTxt);
-
-		label = new FlxText(30, 2, Std.int(labelW), text, 14);
-		label.setFormat(Paths.font('future.ttf'), 14, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		label.borderSize = 1.2;
-		label.scrollFactor.set();
-		label.antialiasing = ClientPrefs.data.antialiasing;
-		add(label);
-
-		hitW = 30 + label.width;
-		redraw();
-	}
-
-	public function over(mx:Float, my:Float):Bool
-	{
-		return mx >= x - 4 && mx <= x + hitW && my >= y - 4 && my <= y + 30;
-	}
-
-	public function setHovered(v:Bool):Void
-	{
-		if (hovered == v) return;
-		hovered = v;
-		redraw();
-	}
-
-	public function toggle():Void
-	{
-		checked = !checked;
-		checkTxt.visible = checked;
-		redraw();
-		if (onChange != null) onChange();
-	}
-
-	public function setChecked(v:Bool, fire:Bool = true):Void
-	{
-		if (checked == v) return;
-		checked = v;
-		checkTxt.visible = checked;
-		redraw();
-		if (fire && onChange != null) onChange();
-	}
-
-	function redraw():Void
-	{
-		box.pixels.fillRect(box.pixels.rect, FlxColor.TRANSPARENT);
-		var fill:Int = checked ? 0x406B7CFF : (hovered ? 0x26FFFFFF : 0x12FFFFFF);
-		var border:Int = checked ? 0x8C9BB5FF : 0x45FFFFFF;
-		FlxSpriteUtil.drawRoundRect(box, 0, 0, 22, 22, 6, 6, fill, {color: border, thickness: 1.5});
-		box.dirty = true;
-	}
-}
-
-class EditorInput extends FlxSpriteGroup
-{
-	public var field:FlxInputText;
-	public var bg:FlxSprite;
-	public var labelTxt:FlxText;
-	public var userOnChange:String->Void;
-	var h:Float = 30;
-
-	public function new(x:Float, y:Float, w:Float, label:String, value:String, ?userOnChange:String->Void, ?numeric:Bool = false)
-	{
-		super(x, y);
-		this.userOnChange = userOnChange;
-
-		labelTxt = new FlxText(0, -20, Std.int(w), label, 12);
-		labelTxt.setFormat(Paths.font('future.ttf'), 12, 0xFF8A8FA8, LEFT);
-		labelTxt.scrollFactor.set();
-		add(labelTxt);
-
-		bg = new FlxSprite(0, 0).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		bg.scrollFactor.set();
-		redraw(false);
-		add(bg);
-
-		field = new FlxInputText(8, 5, Std.int(w) - 16, value, 14, 0xFFE8E8F0, FlxColor.TRANSPARENT);
-		field.setFormat(Paths.font('future.ttf'), 14, 0xFFE8E8F0, LEFT);
-		field.scrollFactor.set();
-		field.antialiasing = ClientPrefs.data.antialiasing;
-		if (numeric) field.customFilterPattern = ~/[^0-9.\-]/g;
-		field.callback = function(text:String, action:String)
-		{
-			if (action == FlxInputText.ENTER_ACTION) field.hasFocus = false;
-			if (userOnChange != null) userOnChange(text);
-		};
-		field.focusGained = function() redraw(true);
-		field.focusLost = function() redraw(false);
-		add(field);
-	}
-
-	public function over(mx:Float, my:Float):Bool
-	{
-		return mx >= x && mx <= x + bg.width && my >= y && my <= y + h;
-	}
-
-	public function setText(v:String):Void
-	{
-		if (field.text != v) field.text = v;
-	}
-
-	function redraw(focused:Bool):Void
-	{
-		bg.pixels.fillRect(bg.pixels.rect, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(bg, 0, 0, bg.width, h, 8, 8, focused ? 0x1EFFFFFF : 0x10FFFFFF, {color: focused ? 0x66FFFFFF : 0x30FFFFFF, thickness: 1.5});
-		bg.dirty = true;
-	}
-}
-
-class EditorStepper extends FlxSpriteGroup
-{
-	public var value:Float;
-	public var min:Float;
-	public var max:Float;
-	public var step:Float;
-	public var onChange:Float->Void;
-	public var labelTxt:FlxText;
-	var minusBtn:FlxSprite;
-	var plusBtn:FlxSprite;
-	var minusTxt:FlxText;
-	var plusTxt:FlxText;
-	var valueTxt:FlxText;
-	var decimals:Int;
-	var hoverMinus:Bool = false;
-	var hoverPlus:Bool = false;
-	var w:Float;
-	var h:Float = 30;
-
-	public function new(x:Float, y:Float, w:Float, label:String, value:Float, min:Float, max:Float, step:Float, ?decimals:Int = 2, ?onChange:Float->Void)
-	{
-		super(x, y);
-		this.value = value;
-		this.min = min;
-		this.max = max;
-		this.step = step;
-		this.onChange = onChange;
-		this.decimals = decimals;
-		this.w = w;
-
-		labelTxt = new FlxText(0, -20, Std.int(w), label, 12);
-		labelTxt.setFormat(Paths.font('future.ttf'), 12, 0xFF8A8FA8, LEFT);
-		labelTxt.scrollFactor.set();
-		add(labelTxt);
-
-		minusBtn = new FlxSprite(0, 0).makeGraphic(30, Std.int(h), FlxColor.TRANSPARENT);
-		minusBtn.antialiasing = ClientPrefs.data.antialiasing;
-		minusBtn.scrollFactor.set();
-		add(minusBtn);
-
-		plusBtn = new FlxSprite(w - 30, 0).makeGraphic(30, Std.int(h), FlxColor.TRANSPARENT);
-		plusBtn.antialiasing = ClientPrefs.data.antialiasing;
-		plusBtn.scrollFactor.set();
-		add(plusBtn);
-
-		minusTxt = new FlxText(0, 4, 30, '-', 16);
-		minusTxt.setFormat(Paths.font('future.ttf'), 16, 0xFFD7D7E0, CENTER);
-		minusTxt.scrollFactor.set();
-		add(minusTxt);
-
-		plusTxt = new FlxText(w - 30, 4, 30, '+', 16);
-		plusTxt.setFormat(Paths.font('future.ttf'), 16, 0xFFD7D7E0, CENTER);
-		plusTxt.scrollFactor.set();
-		add(plusTxt);
-
-		valueTxt = new FlxText(30, 6, Std.int(w - 60), '', 13);
-		valueTxt.setFormat(Paths.font('future.ttf'), 13, 0xFFE8E8F0, CENTER);
-		valueTxt.scrollFactor.set();
-		add(valueTxt);
-
-		redraw();
-		updateValueText();
-	}
-
-	public function overMinus(mx:Float, my:Float):Bool { return mx >= x && mx <= x + 30 && my >= y && my <= y + h; }
-	public function overPlus(mx:Float, my:Float):Bool { return mx >= x + w - 30 && mx <= x + w && my >= y && my <= y + h; }
-
-	public function setHovered(vMinus:Bool, vPlus:Bool):Void
-	{
-		if (hoverMinus == vMinus && hoverPlus == vPlus) return;
-		hoverMinus = vMinus;
-		hoverPlus = vPlus;
-		redraw();
-	}
-
-	public function stepBy(sign:Int, big:Bool):Void
-	{
-		var s:Float = step * (big ? 10 : 1);
-		value = FlxMath.bound(value + sign * s, min, max);
-		updateValueText();
-		if (onChange != null) onChange(value);
-	}
-
-	public function setValue(v:Float):Void
-	{
-		value = FlxMath.bound(v, min, max);
-		updateValueText();
-	}
-
-	function updateValueText():Void
-	{
-		valueTxt.text = Std.string(FlxMath.roundDecimal(value, decimals));
-	}
-
-	function redraw():Void
-	{
-		for (pair in [{spr: minusBtn, hover: hoverMinus}, {spr: plusBtn, hover: hoverPlus}])
-		{
-			pair.spr.pixels.fillRect(pair.spr.pixels.rect, FlxColor.TRANSPARENT);
-			FlxSpriteUtil.drawRoundRect(pair.spr, 0, 0, pair.spr.width, pair.spr.height, 8, 8, pair.hover ? 0x30FFFFFF : 0x14FFFFFF, {color: pair.hover ? 0x66FFFFFF : 0x38FFFFFF, thickness: 1.5});
-			pair.spr.dirty = true;
-		}
-	}
-}
-
-class EditorDropdown extends FlxSpriteGroup
-{
-	public var options:Array<String>;
-	public var selectedIndex:Int = 0;
-	public var onChange:Int->Void;
-	public var open:Bool = false;
-	public var labelTxt:FlxText;
-	var bg:FlxSprite;
-	var valueTxt:FlxText;
-	var arrowTxt:FlxText;
-	var hovered:Bool = false;
-	var w:Float;
-	var h:Float = 30;
-	var layer:FlxSpriteGroup;
-	var panelBg:FlxSprite;
-	var panelItems:Array<{bg:FlxSprite, txt:FlxText}> = [];
-	var scroll:Int = 0;
-	var hoveredItem:Int = -1;
-	var lastHoveredItem:Int = -999;
-	var lastSelectedForHover:Int = -999;
-	var visibleRows:Int = 6;
-	var rowH:Int = 30;
-
-	public function new(x:Float, y:Float, w:Float, label:String, options:Array<String>, selectedIndex:Int, ?onChange:Int->Void, layer:FlxSpriteGroup)
-	{
-		super(x, y);
-		this.options = options;
-		this.selectedIndex = selectedIndex;
-		this.onChange = onChange;
-		this.layer = layer;
-		this.w = w;
-
-		labelTxt = new FlxText(0, -20, Std.int(w), label, 12);
-		labelTxt.setFormat(Paths.font('future.ttf'), 12, 0xFF8A8FA8, LEFT);
-		labelTxt.scrollFactor.set();
-		add(labelTxt);
-
-		bg = new FlxSprite(0, 0).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		bg.scrollFactor.set();
-		add(bg);
-
-		valueTxt = new FlxText(10, 6, Std.int(w - 42), '', 13);
-		valueTxt.setFormat(Paths.font('future.ttf'), 13, 0xFFE8E8F0, LEFT);
-		valueTxt.scrollFactor.set();
-		add(valueTxt);
-
-		arrowTxt = new FlxText(w - 26, 3, 20, '▾', 14);
-		arrowTxt.setFormat(Paths.font('future.ttf'), 14, 0xFFB8B8C8, CENTER);
-		arrowTxt.scrollFactor.set();
-		add(arrowTxt);
-
-		redraw();
-		refreshLabel();
-	}
-
-	public function over(mx:Float, my:Float):Bool
-	{
-		return mx >= x && mx <= x + w && my >= y && my <= y + h;
-	}
-
-	public function setHovered(v:Bool):Void
-	{
-		if (hovered == v) return;
-		hovered = v;
-		redraw();
-	}
-
-	public function selectIndex(i:Int):Void
-	{
-		selectedIndex = i;
-		refreshLabel();
-	}
-
-	public function refreshLabel():Void
-	{
-		if (selectedIndex >= 0 && selectedIndex < options.length) valueTxt.text = options[selectedIndex];
-		else valueTxt.text = '';
-	}
-
-	public function toggle():Void
-	{
-		if (open) close();
-		else openPanel();
-	}
-
-	function openPanel():Void
-	{
-		open = true;
-		scroll = 0;
-		hoveredItem = -1;
-		redraw();
-		panelBg = new FlxSprite(x, y + h).makeGraphic(Std.int(w), visibleRows * rowH + 8, 0xEE161622);
-		panelBg.antialiasing = true;
-		panelBg.scrollFactor.set();
-		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, visibleRows * rowH + 8, 10, 10, 0xEE161622, {color: 0x55FFFFFF, thickness: 1.5});
-		layer.add(panelBg);
-		rebuildItems();
-	}
-
-	public function close():Void
-	{
-		open = false;
-		redraw();
-		if (panelBg != null)
-		{
-			layer.remove(panelBg);
-			panelBg.destroy();
-			panelBg = null;
-		}
-		for (it in panelItems)
-		{
-			layer.remove(it.bg);
-			layer.remove(it.txt);
-			it.bg.destroy();
-			it.txt.destroy();
-		}
-		panelItems = [];
-	}
-
-	public function updateOpen():Void
-	{
-		var mx:Float = FlxG.mouse.screenX;
-		var my:Float = FlxG.mouse.screenY;
-
-		if (FlxG.mouse.wheel != 0)
-		{
-			scroll -= FlxG.mouse.wheel;
-			scroll = Std.int(FlxMath.bound(scroll, 0, Math.max(0, options.length - visibleRows)));
-			rebuildItems();
-		}
-
-		hoveredItem = -1;
-		for (i in 0...panelItems.length)
-		{
-			var it = panelItems[i];
-			if (mx >= it.bg.x && mx <= it.bg.x + it.bg.width && my >= it.bg.y && my <= it.bg.y + it.bg.height) hoveredItem = scroll + i;
-		}
-		rebuildHover();
-
-		if (FlxG.mouse.justPressed)
-		{
-			if (over(mx, my))
-			{
-				close();
-				return;
-			}
-			if (hoveredItem >= 0 && hoveredItem < options.length)
-			{
-				selectedIndex = hoveredItem;
-				refreshLabel();
-				var cb:Int->Void = onChange;
-				close();
-				if (cb != null) cb(selectedIndex);
-			}
-			else if (panelBg != null && !(mx >= panelBg.x && mx <= panelBg.x + panelBg.width && my >= panelBg.y && my <= panelBg.y + panelBg.height))
-			{
-				close();
-			}
-		}
-	}
-
-	function rebuildItems():Void
-	{
-		for (it in panelItems)
-		{
-			layer.remove(it.bg);
-			layer.remove(it.txt);
-			it.bg.destroy();
-			it.txt.destroy();
-		}
-		panelItems = [];
-
-		if (panelBg == null) return;
-		for (i in 0...visibleRows)
-		{
-			var idx:Int = scroll + i;
-			if (idx >= options.length) break;
-			var y:Float = panelBg.y + 4 + i * rowH;
-
-			var bg:FlxSprite = new FlxSprite(panelBg.x + 4, y).makeGraphic(Std.int(w - 8), rowH - 4, 0x00FFFFFF);
-			bg.antialiasing = true;
-			bg.scrollFactor.set();
-			layer.add(bg);
-
-			var txt:FlxText = new FlxText(panelBg.x + 14, y + 6, Std.int(w - 28), options[idx], 13);
-			txt.setFormat(Paths.font('future.ttf'), 13, 0xFFE8E8F0, LEFT);
-			txt.scrollFactor.set();
-			layer.add(txt);
-
-			panelItems.push({bg: bg, txt: txt});
-		}
-		lastHoveredItem = -999;
-		lastSelectedForHover = -999;
-		rebuildHover();
-	}
-
-	function rebuildHover():Void
-	{
-		if (lastHoveredItem == hoveredItem && lastSelectedForHover == selectedIndex) return;
-		lastHoveredItem = hoveredItem;
-		lastSelectedForHover = selectedIndex;
-		for (i in 0...panelItems.length)
-		{
-			var idx:Int = scroll + i;
-			var selected:Bool = idx == selectedIndex;
-			var hover:Bool = idx == hoveredItem;
-			var it = panelItems[i];
-			it.bg.pixels.fillRect(it.bg.pixels.rect, FlxColor.TRANSPARENT);
-			FlxSpriteUtil.drawRoundRect(it.bg, 0, 0, it.bg.width, it.bg.height, 6, 6, hover ? 0x30FFFFFF : (selected ? 0x1EFFFFFF : 0x00FFFFFF));
-			it.bg.dirty = true;
-			it.txt.color = (hover || selected) ? 0xFFFFFFFF : 0xFFE8E8F0;
-		}
-	}
-
-	function redraw():Void
-	{
-		bg.pixels.fillRect(bg.pixels.rect, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(bg, 0, 0, w, h, 8, 8, open ? 0x1EFFFFFF : (hovered ? 0x26FFFFFF : 0x10FFFFFF), {color: open ? 0x66FFFFFF : (hovered ? 0x55FFFFFF : 0x30FFFFFF), thickness: 1.5});
-		bg.dirty = true;
-	}
 }
 
 class AttachedFlxText extends FlxText

@@ -26,17 +26,42 @@ class HScript extends SScript
 	{
 		#if (SScript >= "3.0.0")
 		var hs:HScript = try parent.hscript catch (e) null;
+		var cleaned:String = preprocessScript(code);
 		if(hs == null)
 		{
 			trace('initializing haxe interp for: ${parent.scriptName}');
-			parent.hscript = new HScript(parent, code);
+			parent.hscript = new HScript(parent, cleaned);
 		}
 		else
 		{
 			// Psych 0.7.3 兼容：后续 runHaxeCode 每次都要执行代码（SScript 4.0.1 的 doString 内部有 try/catch，解析失败不抛）
-			hs.doString(code);
+			hs.doString(cleaned);
 		}
 		#end
+	}
+
+	/**
+	 * Psych 0.7.3 模组兼容：SScript 4.0.1 的类型检查器不接受
+	 * `var x:Map<String, Dynamic> = [];`（报 Array should be Map），
+	 * 官方 PE 0.7.3 能跑这类写法。此处把「Map 类型变量用空数组初始化」改写为 `new Map()`。
+	 */
+	public static function preprocessScript(code:String):String
+	{
+		if (code == null || code.length == 0) return code;
+		// Psych 0.7.3 模组兼容：`var x:Map<String, Dynamic> = [];` → `var x = __newMap();`
+		// （字符串级替换，保留 var 名前缀；SScript 4.0.1 类型检查器/运行时均不认这种 Map 初始化）
+		var fixed:Int = 0;
+		var out:String = code;
+		for (m in [':Map<String, Dynamic> = [];', ':Map<String, FlxBackdrop> = [];'])
+		{
+			if (out.indexOf(m) >= 0)
+			{
+				var cnt:Int = out.split(m).length - 1;
+				out = out.split(m).join(' = __newMap();');
+				fixed += cnt;
+			}
+		}
+		return out;
 	}
 
 	public var origin:String;
@@ -540,6 +565,10 @@ class HScript extends SScript
 		#if LUA_ALLOWED
 		funk.addLocalCallback("runHaxeCode", function(codeToRun:String, ?varsToBring:Any = null, ?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):Dynamic {
 			var retVal:SCall = null;
+			// TEMP-DIAG: FlxBackdrop 执行证据（验证后删）
+			if (codeToRun != null && codeToRun.indexOf('FlxBackdrop') >= 0)
+				trace('[RHX] FlxBackdrop code len=' + codeToRun.length + ' head=' + codeToRun.substr(0, 60).replace('
+', ' '));
 			#if (SScript >= "3.0.0")
 			initHaxeModuleCode(funk, codeToRun);
 			if(varsToBring != null)

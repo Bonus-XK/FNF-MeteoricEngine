@@ -128,6 +128,8 @@ class PlayState extends MusicBeatState
 	
 	#if HSCRIPT_ALLOWED
 	public var hscriptArray:Array<HScript> = [];
+	// Psych 0.7 兼容：舞台脚本用 game.backdropSprites 记录 FlxBackdrop（FunkinMix Dogma 等）
+	public var backdropSprites:Map<String, Dynamic> = new Map<String, Dynamic>();
 	#end
 
 	#if LUA_ALLOWED
@@ -5584,7 +5586,17 @@ class PlayState extends MusicBeatState
 		if (replayMode) return;
 		try
 		{
-			var newScript:HScript = new HScript(null, file);
+			// Psych 0.7.3 兼容：读取 .hx 内容并预处理（var x:Map = [] → new Map()），以代码串交给 SScript
+			var scriptCode:String = file;
+			#if sys
+			try
+			{
+				if (sys.FileSystem.exists(file))
+					scriptCode = HScript.preprocessScript(sys.io.File.getContent(file));
+			}
+			catch (e:Dynamic) {}
+			#end
+			var newScript:HScript = new HScript(null, scriptCode);
 			// 66mod 等 Psych 0.7 模组对话脚本需要 songName / startDialogue
 			newScript.set('songName', songName);
 			newScript.set('startDialogue', function(dialogue:Dynamic) startDialogue(dialogue));

@@ -1,5 +1,6 @@
 package states;
 import backend.WheelScroll;
+import backend.CrashHandler;
 
 import objects.BackButton;
 import objects.AchievementPopup;
@@ -324,6 +325,28 @@ class MainMenuState extends MusicBeatState
 			{
 				keyBuffer += String.fromCharCode(pressedKey);
 				if (keyBuffer.length > 9) keyBuffer = keyBuffer.substring(keyBuffer.length - 9);
+				if (keyBuffer.toLowerCase() == 'crash')
+				{
+					// 彩蛋：输入 crash → 弹窗选择崩溃模式（Haxe 级报错 / 原生底层报错）
+					keyBuffer = '';
+					trace('[CRASH-TEST] 输入 crash，弹出崩溃模式选择');
+					ClientPrefs.toggleVolumeKeys(false);
+					openSubState(new CrashTestPrompt(function(choice:Int)
+					{
+						ClientPrefs.toggleVolumeKeys(true);
+						switch (choice)
+						{
+							case 0:
+								// Haxe 级报错：同步抛出未捕获异常（处于 update 链内 → uncaughtErrorEvents → 报错界面 + MeteoricEngine_*.txt）
+								trace('[CRASH-TEST] 触发 Haxe 级报错');
+								throw '手动 Haxe 崩溃测试（主菜单输入 crash 触发）';
+							case 1:
+								// 原生/底层报错：真实段错误（走信号处理器 → native_stack.txt）
+								trace('[CRASH-TEST] 触发原生段错误');
+								CrashHandler.triggerNativeCrash();
+						}
+					}));
+				}
 				if (keyBuffer.toLowerCase() == 'meforever')
 				{
 					keyBuffer = '';
