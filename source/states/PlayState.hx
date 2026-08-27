@@ -869,6 +869,7 @@ class PlayState extends MusicBeatState
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 		#if mobile
 		FlxG.stage.addEventListener(Event.DEACTIVATE, onStageDeactivate);
+		FlxG.stage.addEventListener(Event.ACTIVATE, onStageActivate);
 		#end
 		callOnScripts('onCreatePost');
 
@@ -2401,6 +2402,10 @@ class PlayState extends MusicBeatState
 	override public function onFocus():Void
 	{
 		if (health > 0 && !paused) resetRPC(Conductor.songPosition > 0.0);
+		// Meteoric：从后台回到前台时恢复被冻结的音频（游戏仍停留在暂停菜单，等玩家手动返回）
+		#if mobile
+		restoreBackgroundAudio();
+		#end
 		super.onFocus();
 	}
 
@@ -2452,6 +2457,8 @@ class PlayState extends MusicBeatState
 	}
 
 	public var paused:Bool = false;
+	// Meteoric：后台音频冻结标记（退后台时暂停 music/vocals/opponentVocals，回前台恢复）
+	var _bgAudioFrozen:Bool = false;
 	public var canReset:Bool = true;
 	var startedCountdown:Bool = false;
 	var canPause:Bool = true;
@@ -4642,11 +4649,40 @@ class PlayState extends MusicBeatState
 	private function onStageDeactivate(event:Event):Void
 	{
 		trace('[PAUSE] onStageDeactivate started=' + startedCountdown + ' paused=' + paused + ' canPause=' + canPause);
-		if (startedCountdown && !endingSong && !paused && canPause)
+		if (startedCountdown && !endingSong)
 		{
-			trace('[PAUSE] openPauseMenu from deactivate');
-			openPauseMenu();
+			if (!paused && canPause)
+			{
+				trace('[PAUSE] openPauseMenu from deactivate');
+				openPauseMenu();
+			}
+			// Meteoric：退后台=冻结游戏——音频位置一并暂停（仅开暂停菜单音乐仍会继续响）
+			freezeBackgroundAudio();
 		}
+	}
+
+	/** 回前台：恢复被后台冻结的音频（游戏仍处于暂停菜单，不自动继续游戏） */
+	private function onStageActivate(event:Event):Void
+	{
+		restoreBackgroundAudio();
+	}
+
+	private function freezeBackgroundAudio():Void
+	{
+		if (_bgAudioFrozen) return;
+		_bgAudioFrozen = true;
+		if (FlxG.sound.music != null) FlxG.sound.music.pause();
+		if (vocals != null) vocals.pause();
+		if (opponentVocals != null) opponentVocals.pause();
+	}
+
+	private function restoreBackgroundAudio():Void
+	{
+		if (!_bgAudioFrozen) return;
+		_bgAudioFrozen = false;
+		if (FlxG.sound.music != null) FlxG.sound.music.play();
+		if (vocals != null) vocals.play();
+		if (opponentVocals != null) opponentVocals.play();
 	}
 	#end
 
@@ -5324,6 +5360,7 @@ class PlayState extends MusicBeatState
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 		#if mobile
 		FlxG.stage.removeEventListener(Event.DEACTIVATE, onStageDeactivate);
+		FlxG.stage.removeEventListener(Event.ACTIVATE, onStageActivate);
 		#end
 		FlxAnimationController.globalSpeed = 1;
 		FlxG.sound.music.pitch = 1;
