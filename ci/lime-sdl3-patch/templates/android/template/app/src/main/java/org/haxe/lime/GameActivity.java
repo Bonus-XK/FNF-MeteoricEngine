@@ -106,9 +106,65 @@ public class GameActivity extends SDLActivity {
 	}
 
 
+	/** Meteoric：Java 层全局未捕获异常处理器 —— 写 java_crash_*.txt 到 .meteoric/crash/
+	 *  （覆盖 OOM/JNI/文件操作等 Java 崩溃：此类崩溃不产生 native 信号，仅靠 last_stage 无法定位） */
+	protected void installJavaCrashHandler () {
+
+		Thread.setDefaultUncaughtExceptionHandler (new Thread.UncaughtExceptionHandler () {
+
+			@Override public void uncaughtException (Thread thread, Throwable e) {
+
+				try {
+
+					String base = android.os.Environment.getExternalStorageDirectory ().getAbsolutePath () + "/.meteoric/crash";
+
+					java.io.File dir = new java.io.File (base);
+
+					if (!dir.exists ()) dir.mkdirs ();
+
+					java.io.FileWriter fw = new java.io.FileWriter (base + "/java_crash_" + System.currentTimeMillis () + ".txt");
+
+					fw.write ("============================================================\n");
+
+					fw.write ("  Meteoric Engine - Java Crash Report\n");
+
+					fw.write ("============================================================\n");
+
+					fw.write ("time=" + new java.util.Date () + "\n");
+
+					fw.write ("thread=" + thread.getName () + "\n");
+
+					fw.write ("exception=" + e + "\n");
+
+					Throwable c = e.getCause ();
+
+					int depth = 0;
+
+					while (c != null && depth < 8) { fw.write ("  caused by " + c + "\n"); c = c.getCause (); depth++; }
+
+					for (StackTraceElement se : e.getStackTrace ()) fw.write ("  at " + se + "\n");
+
+					fw.close ();
+
+				} catch (Throwable ignored) {}
+
+				// 终止进程（避免默认处理器重复输出到 logcat 后仍被杀）
+
+				android.os.Process.killProcess (android.os.Process.myPid ());
+
+				System.exit (1);
+
+			}
+
+		});
+
+	}
+
 	protected void onCreate (Bundle state) {
 
 		super.onCreate (state);
+
+		installJavaCrashHandler ();
 
 		assetManager = getAssets ();
 		vibrator = (Vibrator)mSingleton.getSystemService (Context.VIBRATOR_SERVICE);
