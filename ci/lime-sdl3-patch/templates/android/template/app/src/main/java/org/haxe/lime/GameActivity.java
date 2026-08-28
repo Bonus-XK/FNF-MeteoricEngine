@@ -243,13 +243,6 @@ public class GameActivity extends SDLActivity {
 
 	}
 
-	@Override public void onTrimMemory (int level) {
-
-		try { javaHeartbeatNote ("onTrimMemory level=" + level); } catch (Throwable ignored) {}
-
-		super.onTrimMemory (level);
-
-	}
 
 
 	@Override protected void onNewIntent (final Intent intent) {
@@ -392,6 +385,7 @@ public class GameActivity extends SDLActivity {
 	::if (ANDROID_TARGET_SDK_VERSION >= 14)::
 	@Override public void onTrimMemory (int level) {
 
+		try { javaHeartbeatNote ("onTrimMemory level=" + level); } catch (Throwable ignored) {}
 		if (Build.VERSION.SDK_INT >= 14) {
 
 			super.onTrimMemory (level);
