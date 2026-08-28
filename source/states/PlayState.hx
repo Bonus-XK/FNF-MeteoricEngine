@@ -4682,6 +4682,8 @@ class PlayState extends MusicBeatState
 	{
 		if (!_bgAudioFrozen) return;
 		_bgAudioFrozen = false;
+		// 若玩家仍处于暂停菜单（未返回游戏），保持静音；真正恢复由 closeSubState/resyncVocals 负责
+		if (paused) return;
 		if (FlxG.sound.music != null) FlxG.sound.music.play();
 		if (vocals != null) vocals.play();
 		if (opponentVocals != null) opponentVocals.play();
