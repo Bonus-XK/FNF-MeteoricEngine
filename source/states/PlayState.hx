@@ -5909,6 +5909,7 @@ class PlayState extends MusicBeatState
 			return new FlxRuntimeShader();
 		}
 
+		backend.CrashHandler.logEvent('createRuntimeShader: ' + name);
 		var arr:Array<String> = runtimeShaders.get(name);
 		return new FlxRuntimeShader(arr[0], arr[1]);
 		#else

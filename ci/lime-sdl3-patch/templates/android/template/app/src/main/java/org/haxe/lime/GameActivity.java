@@ -207,7 +207,31 @@ public class GameActivity extends SDLActivity {
 	}
 
 
+	/** Meteoric：低内存/后台告警时向 .meteoric/crash/heartbeat_java.txt 追加时间戳记录
+	 *  （OOM 前兆可见；写入失败静默） */
+	protected void javaHeartbeatNote (String reason) {
+
+		try {
+
+			String base = android.os.Environment.getExternalStorageDirectory ().getAbsolutePath () + "/.meteoric/crash";
+
+			java.io.File dir = new java.io.File (base);
+
+			if (!dir.exists ()) dir.mkdirs ();
+
+			java.io.FileWriter fw = new java.io.FileWriter (base + "/heartbeat_java.txt", true);
+
+			fw.write (new java.util.Date () + " | " + reason + "\n");
+
+			fw.close ();
+
+		} catch (Throwable ignored) {}
+
+	}
+
 	@Override public void onLowMemory () {
+
+		try { javaHeartbeatNote ("onLowMemory"); } catch (Throwable ignored) {}
 
 		super.onLowMemory ();
 
@@ -216,6 +240,14 @@ public class GameActivity extends SDLActivity {
 			extension.onLowMemory ();
 
 		}
+
+	}
+
+	@Override public void onTrimMemory (int level) {
+
+		try { javaHeartbeatNote ("onTrimMemory level=" + level); } catch (Throwable ignored) {}
+
+		super.onTrimMemory (level);
 
 	}
 

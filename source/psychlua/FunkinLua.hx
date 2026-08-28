@@ -1763,6 +1763,7 @@ class FunkinLua {
 		if(!ClientPrefs.data.shaders) return false;
 
 		#if (MODS_ALLOWED && !flash && sys)
+		backend.CrashHandler.logEvent('Lua-shader init: ' + name);
 		if(runtimeShaders.exists(name))
 		{
 			luaTrace('Shader $name was already initialized!');

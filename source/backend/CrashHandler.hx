@@ -222,6 +222,13 @@ class CrashHandler
 			Sys.putEnv('METEORIC_LAST_STAGE', 'init');
 		}
 		catch (e:Dynamic) {}
+		// 黑匣子：每 5 秒把最近事件写入 crash/heartbeat.txt（崩溃前最多丢失 5 秒历史）
+		try
+		{
+			logEvent('crash-handler-init');
+			startHeartbeat();
+		}
+		catch (e:Dynamic) {}
 		#end
 	}
 
@@ -425,9 +432,11 @@ class CrashHandler
 		#end
 
 		var dateNow:String = Date.now().toString().replace(' ', '_').replace(':', "'");
+		flushHeartbeat();
 		var errMsg:String = '===== Meteoric Crash Report =====\n'
 			+ buildCrashMeta() + '\n'
 			+ buildMessage(source, error) + '\n\n'
+			+ '事件时间线（黑匣子，最近 120 条）：\n' + (ring.length > 0 ? ring.join('\n') : '(无)') + '\n\n'
 			+ '调用堆栈：\n' + formatStack(stack) + '\n';
 
 		// 依次尝试多个可写目录，单个失败绝不中断（每个都包 try/catch）。
@@ -492,6 +501,57 @@ class CrashHandler
 		return null;
 	}
 
+	// ===== 黑匣子（崩溃前事件记录） =====
+	static var ring:Array<String> = [];
+	static var ringTimer:haxe.Timer = null;
+
+	/** 记录一条事件（带 HH:MM:SS），环形缓冲最多 120 条；每 5 秒由 heartbeat 落盘 */
+	public static function logEvent(msg:String):Void
+	{
+		try
+		{
+			var t:String = Date.now().toString().substr(11, 8);
+			ring.push('[' + t + '] ' + msg);
+			if (ring.length > 120) ring.shift();
+		}
+		catch (e:Dynamic) {}
+	}
+
+	static function startHeartbeat():Void
+	{
+		#if (cpp && !windows)
+		try
+		{
+			if (ringTimer == null)
+			{
+				logEvent('session-start');
+				flushHeartbeat();
+				ringTimer = new haxe.Timer(5000);
+				ringTimer.run = function() flushHeartbeat(true);
+			}
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
+	static function flushHeartbeat(keepRunning:Bool = true):Void
+	{
+		#if (cpp && !windows)
+		try
+		{
+			var dir:String = ensureCrashDir();
+			if (dir != null && dir.length > 0)
+			{
+				var h:String = '===== Meteoric Heartbeat (' + Date.now().toString() + ') =====\n'
+					+ '平台=' + platformInfo() + '\n'
+					+ (ring.length > 0 ? ring.join('\n') : '(空)') + '\n';
+				File.saveContent(dir + '/heartbeat.txt', h);
+			}
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
 	// ===== 原生崩溃阶段簿 =====
 	// SIGSEGV/SIGILL 绕过 Haxe 异常处理器（不产生 MeteoricEngine_*.txt）；本函数把
 	// 最近一个跨过的阶段实时落盘 last_stage.txt（覆盖写）并写入进程环境变量
@@ -500,6 +560,7 @@ class CrashHandler
 	public static function mark(stage:String):Void
 	{
 		lastStage = stage;
+		logEvent('stage:' + stage);
 		#if (cpp && !windows)
 		try
 		{

@@ -40,6 +40,7 @@ class ShaderFunctions
 			}
 
 			if(leObj != null) {
+				backend.CrashHandler.logEvent('setSpriteShader: ' + obj + ' <- ' + shader);
 				var arr:Array<String> = funk.runtimeShaders.get(shader);
 				leObj.shader = new FlxRuntimeShader(arr[0], arr[1]);
 				return true;
@@ -274,7 +275,6 @@ class ShaderFunctions
 		var target:FlxSprite = null;
 		if(split.length > 1) target = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1]);
 		else target = LuaUtils.getObjectDirectly(split[0]);
-
 		if(target == null)
 		{
 			FunkinLua.luaTrace('Error on getting shader: Object $obj not found', false, false, FlxColor.RED);
