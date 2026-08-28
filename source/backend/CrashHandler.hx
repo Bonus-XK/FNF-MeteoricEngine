@@ -227,6 +227,7 @@ class CrashHandler
 		{
 			logEvent('crash-handler-init');
 			startHeartbeat();
+			installTraceRing();
 		}
 		catch (e:Dynamic) {}
 		#end
@@ -411,6 +412,83 @@ class CrashHandler
 		else
 			lines.push('阶段标记    : (无)');
 
+		// ---- 系统报告（Seiun 式） ----
+		lines.push('');
+		lines.push('===== 系统报告 =====');
+		lines.push('--- 引擎 ---');
+		lines.push('引擎        : Meteoric Engine v1.1.0 (Psych 0.7.1h 基座)');
+		lines.push('构建特性    : ' + buildDefines());
+		try
+		{
+			lines.push('当前窗口    : ' + Std.int(flixel.FlxG.width) + 'x' + Std.int(flixel.FlxG.height));
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			var w = openfl.Lib.application.window;
+			if (w != null)
+				lines.push('窗口实际    : ' + Std.int(w.width) + 'x' + Std.int(w.height) + ' 缩放=' + w.scale);
+		}
+		catch (e:Dynamic) {}
+		lines.push('--- 运行态 ---');
+		try
+		{
+			lines.push('FPS         : ' + flixel.FlxG.updateFramerate + ' / ' + flixel.FlxG.drawFramerate);
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			@:privateAccess
+			var cacheCount:Int = 0;
+			untyped { for (_k in flixel.FlxG.bitmap._cache.keys()) cacheCount++; }
+			lines.push('图形缓存    : ' + cacheCount + ' 项');
+		}
+		catch (e:Dynamic) {}
+		lines.push('--- GL ---');
+		try
+		{
+			lines.push('GL 版本     : ' + Std.string(lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.VERSION)));
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			lines.push('GL 厂商     : ' + Std.string(lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.VENDOR)));
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			lines.push('GL 渲染器   : ' + Std.string(lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.RENDERER)));
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			lines.push('最新 GL 错误: ' + Std.string(lime.graphics.opengl.GL.getError()));
+		}
+		catch (e:Dynamic) {}
+		lines.push('');
+		lines.push('--- 最近游戏日志（trace 环形，最后 60 条 / 共 ' + Std.string(traceRing.length) + ' 条） ---');
+		if (traceRing.length > 0)
+			lines.push(traceRing.slice(Std.int(Math.max(0, traceRing.length - 60))).join('\n'));
+		else
+			lines.push('(无 trace 记录)');
+		#if (cpp && !windows)
+		try
+		{
+			var dir:String = ensureCrashDir();
+			if (dir != null && sys.FileSystem.exists(dir))
+			{
+				var files:Array<String> = sys.FileSystem.readDirectory(dir);
+				files.sort(Reflect.compare);
+				lines.push('');
+				lines.push('--- 崩溃目录文件（' + dir + '）---');
+				if (files.length > 0)
+					lines.push(files.join('\n'));
+				else
+					lines.push('(空)');
+			}
+		}
+		catch (e:Dynamic) {}
+		#end
 		#if (cpp && !windows)
 		lines.push('原生栈提示  : 若是原生崩溃，请一并发送 crash/native_stack.txt（含 PC/SP/FP 指针与符号化回溯）');
 		#end
@@ -499,6 +577,47 @@ class CrashHandler
 			catch (e:Dynamic) {}
 		}
 		return null;
+	}
+
+	static var traceRing:Array<String> = [];
+	static var _traceHookInstalled:Bool = false;
+
+	/** 全局 trace 环形日志（Seiun 式 Recent Game Log）：拦截 haxe.Log.trace，保留最近 400 条 */
+	static function installTraceRing():Void
+	{
+		if (_traceHookInstalled) return;
+		_traceHookInstalled = true;
+		var orig = haxe.Log.trace;
+		haxe.Log.trace = function(v:Dynamic, ?pos:haxe.PosInfos)
+		{
+			try
+			{
+				var t:String = Date.now().toString().substr(11, 8);
+				var loc:String = '';
+				if (pos != null && pos.fileName != null)
+					loc = ' (' + pos.fileName + ':' + pos.lineNumber + ')';
+				traceRing.push('[' + t + '] ' + Std.string(v) + loc);
+				if (traceRing.length > 400) traceRing.shift();
+			}
+			catch (e:Dynamic) {}
+			if (orig != null) orig(v, pos);
+		};
+	}
+
+	static function buildDefines():String
+	{
+		var arr:Array<String> = [];
+		#if CRASH_HANDLER arr.push('CRASH_HANDLER'); #end
+		#if MODS_ALLOWED arr.push('MODS_ALLOWED'); #end
+		#if LUA_ALLOWED arr.push('LUA_ALLOWED'); #end
+		#if HSCRIPT_ALLOWED arr.push('HSCRIPT_ALLOWED'); #end
+		#if VIDEOS_ALLOWED arr.push('VIDEOS_ALLOWED'); #end
+		#if ACHIEVEMENTS_ALLOWED arr.push('ACHIEVEMENTS_ALLOWED'); #end
+		#if mobile arr.push('mobile'); #end
+		#if desktop arr.push('desktop'); #end
+		#if android arr.push('android'); #end
+		#if hxcodec arr.push('hxcodec'); #end
+		return arr.length > 0 ? arr.join(' ') : '(未知)';
 	}
 
 	// ===== 黑匣子（崩溃前事件记录） =====
