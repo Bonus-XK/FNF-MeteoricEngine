@@ -24,3 +24,14 @@ export/*
 tools/
 # macOS 垃圾文件
 .DS_Store
+
+### Android / Gradle 构建产物（本地生成，不入库）
+.gradle/
+local.properties
+*.iml
+.idea/
+
+### 通用构建目录
+build/
+bin/
+obj/
