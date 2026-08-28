@@ -76,6 +76,8 @@ class BaseStage extends FlxBasic
 	public var curDecStep:Float = 0;
 	public var curSection:Int = 0;
 	public function beatHit() {}
+	/** Meteoric：快速重开时重置舞台侧状态（默认无操作；School 等重置 bgGirls 表情等） */
+	public function resetForRestart() {}
 	public function stepHit() {}
 	public function sectionHit() {}
 

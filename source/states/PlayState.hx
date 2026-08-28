@@ -70,6 +70,7 @@ import sys.io.File;
 import objects.Note.EventNote;
 import objects.Note.CastNote;
 import objects.Note.SpamNoteData;
+import objects.NoteHitGraph.NoteHitEntry;
 import objects.*;
 import states.stages.objects.*;
 
@@ -222,7 +223,16 @@ class PlayState extends MusicBeatState
 		{
 			var fresh:SwagSong = Song.loadFromJson(chartJsonInput, chartFolder);
 			if (fresh != null)
+			{
+				// 保留引擎运行期派生的字段：School.setDefaultGF('gf-pixel')/vanillaSongStage 等只在
+				// 首次 create 时写入 SONG（roses.json 等基础谱面本身没有这些字段）。重开从 JSON
+				// 重新解析出的 fresh 会丢失它们 → GF 变普通贴图 + 位置错（快速重开 GF 瞬移 bug）。
+				if (fresh.stage == null || fresh.stage.length < 1)
+					fresh.stage = SONG.stage;
+				if (fresh.gfVersion == null || fresh.gfVersion.length < 1)
+					fresh.gfVersion = SONG.gfVersion;
 				SONG = fresh; // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
+			}
 			else
 			{
 				trace('[Memory] 谱面恢复失败（缓存/文件缺失）：' + chartJsonInput);
@@ -323,6 +333,8 @@ class PlayState extends MusicBeatState
 	public var health:Float = 1;
 	public var smoothHealth:Float = 1;
 	public var combo:Int = 0;
+	// KE 结算界面：本局最高连击（命中后取峰值；Miss 重置 combo 不影响该值）
+	public var maxCombo:Int = 0;
 
 	public var healthBar:HealthBar;
 	public var healthBarBG:AttachedSprite;
@@ -336,6 +348,9 @@ class PlayState extends MusicBeatState
 
 	public var ratingsData:Array<Rating> = Rating.loadDefault();
 	public var fullComboFunction:Void->Void = null;
+
+	// KE 结算散点图：本局逐音符判定记录 {t=音符时间, d=命中偏移(+早/-晚), r=评级}（仅内存，不进回放文件）
+	public var judgementHistory:Array<NoteHitEntry> = [];
 
 	private var generatedMusic:Bool = false;
 	public var endingSong:Bool = false;
@@ -587,6 +602,14 @@ class PlayState extends MusicBeatState
 		}
 
 		defaultCamZoom = stageData.defaultZoom;
+
+		// Meteoric：allow-high-dpi 下窗口按物理分辨率双线性放大，pixel 舞台（Week6 等）箭头/像素
+		// 会被柔化发糊；把 stage 质量切到 LOW（最近邻采样）保持硬边像素，非 pixel 舞台维持 HIGH。
+		try
+		{
+			openfl.Lib.current.stage.quality = isPixelStage ? openfl.display.StageQuality.LOW : openfl.display.StageQuality.HIGH;
+		}
+		catch (e:Dynamic) {}
 
 		stageUI = "normal";
 		if (stageData.stageUI != null && stageData.stageUI.trim().length > 0)
@@ -874,6 +897,7 @@ class PlayState extends MusicBeatState
 		FlxG.stage.addEventListener(Event.ACTIVATE, onStageActivate);
 		#end
 		callOnScripts('onCreatePost');
+
 
 		// 原生长条按压覆盖：模组自带 NoteHoldCover.lua 且用户关闭开关时，熄灭其脚本开关
 		// （脚本自身用 UpdateBFHoldCover/UpdateDadHoldCover 门控，置 false 后其回调不再显示覆盖层，
@@ -3852,6 +3876,10 @@ class PlayState extends MusicBeatState
 			#end
 
 			persistentUpdate = false;
+			// 结算时隐藏 HUD 判定侧边栏（stage 级 TextField 不随 flixel 状态隐没；
+			// 此处 _visualsTorn 已上锁，updateJudgementTxt 不再运行——必须在此一次隐藏，
+			// 结算关闭后 updateJudgementTxt 恢复运行会自动按设置重新显示）
+			if (hud != null && hud.judgementField != null) hud.judgementField.visible = false;
 			var resultsSubState:ResultsSubState = new ResultsSubState(replayForResults != null);
 			resultsSubState.closeCallback = function() {
 				persistentUpdate = true;
@@ -4024,9 +4052,11 @@ class PlayState extends MusicBeatState
 		songScore = 0;
 		songHits = 0;
 		songMisses = 0;
+		judgementHistory = []; // KE 散点图：重开清空本局判定记录
 		totalPlayed = 0;
 		totalNotesHit = 0;
 		combo = 0;
+		maxCombo = 0; // 结算界面：最高连击随重开清零
 		songPercent = 0;
 		usedAutoplay = cpuControlled || replayMode;
 		usedGodMode = false; // 上帝模式正常记分
@@ -4181,6 +4211,9 @@ class PlayState extends MusicBeatState
 
 		// 重新加载谱面默认角色（参照不开启快速重开时的完整重开逻辑）
 		reloadDefaultCharacters();
+
+		// Meteoric：快速重开时重置舞台侧状态（bgGirls 表情等，防止事件重放颠倒）
+		stagesFunc(function(stage:BaseStage) stage.resetForRestart());
 
 		// 角色回到待机
 		if (boyfriend != null) { boyfriend.specialAnim = false; boyfriend.stunned = false; boyfriend.holdTimer = 0; boyfriend.dance(); }
@@ -4476,6 +4509,9 @@ class PlayState extends MusicBeatState
 		note.ratingMod = daRating.ratingMod;
 		if(!note.ratingDisabled) daRating.hits += scoreMult;
 		note.rating = daRating.name;
+		// KE 结算散点图：记录主音符命中偏移（+ 早到 / - 晚到；自动游玩不记录）
+		if (!cpuControlled && !note.isSustainNote && note.rating != null && note.rating.length > 0)
+			judgementHistory.push({t: note.strumTime, d: note.strumTime - Conductor.songPosition, r: note.rating});
 		score = daRating.score * scoreMult;
 
 		if(daRating.noteSplash && !note.noteSplashData.disabled && !(cpuControlled && botHitBatch && botBatchSplashDone[note.noteData]))
@@ -5040,6 +5076,14 @@ class PlayState extends MusicBeatState
 
 	function noteMissCommon(direction:Int, note:Note = null)
 	{
+		// KE 结算散点图：主音符 Miss 记录（贴外沿窗口 = 视为最晚；空按/长条子段不记）
+		if (note != null && !note.isSustainNote && !cpuControlled)
+		{
+			var outer:Float = (ratingsData != null && ratingsData.length > 0) ? ratingsData[ratingsData.length - 1].hitWindow : 166;
+			if (outer <= 0) outer = 166;
+			judgementHistory.push({t: note.strumTime, d: outer, r: 'miss'});
+		}
+
 		// score and data
 		var subtract:Float = 0.05;
 		if(note != null) subtract = note.missHealth;
@@ -5257,6 +5301,7 @@ class PlayState extends MusicBeatState
 			if (!note.isSustainNote)
 			{
 				combo += hitMult;
+				if (combo > maxCombo) maxCombo = combo; // 最高连击追踪
 				popUpScore(note, hitMult); // 传入已封顶的 density：计分/评级/命中同源封顶
 				// 回放录制：主音符命中（评分取本局真实判定结果）
 				if (recordingReplay && !cpuControlled && currentReplay != null)
@@ -6313,6 +6358,14 @@ class GameHUD
 	function updateJudgementTxt():Void
 	{
 		if (judgementField == null) return;
+
+		// 结算界面打开时隐藏 HUD 判定侧边栏（stage 级 TextField 不随 flixel 状态隐没，
+		// 且与结算界面的判定统计重复）；关闭后由下方可见性逻辑自动恢复
+		if (st != null && st.subState != null && Std.isOfType(st.subState, ResultsSubState))
+		{
+			judgementField.visible = false;
+			return;
+		}
 
 		var mv:Int = 0, sick:Int = 0, good:Int = 0, bad:Int = 0, shit:Int = 0;
 		if (st.ratingsData != null)

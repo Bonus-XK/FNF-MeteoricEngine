@@ -1525,7 +1525,10 @@ class Note extends FlxSprite
 		color = 0xffffff;
 		blend = openfl.display.BlendMode.NORMAL;
 		shader = null;
-		antialiasing = ClientPrefs.data.antialiasing;
+		// Meteoric：像素舞台复生必须保持 NEAREST 硬边——reloadNote 已在构造时置 false，
+		// 但这里无条件重置会把它改回 ClientPrefs（默认 true=LINEAR），导致下落箭头发糊
+		// （人物/舞台不经此路径所以仍硬边，正是“人物硬、箭头软”不对称的原因）。
+		antialiasing = PlayState.isPixelStage ? false : ClientPrefs.data.antialiasing;
 
 		density = (target.density > 0) ? target.density : 1;
 		chartSeq = target.chartSeq;

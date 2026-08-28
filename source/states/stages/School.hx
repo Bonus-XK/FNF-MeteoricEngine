@@ -93,6 +93,14 @@ class School extends BaseStage
 		}
 	}
 
+	override function resetForRestart()
+	{
+		// 快速重开不重建舞台：bgGirls 表情状态会残留（事件重放颠倒）。
+		// resetState 恢复到“构造完成态”（事件前 = 开心），重放的 BG Freaks Expression
+		// 事件在同一帧内翻回生气 → 与首开一致（重开瞬间即生气）。
+		if (bgGirls != null) bgGirls.resetState();
+	}
+
 	override function beatHit()
 	{
 		if(bgGirls != null) bgGirls.dance();

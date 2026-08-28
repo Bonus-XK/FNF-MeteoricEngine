@@ -7,33 +7,68 @@ import flixel.math.FlxPoint;
 import flixel.util.FlxSpriteUtil;
 import flixel.util.FlxStringUtil;
 import openfl.Lib;
+import objects.NoteHitGraph;
+import objects.NoteHitGraph.NoteHitEntry;
 
+/**
+ * 本局结算界面（Meteoric 风格重排版，信息结构对齐 KE 1.8：
+ * 左侧 = 曲目信息 + 判定统计(Judgements) + 操作菜单；
+ * 右侧 = 本局数据(分数/最高连击/准确度…) + KE 命中判定散点图（大图）。
+ * 中英混合：标题/说明中文，SICK/GOOD/BAD/SHIT/MISS 保留判定缩写。
+ */
 class ResultsSubState extends MusicBeatSubstate
 {
 	var wheelScroll:WheelScroll = new WheelScroll(); // 滚轮限速（Freeplay 同款）
-	// ===== 安全布局常量（与暂停界面同一套风格） =====
-	static final LAYOUT_Y:Float = 120;       // 整体下移，让内容垂直居中
-	static final TITLE_Y:Float = 22 + LAYOUT_Y - 35;  // 标题比面板高一些
-	static final SAFE_MARGIN:Float = 72;
-	static final INFO_PANEL_Y:Float = 70 + LAYOUT_Y;
-	static final INFO_PANEL_H:Float = 200;
-	static final INFO_Y_START:Float = INFO_PANEL_Y + 30;
+
+	// ===== 安全布局常量（1280×720 基准；底部安全线 648 = 720 - 72） =====
+	static final TITLE_Y:Float = 22;
+	static final PANEL_TOP:Float = 96;
+	static final PANEL_X:Float = 40;
+	static final PANEL_W:Float = 560;
+	static final RIGHT_X:Float = 620;
+	static final RIGHT_W:Float = 620;
+	static final TEXT_PAD:Float = 20;
+
+	// 左：曲目信息
+	static final INFO_Y:Float = PANEL_TOP;
+	static final INFO_H:Float = 172;
+	static final INFO_Y_START:Float = INFO_Y + 34;
 	static final INFO_LINE_GAP:Float = 34;
-	static final MENU_X:Float = 72;
-	static final MENU_PANEL_Y:Float = 290 + LAYOUT_Y;
-	static final MENU_Y:Float = MENU_PANEL_Y + 12;
+
+	// 左：判定统计
+	static final JUDGE_Y:Float = INFO_Y + INFO_H + 14;
+	static final JUDGE_H:Float = 168;
+	static final JUDGE_TITLE_Y:Float = JUDGE_Y + 20;
+	static final JUDGE_ROW_START:Float = JUDGE_Y + 62;
+	static final JUDGE_ROW_GAP:Float = 32;
+	static final JUDGE_COL0:Float = PANEL_X + TEXT_PAD;   // 60
+	static final JUDGE_COL1:Float = PANEL_X + 320;        // 360
+	static final JUDGE_VAL_GAP:Float = 175;               // 标签后数值 x 偏移（MARVELOUS 较长，需留宽）
+
+	// 左：操作菜单
+	static final MENU_Y:Float = JUDGE_Y + JUDGE_H + 14;
 	static final MENU_LINE_GAP:Float = 34;
 
-	static final PANEL_X:Float = 40;
-	static final PANEL_W:Float = 600;
+	// 右：本局数据
+	static final STATS_X:Float = RIGHT_X;
+	static final STATS_W:Float = RIGHT_W;
+	static final STATS_Y:Float = PANEL_TOP;
+	static final STATS_H:Float = 288;
+	static final STATS_TITLE_Y:Float = STATS_Y + 24;
+	static final STATS_ROW_START:Float = STATS_Y + 80;
+	static final STATS_ROW_GAP:Float = 32;
+	static final STATS_LABEL_X:Float = STATS_X + TEXT_PAD;
+	static final STATS_VAL_X:Float = STATS_X + 300;
 
-	static final STATS_X:Float = 680;
-	static final STATS_W:Float = 560;
-	static final STATS_Y:Float = 70 + LAYOUT_Y;
-	static final STATS_TEXT_X:Float = 716;
-	static final STATS_TITLE_Y:Float = STATS_Y + 26;
-	static final STATS_ROW_START:Float = STATS_Y + 88;
-	static final STATS_ROW_GAP:Float = 48;
+	// 右：命中判定散点图
+	static final GRAPH_X:Float = RIGHT_X;
+	static final GRAPH_W:Float = RIGHT_W;
+	static final GRAPH_Y:Float = STATS_Y + STATS_H + 14;
+	#if mobile
+	static final GRAPH_H:Float = 150; // 收窄避开右下手柄键
+	#else
+	static final GRAPH_H:Float = 250;
+	#end
 
 	public var resultAction:String = 'continue';
 
@@ -65,6 +100,7 @@ class ResultsSubState extends MusicBeatSubstate
 		cameras[0].scroll.set(0, 0);
 
 		var st:PlayState = PlayState.instance;
+		var invalidResult:Bool = (st.usedAutoplay || st.usedGodMode);
 
 		// ---- 背景 ----
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
@@ -74,7 +110,7 @@ class ResultsSubState extends MusicBeatSubstate
 		FlxTween.tween(bg, {alpha: 0.6}, 0.4, {ease: FlxEase.quartInOut});
 
 		// ---- 标题 ----
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '本局结算', 54);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '本局结算 Song Results', 54);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -83,17 +119,19 @@ class ResultsSubState extends MusicBeatSubstate
 		add(titleText);
 		FlxTween.tween(titleText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.1});
 
-		// ---- 左侧信息面板 ----
-		var infoPanel:FlxSprite = makePanel(PANEL_X, INFO_PANEL_Y, PANEL_W, INFO_PANEL_H, 20);
+		// ================= 左列 =================
+
+		// ---- 曲目信息面板 ----
+		var infoPanel:FlxSprite = makePanel(PANEL_X, INFO_Y, PANEL_W, INFO_H, 20);
 		infoPanel.alpha = 0;
 		add(infoPanel);
 		FlxTween.tween(infoPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.15});
 
-		var songNameText:FlxText = makeInfoText('曲目：' + PlayState.SONG.song, INFO_Y_START);
-		var diffText:FlxText = makeInfoText('难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
-		var ratingText:FlxText = makeInfoText('评级：' + st.ratingName + fcText(st.ratingFC), INFO_Y_START + INFO_LINE_GAP * 2);
+		var infoTexts:Array<FlxText> = [];
+		infoTexts.push(makeInfoText('曲目：' + PlayState.SONG.song, INFO_Y_START));
+		infoTexts.push(makeInfoText('难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP));
+		infoTexts.push(makeInfoText('评级：' + st.ratingName + fcText(st.ratingFC), INFO_Y_START + INFO_LINE_GAP * 2));
 		var modeText:FlxText;
-		var invalidResult:Bool = (st.usedAutoplay || st.usedGodMode);
 		if (invalidResult)
 		{
 			var why:Array<String> = [];
@@ -103,22 +141,81 @@ class ResultsSubState extends MusicBeatSubstate
 		}
 		else
 			modeText = makeInfoText('正常模式', INFO_Y_START + INFO_LINE_GAP * 3);
-
-		var infoTexts:Array<FlxText> = [songNameText, diffText, ratingText, modeText];
+		infoTexts.push(modeText);
 		for (i in 0...infoTexts.length)
 		{
 			var txt:FlxText = infoTexts[i];
 			FlxTween.tween(txt, {alpha: 1, y: txt.y + 4}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3 + i * 0.12});
 		}
 
-		// ---- 菜单面板（重试 / 继续） ----
+		// ---- 判定统计面板（Judgements，KE 同款两列） ----
+		var judgePanel:FlxSprite = makePanel(PANEL_X, JUDGE_Y, PANEL_W, JUDGE_H, 20);
+		judgePanel.alpha = 0;
+		add(judgePanel);
+		FlxTween.tween(judgePanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.2});
+
+		var judgeTitle:FlxText = new FlxText(PANEL_X + TEXT_PAD, JUDGE_TITLE_Y, 0, '判定统计 Judgements', 26);
+		judgeTitle.scrollFactor.set();
+		judgeTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		judgeTitle.borderSize = 2;
+		judgeTitle.antialiasing = ClientPrefs.data.antialiasing;
+		judgeTitle.alpha = 0;
+		add(judgeTitle);
+		FlxTween.tween(judgeTitle, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.35});
+
+		var judgeItems:Array<{name:String, count:Int, color:Int}> = [];
+		for (rating in st.ratingsData)
+		{
+			var c:Int = switch (rating.name)
+			{
+				case 'marvelous': 0xFFFFD700; // 金黄色
+				case 'sick': 0xFF00FFFF;
+				case 'good': 0xFF00FF00;
+				case 'bad': 0xFFFF0000;
+				case 'shit': 0xFF8B0000;
+				default: 0xFFA9A9B8;
+			}
+			judgeItems.push({name: rating.name.toUpperCase(), count: rating.hits, color: c});
+		}
+		judgeItems.push({name: 'MISS', count: st.songMisses, color: 0xFFFF6B6B});
+		for (i in 0...judgeItems.length)
+		{
+			var item = judgeItems[i];
+			var colX:Float = (i % 2 == 0) ? JUDGE_COL0 : JUDGE_COL1;
+			var rowY:Float = JUDGE_ROW_START + Std.int(i / 2) * JUDGE_ROW_GAP;
+
+			var label:FlxText = new FlxText(colX, rowY, 0, item.name, 24);
+			label.scrollFactor.set();
+			label.setFormat(Paths.font('future.ttf'), 24, item.color, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			label.borderSize = 1.5;
+			label.antialiasing = ClientPrefs.data.antialiasing;
+			label.alpha = 0;
+			add(label);
+			FlxTween.tween(label, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
+
+			var count:FlxText = new FlxText(colX + JUDGE_VAL_GAP, rowY, 0, Std.string(item.count), 24);
+			count.scrollFactor.set();
+			count.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			count.borderSize = 1.5;
+			count.antialiasing = ClientPrefs.data.antialiasing;
+			count.alpha = 0;
+			add(count);
+			FlxTween.tween(count, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
+		}
+
+		// ---- 菜单面板（重试 / 回放本局 / 继续） ----
 		var panelHeight:Float = 16 + (menuItems.length * MENU_LINE_GAP * 1.3);
-		var menuPanel:FlxSprite = makePanel(PANEL_X, MENU_PANEL_Y, PANEL_W, Std.int(panelHeight), 20);
+		var menuPanel:FlxSprite = makePanel(PANEL_X, MENU_Y, PANEL_W, Std.int(panelHeight), 20);
 		menuPanel.alpha = 0;
 		add(menuPanel);
 		FlxTween.tween(menuPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.2});
 
-		var hintText:FlxText = new FlxText(SAFE_MARGIN, MENU_PANEL_Y + panelHeight + 12, 0, getHintText(), 18);
+		var hintText:FlxText = new FlxText(PANEL_X + TEXT_PAD, MENU_Y + panelHeight + 12, 0, getHintText(), 18);
+		hintText.scrollFactor.set();
+		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		hintText.borderSize = 1.5;
+		hintText.antialiasing = ClientPrefs.data.antialiasing;
+		add(hintText);
 
 		#if mobile
 		// virtualpad：A 在右下，[上][下] 依次在 A 左侧（同一行，不遮挡面板）；按下有动画
@@ -127,20 +224,16 @@ class ResultsSubState extends MusicBeatSubstate
 		pad.addPadArrow('ui_down', 'down', FlxG.width - objects.MobileControls.BTN_W * 2 - 20 - 12, FlxG.height - objects.MobileControls.BTN_H - 20);
 		add(pad);
 		#end
-		hintText.scrollFactor.set();
-		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		hintText.borderSize = 1.5;
-		hintText.antialiasing = ClientPrefs.data.antialiasing;
-		add(hintText);
 
-		// ---- 右侧统计面板（底部与菜单面板对齐） ----
-		var statsPanelH:Float = (MENU_PANEL_Y + panelHeight) - STATS_Y;
-		var statPanel:FlxSprite = makePanel(STATS_X, STATS_Y, STATS_W, Std.int(statsPanelH), 20);
+		// ================= 右列 =================
+
+		// ---- 本局数据面板 ----
+		var statPanel:FlxSprite = makePanel(STATS_X, STATS_Y, STATS_W, STATS_H, 20);
 		statPanel.alpha = 0;
 		add(statPanel);
 		FlxTween.tween(statPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.25});
 
-		var statTitle:FlxText = new FlxText(STATS_TEXT_X, STATS_TITLE_Y, 0, '本局数据', 26);
+		var statTitle:FlxText = new FlxText(STATS_LABEL_X, STATS_TITLE_Y, 0, '本局数据 Stats', 26);
 		statTitle.scrollFactor.set();
 		statTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		statTitle.borderSize = 2;
@@ -152,7 +245,7 @@ class ResultsSubState extends MusicBeatSubstate
 		var bestScore:Int = Highscore.getScore(PlayState.SONG.song, PlayState.storyDifficulty);
 		if (!invalidResult && st.songScore >= bestScore && st.songScore > 0)
 		{
-			var newRecordText:FlxText = new FlxText(STATS_TEXT_X + 170, STATS_TITLE_Y + 4, 0, '新纪录！', 22);
+			var newRecordText:FlxText = new FlxText(STATS_LABEL_X + 230, STATS_TITLE_Y + 4, 0, '新纪录！ New Record', 22);
 			newRecordText.scrollFactor.set();
 			newRecordText.setFormat(Paths.font('future.ttf'), 22, 0xFFFFD966, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			newRecordText.borderSize = 1.5;
@@ -162,10 +255,11 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(newRecordText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.45});
 		}
 
-		var statDefs:Array<String> = ['当前分数', '最佳分数', '失误数', '命中 / 总音符', '准确度'];
+		var statDefs:Array<String> = ['当前分数', '最佳分数', '最高连击', '失误数', '命中 / 总音符', '准确度'];
 		var statVals:Array<String> = [
 			FlxStringUtil.formatMoney(st.songScore),
 			FlxStringUtil.formatMoney(bestScore),
+			Std.string(st.maxCombo),
 			Std.string(st.songMisses),
 			Std.string(st.songHits) + ' / ' + Std.string(st.totalNotes),
 			CoolUtil.floorDecimal(st.ratingPercent * 100, 2) + '%'
@@ -174,7 +268,7 @@ class ResultsSubState extends MusicBeatSubstate
 		{
 			var rowY:Float = STATS_ROW_START + (i * STATS_ROW_GAP);
 
-			var lbl:FlxText = new FlxText(STATS_TEXT_X, rowY, 0, statDefs[i] + '：', 24);
+			var lbl:FlxText = new FlxText(STATS_LABEL_X, rowY, 0, statDefs[i] + '：', 24);
 			lbl.scrollFactor.set();
 			lbl.setFormat(Paths.font('future.ttf'), 24, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			lbl.borderSize = 1.5;
@@ -183,7 +277,7 @@ class ResultsSubState extends MusicBeatSubstate
 			add(lbl);
 			FlxTween.tween(lbl, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
 
-			var val:FlxText = new FlxText(STATS_TEXT_X + 210, rowY, 0, statVals[i], 24);
+			var val:FlxText = new FlxText(STATS_VAL_X, rowY, 0, statVals[i], 24);
 			val.scrollFactor.set();
 			val.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			val.borderSize = 1.5;
@@ -193,15 +287,73 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(val, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.4 + i * 0.06});
 		}
 
+		// ---- KE 命中判定散点图（大图版） ----
+		var graphPanel:FlxSprite = makePanel(GRAPH_X, GRAPH_Y, GRAPH_W, Std.int(GRAPH_H), 20);
+		graphPanel.alpha = 0;
+		add(graphPanel);
+		FlxTween.tween(graphPanel, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.5});
+
+		var entries:Array<NoteHitEntry> = st.judgementHistory;
+		var innerX:Float = GRAPH_X + 14;
+		var innerW:Int = Std.int(GRAPH_W - 28);
+
+		var graphHead:FlxText = new FlxText(innerX, GRAPH_Y + 8, innerW, '命中分布 Hit Distribution（横轴=时间 · 纵轴=偏移：+早到 / −晚到 · 点色=判定）', 14);
+		graphHead.scrollFactor.set();
+		graphHead.setFormat(Paths.font('future.ttf'), 14, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		graphHead.borderSize = 1.2;
+		graphHead.antialiasing = ClientPrefs.data.antialiasing;
+		graphHead.alpha = 0;
+		add(graphHead);
+		FlxTween.tween(graphHead, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.55});
+
+		if (entries != null && entries.length > 0)
+		{
+			var graph:FlxSprite = NoteHitGraph.build(innerW, Std.int(GRAPH_H - 62), entries, st.songLength);
+			graph.x = innerX;
+			graph.y = GRAPH_Y + 30;
+			graph.scrollFactor.set();
+			graph.alpha = 0;
+			add(graph);
+			FlxTween.tween(graph, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.6});
+
+			// Mean 均值 + 判定窗口说明（KE 同款底行）
+			var sum:Float = 0;
+			var cnt:Int = 0;
+			for (e in entries)
+				if (e.r != 'miss') { sum += e.d; cnt++; }
+			var meanStr:String = (cnt > 0) ? ('平均偏移 Mean ' + CoolUtil.floorDecimal(sum / cnt, 2) + ' ms') : '平均偏移 Mean -';
+			var winStr:String = 'SICK ' + ClientPrefs.data.sickWindow + ' / GOOD ' + ClientPrefs.data.goodWindow
+				+ ' / BAD ' + ClientPrefs.data.badWindow + ' / SHIT 166';
+			var meanText:FlxText = new FlxText(innerX, GRAPH_Y + GRAPH_H - 22, innerW, meanStr + '　' + winStr, 13);
+			meanText.scrollFactor.set();
+			meanText.setFormat(Paths.font('future.ttf'), 13, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			meanText.borderSize = 1.2;
+			meanText.antialiasing = ClientPrefs.data.antialiasing;
+			meanText.alpha = 0;
+			add(meanText);
+			FlxTween.tween(meanText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.65});
+		}
+		else
+		{
+			var noDataText:FlxText = new FlxText(innerX, GRAPH_Y + 44, innerW, '（本局无判定数据）', 16);
+			noDataText.scrollFactor.set();
+			noDataText.setFormat(Paths.font('future.ttf'), 16, 0xFF6E6E7A, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			noDataText.borderSize = 1.2;
+			noDataText.antialiasing = ClientPrefs.data.antialiasing;
+			noDataText.alpha = 0;
+			add(noDataText);
+			FlxTween.tween(noDataText, {alpha: 1}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.6});
+		}
+
 		// ---- 选中高亮条 ----
-		menuSelector = makePanel(PANEL_X + 16, MENU_Y - 3, PANEL_W - 32, 44, 12, 0x2EFFFFFF, null);
+		menuSelector = makePanel(PANEL_X + 16, MENU_Y + 9, PANEL_W - 32, 44, 12, 0x2EFFFFFF, null);
 		add(menuSelector);
 
 		grpMenuShit = new FlxTypedGroup<MenuText>();
 		add(grpMenuShit);
 		for (i in 0...menuItems.length)
 		{
-			var item:MenuText = new MenuText(MENU_X, MENU_Y + (i * MENU_LINE_GAP * 1.3), menuItems[i], true, 34);
+			var item:MenuText = new MenuText(PANEL_X + TEXT_PAD, MENU_Y + 12 + (i * MENU_LINE_GAP * 1.3), menuItems[i], true, 34);
 			item.isMenuItem = false;
 			item.ID = i;
 			grpMenuShit.add(item);
@@ -217,7 +369,7 @@ class ResultsSubState extends MusicBeatSubstate
 
 	function makeInfoText(content:String, yPos:Float, ?textColor:FlxColor = FlxColor.WHITE, ?size:Int = 26):FlxText
 	{
-		var txt:FlxText = new FlxText(SAFE_MARGIN, yPos, 0, content, size);
+		var txt:FlxText = new FlxText(PANEL_X + TEXT_PAD, yPos, 0, content, size);
 		txt.scrollFactor.set();
 		txt.setFormat(Paths.font('future.ttf'), size, textColor, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		txt.borderSize = 2;
@@ -402,9 +554,9 @@ class ResultsSubState extends MusicBeatSubstate
 				menuSelectorTween.cancel();
 				menuSelectorTween = null;
 			}
-			var barY:Float = MENU_Y - 3 + (curSelected * MENU_LINE_GAP * 1.3);
-		if(menuSelector.y != barY)
-			menuSelectorTween = FlxTween.tween(menuSelector, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
+			var barY:Float = MENU_Y + 9 + (curSelected * MENU_LINE_GAP * 1.3);
+			if(menuSelector.y != barY)
+				menuSelectorTween = FlxTween.tween(menuSelector, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
 		}
 
 		callUIScripts('onChangeSelection', [curSelected, menuItems[curSelected]]);
