@@ -21,6 +21,7 @@ import lime.utils.AssetManifest;
 
 import backend.StageData;
 import backend.Song;
+import backend.Multiplayer;
 
 import haxe.io.Path;
 
@@ -422,7 +423,17 @@ class LoadingState extends MusicBeatState
 	function startCharPreload()
 	{
 		if (PlayState.SONG == null) return;
-		var names:Array<String> = [PlayState.SONG.gfVersion, PlayState.SONG.player2, PlayState.SONG.player1];
+		// 联机：双方角色在 PlayState.create 才写入 SONG.player1/2，这里必须按联机映射预载
+		// （否则对方模组皮肤要进曲后才加载，黑屏卡顿且可能加载不出来）。
+		var p1:String = PlayState.SONG.player1;
+		var p2:String = PlayState.SONG.player2;
+		if (PlayState.isOnlineMode)
+		{
+			// 联机：双端均按本端映射预载（我=右侧 BF 位角色，对方=左侧 Dad 位角色）
+			p1 = PlayState.onlineIsHost ? PlayState.onlineHostChar : PlayState.onlineClientChar;
+			p2 = PlayState.onlineIsHost ? PlayState.onlineClientChar : PlayState.onlineHostChar;
+		}
+		var names:Array<String> = [PlayState.SONG.gfVersion, p2, p1];
 		for (name in names)
 			if (name != null && name.length > 0 && !charPreloads.contains(name))
 				charPreloads.push(name);
@@ -436,24 +447,23 @@ class LoadingState extends MusicBeatState
 			try
 			{
 				var characterPath:String = 'characters/' + name + '.json';
-				#if MODS_ALLOWED
-				var p:String = Paths.modFolders(characterPath);
-				if (!FileSystem.exists(p)) p = Paths.getPreloadPath(characterPath);
-				#else
-				var p:String = Paths.getPreloadPath(characterPath);
-				#end
-				if (!FileSystem.exists(p)) continue;
+				var p:String = Multiplayer.resolveSyncFile(characterPath);
+				if (p == null) continue;
 				var json:Dynamic = haxe.Json.parse(File.getContent(p));
 				var imgKey:String = Reflect.field(json, 'image');
 				if (imgKey == null || imgKey.length < 1) continue;
-				#if MODS_ALLOWED
-				var file:String = Paths.modsImages(imgKey);
-				if (!FileSystem.exists(file))
-					file = Paths.getPath('images/' + imgKey + '.png', IMAGE);
-				#else
-				var file:String = Paths.getPath('images/' + imgKey + '.png', IMAGE);
-				#end
-				if (FileSystem.exists(file))
+				var file:String = Multiplayer.resolveSyncFile('images/' + imgKey + '.png');
+				if (file == null)
+				{
+					// Animate 图集目录：取目录内首个 PNG（spritemap*.png）
+					var dirAbs:String = Multiplayer.resolveSyncFile('images/' + imgKey);
+					if (dirAbs != null && FileSystem.isDirectory(dirAbs))
+					{
+						for (fn in FileSystem.readDirectory(dirAbs))
+							if (fn.toLowerCase().endsWith('.png')) { file = Path.join([dirAbs, fn]); break; }
+					}
+				}
+				if (file != null && FileSystem.exists(file))
 					Paths.requestImageDecode(file);
 			}
 			catch(e:Dynamic) {}

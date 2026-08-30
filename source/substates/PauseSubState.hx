@@ -1,5 +1,6 @@
 package substates;
 import backend.WheelScroll;
+import backend.Multiplayer;
 
 import backend.WeekData;
 import backend.Highscore;
@@ -16,6 +17,7 @@ import flixel.util.FlxStringUtil;
 
 import states.StoryMenuState;
 import states.FreeplayState;
+import states.OnlineMenuState;
 import options.OptionsState;
 import openfl.Lib;
 import openfl.events.KeyboardEvent;
@@ -122,6 +124,14 @@ class PauseSubState extends MusicBeatSubstate
 		{
 			menuItemsOG.insert(2, '退出编铺模式');
 			menuItemsOG.insert(3, '结束歌曲');
+		}
+		// 联机对局：重开/跳时间/换难度都会破坏双端同步，直接裁剪掉
+		if (PlayState.isOnlineMode)
+		{
+			menuItemsOG.remove('重新开始');
+			menuItemsOG.remove('结束歌曲');
+			menuItemsOG.remove('跳过时间');
+			menuItemsOG.remove('更换难度');
 		}
 		menuItems = menuItemsOG;
 
@@ -345,6 +355,12 @@ class PauseSubState extends MusicBeatSubstate
 
 	override function update(elapsed:Float)
 	{
+		// 联机：暂停期间 PlayState.update 被冻结，网络须在此轮询（接收 RESUME/QUIT）
+		if (PlayState.isOnlineMode && PlayState.instance != null)
+			PlayState.instance.onlinePauseNetworkTick();
+		// 远程 RESUME 已将本子状态关闭：本帧直接返回，不再操作即将销毁的 UI
+		if (PlayState.isOnlineMode && PlayState.instance != null && PlayState.instance.subState == null)
+			return;
 		// 每帧固定暂停相机缩放/滚动，防止暂停期间任何运行期改动导致文本截断
 		if (cameras != null && cameras[0] != null)
 		{
@@ -633,6 +649,15 @@ class PauseSubState extends MusicBeatSubstate
 					// 设置改动即时生效；需重载的项（判定模式/音符皮肤等）在下次重开曲目时生效。
 					openSubState(new PauseSettingsSubstate());
 				case "返回主菜单":
+					// 联机：通知对方退出；双方保持连接回到房间大厅（可再来一局）
+					if (PlayState.isOnlineMode)
+					{
+						Multiplayer.send('QUIT|' + Multiplayer.myNick + ' 退出了对局');
+						PlayState.changedDifficulty = false;
+						PlayState.chartingMode = false;
+						PlayState.instance.onlineBackToRoomLobby('已退出对局');
+						return;
+					}
 					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;
 					PlayState.seenCutscene = false;
@@ -671,6 +696,13 @@ class PauseSubState extends MusicBeatSubstate
 
 	public static function restartSong(noTrans:Bool = false, skipChartReload:Null<Bool> = null)
 	{
+		// 联机对局禁止重开：任何入口触发都视为主动退出，保持连接回房间大厅
+		if (PlayState.isOnlineMode)
+		{
+			Multiplayer.send('QUIT|' + Multiplayer.myNick + ' 退出了对局');
+			PlayState.instance.onlineBackToRoomLobby('已退出对局（联机禁用重开）');
+			return;
+		}
 		PlayState.instance.paused = true; // For lua
 		FlxG.sound.music.volume = 0;
 		PlayState.instance.vocals.volume = 0;

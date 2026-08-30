@@ -33,6 +33,7 @@ import flixel.input.keyboard.FlxKey;
 import flixel.animation.FlxAnimationController;
 import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
+import openfl.utils.AssetType;
 import openfl.events.Event;
 import openfl.events.KeyboardEvent;
 import openfl.Lib;
@@ -49,6 +50,7 @@ import states.editors.CharacterEditorState;
 import substates.PauseSubState;
 import substates.ResultsSubState;
 import substates.GameOverSubstate;
+import backend.Multiplayer;
 
 #if !flash 
 import flixel.addons.display.FlxRuntimeShader;
@@ -118,6 +120,15 @@ class PlayState extends MusicBeatState
 		['AAAAA', 0.999], 
 		['S', 1]
 	];
+
+	// ===== 联机模式（Meteoric Online，1v1 局域网）=====
+	public static var isOnlineMode:Bool = false;
+	public static var onlineIsHost:Bool = false;
+	public static var onlineMyNick:String = '玩家';
+	public static var onlineOppNick:String = '对手';
+	public static var onlineHoldCountdown:Bool = false;
+	public static var onlineHostChar:String = 'bf';   // 角色选择：房主角色（房主端 BF / 玩家端 Dad）
+	public static var onlineClientChar:String = 'dad'; // 角色选择：玩家角色（玩家端 BF / 房主端 Dad）
 
 	//event variables
 	private var isCameraOnForcedPos:Bool = false;
@@ -336,6 +347,9 @@ class PlayState extends MusicBeatState
 	// KE 结算界面：本局最高连击（命中后取峰值；Miss 重置 combo 不影响该值）
 	public var maxCombo:Int = 0;
 
+	// PF 移植：全 SICK/Marvelous（零失误、无低评）时 Combo 文字使用金色贴图
+	public var allSicks:Bool = true;
+
 	public var healthBar:HealthBar;
 	public var healthBarBG:AttachedSprite;
 	public var timeBar:TimeBar;
@@ -351,6 +365,31 @@ class PlayState extends MusicBeatState
 
 	// KE 结算散点图：本局逐音符判定记录 {t=音符时间, d=命中偏移(+早/-晚), r=评级}（仅内存，不进回放文件）
 	public var judgementHistory:Array<NoteHitEntry> = [];
+
+	// ===== 联机对局运行时状态 =====
+	public var onlineOppStrums:FlxTypedGroup<StrumNote>;
+	public var onlineOppHealth:Float = 1;
+	public var onlineOppScore:Int = 0;
+	public var onlineOppHits:Int = 0;
+	public var onlineOppMisses:Int = 0;
+	public var onlineOppCombo:Int = 0;
+	public var onlineOppMaxCombo:Int = 0;
+	public var onlineOppTotalPlayed:Int = 0;
+	public var onlineOppTotalNotesHit:Float = 0;
+	public var onlineOppRatings:Map<String, Int> = new Map();
+	public var onlineOppBarW:Float = 180;
+	public var onlineOppBarH:Float = 14;
+	public var onlineOppHealthFill:FlxSprite;
+	public var onlineOppTexts:Array<FlxText> = [];
+	public var onlineMyStats:Array<Dynamic> = null;
+	public var onlineOppStats:Array<Dynamic> = null;
+	public var onlineFinished:Bool = false;
+	public var onlineOppFinished:Bool = false;
+	public var onlineTimeSyncTimer:Float = 0;
+	public var onlineWaitTimer:Float = 0;
+	public var onlineWaitingResults:Bool = false;
+	public var onlineRemoteResume:Bool = false; // 远程 RESUME 恢复时不再回发 RESUME
+	public var onlineMirror:Bool = false; // 联机真双人-客户端镜像：自己唱 player2（Dad）半边；双端屏幕仍为标准单机布局（自己=右侧 BF 位）
 
 	private var generatedMusic:Bool = false;
 	public var endingSong:Bool = false;
@@ -705,6 +744,20 @@ class PlayState extends MusicBeatState
 			startCharacterScripts(gf.curCharacter);
 		}
 
+		// 联机角色选择：本端映射（我=BF，对方=Dad）——双端均为标准单机布局：
+		// 自己（右侧 BF 位）唱自己选的半边，对方（左侧 Dad 位）唱对方选的半边。
+		if (isOnlineMode)
+		{
+			SONG.player1 = onlineIsHost ? onlineHostChar : onlineClientChar;
+			SONG.player2 = onlineIsHost ? onlineClientChar : onlineHostChar;
+			// 我方角色可能来自任意模组（选曲后 currentMod 已被切走）：
+			// 把 currentMod 指向含我方角色的模组，保证 Character 的 JSON/图集能解析到；
+			// 对方角色已由 CHARSYNC 同步到 mods/ 根目录，走 modFolders 兜底路径照常解析。
+			var myCharMod:String = Multiplayer.findCharMod(onlineIsHost ? onlineHostChar : onlineClientChar);
+			if (myCharMod != null && myCharMod.length > 0)
+				Mods.currentModDirectory = myCharMod;
+		}
+
 		dad = new Character(0, 0, SONG.player2);
 		startCharacterPos(dad, true);
 		dadGroup.add(dad);
@@ -716,6 +769,11 @@ class PlayState extends MusicBeatState
 		boyfriendGroup.add(boyfriend);
 		boyfriendMap.set(SONG.player1, boyfriend); // 快速重开恢复默认角色用
 		startCharacterScripts(boyfriend.curCharacter);
+
+		// 联机真双人：标记客户端镜像（自己唱 player2/Dad 半边；双端屏幕仍为标准单机布局——
+		// 自己=右侧 BF 位、对方=左侧 Dad 位，仅谱面内容按各自半边分配）。
+		if (isOnlineMode && !onlineIsHost)
+			onlineMirror = true;
 
 		// 暴露角色/摄像机引用给脚本（Psych 0.7.3 setSpecialObject 等价物；必须在 stage 脚本加载前设置）
 		setOnScripts('dad', dad);
@@ -766,6 +824,38 @@ class PlayState extends MusicBeatState
 
 		generateSong(SONG.song);
 
+		// ===== 联机真双人：客户端镜像（自己唱 player2/Dad 半边）=====
+		// 双端屏幕均为标准单机布局：自己（右侧 BF 位）= 自己选的半边，对方（左侧 Dad 位）= 对方选的半边。
+		// 客户端实际打的是谱面 player2（Dad）半边：翻转 mustPress 后它跟随自己的右侧判定条（playerStrums），
+		// player1（BF）半边则成为对侧、显示在左侧判定条（opponentStrums）——箭头位置不变，只有谱面内容互换。
+		if (isOnlineMode && !onlineIsHost)
+		{
+			// 1) 音符归属翻转：player2（Dad 谱面）成为我方 mustPress（跟随右侧玩家判定条），
+			//    player1（BF 谱面）成为对侧（跟随左侧对手段）
+			var newTotal:Int = 0;
+			for (i in 0...unspawnNotes.length)
+			{
+				#if android
+				var nd:Note = unspawnNotes[i];
+				nd.mustPress = !nd.mustPress;
+				if (nd.mustPress && !nd.isSustainNote) newTotal++;
+				#else
+				var nd:CastNote = unspawnNotes[i];
+				if ((nd.noteData & (1 << 8)) != 0) nd.noteData &= ~(1 << 8);
+				else
+				{
+					nd.noteData |= 1 << 8;
+					if ((nd.noteData & (1 << 9)) == 0) newTotal++;
+				}
+				#end
+			}
+			totalNotes = newTotal;
+			// 2) 人声交换：我方（唱 Dad 半边）命中响 opponentVocals，对方（BF 半边）命中响 vocals
+			var tmpV:FlxSound = vocals;
+			vocals = opponentVocals;
+			opponentVocals = tmpV;
+		}
+
 		camFollow = new FlxObject(0, 0, 1, 1);
 		camFollow.setPosition(camPos.x, camPos.y);
 		camPos.put();
@@ -799,6 +889,9 @@ class PlayState extends MusicBeatState
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];
 		notes.cameras = [camHUD];
+
+		// 联机对局：追加右侧对手按键条 + 对手信息面板
+		if (isOnlineMode) addOnlineHUD();
 
 		// 原生长条按压覆盖（QT 模组 NoteHoldCover.lua 移植）：
 		// 模组自带同名全局脚本时跳过原生创建，避免双份覆盖层；
@@ -871,6 +964,13 @@ class PlayState extends MusicBeatState
 				}
 		}
 		#end
+
+		// 联机握手：客户端就绪后上报 ACK；双端在收到 GO 前挂起倒计时
+		if (isOnlineMode)
+		{
+			onlineHoldCountdown = true;
+			if (!onlineIsHost) Multiplayer.send('ACK');
+		}
 
 		startCallback();
 		RecalculateRating();
@@ -1312,6 +1412,9 @@ class PlayState extends MusicBeatState
 			callOnScripts('onStartCountdown');
 			return false;
 		}
+
+		// 联机双端同步：收到 GO（房主）或 GO（客户端）之前挂起，等待双方就绪
+		if (isOnlineMode && onlineHoldCountdown) return false;
 
 		seenCutscene = true;
 		inCutscene = false;
@@ -2323,6 +2426,8 @@ class PlayState extends MusicBeatState
 			{
 				if(!ClientPrefs.data.opponentStrums) targetAlpha = 0;
 				else if(ClientPrefs.data.middleScroll) targetAlpha = 0.35;
+				// 联机：对方箭头 = 单机同款对手段（左侧），强制可见（不受“显示对方箭头”设置影响）
+				if (isOnlineMode) targetAlpha = 1;
 			}
 
 			var babyArrow:StrumNote = new StrumNote(strumLineX, strumLineY, i, player);
@@ -2408,6 +2513,9 @@ class PlayState extends MusicBeatState
 			for (tween in modchartTweens) tween.active = true;
 			for (timer in modchartTimers) timer.active = true;
 			#end
+
+			// 联机：仅「主动恢复」通知对方解除暂停；远程 RESUME 恢复时不再回发
+			if (isOnlineMode && !onlineRemoteResume) Multiplayer.send('RESUME');
 
 			paused = false;
 			callOnScripts('onResume');
@@ -2896,6 +3004,10 @@ class PlayState extends MusicBeatState
 		if (_visualsTorn)
 			return;
 
+		// 联机：网络收发 / 消息处理 / 时间同步 / 对手 HUD 刷新
+		if (isOnlineMode)
+			updateOnline(elapsed);
+
 		callOnScripts('onUpdate', [elapsed]);
 
 		// 原生长条按压覆盖：每帧同步判定线位置
@@ -3083,8 +3195,8 @@ class PlayState extends MusicBeatState
 
 		// Watch calls removed for performance
 
-		// RESET = Quick Game Over Screen
-		if (!ClientPrefs.data.noReset && controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong)
+		// RESET = Quick Game Over Screen（联机对局禁用重开，见 addOnlineHUD）
+		if (!ClientPrefs.data.noReset && controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong && !isOnlineMode)
 		{
 			health = 0;
 			trace("RESET = True");
@@ -3123,6 +3235,9 @@ class PlayState extends MusicBeatState
 						{
 							var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
 							if(!daNote.mustPress) strumGroup = opponentStrums;
+
+							// 联机真双人：两侧谱面全部展示（自己打自己半边、对方打对半边）；
+							// 对侧音符不再隐藏，由对端 HIT/MISS 按 chartSeq 消费（见 applyOppHit/applyOppMiss）。
 
 							var strum:StrumNote = strumGroup.members[daNote.noteData];
 							if (strum == null)
@@ -3184,8 +3299,9 @@ class PlayState extends MusicBeatState
 							}
 							// 对手箭头：到达判定线即触发命中（旧条件是 wasGoodHit——对手音符从未被置位，
 							// 导致对手箭头永远不会被 opponentNoteHit 回收，直接飞过判定线）
+							// 联机：跳过该自动化命中（装饰音符，不闪烁/不触发动画），见上方 visible 屏蔽
 							else if (!rewinding && !daNote.hitByOpponent && !daNote.ignoreNote
-								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0)
+								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0 && !isOnlineMode)
 							{
 								opponentNoteHit(daNote);
 								// 对手簇视觉副本同步销毁（与玩家侧 processBotHits 一致）：
@@ -3274,7 +3390,7 @@ class PlayState extends MusicBeatState
 	}
 	#end
 
-	function openPauseMenu()
+	public function openPauseMenu(fromRemote:Bool = false)
 	{
 		// 防重入：后台/失焦/按键可能在同一帧多次触发，避免打开多个暂停界面
 		if (paused) return;
@@ -3283,6 +3399,9 @@ class PlayState extends MusicBeatState
 		persistentUpdate = false;
 		persistentDraw = true;
 		paused = true;
+		// 联机：仅「主动暂停」广播 PAUSE；远程收到的 PAUSE 打开时不再回发，
+		// 否则对方点继续后会被这个回显 PAUSE 再次强制暂停（无法恢复游玩）
+		if (isOnlineMode && !fromRemote) Multiplayer.send('PAUSE');
 		// 侧边栏（stage 级 TextField）不随 flixel 暂停，需手动隐藏，恢复后 updateJudgementTxt 自动显示
 		if (hud != null && hud.judgementField != null) hud.judgementField.visible = false;
 
@@ -3358,6 +3477,14 @@ class PlayState extends MusicBeatState
 	function doDeathCheck(?skipHealthCheck:Bool = false) {
 		if (((skipHealthCheck && instakillOnMiss) || health <= 0) && !practiceMode && !isDead)
 		{
+			// 联机：不死于 GameOver，直接进入双端成绩对比（先发送本方 FINISH）
+			if (isOnlineMode)
+			{
+				isDead = true;
+				onlineFinishAndShowResults(true);
+				return true;
+			}
+
 			var ret:Dynamic = callOnScripts('onGameOver', null, true);
 			if(ret != FunkinLua.Function_Stop) {
 				boyfriend.stunned = true;
@@ -3684,7 +3811,9 @@ class PlayState extends MusicBeatState
 			return;
 		}
 
-		var isDad:Bool = (SONG.notes[sec].mustHitSection != true);
+		// 联机真双人-客户端镜像：本端演唱半边与谱面 mustHitSection 相反（客户端唱 Dad 半边），
+		// 反转 isDad，保证相机跟随「本屏当前演唱的角色」（房主端不变）。
+		var isDad:Bool = (SONG.notes[sec].mustHitSection != true) != onlineMirror;
 		moveCamera(isDad);
 		callOnScripts('onMoveCamera', [isDad ? 'dad' : 'boyfriend']);
 	}
@@ -3880,6 +4009,14 @@ class PlayState extends MusicBeatState
 			// 此处 _visualsTorn 已上锁，updateJudgementTxt 不再运行——必须在此一次隐藏，
 			// 结算关闭后 updateJudgementTxt 恢复运行会自动按设置重新显示）
 			if (hud != null && hud.judgementField != null) hud.judgementField.visible = false;
+
+			// 联机：进入普通结算界面（精简版，关闭后返回联机大厅）
+			if (isOnlineMode)
+			{
+				onlineFinishAndShowResults(false);
+				return false;
+			}
+
 			var resultsSubState:ResultsSubState = new ResultsSubState(replayForResults != null);
 			resultsSubState.closeCallback = function() {
 				persistentUpdate = true;
@@ -4057,6 +4194,7 @@ class PlayState extends MusicBeatState
 		totalNotesHit = 0;
 		combo = 0;
 		maxCombo = 0; // 结算界面：最高连击随重开清零
+		allSicks = true; // 金色 Combo：重开复位
 		songPercent = 0;
 		usedAutoplay = cpuControlled || replayMode;
 		usedGodMode = false; // 上帝模式正常记分
@@ -4509,6 +4647,8 @@ class PlayState extends MusicBeatState
 		note.ratingMod = daRating.ratingMod;
 		if(!note.ratingDisabled) daRating.hits += scoreMult;
 		note.rating = daRating.name;
+		// PF 移植：非 Marvelous/Sick 判定即退出“全 Sick”金色 Combo
+		if (daRating.name != 'marvelous' && daRating.name != 'sick') allSicks = false;
 		// KE 结算散点图：记录主音符命中偏移（+ 早到 / - 晚到；自动游玩不记录）
 		if (!cpuControlled && !note.isSustainNote && note.rating != null && note.rating.length > 0)
 			judgementHistory.push({t: note.strumTime, d: note.strumTime - Conductor.songPosition, r: note.rating});
@@ -4550,7 +4690,14 @@ class PlayState extends MusicBeatState
 		var ratingImg:String = daRating.image;
 		// Marvelous 无像素版贴图，像素关卡回退 sick
 		if (ratingImg == 'marvelous' && PlayState.isPixelStage) ratingImg = 'sick';
-		rating.loadGraphic(Paths.image(uiPrefix + ratingImg + uiSuffix));
+		// PF 移植：Early/Late 指示器——偏早/偏晚命中优先用 -early/-late 评级图，
+		// 缺失（如 Marvelous / 自定义皮肤）回退基础图
+		var daTiming:String = (note.strumTime < Conductor.songPosition) ? '-late' : '-early';
+		var ratingPath:String = uiPrefix + ratingImg + daTiming + uiSuffix;
+		if (Paths.fileExists('images/' + ratingPath + '.png', IMAGE))
+			rating.loadGraphic(Paths.image(ratingPath));
+		else
+			rating.loadGraphic(Paths.image(uiPrefix + ratingImg + uiSuffix));
 		rating.cameras = [camHUD];
 		rating.screenCenter();
 		rating.x = placement - 40;
@@ -4563,7 +4710,13 @@ class PlayState extends MusicBeatState
 		rating.y -= ClientPrefs.data.comboOffset[1];
 		rating.antialiasing = antialias;
 
-		var comboSpr:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));
+		// PF 移植：全 SICK/Marvelous 时 Combo 文字用金色贴图，缺失回退普通 combo
+		var comboPath:String = uiPrefix + 'combo' + (allSicks ? '-golden' : '') + uiSuffix;
+		var comboSpr:FlxSprite = new FlxSprite();
+		if (Paths.fileExists('images/' + comboPath + '.png', IMAGE))
+			comboSpr.loadGraphic(Paths.image(comboPath));
+		else
+			comboSpr.loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));
 		comboSpr.cameras = [camHUD];
 		comboSpr.screenCenter();
 		comboSpr.x = placement;
@@ -4666,7 +4819,8 @@ class PlayState extends MusicBeatState
 			daLoop++;
 			if(numScore.x > xThing) xThing = numScore.x;
 		}
-		comboSpr.x = xThing + 50;
+		// 修复：Combo 词的水平位置不再被“数字最大 x”覆盖回默认——保留方向键 Rank 偏移
+		comboSpr.x = xThing + 50 + ClientPrefs.data.comboOffset[0];
 		FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
 			startDelay: Conductor.crochet * 0.001 / playbackRate
 		});
@@ -4981,6 +5135,16 @@ class PlayState extends MusicBeatState
 			for (i in 0...releaseArray.length)
 				if(releaseArray[i] || strumsBlocked[i] == true)
 					keyReleased(i);
+
+		// 联机：转发己方按键事件，驱动对方按键条
+		if (isOnlineMode && startedCountdown && !paused && !endingSong && !cpuControlled && !replayMode)
+		{
+			for (i in 0...4)
+			{
+				if (pressArray[i]) Multiplayer.send('PRESS|' + i);
+				if (releaseArray[i]) Multiplayer.send('RELEASE|' + i);
+			}
+		}
 	}
 
 	/** 回放 v2：按录制时间注入按键按下/抬起（走正常判定路径），并处理长按子段命中 */
@@ -5083,6 +5247,8 @@ class PlayState extends MusicBeatState
 			if (outer <= 0) outer = 166;
 			judgementHistory.push({t: note.strumTime, d: outer, r: 'miss'});
 		}
+		// PF 移植：任何失误（含空按）即退出“全 Sick”金色 Combo
+		allSicks = false;
 
 		// score and data
 		var subtract:Float = 0.05;
@@ -5103,6 +5269,11 @@ class PlayState extends MusicBeatState
 		if(!endingSong) songMisses += missMult;
 		totalPlayed += missMult;
 		RecalculateRating(true);
+
+		// 联机：广播己方失误（分数增量/血量增量/密度 + 音符序号），对方据此扣对方血量并给自己回血，
+		// 并按 chartSeq 精确消费对侧音符/播放对方 Miss 动画
+		if (isOnlineMode && !cpuControlled)
+			Multiplayer.send('MISS|' + direction + '~' + (-10 * missMult) + '~' + (-(subtract * healthLoss)) + '~' + missMult + '~' + (note != null ? note.chartSeq : -1));
 
 		// play character anims
 		var char:Character = boyfriend;
@@ -5246,6 +5417,8 @@ class PlayState extends MusicBeatState
 	function goodNoteHit(note:Note):Void
 	{
 		stagesFunc(function(stage:BaseStage) stage.goodNoteHit(note)); //Psych 1.0.4：场景命中回调（Weekend 1）
+		var onlineScoreDelta:Int = 0;
+		var onlineHealthDelta:Float = 0;
 		if (!note.wasGoodHit)
 		{
 			var hitMult:Int = Std.int(note.density); // H-Slice 移植：堆叠合并按 density 计分/加血
@@ -5302,15 +5475,25 @@ class PlayState extends MusicBeatState
 			{
 				combo += hitMult;
 				if (combo > maxCombo) maxCombo = combo; // 最高连击追踪
+				var onlinePrevScore:Int = songScore;
 				popUpScore(note, hitMult); // 传入已封顶的 density：计分/评级/命中同源封顶
+				onlineScoreDelta = songScore - onlinePrevScore;
 				// 回放录制：主音符命中（评分取本局真实判定结果）
 				if (recordingReplay && !cpuControlled && currentReplay != null)
 					currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
 			}
-			health += note.hitHealth * healthGain * hitMult;
+			onlineHealthDelta = note.hitHealth * healthGain * hitMult;
+			health += onlineHealthDelta;
 			// Bad 及以下评分扣一点点血
 			if (!note.isSustainNote && (note.rating == 'bad' || note.rating == 'shit'))
+			{
+				onlineHealthDelta -= 0.02 * healthLoss * hitMult;
 				health -= 0.02 * healthLoss * hitMult;
+			}
+			// 联机：广播己方命中（分数增量/血量增量/密度 + 音符序号），对方据此重建对手面板与血量，
+			// 并按 chartSeq 精确消费对侧音符（真双人：对侧谱面由对方按键打击）
+			if (isOnlineMode && !cpuControlled && !note.isSustainNote)
+				Multiplayer.send('HIT|' + note.noteData + '~' + note.rating + '~' + onlineScoreDelta + '~' + onlineHealthDelta + '~' + hitMult + '~' + note.chartSeq);
 
 			if(!note.noAnimation && !(botHitBatch && botBatchAnimDone[note.noteData])) {
 				var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, note.noteData)))];
@@ -6019,6 +6202,467 @@ class PlayState extends MusicBeatState
 		return false;
 	}
 	#end
+
+	// ==================== 联机（Meteoric Online）====================
+
+	/** 对方 Miss 时我方获得其血量损失的比例（攻防平衡参数，可调） */
+	static inline var ONLINE_OPP_MISS_GAIN:Float = 0.6;
+
+	/** 创建右侧对手按键条 + 对手信息面板；联机对局禁用 R 重开 */
+	function addOnlineHUD():Void
+	{
+		canReset = false; // 联机禁用 R 快速重开（重开会破坏双端同步）
+
+		// 对方箭头：直接复用单机标准对手段（opponentStrums，双端均在左侧）。
+		// 真双人下网络 PRESS/RELEASE 经 flashOppStrums 驱动；HIT/MISS 再按 chartSeq 消费对侧谱面音符并触发对方唱歌/Miss 动画。
+		onlineOppStrums = opponentStrums;
+
+		// 对手信息面板（右侧：按键条下方/上方，避开音符判定线）
+		var panelX:Float = FlxG.width - 252;
+		var panelY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 380) : 175;
+		var panelBg:FlxSprite = new FlxSprite(panelX, panelY).makeGraphic(240, 212, 0xCC161622);
+		panelBg.cameras = [camHUD];
+		add(panelBg);
+
+		var labelX:Float = panelX + 14;
+		var labelW:Float = 212;
+		onlineOppTexts = [];
+		var textYs:Array<Float> = [panelY + 12, panelY + 64, panelY + 92, panelY + 120, panelY + 148];
+		for (i in 0...5)
+		{
+			var t:FlxText = new FlxText(labelX, textYs[i], labelW, '', i == 0 ? 20 : 16);
+			t.setFormat(Paths.font('future.ttf'), i == 0 ? 20 : 16, (i == 0 ? 0xFFFF8A8A : 0xFFD7D7E0), LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			t.cameras = [camHUD];
+			add(t);
+			onlineOppTexts.push(t);
+		}
+
+		// 对手血条
+		var hbBg:FlxSprite = new FlxSprite(labelX, panelY + 42).makeGraphic(Std.int(onlineOppBarW), Std.int(onlineOppBarH), 0xFF2A2A38);
+		hbBg.cameras = [camHUD];
+		add(hbBg);
+		onlineOppHealthFill = new FlxSprite(labelX, panelY + 42).makeGraphic(Std.int(onlineOppBarW), Std.int(onlineOppBarH), 0xFF7BE27B);
+		onlineOppHealthFill.cameras = [camHUD];
+		add(onlineOppHealthFill);
+
+		onlineOppHealth = 1;
+		onlineOppTexts[0].text = onlineOppNick;
+		refreshOppHud();
+	}
+
+	/** 每帧联机驱动：网络收发、消息处理、房主时间同步、对手 HUD 刷新 */
+	function updateOnline(elapsed:Float):Void
+	{
+		Multiplayer.update();
+		processOnlineMessages();
+
+		// 握手超时保护：15 秒内未收到对方就绪/GO 信号则回大厅
+		if (onlineHoldCountdown)
+		{
+			onlineWaitTimer += elapsed;
+			if (onlineWaitTimer > 15)
+			{
+				onlineGoBackToLobby('连接超时：对方未就绪');
+				return;
+			}
+		}
+		else
+			onlineWaitTimer = 0;
+
+		if (onlineIsHost && startedCountdown && !paused && !endingSong)
+		{
+			onlineTimeSyncTimer += elapsed;
+			if (onlineTimeSyncTimer >= 0.5)
+			{
+				onlineTimeSyncTimer = 0;
+				Multiplayer.send('TIME|' + Conductor.songPosition);
+			}
+		}
+		refreshOppHud();
+	}
+
+	function processOnlineMessages():Void
+	{
+		for (m in Multiplayer.pollMessages())
+		{
+			var parts:Array<String> = m.split('|');
+			var cmd:String = parts[0];
+			switch (cmd)
+			{
+				case 'ACK':
+					if (onlineIsHost)
+					{
+						onlineHoldCountdown = false;
+						Multiplayer.send('GO');
+						startCountdown();
+					}
+				case 'GO':
+					if (!onlineIsHost)
+					{
+						onlineHoldCountdown = false;
+						startCountdown();
+					}
+				case 'TIME':
+					if (!onlineIsHost && startedCountdown && !paused && !endingSong && parts.length >= 2)
+					{
+						var t:Float = Std.parseFloat(parts[1]);
+						if (!Math.isNaN(t) && Math.abs(Conductor.songPosition - t) > 45)
+							setSongTime(t);
+					}
+				case 'HIT':
+					if (parts.length >= 2)
+					{
+						var f:Array<String> = parts[1].split('~');
+						if (f.length >= 5)
+						{
+							var seq:Int = f.length >= 6 ? Std.parseInt(f[5]) : -1;
+							applyOppHit(Std.parseInt(f[0]), f[1], Std.parseInt(f[2]), Std.parseFloat(f[3]), Std.parseInt(f[4]), seq);
+						}
+					}
+				case 'MISS':
+					if (parts.length >= 2)
+					{
+						var f:Array<String> = parts[1].split('~');
+						if (f.length >= 4)
+						{
+							var seq:Int = f.length >= 5 ? Std.parseInt(f[4]) : -1;
+							applyOppMiss(Std.parseInt(f[0]), Std.parseInt(f[1]), Std.parseFloat(f[2]), Std.parseInt(f[3]), seq);
+						}
+					}
+				case 'PRESS':
+					if (parts.length >= 2) flashOppStrums(Std.parseInt(parts[1]), 'press', false);
+				case 'RELEASE':
+					if (parts.length >= 2) flashOppStrums(Std.parseInt(parts[1]), 'static', false);
+				case 'PAUSE':
+					if (!paused && !endingSong && startedCountdown && subState == null)
+						openPauseMenu(true); // 远程暂停：不再回发 PAUSE
+				case 'RESUME':
+					if (paused && subState != null)
+					{
+						onlineRemoteResume = true;
+						closeSubState();
+						onlineRemoteResume = false;
+					}
+				case 'QUIT':
+					// 对方主动退出对局：同样保持连接回房间大厅（可再来一局）
+					onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
+				case 'DISCONNECTED':
+					onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
+				case 'FINISH':
+					onlineOppFinished = true;
+					if (parts.length >= 2)
+					{
+						var f:Array<String> = parts[1].split('~');
+						if (f.length >= 8)
+							onlineOppStats = [f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]];
+					}
+					if (onlineFinished)
+						openOnlineResults();
+			}
+		}
+	}
+
+	function applyOppHit(data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
+	{
+		onlineOppScore += scoreDelta;
+		onlineOppCombo += mult;
+		if (onlineOppCombo > onlineOppMaxCombo) onlineOppMaxCombo = onlineOppCombo;
+		onlineOppHits += mult;
+		onlineOppTotalPlayed += mult;
+		onlineOppTotalNotesHit += getRatingModByName(rating) * mult;
+		onlineOppRatings.set(rating, (onlineOppRatings.exists(rating) ? onlineOppRatings.get(rating) : 0) + mult);
+		onlineOppHealth = FlxMath.bound(onlineOppHealth + healthDelta, 0, 2);
+		flashOppStrums(data, 'confirm', true);
+		// 真双人：对侧谱面由对方按键打击——按 chartSeq 消费对侧音符 + 对方角色唱歌 + 对方人声响起
+		onlineOppHitVisual(data, seq);
+	}
+
+	function applyOppMiss(data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
+	{
+		onlineOppScore += scoreDelta;
+		onlineOppMisses += mult;
+		onlineOppTotalPlayed += mult;
+		onlineOppCombo = 0;
+		onlineOppHealth = FlxMath.bound(onlineOppHealth + healthDelta, 0, 2);
+		// 攻防式：对方 Miss → 我方按比例回血
+		if (healthDelta < 0)
+			health = FlxMath.bound(health + (-healthDelta) * ONLINE_OPP_MISS_GAIN, 0, 2);
+		flashOppStrums(data, 'static', false);
+		// 真双人：对方 Miss —— 对侧音符不消费（自然飞过判定线，由回收窗清理），
+		// 仅播放对方角色 Miss 动画 + 对方人声静音
+		playOnlineOppMiss(data, findOnlineOppNoteBySeq(seq));
+	}
+
+	// ==================== 联机真双人：对侧音符消费 / 对方演唱 ====================
+
+	/** 按 chartSeq 查对侧存活基准音符（seqNote 静态表 O(1)；已消费/已飞过返回 null） */
+	function findOnlineOppNoteBySeq(seq:Int):Note
+	{
+		if (seq < 0 || seq >= Note.seqNote.length) return null;
+		var n:Note = Note.seqNote[seq];
+		if (n != null && n.alive && n.exists && !n.blockHit) return n;
+		// seqNote 可能被同 chartSeq 的视觉副本（blockHit）覆盖：回退扫描基准音符
+		var found:Note = null;
+		if (notes != null)
+			notes.forEachAlive(function(c:Note) {
+				if (found == null && c.chartSeq == seq && !c.blockHit) found = c;
+			});
+		return found;
+	}
+
+	/** 对方命中：消费对侧基准音符（含同 chartSeq 视觉副本）+ 对方角色唱歌 + 对方人声响起 */
+	function onlineOppHitVisual(data:Int, seq:Int):Void
+	{
+		var note:Note = findOnlineOppNoteBySeq(seq);
+		if (note != null)
+		{
+			note.wasGoodHit = true;
+			note.active = false;
+			note.visible = false;
+			notes.invalidateNote(note);
+			// 同簇视觉副本一并销毁（与玩家侧 processBotHits 一致，避免副本飞过判定线滞留）
+			if (note.chartSeq >= 0)
+			{
+				var i:Int = notes.members.length - 1;
+				while (i >= 0)
+				{
+					var sib:Note = notes.members[i];
+					if (sib != null && sib != note && sib.blockHit && sib.ignoreNote && sib.chartSeq == note.chartSeq)
+						notes.invalidateNote(sib);
+					i--;
+				}
+			}
+		}
+		playOnlineOppSing(data, note);
+		if (opponentVocals != null) opponentVocals.volume = 1;
+	}
+
+	/** 对方角色唱歌动画（联机对侧命中触发；客户端镜像已交换角色引用，dad 恒为屏幕上“对方角色”） */
+	function playOnlineOppSing(data:Int, note:Note):Void
+	{
+		if (note != null && note.noAnimation) return;
+		var char:Character = dad;
+		if (note != null)
+		{
+			if (note.noteType == 'Hey!' && char != null && char.animOffsets.exists('hey'))
+			{
+				char.playAnim('hey', true);
+				char.specialAnim = true;
+				char.heyTimer = 0.6;
+				return;
+			}
+			if (note.gfNote) char = gf;
+		}
+		var altAnim:String = note != null ? note.animSuffix : '';
+		if (SONG.notes[curSection] != null)
+		{
+			if (SONG.notes[curSection].altAnim && !SONG.notes[curSection].gfSection)
+				altAnim = '-alt';
+		}
+		if (char != null)
+		{
+			char.playAnim(singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, data)))] + altAnim, true);
+			char.holdTimer = 0;
+		}
+	}
+
+	/** 对方 Miss 动画 + 对方人声静音（角色有 miss 动画才播） */
+	function playOnlineOppMiss(data:Int, note:Note):Void
+	{
+		var char:Character = dad;
+		if (note != null && note.gfNote) char = gf;
+		if (char != null && char.hasMissAnimations)
+		{
+			var suffix:String = note != null ? note.animSuffix : '';
+			char.playAnim(singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, data)))] + 'miss' + suffix, true);
+		}
+		if (opponentVocals != null) opponentVocals.volume = 0;
+	}
+
+	function flashOppStrums(data:Int, anim:String, confirm:Bool):Void
+	{
+		if (onlineOppStrums == null) return;
+		var s:StrumNote = onlineOppStrums.members[data];
+		if (s == null) return;
+		s.playAnim(anim, true);
+		if (confirm)
+			s.resetAnim = Conductor.stepCrochet * 1.25 / 1000 / playbackRate;
+	}
+
+	function refreshOppHud():Void
+	{
+		if (onlineOppTexts == null || onlineOppTexts.length < 5) return;
+		onlineOppTexts[0].text = onlineOppNick;
+		onlineOppTexts[1].text = '连击: ' + onlineOppCombo;
+		onlineOppTexts[2].text = '分数: ' + onlineOppScore;
+		var oppAcc:Float = onlineOppTotalPlayed > 0 ? onlineOppTotalNotesHit / onlineOppTotalPlayed : 0;
+		onlineOppTexts[3].text = '准确率: ' + Math.round(oppAcc * 1000) / 10 + '%';
+		onlineOppTexts[4].text = '判定: ' + buildOppCountsLine();
+		refreshOppHealthFill();
+	}
+
+	function buildOppCountsLine():String
+	{
+		var parts:Array<String> = [];
+		for (r in ratingsData)
+			if (onlineOppRatings.exists(r.name) && onlineOppRatings.get(r.name) > 0)
+				parts.push(r.name + ':' + onlineOppRatings.get(r.name));
+		parts.push('miss:' + onlineOppMisses);
+		return parts.join(' ');
+	}
+
+	function refreshOppHealthFill():Void
+	{
+		if (onlineOppHealthFill == null) return;
+		var pct:Float = FlxMath.bound(onlineOppHealth, 0, 2) / 2;
+		var newW:Int = Std.int(onlineOppBarW * pct);
+		if (newW <= 0)
+		{
+			onlineOppHealthFill.visible = false;
+			return;
+		}
+		onlineOppHealthFill.visible = true;
+		onlineOppHealthFill.makeGraphic(newW, Std.int(onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
+	}
+
+	function getRatingModByName(name:String):Float
+	{
+		for (r in ratingsData)
+			if (r.name == name) return r.ratingMod;
+		return 1;
+	}
+
+	function buildRatingCountsCsv():String
+	{
+		var parts:Array<String> = [];
+		for (r in ratingsData)
+			if (r.hits > 0) parts.push(r.name + ':' + r.hits);
+		parts.push('miss:' + songMisses);
+		return parts.join(',');
+	}
+
+	/** 单曲结束（含死亡）：上报本方 FINISH 并打开普通结算界面（联机精简版） */
+	function onlineFinishAndShowResults(died:Bool):Void
+	{
+		if (onlineFinished && subState != null) return;
+		if (!onlineFinished)
+		{
+			onlineFinished = true;
+			var acc:Float = Math.isNaN(ratingPercent) ? 0 : ratingPercent;
+			var counts:String = buildRatingCountsCsv();
+			onlineMyStats = [songScore, songHits, songMisses, totalNotesHit, totalPlayed, maxCombo, acc, counts];
+			Multiplayer.send('FINISH|' + songScore + '~' + songHits + '~' + songMisses + '~' + totalNotesHit
+				+ '~' + totalPlayed + '~' + maxCombo + '~' + acc + '~' + counts);
+		}
+		if (died)
+		{
+			try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
+			persistentUpdate = false;
+			persistentDraw = false;
+		}
+		openOnlineResults();
+	}
+
+	function openOnlineResults():Void
+	{
+		if (subState != null) return;
+		persistentUpdate = false;
+		// 普通结算界面（联机下自动渲染为双栏对比版）：关闭（继续/ESC）后保持连接返回房间大厅
+		var onlineResults:ResultsSubState = new ResultsSubState();
+		onlineResults.closeCallback = function() {
+			persistentUpdate = true;
+			onlineBackToRoomLobby('对局结束，返回大厅');
+		};
+		openSubState(onlineResults);
+	}
+
+	function onlineGoBackToLobby(reason:String):Void
+	{
+		Multiplayer.stop();
+		PlayState.isOnlineMode = false;
+		OnlineMenuState.notifyReason = reason;
+		try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
+		MusicBeatState.switchState(new OnlineMenuState());
+	}
+
+	/** 结算/主动退出对局：保持局域网连接，返回房间大厅（双方可再选曲再来一局），不切断 socket */
+	public function onlineBackToRoomLobby(reason:String):Void
+	{
+		PlayState.isOnlineMode = false;
+		OnlineMenuState.notifyReason = reason;
+		OnlineMenuState.openInLobby = true;
+		try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
+		MusicBeatState.switchState(new OnlineMenuState());
+	}
+
+	/**
+	 * 暂停期间由 PauseSubState 每帧调用：PlayState.update 被冻结时仍处理
+	 * RESUME / QUIT / DISCONNECTED（普通游戏事件在暂停期间忽略，恢复后再消费）。
+	 */
+	public function onlinePauseNetworkTick():Void
+	{
+		if (!isOnlineMode) return;
+		Multiplayer.update();
+		var leftover:Array<String> = [];
+		for (m in Multiplayer.pollMessages())
+		{
+			var parts:Array<String> = m.split('|');
+			switch (parts[0])
+			{
+				case 'RESUME':
+					if (paused && subState != null)
+					{
+						onlineRemoteResume = true;
+						closeSubState();
+						onlineRemoteResume = false;
+					}
+				case 'QUIT':
+					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
+					onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
+					return;
+				case 'DISCONNECTED':
+					onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
+					return;
+				default:
+					// 暂停期间暂存游戏事件；PAUSE 丢弃（恢复后不得重放对方的旧暂停）
+					if (parts[0] != 'PAUSE') leftover.push(m);
+			}
+		}
+		Multiplayer.reinjectMany(leftover);
+	}
+
+	/**
+	 * 联机结算界面打开后由 ResultsSubState 每帧调用：
+	 * PlayState.update 已冻结，仍需实时接收对方 FINISH / QUIT / DISCONNECTED。
+	 */
+	public function onlineResultsNetworkTick():Void
+	{
+		if (!isOnlineMode) return;
+		Multiplayer.update();
+		for (m in Multiplayer.pollMessages())
+		{
+			var parts:Array<String> = m.split('|');
+			switch (parts[0])
+			{
+				case 'FINISH':
+					onlineOppFinished = true;
+					if (parts.length >= 2)
+					{
+						var f:Array<String> = parts[1].split('~');
+						if (f.length >= 8)
+							onlineOppStats = [f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]];
+					}
+				case 'QUIT':
+					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
+					onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
+					return;
+				case 'DISCONNECTED':
+					onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
+					return;
+				default:
+			}
+		}
+	}
 }
 
 /**
@@ -6329,8 +6973,9 @@ class GameHUD
 		if (st.health > 2) st.health = 2;
 		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset;
 		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2;
-		iconP1.animation.curAnim.curFrame = (healthBar.percent < 20) ? 1 : 0;
-		iconP2.animation.curAnim.curFrame = (healthBar.percent > 80) ? 1 : 0;
+		// 胜利小图标（OSEngine/FNF PR#138 语义）：3 帧 = [0 正常 / 1 劣势 / 2 胜利]，2 帧兼容旧图标
+		iconP1.animation.curAnim.curFrame = iconFrame(iconP1, healthBar.percent, true);
+		iconP2.animation.curAnim.curFrame = iconFrame(iconP2, healthBar.percent, false);
 
 		// 血量阴影滚动：方向随推条方向（回血向左、掉血向右）
 		var hpDelta:Float = healthBar.percent - lastHpPercent;
@@ -6353,6 +6998,18 @@ class GameHUD
 
 		// 可见性权威：每帧拉回设置值
 		enforce();
+	}
+
+	/** 图标帧选择：3 帧 = [0 正常 / 1 劣势 / 2 胜利]；2 帧只到劣势。玩家与敌方互为镜像。 */
+	static function iconFrame(icon:HealthIcon, percent:Float, isPlayer:Bool):Int
+	{
+		if (icon.iconFrames >= 3)
+			return switch (isPlayer)
+			{
+				case true:  (percent < 20) ? 1 : ((percent > 80) ? 2 : 0);
+				default:    (percent > 80) ? 1 : ((percent < 20) ? 2 : 0);
+			}
+		return isPlayer ? ((percent < 20) ? 1 : 0) : ((percent > 80) ? 1 : 0);
 	}
 
 	function updateJudgementTxt():Void

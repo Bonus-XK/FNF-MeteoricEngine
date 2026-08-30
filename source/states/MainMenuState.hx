@@ -39,7 +39,7 @@ class MainMenuState extends MusicBeatState
 	var optionShit:Array<Array<Dynamic>> = [
 		['story_mode', '故事模式', '按章节顺序挑战官方曲目，一路打到周日晚上的对决。', 0xFFDD88FF],
 		['freeplay', '自由游玩', '从全部已解锁曲目中任选一首挑战，还能查看最佳成绩与准确率。', 0xFF66DDFF],
-		// ['online', '联机', ...] 联机功能暂时屏蔽
+		['online', '联机', '与好友实时对战：创建房间或输入房主 IP 加入。', 0xFF8AD7FF],
 		#if MODS_ALLOWED
 		['mods', 'MOD', '管理已安装的模组：启用、停用或浏览模组内容。', 0xFF88E58A],
 		#end
@@ -611,7 +611,8 @@ class MainMenuState extends MusicBeatState
 				MusicBeatState.switchState(new StoryMenuState());
 			case 'freeplay':
 				MusicBeatState.switchState(new FreeplayState());
-			// case 'online': 联机功能暂时屏蔽
+			case 'online':
+				MusicBeatState.switchState(new OnlineMenuState());
 			#if MODS_ALLOWED
 			case 'mods':
 				MusicBeatState.switchState(new ModsMenuState());

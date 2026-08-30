@@ -352,6 +352,8 @@ class SoundFrontEnd
 	/**
 	 * Changes the volume by a certain amount, also activating the sound tray.
 	 * 音量会从当前值平滑渐变到目标值（而非瞬间跳变）。
+	 * 已在边界（满/零）时变化量为 0：只静默显示托盘提示“已到顶/已到底”，不再响“嘀”，
+	 * 否则游玩中反复按 +/-（每次都是无效变更）会一直滴滴滴。
 	 */
 	public function changeVolume(Amount:Float):Void
 	{
@@ -360,19 +362,23 @@ class SoundFrontEnd
 		_volumeTarget = FlxMath.bound(volume + Amount, 0, 1);
 		_volumeLerp = 0;
 		_volumeTweening = true;
-		showSoundTray(Amount > 0);
+		var noChange:Bool = (_volumeTarget == _volumeFrom);
+		if (noChange)
+			_volumeTweening = false; // 无渐变：防止 0 变化量空转
+		showSoundTray(Amount > 0, noChange);
 	}
 
 	/**
 	 * Shows the sound tray if it is enabled.
 	 * @param up Whether or not the volume is increasing.
+	 * @param silentOnly 为 true 时托盘只显示不发声（无效音量变更时的视觉反馈）
 	 */
-	public function showSoundTray(up:Bool = false):Void
+	public function showSoundTray(up:Bool = false, silentOnly:Bool = false):Void
 	{
 		#if FLX_SOUND_TRAY
 		if (FlxG.game.soundTray != null && soundTrayEnabled)
 		{
-			FlxG.game.soundTray.show(up);
+			FlxG.game.soundTray.show(up, silentOnly);
 		}
 		#end
 	}

@@ -342,9 +342,10 @@ class FlxSoundTray extends Sprite
 		}
 	}
 
-	public function show(up:Bool = false):Void
+	public function show(up:Bool = false, silentOnly:Bool = false):Void
 	{
-		if (!silent)
+		// silentOnly：无效音量变更（已满/已零）只显示托盘，不响提示音（避免游玩中按住 +/- 连续滴滴滴）
+		if (!silent && !silentOnly)
 		{
 			var sound = FlxAssets.getSound(up ? volumeUpSound : volumeDownSound);
 			if (sound != null)

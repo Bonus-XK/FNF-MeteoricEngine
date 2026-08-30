@@ -298,6 +298,7 @@ class Character extends FlxSprite
 	{
 		#if flxanimate
 		if (isAnimateAtlas) atlas.update(elapsed);
+
 		#end
 		if (debugMode || isAnimationNull())
 		{
