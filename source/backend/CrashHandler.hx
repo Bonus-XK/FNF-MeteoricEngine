@@ -416,7 +416,7 @@ class CrashHandler
 		lines.push('');
 		lines.push('===== 系统报告 =====');
 		lines.push('--- 引擎 ---');
-		lines.push('引擎        : Meteoric Engine v1.1.0 (Psych 0.7.1h 基座)');
+		lines.push('引擎        : Meteoric Engine v1.1.1 (Psych 0.7.1h 基座)');
 		lines.push('构建特性    : ' + buildDefines());
 		try
 		{

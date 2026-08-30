@@ -33,8 +33,8 @@ class Main extends Sprite
 
 	public static var fpsVar:FPS;
 
-	public static var meVersion:String = '1.1.0';
-	public static var meVersionIndex:Int = 1;
+	public static var meVersion:String = '1.1.1';
+	public static var meVersionIndex:Int = 2;
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
 	#if mobile
