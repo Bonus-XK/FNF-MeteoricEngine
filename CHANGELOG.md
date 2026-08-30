@@ -1,11 +1,19 @@
 # Meteoric Engine 更新日志
 
-> 版本：1.1.0
+> 版本：1.1.1
 
 ---
 
 ## 目录
 
+- [v1.1.1 更新总览](#v111-更新总览)
+- [联机对战（全新）](#联机对战全新)
+- [联机真双人（v1.1.1 核心）](#联机真双人v111-核心)
+- [局域网房间自动发现](#局域网房间自动发现)
+- [模组皮肤跨端同步（CHARSYNC）](#模组皮肤跨端同步charsync)
+- [结算与判定](#结算与判定)
+- [稳定性 · 性能 · 兼容](#稳定性--性能--兼容)
+- [版本与发布](#版本与发布)
 - [v1.1.0 更新总览](#v110-更新总览)
 - [Meteoric Reboot 1 —— 环境搭建与基础优化](#meteoric-reboot-1--环境搭建与基础优化)
 - [Meteoric Reboot 2 —— 交互与字体](#meteoric-reboot-2--交互与字体)
@@ -13,6 +21,84 @@
 - [Meteoric Reboot 4 —— 玩法、性能与编辑器](#meteoric-reboot-4--玩法性能与编辑器)
 - [Meteoric Reboot 5 —— 安卓端与模组兼容](#meteoric-reboot-5--安卓端与模组兼容)
 - [后续维护 —— 回放重写 / HUD 重构 / 稳定性](#后续维护--回放重写--hud-重构--稳定性)
+
+---
+
+## v1.1.1 更新总览
+
+- **联机功能完整落地**：局域网 1v1 实时对战（主菜单恢复入口）
+- **联机真双人**：双方各唱半边谱面，不再「双方都唱 BF 侧、对方侧变空气」
+- **局域网房间自动发现**：UDP 广播免输 IP 直连
+- **模组皮肤跨端同步**：无模组端也能看到对方模组角色
+- **结算界面重写**：KE 命中散点图 / 对方成绩对比 / 精简版联机结算
+- **大量稳定性与模组兼容修复**（QT/FlxAnimate、FunkinMix shader、66mod HScript、三端 CI）
+- **版本校验索引 1 → 2**（1.1.1）
+
+---
+
+### 🌐 联机对战（全新）
+
+- 主菜单恢复「联机」入口；TCP 房主即服务器（27750），仅 1v1，满员拒绝
+- 各自本地判定；HIT/MISS/PRESS/RELEASE 增量同步；对手按键条 / 血条 / 分数 / 连击 / 判定统计实时同步
+- 单方暂停双端同步；暂停与结算期间持续轮询网络；防 PAUSE/RESUME 回声死锁；联机禁用重开
+- 血条攻防式：己方 Hit 推己方条、己方 Miss 扣血、对方 Miss 按损失量 60% 回血
+- 昵称 / IP 输入框重构（future.ttf 显示层 + 原生 TextField IME + 自绘光标）；中文昵称 UTF-8 修复
+- 全界面鼠标为主 + 输入聚焦时屏蔽游戏键位；难度/选曲/发送/开始两段式
+- 断线 / 对方退出自动回大厅并显示原因；退出对局与结算「继续」统一回「房间大厅」（连接保持，可再来一局）
+
+### 🎤 联机真双人（v1.1.1 核心）
+
+- 双端各唱半边：房主打 player1（BF 位）、玩家打 player2（Dad 位）；客户端镜像人声（Vocals ↔ OpponentVocals）
+- 左右谱面均恢复滚动；对方按键命中左侧音符；Dad 唱歌 + 人声；对方 Miss 播 Miss 动画；长按完整判定
+- HIT/MISS 携带 chartSeq，接收端按序号精确消费音符（`findOnlineOppNoteBySeq`，视觉副本覆盖时回退基准音符）
+- 相机跟随当前演唱角色（客户端镜像 isDad）；中间滚动布局按物理位置修正，双端与单机标准布局一致
+- 加载界面按角色映射预载双方贴图；角色槽位标签固定「我的角色（BF）/ 对手角色（Dad）」
+
+### 📡 局域网房间自动发现
+
+- UDP 27751 心跳广播（每 1s）：房间码 / 房主昵称 / 人数 / 是否已满；广播至广播地址 + 回环 + 本机局域网 IP（单机双开可发现）
+- 首页新增「发现房间」；发现页实时列表、4s 超时移除、满房置灰、点击行直连（无需手输 IP）
+- 建房即广播、离开/断线自动停止；跨路由器 AP 隔离仍可走原「加入房间」手输 IP
+
+### 🧩 模组皮肤跨端同步（CHARSYNC）
+
+- 选角确认时把模组角色资源（JSON / 图集 / 血条图标）分块（60KB base64）同步到对端 mods/ 兜底路径，无需安装模组
+- 出站字节队列 + 每帧 pumpOut：非阻塞 socket Blocked 视为背压、不再误判断线
+- 资源收集遍历全部已安装模组（resolveSyncFile）；加载界面预载双方贴图（pendingBitmaps）
+- 角色列表过滤资源不全角色 / 同步前完整性校验 / 进曲锁定我方角色所在模组（currentModDirectory）
+- 「开始对局」需等对方资源同步完成（oppSyncDone）
+
+### 🧾 结算与判定
+
+- KE 命中判定散点图移植（NoteHitGraph：时间轴 / 偏移 / 4 条判定窗 / Mean）
+- 结算整体重写：左曲目+判定统计两列 / 右本局数据（分数/最高连击/准确率/新纪录）/ 大版散点图
+- Marvelous 改金黄色；判定首行遮挡与数值间距修复；结算时隐藏 HUD 判定侧边栏
+- 联机精简版结算（分数/连击/准确率/判定 + 「继续」→ 回房间大厅）；对方成绩栏实时刷新
+- Psych-Forever Early / Late 指示器（sick/good/bad/shit -early/-late，普通 + 像素全套）
+- 金色 Combo（全 Marvelous/Sick 时切换 combo-golden，Good 以下或 Miss 恢复；allSicks）
+- 修复 Combo 词 x 被覆盖导致方向键偏移不生效（comboSpr.x 补上 comboOffset[0]）
+- OSEngine 三帧胜利小图标（450×150：正常/劣势/胜利，>80% 血量切胜利帧、<20% 切劣势帧；原版 2 帧保留 -pe 后缀）
+- 像素舞台下落箭头恢复 NEAREST 硬边（Note.recycleNote 按 isPixelStage 保留 antialiasing=false）
+- 音量调节到边界（100%/0%）不再响提示音（SoundFrontEnd.changeVolume + FlxSoundTray.show silentOnly）
+
+### 🛠️ 稳定性 · 性能 · 兼容
+
+- 暂停→返回主菜单闪退根治（转场期 persistentUpdate=false + LuaJIT `pushing nil` Convert.hx 修复）
+- QT / FlxAnimate 动画：ATLAS.SPRITES 坐标随降采样缩放、ATLAS 格式不回缩、playAnim 强制重启、DCE 保护（@:keep / 静态调用）、addLuaSprite 官方语义
+- 内存：未用缓存每 60s 清理（useCount 守卫）、Character.atlas 销毁修复、回放/重开同曲 100% 死循环修复、StrumNote 缺资源兜底
+- FunkinMix shader 白/黑屏（sos / Dogma 等）：FlxRuntimeShader 官方对齐 + viewOffset 公开访问 + FlxRuntimeShaderMap；runHaxeCode Map 变量预处理
+- 编谱面板重写（ChartingPanel / ChartWidgets，每标签独立注册 + makeGraphic unique=true 根除「悬浮串亮」）；多引擎导出（CNE / 0.6.3）；修复「需要人声」NPE
+- 多层级崩溃日志与报告：黑匣子心跳 / 阶段簿 / Haxe 未捕获 / 原生信号栈 / Java 层；Seiun 式系统报告
+- 安卓：后台冻结（暂停 + 音频冻结）、Java 崩溃落盘、onTrimMemory 重复定义修复、重开回溯 NPE / VarTween 防御
+- 66mod HScript 兼容：var 声明、camFollow 注入、SScript inline 静态反射修复
+- CI：haxelib/lime 缓存提速、Windows 交叉构建修复（icon 注入、大小写头文件、_WIN32_WINNT、comsupp）、Windows job 迁 ubuntu
+- 背景学生重开表情重置（bgGirls 构造完成态）、GF 快速重开修复（保留 stage/gfVersion 派生值）
+
+### 🚀 版本与发布
+
+- 版本号 1.1.0 → **1.1.1**；**版本校验索引 1 → 2**（gitVersion.txt 第 2 行同步为 2）；CrashHandler 引擎名更新
+- GitHub 仓库补齐 .gitignore（Gradle/Android 构建产物、.DS_Store、build/bin/obj、export/）
+- 三端产物自动构建：Windows x64/x86、macOS x64/arm64、Android arm64
 
 ---
 
