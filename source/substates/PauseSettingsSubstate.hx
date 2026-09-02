@@ -273,6 +273,9 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 
 	override function update(elapsed:Float)
 	{
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.begin();
+		#end
 		if (cameras != null && cameras[0] != null)
 		{
 			cameras[0].zoom = 1;
@@ -284,6 +287,9 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 		{
 			if (!listUIHidden) { setListUI(false); listUIHidden = true; }
 			super.update(elapsed);
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.end('PauseSettingsSubstate.update');
+			#end
 			return;
 		}
 		if (listUIHidden) { setListUI(true); listUIHidden = false; }
@@ -351,6 +357,9 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 		if (clickPressed && backBtn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
 		{
 			takeBack();
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.end('PauseSettingsSubstate.update');
+			#end
 			return;
 		}
 
@@ -367,5 +376,9 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 
 		if (controls.BACK)
 			takeBack();
+
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.end('PauseSettingsSubstate.update');
+		#end
 	}
 }

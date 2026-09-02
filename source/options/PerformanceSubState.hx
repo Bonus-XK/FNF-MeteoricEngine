@@ -108,6 +108,63 @@ class PerformanceSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		// ===== JS Engine（JordanSantiagoYT/FNF-JS-Engine 优化页）移植 =====
+		option = new Option('只显示 HUD',
+			'开启后仅渲染音符与 HUD（角色/舞台/雨效等全场景不渲染，舞台脚本也跳过），帧率大幅提升；\n'
+			+ '依赖舞台视觉或舞台脚本的模组请保持关闭',
+			'hudOnly',
+			'bool');
+		addOption(option);
+
+		option = new Option('启用 GC',
+			'关闭可消除 GC 尖峰（内存可能上升）；默认开启与旧版一致',
+			'enableGC',
+			'bool');
+		addOption(option);
+
+		option = new Option('对手箭头点亮',
+			'对手命中时 strum 是否高亮 confirm；关闭省一点绘制',
+			'opponentLightStrum',
+			'bool');
+		addOption(option);
+
+		option = new Option('自动游玩箭头点亮',
+			'自动游玩命中时玩家 strum 是否高亮 confirm；关闭省绘制',
+			'botLightStrum',
+			'bool');
+		addOption(option);
+
+		option = new Option('玩家箭头点亮',
+			'手动命中/按下时玩家 strum 是否高亮；关闭省绘制',
+			'playerLightStrum',
+			'bool');
+		addOption(option);
+
+		option = new Option('评分弹窗',
+			'命中时是否创建评级弹窗（Sick/Good…）；关闭后仍正常计分，只少视觉',
+			'ratingPopups',
+			'bool');
+		addOption(option);
+
+		option = new Option('连击弹窗',
+			'命中时是否创建连击数字与 Combo 词；关闭后仍正常计连击',
+			'comboPopups',
+			'bool');
+		addOption(option);
+
+		option = new Option('自动游玩省资源',
+			'自动游玩时只计分/评级，不创建评分连击弹窗（少精灵创建与 GC 压力）',
+			'lessBotLag',
+			'bool');
+		addOption(option);
+
+		option = new Option('关闭命中回调',
+			'命中音符不再触发 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调；\n'
+			+ '依赖这些回调的模组（如计分/特效脚本）请保持开启',
+			'noHitFuncs',
+			'bool');
+		addOption(option);
+
 		super();
 	}
 }

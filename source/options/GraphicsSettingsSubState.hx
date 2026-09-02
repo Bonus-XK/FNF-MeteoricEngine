@@ -74,17 +74,30 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.scrollSpeed = 0.05;
 		option.onChange = null;
 
-		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
-		var option:Option = new Option('帧率',
-			'调整游戏的帧率上限',
-			'framerate',
-			'int');
+		// JS 优化移植续：帧率上限设置项（原 30~1000 的「帧率」项已被移除，现以档位形式回归）
+		var option:Option = new Option('帧率上限',
+			'游戏更新/绘制帧率档位：120 / 240 / 480 / 无上限。"无上限"与桌面一致，帧率只受 CPU/GPU 限制（发热/耗电更高）。移动端默认 120 防过热；切换立即生效',
+			'framerateMode',
+			'string',
+			['120', '240', '480', '无上限']);
 		addOption(option);
+		option.onChange = ClientPrefs.applyFramerate;
 
-		option.minValue = 30;
-		option.maxValue = 1000;
-		option.displayFormat = '%v FPS';
-		option.onChange = onChangeFramerate;
+		#if desktop
+		var option:Option = new Option('高清渲染',
+			'2x 清晰渲染（Retina 下画面锐利；大规模谱面约 700~1400 帧）。关闭 = 1x 高性能（画面略糊，帧率约 3 倍，轻松 2200+）。修改后需重启游戏生效',
+			'highDPIRender',
+			'bool');
+		addOption(option);
+		option.onChange = ClientPrefs.applyHighDPIRenderMode;
+		#end
+
+		#if desktop
+		var option:Option = new Option('性能模式',
+			'Seiun 式音符快速路径：音符去 RGB 着色器、改用 ColorTransform 上色并直连 quad 合批（消除 shader 绑定开销，大规模谱面帧率大幅提升；音符颜色由三色渐变改为单色平涂）',
+			'perfMode',
+			'bool');
+		addOption(option);
 		#end
 
 		super();
@@ -99,20 +112,6 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			if(sprite != null && (sprite is FlxSprite) && !(sprite is FlxText)) {
 				sprite.antialiasing = ClientPrefs.data.antialiasing;
 			}
-		}
-	}
-
-	function onChangeFramerate()
-	{
-		if(ClientPrefs.data.framerate > FlxG.drawFramerate)
-		{
-			FlxG.updateFramerate = ClientPrefs.data.framerate;
-			FlxG.drawFramerate = ClientPrefs.data.framerate;
-		}
-		else
-		{
-			FlxG.drawFramerate = ClientPrefs.data.framerate;
-			FlxG.updateFramerate = ClientPrefs.data.framerate;
 		}
 	}
 

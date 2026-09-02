@@ -14,6 +14,15 @@
 
 namespace lime {
 
+	// High-resolution time in milliseconds from the performance counter (mohong2/lime sdl3).
+	static double HiResMs () {
+
+		static double invFreq = -1.0;
+		if (invFreq < 0) invFreq = 1000.0 / (double) SDL_GetPerformanceFrequency ();
+		return (double) SDL_GetPerformanceCounter () * invFreq;
+
+	}
+
 
 	AutoGCRoot* Application::callback = 0;
 	SDLApplication* SDLApplication::currentApplication = 0;
@@ -838,6 +847,96 @@ namespace lime {
 
 		#if (!defined (IPHONE) && !defined (EMSCRIPTEN))
 
+		while (SDL_PollEvent (&event)) {
+
+			if (event.type != SDL_EVENT_USER) {
+
+				HandleEvent (&event);
+
+			}
+
+			event.type = -1;
+
+			if (!active)
+				return active;
+
+		}
+
+		currentUpdate = HiResMs ();
+
+		if (!active)
+			return active;
+
+		if (currentUpdate >= nextUpdate) {
+
+			// Due frame: advance by wall clock; resync after long stalls to avoid catch-up bursts.
+			int catchup = 0;
+
+			do {
+
+				nextUpdate += framePeriod;
+				catchup++;
+
+			} while (nextUpdate <= currentUpdate && catchup < 4);
+
+			if (catchup >= 4) {
+				nextUpdate = currentUpdate + framePeriod;
+			}
+
+			applicationEvent.type = UPDATE;
+			applicationEvent.deltaTime = currentUpdate - lastUpdate;
+			lastUpdate = currentUpdate;
+
+			ApplicationEvent::Dispatch (&applicationEvent);
+			RenderEvent::Dispatch (&renderEvent);
+
+		} else if (!inBackground && nextUpdate > currentUpdate) {
+
+			double remainMs = nextUpdate - currentUpdate;
+
+			if (remainMs > 3.0) {
+
+				// Long wait: timed event wait keeps input responsive.
+				int timeout = (int) (remainMs - 2.0);
+
+				if (timeout > 0 && WaitEventTimeout (&event, timeout)) {
+
+					if (event.type != SDL_EVENT_USER) {
+						HandleEvent (&event);
+					}
+
+				}
+
+			} else {
+
+				// Final <=3ms alignment: NS sleep plus a short spin to remove the 1ms floor.
+				while ((remainMs = nextUpdate - HiResMs ()) > 0) {
+
+					if (remainMs > 0.55) {
+						SDL_DelayNS ((Uint64) ((remainMs - 0.30) * 1000000.0));
+					} else {
+						while (nextUpdate - HiResMs () > 0) { }
+						break;
+					}
+
+				}
+
+			}
+
+		} else {
+
+			// Background: block until a real event rather than burning CPU.
+			if (WaitEvent (&event) && event.type != SDL_EVENT_USER) {
+				HandleEvent (&event);
+			}
+
+		}
+
+		return active;
+
+		#else
+
+		// Original IPHONE / EMSCRIPTEN path.
 		if (active && (firstTime || WaitEvent (&event))) {
 
 			firstTime = false;
@@ -846,8 +945,6 @@ namespace lime {
 			event.type = -1;
 			if (!active)
 				return active;
-
-		#endif
 
 			while (SDL_PollEvent (&event)) {
 
@@ -860,18 +957,6 @@ namespace lime {
 
 			currentUpdate = SDL_GetTicks ();
 
-		#if defined (IPHONE) || defined (EMSCRIPTEN)
-
-			if (currentUpdate >= nextUpdate) {
-
-				event.type = SDL_EVENT_USER;
-				HandleEvent (&event);
-				event.type = -1;
-
-			}
-
-		#else
-
 			if (currentUpdate >= nextUpdate) {
 
 				if (timerActive) SDL_RemoveTimer (timerID);
@@ -880,15 +965,71 @@ namespace lime {
 			} else if (!timerActive) {
 
 				timerActive = true;
-				timerID = SDL_AddTimer (nextUpdate - currentUpdate, OnTimer, 0);
+				timerID = SDL_AddTimer ((Uint32) (nextUpdate - currentUpdate), OnTimer, 0);
+
+			}
+
+		}
+
+		return active;
+
+		#endif
+
+	}
+
+
+		// Wait up to timeout ms for an event; returns 1 on event, 0 on timeout.
+	int SDLApplication::WaitEventTimeout (SDL_Event *event, int timeout) {
+
+		if (timeout <= 0) return 0;
+
+		#if defined(HX_MACOS) || defined(ANDROID)
+
+		System::GCEnterBlocking ();
+		int result = SDL_WaitEventTimeout (event, timeout);
+		System::GCExitBlocking ();
+		return result;
+
+		#else
+
+		bool isBlocking = false;
+		Uint32 deadline = SDL_GetTicks () + (Uint32)timeout;
+
+		for(;;) {
+
+			SDL_PumpEvents ();
+
+			switch (SDL_PeepEvents (event, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_LAST)) {
+
+				case -1:
+
+					if (isBlocking) System::GCExitBlocking ();
+					return 0;
+
+				case 1:
+
+					if (isBlocking) System::GCExitBlocking ();
+					return 1;
+
+				default:
+
+					if (SDL_GetTicks () >= deadline) {
+
+						if (isBlocking) System::GCExitBlocking ();
+						return 0;
+
+					}
+
+					if (!isBlocking) System::GCEnterBlocking ();
+					isBlocking = true;
+					SDL_Delay (1);
+					break;
 
 			}
 
 		}
 
 		#endif
-
-		return active;
 
 	}
 

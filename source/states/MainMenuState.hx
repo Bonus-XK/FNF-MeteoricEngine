@@ -274,6 +274,9 @@ class MainMenuState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.begin();
+		#end
 		if (FlxG.sound.music.volume < 0.8)
 		{
 			FlxG.sound.music.volume += 0.5 * elapsed;
@@ -437,6 +440,10 @@ class MainMenuState extends MusicBeatState
 		}
 
 		super.update(elapsed);
+
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.end('MainMenuState.update');
+		#end
 	}
 
 	// ===== 鼠标控制（全部基于屏幕坐标） =====

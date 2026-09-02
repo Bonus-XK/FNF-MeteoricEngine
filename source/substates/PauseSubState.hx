@@ -355,12 +355,20 @@ class PauseSubState extends MusicBeatSubstate
 
 	override function update(elapsed:Float)
 	{
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.begin();
+		#end
 		// 联机：暂停期间 PlayState.update 被冻结，网络须在此轮询（接收 RESUME/QUIT）
 		if (PlayState.isOnlineMode && PlayState.instance != null)
 			PlayState.instance.onlinePauseNetworkTick();
 		// 远程 RESUME 已将本子状态关闭：本帧直接返回，不再操作即将销毁的 UI
 		if (PlayState.isOnlineMode && PlayState.instance != null && PlayState.instance.subState == null)
+		{
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.end('PauseSubState.update');
+			#end
 			return;
+		}
 		// 每帧固定暂停相机缩放/滚动，防止暂停期间任何运行期改动导致文本截断
 		if (cameras != null && cameras[0] != null)
 		{
@@ -377,6 +385,9 @@ class PauseSubState extends MusicBeatSubstate
 			if (pauseMusic != null && pauseMusic.volume < 0.5)
 				pauseMusic.volume += 0.01 * elapsed;
 			super.update(elapsed);
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.end('PauseSubState.update');
+			#end
 			return;
 		}
 		if (menuUIHidden) { setMenuUI(true); menuUIHidden = false; }
@@ -596,6 +607,9 @@ class PauseSubState extends MusicBeatSubstate
 				case "返回游戏":
 					close();
 					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+					#if METEORIC_PROFILE
+					trace('[TITLE] resume set lib="' + Lib.application.window.title + '" limeSame=' + (lime.app.Application.current.window == Lib.application.window));
+					#end
 				case '更换难度':
 					menuItems = difficultyChoices;
 					deleteSkipTimeText();
@@ -680,6 +694,10 @@ class PauseSubState extends MusicBeatSubstate
 					FlxG.camera.followLerp = 0;
 			}
 		}
+
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.end('PauseSubState.update');
+		#end
 	}
 
 	function deleteSkipTimeText()

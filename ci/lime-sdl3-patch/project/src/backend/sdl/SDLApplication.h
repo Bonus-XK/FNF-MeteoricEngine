@@ -51,6 +51,7 @@ namespace lime {
 			void ProcessTouchEvent (SDL_Event* event);
 			void ProcessWindowEvent (SDL_Event* event);
 			int WaitEvent (SDL_Event* event);
+			int WaitEventTimeout (SDL_Event* event, int timeout);
 
 			static void UpdateFrame ();
 			static void UpdateFrame (void*);
@@ -60,15 +61,19 @@ namespace lime {
 			bool active;
 			ApplicationEvent applicationEvent;
 			ClipboardEvent clipboardEvent;
-			Uint32 currentUpdate;
+			double currentUpdate; // Performance-counter time in ms (HiResMs).
 			double framePeriod;
+			// 【Meteoric 亚毫秒更新】nextUpdate 必须为浮点：原 Uint32 在 framePeriod < 1.0
+			// （frameRate > 1000）时每次 += framePeriod 都被截断成 +0 → catch-up 循环
+			// while (nextUpdate <= currentUpdate) 永不前进 → 主线程 100% 死循环（加载卡死）。
+			// 亚毫秒目标需要亚毫秒精度的时间账本。
+			double nextUpdate;
 			DropEvent dropEvent;
 			GamepadEvent gamepadEvent;
 			JoystickEvent joystickEvent;
 			KeyEvent keyEvent;
-			Uint32 lastUpdate;
+			double lastUpdate; // Performance-counter time in ms (HiResMs).
 			MouseEvent mouseEvent;
-			Uint32 nextUpdate;
 			RenderEvent renderEvent;
 			SensorEvent sensorEvent;
 			TextEvent textEvent;

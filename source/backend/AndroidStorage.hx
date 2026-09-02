@@ -13,6 +13,11 @@ class AndroidStorage
 	static var _root:String = null;
 	static var _fallbackRoot:String = null;
 	static var _useFallbackRoot:Bool = false;
+	// 真实写探测缓存：_probeResult = null 表示成功，否则为错误信息；
+	// 等待授权期间每帧都会调 hasStoragePermission()，用短 TTL 避免反复写盘
+	static var _probeResult:String = null;
+	static var _probeAt:Float = -1;
+	static final PROBE_TTL:Float = 1.0; // 秒
 
 	public static function root():String
 	{
@@ -186,39 +191,53 @@ class AndroidStorage
 		while (n < 6 && _copyIndex < _copyList.length)
 		{
 			var id = _copyList[_copyIndex++];
+			var skipThis:Bool = false;
 			try
 			{
 				var colon = id.indexOf(':');
 				var writePath = colon >= 0 ? id.substring(colon + 1) : id;
 				var dst = root() + '/' + writePath;
 				if (FileSystem.exists(dst))
-					_copySkipped++;
+					skipThis = true;
 				else
 				{
 					ensureParentDir(dst);
-					var bytes = Assets.getBytes(id);
-					if (bytes == null || bytes.length == 0)
-						_copySkipped++; // 空占位文件（data-goes-here.txt 等）不落盘，避免原生崩溃
-					else
-						File.saveBytes(dst, bytes);
+					// 内嵌资源（字体/音乐/部分图片，classType）无法用 getBytes 提取，
+					// 它们直接由游戏从二进制读取，不需要外部副本——只有这类“提取失败”才允许跳过。
+					var bytes:Dynamic = null;
+					try
+					{
+						bytes = Assets.getBytes(id);
+					}
+					catch (e:Dynamic)
+					{
+						var msg = Std.string(e);
+						if (msg.indexOf('Invalid Cast') >= 0 || msg.indexOf('null') >= 0 || msg.indexOf('There is no') >= 0)
+							skipThis = true;
+						else
+						{
+							_copyError = msg;
+							_copyFinished = true;
+							return;
+						}
+					}
+					if (!skipThis)
+					{
+						if (bytes == null || bytes.length == 0)
+							skipThis = true; // 空占位文件（data-goes-here.txt 等）不落盘，避免原生崩溃
+						else
+							File.saveBytes(dst, bytes); // 写盘失败 = 真实错误，绝不静默吞掉
+					}
 				}
 			}
 			catch (e:Dynamic)
 			{
-				// 内嵌资源（字体/音乐/部分图片）无法用 getBytes 提取，跳过不中断；
-				// 它们直接由游戏从二进制读取，不需要外部副本。
-				var msg = Std.string(e);
-				if (msg.indexOf('Invalid Cast') >= 0 || msg.indexOf('null') >= 0 || msg.indexOf('There is no') >= 0)
-				{
-					_copySkipped++;
-					_copyDoneCount++;
-					n++;
-					continue;
-				}
-				_copyError = msg;
+				// 到这里只剩写盘/建目录等真实 IO 错误：记录并停止，不静默跳过
+				_copyError = Std.string(e);
 				_copyFinished = true;
 				return;
 			}
+			if (skipThis) _copySkipped++;
 			_copyDoneCount++;
 			n++;
 		}
@@ -288,19 +307,48 @@ class AndroidStorage
 		}
 	}
 
-	/** 已获得在根目录 /sdcard/.meteoric 读写所需的存储权限？
-	 *  Android 10 = WRITE_EXTERNAL_STORAGE 已授权；Android 11+ = "所有文件访问"已授权 */
+	/** 真实写探测：在公共根目录的**父目录**（/storage/emulated/0）写入并删除一个探针文件。
+	 *  isExternalStorageManager() 在部分定制 ROM（MIUI/HyperOS、ColorOS 等）上存在
+	 *  “已授权仍返回 false / 授权页不可靠”的问题；能否真的写进公共根目录才是唯一可靠判定。
+	 *  注意：只探父目录、不创建 .meteoric 本身——若探测先建出空目录，
+	 *  migrateFromFallback 会因“目标已存在”跳过，回退数据永远搬不回根目录。
+	 *  返回 null = 公共根目录真实可写，否则返回错误信息。 */
+	public static function probePublicRoot():String
+	{
+		try
+		{
+			var parent:String = haxe.io.Path.directory(publicRoot());
+			if (parent == null || parent.length == 0) parent = '/sdcard';
+			var probe:String = parent + '/.storage_probe_meteoric';
+			File.saveContent(probe, '1');
+			try FileSystem.deleteFile(probe) catch (e:Dynamic) {}
+			return null;
+		}
+		catch (e:Dynamic)
+		{
+			return Std.string(e);
+		}
+	}
+
+	static function probePublicRootCached():String
+	{
+		var now:Float = haxe.Timer.stamp();
+		if (_probeAt < 0 || now - _probeAt > PROBE_TTL)
+		{
+			_probeResult = probePublicRoot();
+			_probeAt = now;
+		}
+		return _probeResult;
+	}
+
+	/** 已获得在根目录 /sdcard/.meteoric 的真实读写能力？
+	 *  Android 10 的 WRITE 授权与 Android 11+ 的“所有文件访问”最终都体现在
+	 *  “能否真的写入公共根目录”上，因此统一用写探测判定（API 判定仅供参考）。 */
 	public static function hasStoragePermission():Bool
 	{
 		try
 		{
-			if (isAndroid11Plus())
-			{
-				var m = JNI.createStaticMethod('android/os/Environment', 'isExternalStorageManager', '()Z', false);
-				var ok:Dynamic = m();
-				return ok != null && ok == true;
-			}
-			return hasWritePermission();
+			return probePublicRootCached() == null;
 		}
 		catch (e:Dynamic)
 		{

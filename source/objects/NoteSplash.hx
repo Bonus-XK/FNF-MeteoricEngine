@@ -20,6 +20,8 @@ class NoteSplash extends FlxSprite
 
 	public static var defaultNoteSplash(default, never):String = 'noteSplashes/noteSplashes';
 	public static var configs:Map<String, NoteSplashConfig> = new Map<String, NoteSplashConfig>();
+	// 缺失皮肤 → 实际生效皮肤的缓存：避免每个音符命中都重复“失败加载 + 回退 + trace”
+	public static var skinFallbackCache:Map<String, String> = new Map<String, String>();
 
 	public function new(x:Float = 0, y:Float = 0) {
 		super(x, y);
@@ -117,11 +119,13 @@ class NoteSplash extends FlxSprite
 	}
 
 	function loadAnims(skin:String, ?animName:String = null):NoteSplashConfig {
+		if(skinFallbackCache.exists(skin)) skin = skinFallbackCache.get(skin);
 		maxAnims = 0;
 		frames = Paths.getSparrowAtlas(skin);
 		var config:NoteSplashConfig = null;
 		if(frames == null)
 		{
+			var origSkin:String = skin;
 			skin = defaultNoteSplash + getSplashSkinPostfix();
 			frames = Paths.getSparrowAtlas(skin);
 			if(frames == null) //if you really need this, you really fucked something up
@@ -129,6 +133,7 @@ class NoteSplash extends FlxSprite
 				skin = defaultNoteSplash;
 				frames = Paths.getSparrowAtlas(skin);
 			}
+			if(frames != null) skinFallbackCache.set(origSkin, skin);
 		}
 		config = precacheConfig(skin);
 		_configLoaded = skin;

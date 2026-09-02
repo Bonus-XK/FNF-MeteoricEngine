@@ -20,11 +20,16 @@ static double meteoric_cpu_time() {
 #else
 @:cppFileCode('
 #include <sys/resource.h>
+#include <unistd.h>
 static double meteoric_cpu_time() {
 	struct rusage ru;
 	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1.0;
 	return (double)ru.ru_utime.tv_sec + (double)ru.ru_utime.tv_usec / 1e6
 	+ (double)ru.ru_stime.tv_sec + (double)ru.ru_stime.tv_usec / 1e6;
+}
+static int meteoric_cpu_cores() {
+	long n = sysconf(_SC_NPROCESSORS_ONLN);
+	return (n > 0) ? (int)n : 0;
 }
 ')
 #end
@@ -38,6 +43,9 @@ class FPS extends TextField
 
 	var _frameCount:Int = 0;
 	var _elapsed:Float = 0;
+	// 真实时间基准：Lime 传入的 deltaTime 是 Int 毫秒（0/1ms 量化），高帧率下会把
+	// 计数器虚高 4~8 倍；改用 haxe.Timer.stamp() 实测墙钟，与探针 frame_avg 同口径。
+	var _lastStamp:Float = 0;
 
 	var _warnColor:Int = 0xFFFF0000;
 	var _defaultColor:Int;
@@ -55,7 +63,9 @@ class FPS extends TextField
 	var _lastTitle:String = null;
 
 	#if sys
-	// CPU 占用：读取进程累计 CPU 时间，两次采样差值 / 墙钟时间 = 瞬时占用（单核口径，多线程可超 100%）
+	// CPU 占用：读取进程累计 CPU 时间（全部线程），两次采样差值 / 墙钟时间。
+	// 桌面端保持「单核口径」（多线程可超 100%）；手机端按逻辑核数归一化为
+	// 「总容量百分比」（永不超过 100，只在 mobile 目标生效）。
 	var _cpuPct:Float = 0;
 	var _cpuTick:Float = 0;
 	var _cpuTime:Float = -1;
@@ -108,10 +118,18 @@ class FPS extends TextField
 
 	override function __enterFrame(deltaTime:Float):Void
 	{
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.frameTick();
+		#end
 		_frameCount++;
-		_elapsed += deltaTime;
 
-		if (_elapsed >= 500)
+		// 真实帧周期（秒→毫秒）：取代 Int 量化 deltaTime，高帧率下不再虚高
+		var now:Float = haxe.Timer.stamp();
+		if (_lastStamp > 0)
+			_elapsed += (now - _lastStamp) * 1000.0;
+		_lastStamp = now;
+
+		if (_elapsed >= 100) // 显示刷新 100ms（原 Psych 手感），高帧率下数字更跟手
 		{
 			currentFPS = Math.round(_frameCount / (_elapsed / 1000));
 			_frameCount = 0;
@@ -198,7 +216,7 @@ class FPS extends TextField
 
 		#if sys
 		_cpuSamples++;
-		if (_cpuSamples % 2 == 0) sampleCpu(); // 两次 500ms tick = 每 1 秒采样一次
+		if (_cpuSamples % 10 == 0) sampleCpu(); // 十次 100ms tick = 每 1 秒采样一次
 		#end
 
 		// 标题栏模式：屏幕计数器隐藏，统计信息写进窗口标题
@@ -267,11 +285,36 @@ class FPS extends TextField
 		var w:Window = lime.app.Application.current.window;
 		if (w == null) return;
 		if (_baseTitle == null) _baseTitle = w.title;
-		// 引擎其他代码（选歌/暂停/结算等）主动改过标题 → 保留它的上下文作为新基准
-		if (_lastTitle != null && w.title != _lastTitle)
-			_baseTitle = w.title;
+		// 防累积：当前标题可能已带上一次写入的统计后缀（macOS 下 window.title 读回
+		// 与写入值不等价，导致旧判断把整串统计当成新基准，每刷一次叠加一段）。
+		// 先剥掉已有的「 - FPS: …」后缀再判断，保证幂等。
+		var cur:String = w.title;
+		#if METEORIC_PROFILE
+		trace('[TITLE] tick sameObj=' + (Lib.application.window == w) + ' cur="' + cur + '" last="' + _lastTitle + '" base="' + _baseTitle + '"');
+		#end
+		var p:Int = lastIndexOfStatsSuffix(cur);
+		if (p >= 0)
+			_baseTitle = cur.substring(0, p);
+		else if (_lastTitle != null && cur != _lastTitle)
+			_baseTitle = cur; // 引擎其他代码（选歌/暂停/结算等）改过标题 → 保留它的上下文作为新基准
 		_lastTitle = _baseTitle + ' - ' + buildStatsLine(mem);
-		w.title = _lastTitle;
+		if (w.title != _lastTitle)
+			w.title = _lastTitle;
+	}
+
+	// 标题中「 - FPS: 」统计后缀的最后一个出现位置（-1 = 无）；统计串本身不含该标记，逐段剥除安全
+	static function lastIndexOfStatsSuffix(title:String):Int
+	{
+		if (title == null) return -1;
+		var marker:String = ' - FPS: ';
+		var idx:Int = title.indexOf(marker);
+		var last:Int = -1;
+		while (idx >= 0)
+		{
+			last = idx;
+			idx = title.indexOf(marker, idx + 1);
+		}
+		return last;
 	}
 
 	function restoreWindowTitle():Void
@@ -293,6 +336,16 @@ class FPS extends TextField
 		#end
 	}
 
+	/** 逻辑 CPU 核数（手机端归一化用；0 = 未知/不支持 → 不做归一化）。 */
+	function readCpuCores():Int
+	{
+		#if (cpp && !windows)
+		return untyped __cpp__("::meteoric_cpu_cores()");
+		#else
+		return 0;
+		#end
+	}
+
 	function sampleCpu():Void
 	{
 		var now:Float = Sys.time();
@@ -302,7 +355,21 @@ class FPS extends TextField
 			var dt:Float = now - _cpuTick;
 			var dc:Float = t - _cpuTime;
 			if (dt > 0 && dc >= 0)
-				_cpuPct = dc / dt * 100;
+			{
+				var pct:Float = dc / dt * 100;
+				#if mobile
+				// getrusage 统计全进程所有线程，单核口径在手机多核上会显示 >100%（如 110%）。
+				// 手机端改为「占总容量百分比」：除以逻辑核数，并做 100% 上限兜底；
+				// 核数未知（readCpuCores<=1）时保持原值，避免无意义地放大。
+				var cores:Int = readCpuCores();
+				if (cores > 1)
+				{
+					pct = pct / cores;
+					if (pct > 100) pct = 100;
+				}
+				#end
+				_cpuPct = pct;
+			}
 		}
 		_cpuTick = now;
 		_cpuTime = t;

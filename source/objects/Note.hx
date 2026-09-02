@@ -13,15 +13,20 @@ import flixel.graphics.FlxGraphic;
 import flixel.graphics.frames.FlxAtlasFrames;
 import flixel.graphics.frames.FlxFrame;
 import flixel.graphics.frames.FlxFrame.FlxFrameAngle;
+import flixel.graphics.frames.FlxFrame.FlxFrameType;
 import flixel.graphics.frames.FlxFramesCollection;
+import flixel.math.FlxMatrix;
 import flixel.math.FlxRect;
 import flixel.util.FlxSpriteUtil;
 import openfl.display.BitmapData;
+import openfl.geom.ColorTransform;
 import openfl.geom.Point;
 import openfl.geom.Rectangle;
 import openfl.geom.Matrix;
 import openfl.utils.ByteArray;
 import openfl.utils.Assets as OpenFlAssets;
+
+using flixel.util.FlxColorTransformUtil;
 
 #if MODS_ALLOWED
 import sys.FileSystem;
@@ -555,6 +560,16 @@ class Note extends FlxSprite
 				rgbShader.enabled = (skinPath.indexOf('chip') < 0);
 			}
 			#end
+
+			// 【性能模式（Seiun 移植）】音符去掉 RGB 着色器，改用 ColorTransform 单色平涂上色：
+			// 消除每次绘制的 shader 绑定/uniform 上传开销，使所有音符并入同一 quad 批次（见 draw()）
+			// 平涂色取轨道主色 laneColors[0]（紫/青/绿/红）；[1] 是三色渐变的中色（白），不能用作平涂色
+			if (ClientPrefs.data.perfMode)
+			{
+				rgbShader.enabled = false;
+				var laneColors:Array<FlxColor> = PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel[noteData] : ClientPrefs.data.arrowRGB[noteData];
+				color = (laneColors != null && laneColors.length > 0) ? laneColors[0] : 0xFFFFFFFF;
+			}
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
@@ -1367,6 +1382,59 @@ class Note extends FlxSprite
 		} else animation.add(colArray[noteData] + 'Scroll', [noteData + 4], 24, true);
 	}
 
+	// 【性能模式（Seiun 移植）】简单音符直连 quad 合批：跳过 FlxSprite.draw 的矩阵/绘制管线开销。
+	// 条件全部满足时才走快速路径，否则回退 super.draw()，视觉与旧路径一致。
+	static var _perfDrawMatrix:FlxMatrix = new FlxMatrix();
+
+	override function draw():Void
+	{
+		if (ClientPrefs.data.perfMode
+			&& FlxG.renderTile && !PlayState.isPixelStage && cameras != null && cameras.length == 1
+			&& alpha > 0 && angle == 0 && scale.x == scale.y && scale.x != 0
+			&& !isSustainNote && sustainLength <= 0 && clipRect == null
+			&& !flipX && !flipY && blend == null && shader == null)
+		{
+			@:privateAccess
+			{
+				checkEmptyFrame();
+				if (alpha > 0 && _frame != null && _frame.type != FlxFrameType.EMPTY && frames != null
+					&& _frame.angle == FlxFrameAngle.ANGLE_0 && !_frame.flipX && !_frame.flipY
+					&& (animation.curAnim == null || (!animation.curAnim.flipX && !animation.curAnim.flipY)))
+				{
+					if (dirty)
+						calcFrame(useFramePixels);
+
+					final cam:FlxCamera = cameras[0];
+					if (cam.visible && cam.exists && !isPixelPerfectRender(cam))
+					{
+						final s:Float = scale.x;
+						final sx:Float = x - cam.scroll.x * scrollFactor.x - offset.x;
+						final sy:Float = y - cam.scroll.y * scrollFactor.y - offset.y;
+						// 与 drawComplex(angle=0 无翻转) 矩阵结果一致：
+						// destTL = screenPos - offset + origin*(1-scale)
+						final dx:Float = sx + origin.x * (1 - s);
+						final dy:Float = sy + origin.y * (1 - s);
+						if (dx + width > cam.viewOffsetX && dx < cam.viewOffsetWidth
+							&& dy + height > cam.viewOffsetY && dy < cam.viewOffsetHeight)
+						{
+							_perfDrawMatrix.identity();
+							_perfDrawMatrix.scale(s, s);
+							_perfDrawMatrix.translate(dx + _frame.offset.x * s, dy + _frame.offset.y * s);
+
+							final ct:ColorTransform = colorTransform;
+							final isColored:Bool = (ct != null && ct.hasRGBMultipliers());
+							final hasOffsets:Bool = (ct != null && ct.hasRGBAOffsets());
+							final item = cam.startQuadBatch(_frame.parent, isColored, hasOffsets, blend, antialiasing, null);
+							item.addQuad(_frame, _perfDrawMatrix, ct);
+						}
+					}
+				}
+			}
+			return;
+		}
+		super.draw();
+	}
+
 	override function update(elapsed:Float)
 	{
 		if (PlayState.instance != null && PlayState.instance.rewinding)
@@ -1580,6 +1648,24 @@ class Note extends FlxSprite
 		try {
 			if (ct != null && ct.length > 0) noteType = ct;
 		} catch (e:Dynamic) {}
+
+		// 【修复】模板构造永远是 lane0（左箭头）：标准音符 noteType 为空不触发
+		// set_noteType → defaultRGB + tryUseBakedGraphic 未执行；提前渲染开启时
+		// 全部轨道共用模板的 lane0 烘焙图（全朝左），未烘焙时轨道色也停在 lane0。
+		// 按真实轨道补齐：先对齐轨道色，再切换烘焙贴图（未烘焙时 tryUseBakedGraphic 安全 no-op）。
+		defaultRGB();
+		tryUseBakedGraphic();
+
+		// 【性能模式（Seiun 移植）】构造函数的同款覆盖——对象池复生路径必须同样执行：
+		// 否则上面的按皮肤判定会把 rgbShader 重新启用（shader != null），
+		// Note.draw() 快速合批路径的 shader==null 条件永不成立，perfMode 实际空转。
+		// 平涂色与构造函数一致：取轨道主色 laneColors[0]。
+		if (ClientPrefs.data.perfMode)
+		{
+			rgbShader.enabled = false;
+			var laneColors:Array<FlxColor> = PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel[noteData] : ClientPrefs.data.arrowRGB[noteData];
+			color = (laneColors != null && laneColors.length > 0) ? laneColors[0] : 0xFFFFFFFF;
+		}
 
 		sustainLength = target.holdLength;
 		multSpeed = target.multSpeed; // set_multSpeed 同步 resize 长条

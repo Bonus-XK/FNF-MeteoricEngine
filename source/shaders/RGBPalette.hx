@@ -71,24 +71,27 @@ class RGBShaderReference
 		}
 	}
 	
+	// 只在 shader 实际启用时克隆（克隆=为该音符创建私有 RGBPalette 实例；禁用态
+	// 移动端强制烘焙色/关着色器/Chips 自带色，着色器从不渲染，openfl 的 uniform 是
+	// 懒创建（未渲染→shader.r==null），克隆后写色必 NRE。禁用态直接写共享调色板即可）
 	private function set_r(value:FlxColor)
 	{
-		if(allowNew && value != _original.r) cloneOriginal();
+		if(allowNew && enabled && value != _original.r) cloneOriginal();
 		return (r = parent.r = value);
 	}
 	private function set_g(value:FlxColor)
 	{
-		if(allowNew && value != _original.g) cloneOriginal();
+		if(allowNew && enabled && value != _original.g) cloneOriginal();
 		return (g = parent.g = value);
 	}
 	private function set_b(value:FlxColor)
 	{
-		if(allowNew && value != _original.b) cloneOriginal();
+		if(allowNew && enabled && value != _original.b) cloneOriginal();
 		return (b = parent.b = value);
 	}
 	private function set_mult(value:Float)
 	{
-		if(allowNew && value != _original.mult) cloneOriginal();
+		if(allowNew && enabled && value != _original.mult) cloneOriginal();
 		return (mult = parent.mult = value);
 	}
 	private function set_enabled(value:Bool)

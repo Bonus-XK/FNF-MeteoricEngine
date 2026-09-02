@@ -1,11 +1,19 @@
 # Meteoric Engine 更新日志
 
-> 版本：1.1.1
+> 版本：1.1.2
 
 ---
 
 ## 目录
 
+- [v1.1.2 更新总览](#v112-更新总览)
+- [高帧率与性能](#高帧率与性能)
+- [JS 引擎优化融合](#js-引擎优化融合)
+- [渲染与 HUD 修复](#渲染与-hud-修复)
+- [安卓兼容与存储修复](#安卓兼容与存储修复)
+- [开发与诊断工具](#开发与诊断工具)
+- [构建基础设施](#构建基础设施)
+- [版本与更新校验](#版本与更新校验)
 - [v1.1.1 更新总览](#v111-更新总览)
 - [联机对战（全新）](#联机对战全新)
 - [联机真双人（v1.1.1 核心）](#联机真双人v111-核心)
@@ -21,6 +29,78 @@
 - [Meteoric Reboot 4 —— 玩法、性能与编辑器](#meteoric-reboot-4--玩法性能与编辑器)
 - [Meteoric Reboot 5 —— 安卓端与模组兼容](#meteoric-reboot-5--安卓端与模组兼容)
 - [后续维护 —— 回放重写 / HUD 重构 / 稳定性](#后续维护--回放重写--hud-重构--稳定性)
+
+---
+
+## v1.1.2 更新总览
+
+- **版本 1.1.2 / 更新校验索引 3**，APK 包版本（versionName）同步为 1.1.2
+- **Mac 高帧率与性能**：帧率上限设置（120/240/480/无上限）、高清渲染 / 性能模式、设置二级页性能、PlayState 万帧稳定、FPS 计数器修复
+- **JS 引擎优化融合（9 项）**：HUD Only / Allow GC / Strum 呼吸灯 / 弹窗开关 / Less Botplay Lag / No Hit Lua Calls，全部默认原版行为
+- **渲染修复**：「提前渲染音符」全朝左 bug、血条图标飞出 0.8s 回位、RGBPalette 移动端空指针
+- **安卓**：CastNote 轻量管线接通（226 万音符大谱面）、Android 12 存储（`.meteoric` 释放）、设置 ◀▶ 长按连续调节
+- **开发工具**：MeteoricProfile 性能探针（`-D METEORIC_PROFILE`）、GL 错误监控（Seiun 移植）；移除高开销 FPS 波动图
+- **构建基础设施**：SDL3 lime 补丁更新（高精度计时 / 高 DPI 模式文件）、CI 缓存与重试调整
+
+---
+
+### ⚡ 高帧率与性能
+
+- **「帧率上限」设置**（图像设置）：`120 / 240 / 480 / 无上限` 四档，切换即时生效（`applyFramerate`）；桌面默认无上限，移动端默认 120 防过热
+- **「高清渲染」**：`meteoric_dpi_mode.txt` 运行时模式文件（1x 高性能 / 2x 高清），重启生效；1x 下 Retina 帧率约 3 倍
+- **「性能模式」（perfMode）**：渲染开销收紧，游戏中实时生效
+- **设置二级页性能**：打开二级页时父级 `persistentDraw = false`（不再被遮挡仍渲染）→ 二级页帧率 ~900 → ~1300+
+- **PlayState 万帧稳定**：自定义 FlxGame 帧循环（桌面 100000 哨兵墙钟）；已消费音符引用定期释放（`releaseConsumedNotes`），GC 尖峰 120ms → ≤24ms
+- **FPS 计数器修复**：`_lastStamp` 时间戳修正，标题栏 / 角标读数真实（并显示引擎版本）
+- 移除 **FPS 波动图**（FPSGraph：高频重绘纹理，开销远大于收益）
+
+### 🧩 JS 引擎优化融合
+
+从 FNF-JS-Engine（Seiun 系）移植，全部**默认关闭 / 原版行为**，可在 设置 → 性能 逐项开启：
+
+| 设置 | 作用 |
+|---|---|
+| HUD Only | 只渲染 HUD + 音符，角色/舞台（含全屏雨滤镜）不再绘制 |
+| Allow GC | 关闭 GC 消除高帧率尖峰（内存可能上升） |
+| 三个 Strum 灯（对手/自动/玩家） | 控制对方 / botplay / 玩家鼓面呼吸灯 |
+| 评分弹窗 / 连击弹窗 | 关闭后大谱面高密度命中不掉帧 |
+| Less Botplay Lag | 自动游玩只计分不弹窗 |
+| No Hit Lua Calls | 关闭 goodNoteHit / opponentNoteHit 的 Lua/Hscript 回调 |
+
+### 🎨 渲染与 HUD 修复
+
+- **「提前渲染音符」全朝左 bug**（`Note.recycleNote`）：补 `defaultRGB()` + `tryUseBakedGraphic()`，模板复生音符按当前轨道着色 / 换烘焙图，不再全部是 lane0 左箭头
+- **血条图标飞出回位**：`iconFlyTarget` 4.0 / `iconFlyOff` 6.0 追赶速率，600% 爆发后约 0.8s 回位（原 3~4s）
+- **RGBPalette 移动端 NRE 修复**：4 个 setter 克隆条件改为 `allowNew && enabled && 值不同`——移动端/烘焙（着色器未渲染、uniform 为 null）不再克隆，桌面行为不变
+
+### 📱 安卓兼容与存储修复
+
+- **CastNote 轻量管线接通安卓**：PlayState 谱面管线 12 处 `#if android` → `#if false`（旧分支完整保留可回退）——Flocc Hard（2,260,102 音符）在安卓可加载并游玩，不再原生崩溃
+- **Android 12 `.meteoric` 释放修复**：
+  - 权限判定改为**真实写探测**（`probePublicRoot`：写入探针文件验证），绕开 MIUI/HyperOS、ColorOS 等定制 ROM 上 `isExternalStorageManager()` 不可靠的问题
+  - 授权成功后**先迁移回退数据再建目录**，mods/assets 能搬到根目录 `.meteoric`
+  - 资源复制**写盘失败不再静默跳过**（仅内嵌资源「不可提取」允许跳过）
+  - 授权跳转三层兜底：按应用授权页 → 全局「所有文件访问」总览页 → 应用详情页（lime 模板 + 生成工程）
+  - 未授权时显示手动授权路径，授权后重启自动迁移
+- **设置 ◀▶ 长按连续调节**：按住 0.5s 后数字按 `scrollSpeed` 连续滚动、字符串档位每 0.2s 切换、开关仍单次切换；松手/滑出即停
+- 9 项 JS 优化在安卓端验证可用；「帧率上限」在移动端默认 120 防过热
+
+### 🧰 开发与诊断工具
+
+- **MeteoricProfile**：每帧耗时探针（编译定义 `-D METEORIC_PROFILE` 启用，默认零开销 inline）
+- **GlErrorWatchdog**（Seiun 移植）：渲染帧轮询 `glGetError()`，GL 错误写入 CrashHandler 结构化日志环，不再静默
+- **CrashHandler**：结构化日志环（最近 60 条游戏日志）随崩溃报告输出，对接以上探针与 GL 监控
+
+### 🔧 构建基础设施
+
+- `ci/lime-sdl3-patch`：高精度性能计数器（`SDL_GetPerformanceCounter`）事件循环重写、高 DPI 模式文件开关（2x 高清 / 1x 高性能）
+- CI：lime-full 缓存 key 纳入 `ci/lime-sdl3-patch/**`，setup 网络重试收紧
+
+### 🔢 版本与更新校验
+
+- 引擎版本 `1.1.2`（主菜单 / 水印 / FPS 角标 / 崩溃日志 / Lua `version`）
+- 更新校验索引 `2 → 3`（`gitVersion.txt` = 1.1.2 / 3）
+- APK 包版本 `versionName = 1.1.2`（与引擎版本一致；versionCode 由 lime 构建自动递增）
 
 ---
 

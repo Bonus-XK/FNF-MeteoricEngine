@@ -499,6 +499,8 @@ class Paths
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
 	// 后台线程预解码完成的贴图（LoadingState 并行解码人物等大图），主线程 image() 消费并转入正式缓存
 	public static var pendingBitmaps:Map<String, BitmapData> = [];
+	// 已告警过的缺失图片（只 trace 一次，避免高帧/高命中率下重复格式化+写屏）
+	public static var missingImageTraced:Map<String, Bool> = new Map<String, Bool>();
 
 	// 清空未消费的预解码贴图（防止大图残留内存）
 	public static function clearPendingBitmaps()
@@ -673,7 +675,12 @@ class Paths
 			return newGraphic;
 		}
 
-		trace('oh no its returning null NOOOO ($file)');
+		// 同一缺失文件只告警一次：高帧率/高命中率下重复 trace 会白耗 CPU 并刷屏
+		if (!missingImageTraced.exists(file))
+		{
+			missingImageTraced.set(file, true);
+			trace('oh no its returning null NOOOO ($file)');
+		}
 		return null;
 	}
 

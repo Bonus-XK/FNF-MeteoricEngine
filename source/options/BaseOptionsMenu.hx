@@ -57,6 +57,13 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var mouseLockY:Float = 0;
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
+	// 移动端 ◀▶ 长按连续调节状态（与键盘按住逻辑同参数，触摸独立计时）
+	static final PAD_HOLD_DELAY:Float = 0.5;   // 长按初始延迟（秒）
+	static final PAD_STRING_STEP:Float = 0.2;  // 字符串档位长按步进间隔（约 5 档/秒）
+	var padHoldDir:Int = 0;       // -1 左 / 1 右 / 0 无
+	var padHoldTime:Float = 0;    // 长按已持续时长
+	var padHoldValue:Float = 0;   // 数字类长按累计值（独立于键盘 holdValue）
+	var padStepTimer:Float = 0;   // 字符串类长按步进计时
 	var nextAccept:Int = 5;        // 进入界面先忽略确认键，防误触
 	var timeForMoving:Float = 0.1; // 进入子状态先忽略输入，防控制器误触
 
@@ -393,34 +400,8 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 		if (clickPressed)
 		{
-			#if mobile
-			// ◀ ▶ 按钮：FlxG.mouse 通道 + 300ms 冷却。instance 的触摸路径（dpad）触发时
-			// 会在下方 nextAccept 块更新 lastPadBtnTap，本检测随即被冷却挡住，保证一次按下只触发一次。
-			if (Lib.getTimer() - lastPadBtnTap > 300)
-			{
-				// ◀ 按钮：调节当前选项值（等效左方向键；bool 选项=切换，key 选项不可调）
-				if (diffLeftBtn != null && FlxG.mouse.screenX >= diffLeftBtn.x && FlxG.mouse.screenX <= diffLeftBtn.x + diffLeftBtn.width
-					&& FlxG.mouse.screenY >= diffLeftBtn.y && FlxG.mouse.screenY <= diffLeftBtn.y + diffLeftBtn.height)
-				{
-					lastPadBtnTap = Lib.getTimer();
-					mouseActive = true;
-					if (curOption != null && curOption.type == 'bool')
-						toggleSelected();
-					else if (curOption != null && curOption.type != 'key')
-						changeOptionValue(-1);
-				}
-				else if (diffRightBtn != null && FlxG.mouse.screenX >= diffRightBtn.x && FlxG.mouse.screenX <= diffRightBtn.x + diffRightBtn.width
-					&& FlxG.mouse.screenY >= diffRightBtn.y && FlxG.mouse.screenY <= diffRightBtn.y + diffRightBtn.height)
-				{
-					lastPadBtnTap = Lib.getTimer();
-					mouseActive = true;
-					if (curOption != null && curOption.type == 'bool')
-						toggleSelected();
-					else if (curOption != null && curOption.type != 'key')
-						changeOptionValue(1);
-				}
-			}
-			#end
+			// 移动端 ◀▶ 的按下/长按统一在下方 #if mobile 块处理（按下即生效 + 0.5s 后连续重复）；
+			// 此处的 release 路径不再处理 ◀▶，避免长按松手后重复触发。
 			#if !mobile
 			// 桌面：点击复选框/选项行 = 选中/切换数值（与 Psych 原版一致）。
 			// 手机不启用：触屏拖动手势的释放帧易被误判为点击，改为「拖动选中 + A/◀▶ 确认调整」。
@@ -453,6 +434,78 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			}
 			#end
 		}
+
+		#if mobile
+		// ---- 移动端 ◀ ▶ 长按连续调节（按下即生效；按住 0.5s 后按键盘同参数自动重复）----
+		var padHitLeft:Bool = padBtnHit(diffLeftBtn);
+		var padHitRight:Bool = padBtnHit(diffRightBtn);
+		if (FlxG.mouse.justPressed && padHoldDir == 0 && Lib.getTimer() - lastPadBtnTap > 300)
+		{
+			var dir:Int = padHitLeft ? -1 : (padHitRight ? 1 : 0);
+			if (dir != 0)
+			{
+				lastPadBtnTap = Lib.getTimer();
+				mouseActive = true;
+				padHoldDir = dir;
+				padHoldTime = 0;
+				padStepTimer = 0;
+				if (curOption == null || curOption.type == 'key')
+					padHoldDir = 0; // key 类不可调
+				else
+				{
+					if (curOption.type == 'bool')
+						toggleSelected();       // 开关：仅点按切换，不参与长按重复
+					else
+						changeOptionValue(dir); // 数字/字符串：按下立即生效（与键盘 key-down 一致）
+					if (curOption.type != 'string')
+						padHoldValue = curOption.getValue();
+				}
+			}
+		}
+
+		if (padHoldDir != 0)
+		{
+			var hit:Bool = (padHoldDir < 0) ? padHitLeft : padHitRight;
+			if (FlxG.mouse.pressed && hit)
+			{
+				padHoldTime += elapsed;
+				if (padHoldTime > PAD_HOLD_DELAY && curOption != null)
+				{
+					switch (curOption.type)
+					{
+						case 'int' | 'float' | 'percent':
+							padHoldValue += curOption.scrollSpeed * elapsed * padHoldDir;
+							if (padHoldValue < curOption.minValue) padHoldValue = curOption.minValue;
+							else if (padHoldValue > curOption.maxValue) padHoldValue = curOption.maxValue;
+							switch (curOption.type)
+							{
+								case 'int':
+									curOption.setValue(Math.round(padHoldValue));
+								case 'float' | 'percent':
+									curOption.setValue(FlxMath.roundDecimal(padHoldValue, curOption.decimals));
+							}
+							updateTextFrom(curOption);
+							curOption.change();
+							// 与键盘按住路径一致：数字连续滚动不逐帧播 scrollMenu
+
+						case 'string':
+							padStepTimer += elapsed;
+							while (padStepTimer >= PAD_STRING_STEP)
+							{
+								padStepTimer -= PAD_STRING_STEP;
+								changeOptionValue(padHoldDir); // 每 0.2s 切一档（含 scrollMenu 反馈）
+							}
+
+						default: // bool / key：不重复
+					}
+				}
+			}
+			else
+				clearPadHold();
+		}
+		else if (FlxG.mouse.justReleased)
+			clearPadHold();
+		#end
 
 		if (controls.BACK) {
 			close();
@@ -598,6 +651,26 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		}
 		#end
 	}
+
+	#if mobile
+	/** 移动端 ◀▶ 触摸命中判定（屏幕坐标，与 updatePadBtnVisuals 同一套） */
+	function padBtnHit(btn:FlxSprite):Bool
+	{
+		if (btn == null) return false;
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		return mx >= btn.x && mx <= btn.x + btn.width && my >= btn.y && my <= btn.y + btn.height;
+	}
+
+	/** 结束移动端 ◀▶ 长按状态（松手或滑出按钮） */
+	function clearPadHold():Void
+	{
+		padHoldDir = 0;
+		padHoldTime = 0;
+		padStepTimer = 0;
+		padHoldValue = 0;
+	}
+	#end
 
 	function clearHold()
 	{

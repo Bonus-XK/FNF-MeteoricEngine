@@ -1,6 +1,7 @@
 package backend;
 
 import flixel.util.FlxSave;
+import flixel.FlxG;
 import flixel.input.keyboard.FlxKey;
 import flixel.input.gamepad.FlxGamepadInputID;
 
@@ -15,6 +16,7 @@ class SaveVariables {
 	@:keep public var showVer:Bool = true;
 	@:keep public var fpsInTitleBar:Bool = false;
 	@:keep public var fpsColor:String = '自动';
+	@:keep public var framerateMode:String = #if desktop '无上限' #else '120' #end; // 帧率上限档位：120/240/480/无上限（移动端默认 120 防过热，桌面默认无上限）
 	@:keep public var showScrollSpeed:Bool = true; // FPS 计数器下方显示当前滚动速度（颜色随速度变化）
 	@:keep public var showNPS:Bool = false; // FPS 计数器下方显示每秒收到的音符数（NPS）
 	@:keep public var flashing:Bool = true;
@@ -45,7 +47,13 @@ class SaveVariables {
 	// 位图缩小后精灵渲染尺寸减半但坐标不变 → 布局大错位。因此**默认 1.0（关闭）**，
 	// 需要时在设置里手动开启并自行确认布局（或后续做“位置同比例补偿”的完整方案）。
 	@:keep public var backgroundScale:Float = 1.0;
-	@:keep public var framerate:Int = 120;
+	// 高清渲染开关（重启生效）：true=Retina 2x 清晰（游戏内大规模谱面约 700~1400 帧）；
+	// false=1x 高性能（画面略糊，帧率约 3 倍，游戏内可 2200+）。由 SDLWindow.cpp 在创建窗口时读取模式文件。
+	@:keep public var highDPIRender:Bool = true;
+	// 性能模式（Seiun 移植）：音符走「无着色器 + ColorTransform 上色 + 直连 quad 合批」快速路径，
+	// 消除每 item 的 shader 绑定/缓冲重灌开销；部分音符渲染细节（如单色平涂代替三色渐变）略有差异。
+	@:keep public var perfMode:Bool = false;
+	// 【帧数上限已移除】framerate 偏好已删除：桌面端由 Main 配置 1000（无实际限制），移动端保持 120。
 	@:keep public var camZooms:Bool = true;
 	@:keep public var hideHud:Bool = false;
 	@:keep public var scoreTxtFont:String = '默认';
@@ -102,6 +110,19 @@ class SaveVariables {
 	@:keep public var botplayScheduledHits:Bool = true; // 生成即排期命中（大谱面自动游玩 100% 覆盖的架构开关）
 	@:keep public var botplayPopMargin:Int = 6;         // 排期弹出提前余量（毫秒）：弹出窗 = 帧步长 + 余量，须 ≥ 回收窗
 	@:keep public var botplayKillWindow:Int = 6;        // 自动游玩未命中回收窗（毫秒）：越小柱子越贴判定线，太小会与弹出竞态
+
+	// ===== JS Engine（JordanSantiagoYT/FNF-JS-Engine 优化页）移植 =====
+	// 默认全部 = 当前行为，纯自愿开启的性能开关
+	@:keep public var hudOnly:Bool = false;             // 只显示 HUD：不渲染角色/舞台（含雨滤镜等全场景特效）；默认关闭=完整画面
+	@:keep public var enableGC:Bool = true;             // 允许 GC（false=关闭 GC 消除尖峰，内存可能上升）
+	@:keep public var opponentLightStrum:Bool = true;   // 对手命中时 strum 高亮 confirm
+	@:keep public var botLightStrum:Bool = true;        // 自动游玩命中时玩家 strum 高亮 confirm
+	@:keep public var playerLightStrum:Bool = true;     // 手动命中/按下时玩家 strum 高亮
+	@:keep public var ratingPopups:Bool = true;         // 评级弹窗（Sick/Good…）
+	@:keep public var comboPopups:Bool = true;          // 连击数字 + Combo 词弹窗
+	@:keep public var lessBotLag:Bool = false;          // 自动游玩只计分不弹窗（JS 引擎 lessBotLag）
+	@:keep public var noHitFuncs:Bool = false;          // 关闭 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调
+	@:keep public var iconFlyOverflow:Bool = false;     // 血条溢出图标飞出（JS 引擎同款：>100% 时图标沿填充方向滑出条外，不封顶）
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
 	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
 	public var gameplaySettings:Map<String, Dynamic> = [
@@ -315,6 +336,32 @@ class ClientPrefs {
 		data.hudLayout = m;
 	}
 
+	// JS 优化移植续：帧率上限设置项（120/240/480/无上限）——
+	// 把档位解析为实际帧率并接管 FlxG 步长/绘制帧率（FlxG.drawFramerate setter 会同步 stage.frameRate）。
+	// 移动端默认 120（防过热）；「无上限」与桌面同款 100000 哨兵，只受 CPU/GPU 限制。
+	public static function applyFramerate():Void
+	{
+		var target:Int = switch (data.framerateMode)
+		{
+			case '240': 240;
+			case '480': 480;
+			case '无上限': 100000;
+			default: 120;
+		}
+		if (FlxG.game == null) return;
+		// 避免 flixel 的两个方向性警告：升档先 update 后 draw，降档先 draw 后 update
+		if (target > FlxG.updateFramerate)
+		{
+			FlxG.updateFramerate = target;
+			FlxG.drawFramerate = target;
+		}
+		else
+		{
+			FlxG.drawFramerate = target;
+			FlxG.updateFramerate = target;
+		}
+	}
+
 	public static function loadPrefs() {
 		if(data == null) data = new SaveVariables();
 		if(defaultData == null) defaultData = new SaveVariables();
@@ -417,17 +464,15 @@ class ClientPrefs {
 			Main.fpsVar.applyDisplayMode();
 		}
 
+		// 高清/高性能渲染模式：写入可执行文件旁的模式文件，供 SDLWindow.cpp 下次启动创建窗口时读取（重启生效）
+		applyHighDPIRenderMode();
+
 		#if (!html5 && !switch)
 		FlxG.autoPause = ClientPrefs.data.autoPause;
 		#end
 
-		if(data.framerate > FlxG.drawFramerate) {
-			FlxG.updateFramerate = data.framerate;
-			FlxG.drawFramerate = data.framerate;
-		} else {
-			FlxG.drawFramerate = data.framerate;
-			FlxG.updateFramerate = data.framerate;
-		}
+		// JS 优化移植续：帧率上限设置项（120/240/480/无上限）——加载设置后立即接管 FlxG 步长/绘制帧率
+		applyFramerate();
 
 		if(FlxG.save.data.gameplaySettings != null) {
 			var savedMap:Map<String, Dynamic> = FlxG.save.data.gameplaySettings;
@@ -469,6 +514,17 @@ class ClientPrefs {
 	inline public static function getGameplaySetting(name:String, defaultValue:Dynamic = null, ?customDefaultValue:Bool = false):Dynamic {
 		if(!customDefaultValue) defaultValue = defaultData.gameplaySettings.get(name);
 		return /*PlayState.isStoryMode ? defaultValue : */ (data.gameplaySettings.exists(name) ? data.gameplaySettings.get(name) : defaultValue);
+	}
+
+	// 高清渲染模式 → 可执行文件旁 meteoric_dpi_mode.txt（'1'=2x 高清 / '0'=1x 高性能）
+	// SDLWindow.cpp 在创建窗口前读取；修改需重启游戏生效。
+	public static function applyHighDPIRenderMode() {
+		#if sys
+		try {
+			var modeFile:String = haxe.io.Path.directory(Sys.programPath()) + '/meteoric_dpi_mode.txt';
+			sys.io.File.saveContent(modeFile, data.highDPIRender ? '1' : '0');
+		} catch (e:Dynamic) {}
+		#end
 	}
 
 	public static function reloadVolumeKeys() {

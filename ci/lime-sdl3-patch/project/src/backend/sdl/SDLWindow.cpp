@@ -83,7 +83,26 @@ namespace lime {
 
 			if (flags & WINDOW_FLAG_ALLOW_HIGHDPI) {
 
-				sdlWindowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+				// 【Meteoric 设置开关】运行时模式文件（游戏内设置写入，重启生效）：
+				// 可执行文件旁 meteoric_dpi_mode.txt 首字符 '0' → 1x 高性能渲染（跳过
+				// HIGH_PIXEL_DENSITY，Retina 上帧率约 3 倍，画面略糊）；默认/缺失/非'0' → 2x 高清。
+				bool highDpiAllowed = true;
+				const char* basePath = SDL_GetBasePath ();
+				if (basePath != NULL) {
+
+					char modePath[4096];
+					snprintf (modePath, sizeof (modePath), "%smeteoric_dpi_mode.txt", basePath);
+					FILE* modeFile = fopen (modePath, "rb");
+					if (modeFile != NULL) {
+
+						int modeChar = fgetc (modeFile);
+						fclose (modeFile);
+						if (modeChar == '0') highDpiAllowed = false;
+
+					}
+
+				}
+				if (highDpiAllowed) sdlWindowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
 			}
 

@@ -183,7 +183,7 @@ class FunkinLua {
 		// Some settings, no jokes
 		set('downscroll', ClientPrefs.data.downScroll);
 		set('middlescroll', ClientPrefs.data.middleScroll);
-		set('framerate', ClientPrefs.data.framerate);
+		// 【帧数上限已移除】framerate 偏好已删除，不再暴露给 Lua（桌面端无上限，移动端固定 120）
 		set('ghostTapping', ClientPrefs.data.ghostTapping);
 		set('hideHud', ClientPrefs.data.hideHud);
 		set('timeBarType', ClientPrefs.data.timeBarType);

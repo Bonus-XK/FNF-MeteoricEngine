@@ -26,15 +26,15 @@ class Main extends Sprite
 		height: 720, // WINDOW height
 		initialState: TitleState, // initial game state
 		zoom: -1.0, // game state bounds
-		framerate: 120, // default framerate
+		framerate: #if desktop 100000 #else 120 #end, // 启动默认值（桌面=无人工限制哨兵；移动端=120 防过热）；实际档位由设置页「帧率上限」在 loadPrefs 后 applyFramerate() 接管，可切 240/480/无上限
 		skipSplash: true, // if the default flixel splash screen should be skipped
 		startFullscreen: false // if the game should start at fullscreen mode
 	};
 
 	public static var fpsVar:FPS;
 
-	public static var meVersion:String = '1.1.1';
-	public static var meVersionIndex:Int = 2;
+	public static var meVersion:String = '1.1.2';
+	public static var meVersionIndex:Int = 3;
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
 	#if mobile
@@ -172,7 +172,10 @@ class Main extends Sprite
 
 		if (st.hasStoragePermission())
 		{
-			// 已授权：直接用公共根目录；失败再回退
+			// 已具备真实写权限：若此前数据在应用专属目录（回退/升级用户），
+			// 必须先整体迁移再建目录——否则 tryEnsureRootDirs 先建出公共目录，
+			// migrateFromFallback 会因"目标已存在"跳过，mods/assets 就永远搬不上来。
+			st.migrateFromFallback();
 			var err = st.tryEnsureRootDirs();
 			if (err != null && !st.usingFallback())
 			{
@@ -181,8 +184,6 @@ class Main extends Sprite
 			}
 			if (err == null)
 			{
-				// 若此前数据在应用专属目录（升级用户），整体迁到根目录（mods/assets 一并带走）
-				st.migrateFromFallback();
 				st.startCopyAssets();
 			}
 			else
@@ -200,7 +201,9 @@ class Main extends Sprite
 			{
 				_storageLabel.text = '需要"所有文件访问"权限\n'
 					+ '授权后即可把 Mod 直接放进手机根目录的 .meteoric/mods 文件夹\n'
-					+ '正在打开系统设置...';
+					+ '正在打开系统设置...\n\n'
+					+ '若未自动跳转，请手动：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n'
+					+ '（部分机型在"特殊应用权限"里，请在应用详情页开启）';
 				st.openStorageSettings();
 			}
 			else
@@ -238,12 +241,12 @@ class Main extends Sprite
 		// ---- 权限等待阶段：每帧检查授权结果 ----
 		if (st.hasStoragePermission())
 		{
-			// 授权成功（设置页返回 / 弹窗授权）：切公共根目录，迁移旧数据，开始复制
+			// 授权成功（设置页返回 / 弹窗授权）：先迁移旧数据再切公共根目录（顺序不可反）
 			st.enableFallbackOff();
+			st.migrateFromFallback();
 			var err = st.tryEnsureRootDirs();
 			if (err == null)
 			{
-				st.migrateFromFallback();
 				_storageError = false;
 				st.startCopyAssets();
 				return;
@@ -271,8 +274,10 @@ class Main extends Sprite
 			if (err == null)
 			{
 				_storageError = false;
-				_storageLabel.text = '未获得存储权限，改用应用专用目录：\n' + st.root()
-					+ '\n（下次可在系统设置允许"所有文件访问"后使用根目录 .meteoric）';
+				_storageLabel.text = '未获得"所有文件访问"权限，已改用应用专用目录：\n' + st.root()
+					+ '\n\n授权方法：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n'
+					+ '（部分机型在"特殊应用权限"里）\n'
+					+ '授权后重启游戏，会自动把 Mod 与资源迁移到根目录 .meteoric。';
 				try { extension.androidtools.widget.Toast.makeText('未获权限，使用应用专用目录', 0); } catch (e:Dynamic) {}
 				st.startCopyAssets();
 				return;
@@ -368,7 +373,13 @@ class Main extends Sprite
 
 		// Performance optimizations
 		FlxG.fixedTimestep = false;
-		openfl.Lib.current.stage.frameRate = 120;
+		// 【帧数上限已移除】不再硬编码 stage.frameRate = 120。
+		// flixel 5.2.2 会在 create()/onFocus() 自动执行 stage.frameRate = FlxG.drawFramerate，
+		// 桌面端 drawFramerate 由上方配置为 100000（仅作“无人工限制”哨兵）→ SDL 帧循环走
+		// 墙钟自调度（ci/lime-sdl3-patch：HiResMs + WaitEventTimeout + SDL_DelayNS/spin，
+		// nextUpdate/currentUpdate/lastUpdate 全 double，无定时器 1ms 地板、无事件洪泛、
+		// 无整数截断死循环），帧数只由 CPU/GPU 渲染提交决定（实测 Retina 2x 前台 4000~12000）；
+		// 移动端保持 120，避免高帧导致发热/耗电问题。
 
 		// FPS 计数器：所有平台都创建，安卓/iOS 同样显示（标题栏模式仅在桌面端生效）
 		fpsVar = new FPS(10, 3, 0xFFFFFF);
@@ -379,6 +390,13 @@ class Main extends Sprite
 		if(fpsVar != null) {
 			fpsVar.applyDisplayMode();
 		}
+
+		// FPS 波动图功能已移除（曾因渲染/数据口径问题反复调试，删除避免持续困扰）
+		
+		#if desktop
+		// F3 已释放（FPS 波动图移除后不再占用）
+		#end
+
 		#if !mobile
 		Lib.current.stage.align = "tl";
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;

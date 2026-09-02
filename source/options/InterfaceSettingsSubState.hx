@@ -119,6 +119,14 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('血条溢出图标飞出',
+			'开启后，任意堆叠命中（≥2 连打簇，即使没顶破 100%）都会触发：血量显示按该堆叠提供的血量%爆发'
+			+ '（堆叠越大越高，最多 1000%），小图标按比例冲出条外再被慢速拉回；\n'
+			+ '血条上限仍为 100%，仅显示与飞行节奏发生变化',
+			'iconFlyOverflow',
+			'bool');
+		addOption(option);
+
 		super();
 	}
 

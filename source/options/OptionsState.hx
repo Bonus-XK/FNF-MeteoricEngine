@@ -47,6 +47,10 @@ class OptionsState extends MusicBeatState
 	var nextAccept:Int = 5;        // 进入界面先忽略确认键，防开界面时按住的 A 误触发
 
 	function openSelectedSubstate(label:String) {
+		// 【性能】二级页打开期间父级停止绘制：子页背景（menuDesat，不透明整屏）100% 盖住父级，
+		// 父级继续画是纯白绘（实测二级页帧耗 ~1090us vs 一级 ~730us，多出的 ~360us 正是父级
+		// 被遮死仍在下层持续渲染的 GPU 成本）。关闭时由 closeSubState() 恢复绘制。
+		persistentDraw = false;
 		switch(label) {
 			case '音符':
 				openSubState(new options.NoteSettingsSubState());
@@ -152,6 +156,7 @@ class OptionsState extends MusicBeatState
 
 	override function closeSubState() {
 		super.closeSubState();
+		persistentDraw = true; // 恢复父级绘制（见 openSelectedSubstate 性能注释）
 		FlxG.mouse.visible = true;
 		#if mobile
 		if (menuPad != null) menuPad.visible = true;
@@ -160,6 +165,9 @@ class OptionsState extends MusicBeatState
 	}
 
 	override function update(elapsed:Float) {
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.begin();
+		#end
 		super.update(elapsed);
 
 		// 鼠标在本界面始终可见
@@ -173,6 +181,9 @@ class OptionsState extends MusicBeatState
 			// 隐藏本页 A 键：子界面（尤其移动触控布局编辑）拖动按钮时，
 			// 右下角多余的 A 键会与"保存并退出"等按钮重叠、极易误触
 			if (menuPad != null) menuPad.visible = false;
+			#end
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.end('OptionsState.update');
 			#end
 			return;
 		}
@@ -268,6 +279,10 @@ class OptionsState extends MusicBeatState
 			if (acceptPressed) openSelectedSubstate(options[curSelected]);
 			else if (controls.BACK) goBack();
 		}
+
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.end('OptionsState.update');
+		#end
 	}
 
 	#if mobile
