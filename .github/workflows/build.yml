@@ -128,8 +128,23 @@ jobs:
           echo "==> Gradle 发行版就绪："
           ls -la "$DIST_DIR"
 
+      - name: 缓存 Gradle 依赖模块（AGP/Kotlin 类路径，防 Maven Central 限流）
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches/modules-2
+          key: gradle-modules-${{ runner.os }}-v1
+
       - name: 构建 Android APK
-        run: ./compile-android.sh
+        run: |
+          # Maven Central 偶发 429（Too Many Requests）导致类路径解析失败：重试一轮再放弃
+          for i in 1 2; do
+            if ./compile-android.sh; then
+              exit 0
+            fi
+            echo "==> Android 构建失败（第 $i 次），20 秒后重试..."
+            sleep 20
+          done
+          exit 1
 
       - name: 上传 APK
         uses: actions/upload-artifact@v5
