@@ -46,12 +46,16 @@ else
   haxelib run lime build macos -release
 fi
 
-# ---- 构建后处理：恢复 8月17 稳定版 lime.ndll ----
-# lime 构建流程会重新编译并覆盖 app 里的 lime.ndll（SDLSystem 补丁版），
-# 该版本与 llvm@18 编译的游戏代码不兼容（malloc free 崩溃，根因）。
-# lime build 返回后仍有异步收尾（约 1~2 分钟）会再次覆盖 app 里的 ndll，
-# 所以先等所有 lime/hxcpp 残留进程结束，再恢复稳定版并重签名。
-STABLE_NDLL="tools/lime.ndll.stable"
+# ---- 构建后处理：恢复墙钟版 lime.ndll ----
+# lime 构建流程会重新编译并覆盖 app 里的 lime.ndll；lime 返回后仍有异步收尾
+# （约 1~2 分钟）会再次覆盖 app 里的 ndll，所以先等所有 lime/hxcpp 残留进程结束。
+#
+# 【v1.1.2 关键】Main.hx 桌面端 frameRate 哨兵已是 100000（无人工限制），
+# 必须配合「墙钟帧循环」ndll（nextUpdate/currentUpdate 为 double + HiResMs + WaitEventTimeout）；
+# 若沿用 8月17 旧 stable ndll（nextUpdate 是 Uint32），亚毫秒 framePeriod 每次 += 被截断成 +0
+# → catch-up 循环 while (nextUpdate <= currentUpdate) 永不前进 → 主线程 100% 死循环
+# → 启动后卡死在加载界面（CPU 100%）。因此这里恢复「墙钟版」而不是旧 stable。
+STABLE_NDLL="tools/lime.ndll.wallclock"
 APP_NDLL="export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll"
 echo "[post-build] waiting for lime/hxcpp tail processes to finish..."
 for attempt in $(seq 1 30); do
@@ -66,7 +70,7 @@ if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
   sleep 3
   if cmp -s "$STABLE_NDLL" "$APP_NDLL"; then
     codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
-    echo "[post-build] restored stable lime.ndll + re-signed  (md5: $(md5 -q "$APP_NDLL"))"
+    echo "[post-build] restored wallclock lime.ndll + re-signed  (md5: $(md5 -q "$APP_NDLL"))"
   else
     echo "[post-build] WARNING: lime.ndll was overwritten again after restore"
   fi
