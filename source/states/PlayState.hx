@@ -5476,7 +5476,6 @@ class PlayState extends MusicBeatState
 			}
 		}
 		vocals.volume = 0;
-		opponentVocals.volume = 0;
 	}
 
 	function opponentNoteHit(note:Note):Void
