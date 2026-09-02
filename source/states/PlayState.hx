@@ -35,6 +35,7 @@ import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
 import openfl.utils.AssetType;
 import openfl.events.Event;
+import openfl.events.FocusEvent;
 import openfl.events.KeyboardEvent;
 import openfl.Lib;
 import tjson.TJSON as Json;
@@ -1048,6 +1049,7 @@ class PlayState extends MusicBeatState
 		#if mobile
 		FlxG.stage.addEventListener(Event.DEACTIVATE, onStageDeactivate);
 		FlxG.stage.addEventListener(Event.ACTIVATE, onStageActivate);
+		FlxG.stage.addEventListener(FocusEvent.FOCUS_IN, onStageActivate);
 		#end
 		callOnScripts('onCreatePost');
 
@@ -4926,7 +4928,7 @@ class PlayState extends MusicBeatState
 			if (lastCombo != null) lastCombo.kill();
 			lastCombo = comboSpr;
 		}
-		if (showComboPop && lastScore != null)
+		if (showComboNumPop && lastScore != null)
 		{
 			while (lastScore.length > 0)
 			{
@@ -4934,7 +4936,9 @@ class PlayState extends MusicBeatState
 				lastScore.remove(lastScore[0]);
 			}
 		}
-		if (showComboPop)
+		// 数字弹窗独立于 Combo 词：词受 showComboPop 控制，数字受 showComboNumPop 控制。
+		// （v1.1.2 曾把数字循环误包进恒为 false 的 showComboPop，导致连击数字完全不显示）
+		if (showComboNumPop)
 		for (i in seperatedScore)
 		{
 			var numScore:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'num' + Std.int(i) + uiSuffix));
@@ -5019,6 +5023,16 @@ class PlayState extends MusicBeatState
 	private function onStageActivate(event:Event):Void
 	{
 		restoreBackgroundAudio();
+		// flixel 在焦点恢复时会自动 resume 失焦前“正在播放”的声音（FlxG.sound.onFocus()），
+		// 而本钩子在 FlxGame 焦点处理之后执行（FlxGame 先注册）——若暂停菜单仍打开，
+		// 歌曲伴奏/人声会被误恢复，立即重新冻结；暂停菜单音乐与场景音效仍由 flixel 正常续播。
+		// 玩家点“返回游戏”后由 closeSubState → resyncVocals 统一恢复歌曲。
+		if (paused)
+		{
+			if (FlxG.sound.music != null) FlxG.sound.music.pause();
+			if (vocals != null) vocals.pause();
+			if (opponentVocals != null) opponentVocals.pause();
+		}
 	}
 
 	private function freezeBackgroundAudio():Void
@@ -5028,6 +5042,9 @@ class PlayState extends MusicBeatState
 		if (FlxG.sound.music != null) FlxG.sound.music.pause();
 		if (vocals != null) vocals.pause();
 		if (opponentVocals != null) opponentVocals.pause();
+		// 暂停菜单音乐等所有在播 FlxSound 一并冻结，避免锁屏/后台期间仍有声音
+		for (sound in FlxG.sound.list.members)
+			if (sound != null) sound.pause();
 	}
 
 	private function restoreBackgroundAudio():Void
@@ -5774,6 +5791,7 @@ class PlayState extends MusicBeatState
 		#if mobile
 		FlxG.stage.removeEventListener(Event.DEACTIVATE, onStageDeactivate);
 		FlxG.stage.removeEventListener(Event.ACTIVATE, onStageActivate);
+		FlxG.stage.removeEventListener(FocusEvent.FOCUS_IN, onStageActivate);
 		#end
 		FlxAnimationController.globalSpeed = 1;
 		FlxG.sound.music.pitch = 1;
