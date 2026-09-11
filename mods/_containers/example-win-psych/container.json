@@ -1,0 +1,11 @@
+{
+  "displayName": "Psych Engine 0.6.3",
+  "version": "0.6.3",
+  "engine": "psych-0.6.3",
+  "author": "Shadow Mario",
+  "description": "Windows 容器示例：把目标引擎的 exe 与同目录资源整体放进本文件夹（例如 PsychEngine.exe + assets/ + mods/），再把下面的 app 改成实际 exe 文件名。留空则由引擎自动探测（Windows 优先找 *.exe）。",
+  "app": "PsychEngine.exe",
+  "exitMode": "terminate",
+  "waitSeconds": 2.5,
+  "env": {}
+}

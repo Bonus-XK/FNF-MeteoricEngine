@@ -1,0 +1,14 @@
+{
+  "displayName": "Meteoric Engine v1.1.0",
+  "version": "1.0",
+  "engine": "psych-0.6.3",
+  "author": "Shadow Mario",
+  "description": "容器测试用目标引擎（Meteoric 1.1.0 样本）。注意：容器目录名必须是纯 ASCII —— 路径含非 ASCII 字符时，嵌套在容器里的 app 会在启动时抛 Invalid UTF16 秒退。",
+  "app": "Psych Engine.app",
+  "exitMode": "terminate",
+  "suspendHost": true,
+  "waitSeconds": 1.4,
+  "env": {
+    "SDL_HINT_NO_SIGNAL_HANDLERS": "1"
+  }
+}

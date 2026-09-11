@@ -1,0 +1,27 @@
+<xml>
+
+    <files id="native-toolkit-lzma">
+
+        <!-- Meteoric（构建修复）：hashlink 头路径。
+             include/system/CFFI.h 无条件 `#include <hl.h>`（即便目标是 hxcpp 而非
+             HashLink，LIME_HASHLINK 未定义也一样包含），因此凡是包含 CFFI.h 的源文件
+             —— 本组里的 LzmaBinding.cpp 就是 —— 都必须能看到 lib/hashlink/src。
+             原版 Build.xml 把这行 compilerflag 放在全部 section 之外，实测 hxcpp 不会把
+             它并入各 target 的编译命令行，导致
+                 include/system/CFFI.h:6:10: fatal error: hl.h: No such file or directory
+             放在真正会被下发的位置（各受影响分组内）即可。 -->
+        <compilerflag value="-I${NATIVE_TOOLKIT_PATH}/hashlink/src" />
+
+        <compilerflag value="-I${NATIVE_TOOLKIT_PATH}/lzma/include/" if="NATIVE_TOOLKIT_LZMA_BINDING" />
+        <compilerflag value="-D_7ZIP_ST" unless="windows" />
+
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/LzFind.c" />
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/LzFindMt.c" if="windows" />
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/LzmaBinding.cpp" if="NATIVE_TOOLKIT_LZMA_BINDING" />
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/LzmaDec.c" />
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/LzmaEnc.c" />
+        <file name="${NATIVE_TOOLKIT_PATH}/lzma/src/Threads.c" if="windows" />
+
+    </files>
+
+</xml>

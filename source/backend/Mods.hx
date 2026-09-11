@@ -1,0 +1,266 @@
+package backend;
+
+#if sys
+import sys.FileSystem;
+import sys.io.File;
+#else
+import lime.utils.Assets;
+#end
+import tjson.TJSON as Json;
+
+typedef ModsList = {
+	enabled:Array<String>,
+	disabled:Array<String>,
+	all:Array<String>
+};
+
+class Mods
+{
+	static public var currentModDirectory:String = '';
+	public static var ignoreModFolders:Array<String> = [
+		'characters',
+		'custom_events',
+		'custom_notetypes',
+		'data',
+		'songs',
+		'music',
+		'sounds',
+		'shaders',
+		'videos',
+		'images',
+		'stages',
+		'weeks',
+		'fonts',
+		'scripts',
+		'achievements',
+		// 多版本容器仓库（backend.ContainerStore.CONTAINERS_DIR）。
+		// 必须显式登记：getModDirectories 只按本白名单过滤，**没有**「下划线前缀自动跳过」这条规则，
+		// 不写进来 mods/_containers 会被扫成一个名为 "_containers" 的假模组。
+		'_containers'
+	];
+
+	private static var globalMods:Array<String> = [];
+
+	inline public static function getGlobalMods()
+		return globalMods;
+
+	inline public static function pushGlobalMods() // prob a better way to do this but idc
+	{
+		globalMods = [];
+		for(mod in parseList().enabled)
+		{
+			var pack:Dynamic = getPack(mod);
+			if(pack != null && pack.runsGlobally) globalMods.push(mod);
+		}
+		return globalMods;
+	}
+
+	inline public static function getModDirectories():Array<String>
+	{
+		var list:Array<String> = [];
+		#if MODS_ALLOWED
+		var modsFolder:String = Paths.mods();
+		// mods 目录不存在时自动创建，否则 Mod 无法加载/安装
+		if(!FileSystem.exists(modsFolder)) {
+			try {
+				FileSystem.createDirectory(modsFolder);
+			} catch(e:Dynamic) {
+				trace('Could not create mods folder: $e');
+			}
+		}
+		if(FileSystem.exists(modsFolder)) {
+			for (folder in FileSystem.readDirectory(modsFolder))
+			{
+				var path = haxe.io.Path.join([modsFolder, folder]);
+				if (sys.FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
+					list.push(folder);
+			}
+		}
+		#end
+		return list;
+	}
+	
+	inline public static function mergeAllTextsNamed(path:String, defaultDirectory:String = null, allowDuplicates:Bool = false)
+	{
+		if(defaultDirectory == null) defaultDirectory = Paths.getPreloadPath();
+		defaultDirectory = defaultDirectory.trim();
+		if(!defaultDirectory.endsWith('/')) defaultDirectory += '/';
+		if(!defaultDirectory.startsWith('assets/') && !haxe.io.Path.isAbsolute(defaultDirectory)) defaultDirectory = 'assets/$defaultDirectory';
+
+		var mergedList:Array<String> = [];
+		var paths:Array<String> = directoriesWithFile(defaultDirectory, path);
+
+		var defaultPath:String = defaultDirectory + path;
+		if(paths.contains(defaultPath))
+		{
+			paths.remove(defaultPath);
+			paths.insert(0, defaultPath);
+		}
+
+		for (file in paths)
+		{
+			var list:Array<String> = CoolUtil.coolTextFile(file);
+			for (value in list)
+				if((allowDuplicates || !mergedList.contains(value)) && value.length > 0)
+					mergedList.push(value);
+		}
+		return mergedList;
+	}
+
+	inline public static function directoriesWithFile(path:String, fileToFind:String, mods:Bool = true)
+	{
+		var foldersToCheck:Array<String> = [];
+		#if sys
+		if(FileSystem.exists(path + fileToFind))
+		#end
+			foldersToCheck.push(path + fileToFind);
+
+		#if MODS_ALLOWED
+		if(mods)
+		{
+			// Global mods first
+			for(mod in Mods.getGlobalMods())
+			{
+				var folder:String = Paths.mods(mod + '/' + fileToFind);
+				if(FileSystem.exists(folder)) foldersToCheck.push(folder);
+			}
+
+			// Then "PsychEngine/mods/" main folder
+			var folder:String = Paths.mods(fileToFind);
+			if(FileSystem.exists(folder)) foldersToCheck.push(Paths.mods(fileToFind));
+
+			// And lastly, the loaded mod's folder
+			if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+			{
+				var folder:String = Paths.mods(Mods.currentModDirectory + '/' + fileToFind);
+				if(FileSystem.exists(folder)) foldersToCheck.push(folder);
+			}
+		}
+		#end
+		return foldersToCheck;
+	}
+
+	public static function getPack(?folder:String = null):Dynamic
+	{
+		#if MODS_ALLOWED
+		if(folder == null) folder = Mods.currentModDirectory;
+
+		var path = Paths.mods(folder + '/pack.json');
+		if(FileSystem.exists(path)) {
+			try {
+				#if sys
+				var rawJson:String = File.getContent(path);
+				#else
+				var rawJson:String = Assets.getText(path);
+				#end
+				if(rawJson != null && rawJson.length > 0) return Json.parse(rawJson);
+			} catch(e:Dynamic) {
+				trace(e);
+			}
+		}
+		#end
+		return null;
+	}
+
+	public static var updatedOnState:Bool = false;
+
+	// modsList.txt 在安卓上写到外部存储（/sdcard/meteoric），桌面保持原样
+	public static inline function modsListPath():String
+	{
+		#if android
+		return backend.AndroidStorage.root() + '/modsList.txt';
+		#else
+		return 'modsList.txt';
+		#end
+	}
+
+	inline public static function parseList():ModsList {
+		if(!updatedOnState) updateModList();
+		var list:ModsList = {enabled: [], disabled: [], all: []};
+
+		#if MODS_ALLOWED
+		try {
+			for (mod in CoolUtil.coolTextFile(modsListPath()))
+			{
+				//trace('Mod: $mod');
+				if(mod.trim().length < 1) continue;
+
+				var dat = mod.split("|");
+				list.all.push(dat[0]);
+				if (dat[1] == "1")
+					list.enabled.push(dat[0]);
+				else
+					list.disabled.push(dat[0]);
+			}
+		} catch(e) {
+			trace(e);
+		}
+		#end
+		return list;
+	}
+	
+	private static function updateModList()
+	{
+		#if MODS_ALLOWED
+		// Find all that are already ordered
+		var list:Array<Array<Dynamic>> = [];
+		var added:Array<String> = [];
+		try {
+			for (mod in CoolUtil.coolTextFile(modsListPath()))
+			{
+				var dat:Array<String> = mod.split("|");
+				var folder:String = dat[0];
+				if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) && !added.contains(folder))
+				{
+					added.push(folder);
+					list.push([folder, (dat[1] == "1")]);
+				}
+			}
+		} catch(e) {
+			trace(e);
+		}
+		
+		// Scan for folders that aren't on modsList.txt yet
+		for (folder in getModDirectories())
+		{
+			if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) &&
+			!ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
+			{
+				added.push(folder);
+				// 新发现的 mod 文件夹默认【关闭】：
+				// 若默认启用，装进来的半成品/缺资源 mod 会立刻被加载，
+				// 在 TitleState/PlayState 因缺失贴图（如 spritemap）崩溃，
+				// 也会把 loadTopMod 的 currentModDirectory 顶到新 mod 上（"上一个模组失效"）。
+				list.push([folder, false]);
+			}
+		}
+
+		// Now save file
+		var fileStr:String = '';
+		for (values in list)
+		{
+			if(fileStr.length > 0) fileStr += '\n';
+			fileStr += values[0] + '|' + (values[1] ? '1' : '0');
+		}
+
+		try {
+			File.saveContent(modsListPath(), fileStr);
+		} catch(e:Dynamic) {
+			trace('Could not save modsList.txt: $e');
+		}
+		updatedOnState = true;
+		//trace('Saved modsList.txt');
+		#end
+	}
+
+	public static function loadTopMod()
+	{
+		Mods.currentModDirectory = '';
+		
+		#if MODS_ALLOWED
+		var list:Array<String> = Mods.parseList().enabled;
+		if(list != null && list[0] != null)
+			Mods.currentModDirectory = list[0];
+		#end
+	}
+}

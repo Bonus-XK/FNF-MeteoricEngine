@@ -1,0 +1,43 @@
+### FNF-Specific
+# File used for the NG API. Should not be shared with others.
+APIStuff.hx
+art/build_x32-officialrelease.bat
+art/build_x64-officialrelease.bat
+art/test_x64-debug-officialrelease.bat
+
+### VS Code
+export/*
+.vscode/*
+.haxelib/
+*.code-workspace
+# Local history which shouldn't be shared.
+.history
+.ionide
+# ! means a file should be added regardless of it it gets ignored prior.
+# Including to allow others to use already set-up configuration tweaked for the project.
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+### Meteoric Engine —— 构建期本地快照 / 用户数据（禁止入库）
+# compile-mac.sh / compile-windows.sh 在构建前会把用户 mods、容器目录快照到 tools/ 下，
+# 构建后还原。这些是**本机用户数据**（实测 user_mods_prev 达 15G），绝不能上传。
+tools/user_mods_prev/
+tools/user_containers_prev/
+tools/user_mods/
+tools/scriptcheck/
+# 构建中间产物与崩溃转储
+crash/
+*.log
+run.log
+# 本地设置/模式文件（运行时生成在可执行文件旁）
+meteoric_dpi_mode.txt
+
+### 系统/编辑器垃圾文件
+.DS_Store
+*.glassbak
+*~
+*.swp
+### 备份文件
+*.bak
