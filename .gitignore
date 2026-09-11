@@ -41,3 +41,4 @@ meteoric_dpi_mode.txt
 *.swp
 ### 备份文件
 *.bak
+*.hx.bak
