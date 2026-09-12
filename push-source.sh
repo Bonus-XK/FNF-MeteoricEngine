@@ -114,26 +114,40 @@ if [ -n "$BIG" ]; then
 fi
 
 # ---------- 4. 危险路径断言（.gitignore 失效时的最后一道闸） ----------
-# 只看**本次暂存变更**（新增/修改/删除），不看全部已跟踪文件——
-# 否则会把「早已在库里、本次并未改动」的历史遗留物误报成危险项。
+# 只看**本次变更**，且只看「新增(A)/修改(M)/重命名(R)/复制(C)」——
+# ① 不看全部已跟踪文件：否则会把「早已在库里、本次未改动」的历史遗留物误报成危险项；
+# ② **放行删除(D)**：清理已入库的垃圾文件正是靠删除，拦掉就永远清不掉
+#    （本脚本首次实跑时就误报过一次）。
 head1 "忽略规则断言（本次变更）"
-STAGED="$(git status --porcelain | awk '{print $1"  "$2}')"
+STAGED="$(git status --porcelain)"
+# 非删除动作（A/M/R/C/??）的条目
+STAGED_ADD="$(printf '%s\n' "$STAGED" | grep -E '^(A|M|R|C|\?\?)' || true)"
+# 删除动作的条目（放行，但单独提示）
+STAGED_DEL="$(printf '%s\n' "$STAGED" | grep -E '^(D| D)' || true)"
 BAD=0
-for pat in '^A  export/' '^A  tools/user_mods_prev/' '^A  tools/user_containers_prev/' \
-           '^A  tools/user_mods/' '^A  crash/' '.DS_Store$' '\.orig$' '\.bak$' '\.log$'; do
-  n=$(printf '%s\n' "$STAGED" | grep -c -E "$pat" 2>/dev/null || true)
+for pat in 'export/' 'tools/user_mods_prev/' 'tools/user_containers_prev/' \
+           'tools/user_mods/' 'crash/' '.DS_Store$' '\.orig$' '\.bak$' '\.log$'; do
+  n=$(printf '%s\n' "$STAGED_ADD" | grep -c -E "$pat" 2>/dev/null || true)
   n=${n:-0}
   if [ "$n" -gt 0 ]; then
-    say "  ✘ $pat  命中 $n 个（不应入库！）"
-    printf '%s\n' "$STAGED" | grep -E "$pat" | sed 's/^/      /'
+    say "  ✘ $pat  以「新增/修改」形式命中 $n 个（不应入库！）"
+    printf '%s\n' "$STAGED_ADD" | grep -E "$pat" | sed 's/^/      /'
     BAD=1
   fi
 done
-[ "$BAD" -eq 0 ] && say "  ✔ 本次变更未触碰 export/、用户数据快照、崩溃转储、编辑器垃圾"
+
+# 单独显示删除项（清理遗留文件属正常操作，不阻断）
+DEL_N=$(printf '%s\n' "$STAGED_DEL" | grep -c . 2>/dev/null || true)
+DEL_N=${DEL_N:-0}
+if [ "$DEL_N" -gt 0 ]; then
+  say "  • 本次含 $DEL_N 个删除（清理遗留文件，正常）："
+  printf '%s\n' "$STAGED_DEL" | sed 's/^/      /'
+fi
+[ "$BAD" -eq 0 ] && say "  ✔ 本次没有把 export/、用户数据快照、崩溃转储、编辑器垃圾**新增/修改**进库"
 
 if [ "$BAD" -eq 1 ]; then
   say ""
-  say "✘ 中止：有本应被忽略的文件出现在本次变更里，请检查 .gitignore。"
+  say "✘ 中止：有本应被忽略的文件以新增/修改形式进入本次变更，请检查 .gitignore。"
   exit 1
 fi
 

@@ -42,3 +42,6 @@ meteoric_dpi_mode.txt
 ### 备份文件
 *.bak
 *.hx.bak
+
+# 合并/编辑器备份文件（git mergetool 等产生）
+*.orig
