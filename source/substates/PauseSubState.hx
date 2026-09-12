@@ -186,7 +186,7 @@ class PauseSubState extends MusicBeatSubstate
 
 		var chartingText:FlxText = new FlxText(40, 20, 130, '编铺模式', 18);
 		chartingText.scrollFactor.set();
-		chartingText.setFormat(Paths.font('future.ttf'), 18, FlxColor.fromString('0xFFFFD9A0'), CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		chartingText.setFormat(Paths.font('future.ttf'), 18, DesignTokens.secondary, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		chartingText.borderSize = 2;
 		chartingText.antialiasing = ClientPrefs.data.antialiasing;
 		chartingText.visible = PlayState.chartingMode;
@@ -208,7 +208,7 @@ class PauseSubState extends MusicBeatSubstate
 		var levelDifficulty:FlxText = makeInfoText('游玩难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
 		var blueballedTxt:FlxText = makeInfoText('死亡次数：' + PlayState.deathCounter, INFO_Y_START + INFO_LINE_GAP * 2);
 
-		practiceText = makeInfoText('上帝模式已激活！', INFO_Y_START + INFO_LINE_GAP * 3, 0xFFFFD9A0);
+		practiceText = makeInfoText('上帝模式已激活！', INFO_Y_START + INFO_LINE_GAP * 3, DesignTokens.secondary);
 		practiceText.visible = PlayState.instance.practiceMode;
 		if(PlayState.instance.practiceMode) FlxTween.tween(practiceText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
@@ -268,7 +268,7 @@ class PauseSubState extends MusicBeatSubstate
 		updateStats();
 
 		// ---- 选中高亮条（跟随当前菜单项） ----
-		menuSelector = makePanel(PANEL_X + 16, MENU_Y - 3, PANEL_W - 32, 44, 12, 0x3AFFFFFF, null);
+		menuSelector = makePanel(PANEL_X + 16, MENU_Y - 3, PANEL_W - 32, 44, 12, DesignTokens.rowHighlight, null);
 		menuSelector.alpha = 0;
 		add(menuSelector);
 		FlxTween.tween(menuSelector, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
@@ -334,8 +334,12 @@ class PauseSubState extends MusicBeatSubstate
 		return txt;
 	}
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if(border != null)

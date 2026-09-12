@@ -33,9 +33,8 @@ typedef MouseBtn = {
 
 class OnlineMenuState extends MusicBeatState
 {
-	static final THEME:FlxColor = 0xFF8AD7FF;      // 联机主题色（主菜单联机项同款）
-	static final PANEL_FILL:FlxColor = 0xCC161622;  // 圆角磨砂面板底色
-	static final TEXT_GRAY:FlxColor = 0xFFA9A9B8;
+	// 主题色：原 static final THEME = 0xFF8AD7FF（static final 会冻结取值，随主题色切换失效），改为运行时读 DesignTokens.primary
+		static final TEXT_GRAY:FlxColor = 0xFFA9A9B8;
 	static final TEXT_LIGHT:FlxColor = 0xFFD7D7E0;
 
 	/** 由 PlayState / 断线检测写入：回到大厅时展示原因 */
@@ -145,7 +144,7 @@ class OnlineMenuState extends MusicBeatState
 		homeTitle = makeCenterText(0, 46, FlxG.width, '联机模式', 52, FlxColor.WHITE);
 		homeTitle.antialiasing = true;
 		add(homeTitle);
-		homeSub = makeCenterText(0, 118, FlxG.width, '局域网 1v1 实时对战 · 分数高者胜', 20, THEME);
+		homeSub = makeCenterText(0, 118, FlxG.width, '局域网 1v1 实时对战 · 分数高者胜', 20, DesignTokens.primary);
 		homeSub.antialiasing = true;
 		add(homeSub);
 
@@ -175,7 +174,7 @@ class OnlineMenuState extends MusicBeatState
 		ipInput.onEnter = doConnect;
 		add(ipInput);
 
-		connectBtnLabel = addMouseBtn('连 接', 770, 472, 132, 42, 22, doConnect, THEME);
+		connectBtnLabel = addMouseBtn('连 接', 770, 472, 132, 42, 22, doConnect, DesignTokens.primary);
 
 		ipLabel.visible = false;
 		ipInput.visible = false;
@@ -219,7 +218,7 @@ class OnlineMenuState extends MusicBeatState
 		panelPlayer = makePanel(60, 120, 390, 190);
 		add(panelPlayer);
 		playerListTitle = new FlxText(80, 136, 350, '玩家 (1/2)', 20);
-		playerListTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		playerListTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(playerListTitle);
 		playerRows = [];
 		for (i in 0...2)
@@ -234,7 +233,7 @@ class OnlineMenuState extends MusicBeatState
 		panelRoom = makePanel(60, 330, 390, 190);
 		add(panelRoom);
 		roomInfoTitle = new FlxText(80, 346, 350, '房间信息', 20);
-		roomInfoTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		roomInfoTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(roomInfoTitle);
 		roomInfoText = new FlxText(80, 386, 350, '', 20);
 		roomInfoText.setFormat(Paths.font('future.ttf'), 20, TEXT_LIGHT, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -244,7 +243,7 @@ class OnlineMenuState extends MusicBeatState
 		panelSong = makePanel(470, 120, 750, 400);
 		add(panelSong);
 		songCardTitle = new FlxText(490, 136, 640, '选曲', 20);
-		songCardTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		songCardTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(songCardTitle);
 		songHeader = new FlxText(490, 166, 640, '', 16);
 		songHeader.setFormat(Paths.font('future.ttf'), 16, TEXT_LIGHT, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -263,11 +262,11 @@ class OnlineMenuState extends MusicBeatState
 		add(songFooter);
 
 		// 难度切换 ◀ ▶ / 列表滚动 ▲ ▼ / 房主「发送选曲→开始对局」
-		diffLeftLabel = addMouseBtn('◀', 1140, 160, 36, 30, 18, changeDiffLeft, THEME);
-		diffRightLabel = addMouseBtn('▶', 1180, 160, 36, 30, 18, changeDiffRight, THEME);
-		scrollUpLabel = addMouseBtn('▲', 1140, 200, 36, 30, 18, scrollSong, THEME);
-		scrollDownLabel = addMouseBtn('▼', 1140, 234, 36, 30, 18, scrollSongDown, THEME);
-		hostSendLabel = addMouseBtn('发送选曲', 1000, 478, 200, 34, 20, hostConfirmAction, THEME);
+		diffLeftLabel = addMouseBtn('◀', 1140, 160, 36, 30, 18, changeDiffLeft, DesignTokens.primary);
+		diffRightLabel = addMouseBtn('▶', 1180, 160, 36, 30, 18, changeDiffRight, DesignTokens.primary);
+		scrollUpLabel = addMouseBtn('▲', 1140, 200, 36, 30, 18, scrollSong, DesignTokens.primary);
+		scrollDownLabel = addMouseBtn('▼', 1140, 234, 36, 30, 18, scrollSongDown, DesignTokens.primary);
+		hostSendLabel = addMouseBtn('发送选曲', 1000, 478, 200, 34, 20, hostConfirmAction, DesignTokens.primary);
 	}
 
 	function buildCommon():Void
@@ -294,7 +293,7 @@ class OnlineMenuState extends MusicBeatState
 	function makePanel(x:Float, y:Float, w:Float, h:Float):FlxSprite
 	{
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
-		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 20, 20, PANEL_FILL);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 20, 20, DesignTokens.panelFill);
 		spr.scrollFactor.set();
 		return spr;
 	}
@@ -420,7 +419,7 @@ class OnlineMenuState extends MusicBeatState
 		{
 			playerListTitle.text = '玩家 (' + (1 + lastPlayerCount) + '/2)';
 			playerRows[0].text = '★ 房主  ' + Multiplayer.myNick;
-			playerRows[0].color = THEME;
+			playerRows[0].color = DesignTokens.primary;
 			if (lastPlayerCount > 0)
 			{
 				playerRows[1].text = '玩家  ' + Multiplayer.oppNick;
@@ -436,7 +435,7 @@ class OnlineMenuState extends MusicBeatState
 		{
 			playerListTitle.text = '玩家 (2/2)';
 			playerRows[0].text = '★ 房主  ' + Multiplayer.oppNick;
-			playerRows[0].color = THEME;
+			playerRows[0].color = DesignTokens.primary;
 			playerRows[1].text = '玩家  ' + Multiplayer.myNick;
 			playerRows[1].color = 0xFFFFA0A0;
 		}
@@ -515,7 +514,7 @@ class OnlineMenuState extends MusicBeatState
 			{
 				var hov:Bool = inRect(mx, my, 340, 200 + i * 72, 420, 62);
 				if (hov)
-					homeTexts[i].color = THEME;
+					homeTexts[i].color = DesignTokens.primary;
 				else
 					homeTexts[i].color = (i == homeSelected) ? FlxColor.WHITE : TEXT_GRAY;
 				if (hov && FlxG.mouse.justPressed)
@@ -536,7 +535,7 @@ class OnlineMenuState extends MusicBeatState
 				if (i >= rooms.length) continue;
 				var hov:Bool = inRect(mx, my, 290, 196 + i * 50, 700, 44);
 				if (hov && !rooms[i].full)
-					discoverRows[i].color = THEME;
+					discoverRows[i].color = DesignTokens.primary;
 				else
 					discoverRows[i].color = rooms[i].full ? TEXT_GRAY : FlxColor.WHITE;
 				if (hov && FlxG.mouse.justPressed)

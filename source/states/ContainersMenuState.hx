@@ -67,10 +67,11 @@ class ContainersMenuState extends MusicBeatState
 	static final TEXT_PRIMARY:Int = 0xFFD7D7E0;
 	static final TEXT_MUTED:Int = 0xFFCFCFDC;
 	static final TEXT_DIM:Int = 0xFF9A9AA8;
-	static final ACCENT:Int = 0xFFFFD9A0;
-	static final ACCENT_CYAN:Int = 0xFF33E0FF;
-	static final DANGER:Int = 0xFFFF6B6B;
-	static final ROW_SEL:Int = 0x3AFFFFFF;
+	static final DANGER:Int = 0xFFFF6B6B; // 语义色（失败/不支持），**不参与主题化**
+	// 强调色不再用 static final 固化：曾写 ACCENT = 0xFFFFD9A0（暖金，恰等于令牌 secondary）
+	// 与 ACCENT_CYAN = 0xFF33E0FF（定义了却从未使用）。static final 会在类加载时冻结取值，
+	// 主题切换后不跟随 —— 一律在**使用点**运行时读 DesignTokens.secondary。
+	inline static function ACCENT():Int return DesignTokens.secondary;
 
 	var wheelScroll:WheelScroll = new WheelScroll();
 
@@ -158,7 +159,7 @@ class ContainersMenuState extends MusicBeatState
 		{
 			var bar:FlxSprite = new FlxSprite(LIST_X - 14, LIST_Y + i * ROW_GAP - 6)
 				.makeGraphic(Std.int(PANEL_L_W - 56), Std.int(ROW_GAP - 8), FlxColor.TRANSPARENT, true);
-			FlxSpriteUtil.drawRoundRect(bar, 0, 0, PANEL_L_W - 56, ROW_GAP - 8, 10, 10, ROW_SEL);
+			FlxSpriteUtil.drawRoundRect(bar, 0, 0, PANEL_L_W - 56, ROW_GAP - 8, 10, 10, DesignTokens.rowHighlight);
 			bar.scrollFactor.set();
 			bar.visible = false;
 			add(bar);
@@ -184,7 +185,7 @@ class ContainersMenuState extends MusicBeatState
 		var dx:Float = PANEL_R_X + 32;
 		var dw:Int = Std.int(PANEL_R_W - 64);
 
-		detName = makeDetail(dx, 158, dw, '', 21, ACCENT);
+		detName = makeDetail(dx, 158, dw, '', 21, ACCENT());
 		detMeta = makeDetail(dx, 194, dw, '', 16, TEXT_MUTED);
 		detDesc = makeDetail(dx, 232, dw, '', 16, TEXT_MUTED);
 		detPath = makeDetail(dx, 424, dw, '', 13, TEXT_DIM);
@@ -202,7 +203,7 @@ class ContainersMenuState extends MusicBeatState
 		add(switchBtn);
 		add(rescanBtn);
 		add(folderBtn);
-		toggleBtn.spr.color = 0xFFCFE8FF; // 开关按钮轻微着色以示“可点击状态项”
+		toggleBtn.spr.color = ACCENT(); // 开关按钮着色（主题强调色）：示意“可点击状态项”
 		updateToggleLabel();
 
 		// 状态行挪到操作条上方：底部右侧位置已被第 4 个按钮占用
@@ -311,7 +312,7 @@ class ContainersMenuState extends MusicBeatState
 			var mark:String = ready ? '' : '⚠ ';
 			var engineTxt:String = (info.engine != null && info.engine.length > 0) ? ('  ·  ' + info.engine) : '';
 			t.text = mark + (idx + 1) + '. ' + info.displayName + engineTxt;
-			t.color = ready ? (idx == curSelected ? ACCENT : TEXT_MUTED) : DANGER;
+			t.color = ready ? (idx == curSelected ? ACCENT() : TEXT_MUTED) : DANGER;
 			bar.visible = (idx == curSelected);
 		}
 
@@ -569,7 +570,7 @@ class ContainersMenuState extends MusicBeatState
 	{
 		var on:Bool = ClientPrefs.data.containersEnabled;
 		toggleBtn.label.text = on ? '容器功能：已启用' : '容器功能：已关闭';
-		toggleBtn.label.color = on ? 0xFFFFD9A0 : 0xFF9A9AA8;
+		toggleBtn.label.color = on ? ACCENT() : TEXT_DIM;
 	}
 
 	/**
@@ -692,8 +693,12 @@ class ContainersMenuState extends MusicBeatState
 
 	// ───────────────────────── 面板绘制 ─────────────────────────
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)

@@ -68,6 +68,9 @@ class SaveVariables {
 	@:keep public var closeAnimSpeed:Float = 1.0;
 	// 【帧数上限已移除】framerate 偏好已删除：桌面端由 Main 配置 1000（无实际限制），移动端保持 120。
 	@:keep public var camZooms:Bool = true;
+	// 镜头缓动时长档位：'fast' / 'normal' / 'smooth'（设置页显示中文名，存储值为英文，与 closeAnimStyle 同款）
+	// 语义 = 换段/事件后镜头滑到新位置所需时间（到达 95% 的墙钟秒数），见 PlayState.CAM_SMOOTH_SECONDS_TO_95
+	@:keep public var camSmooth:String = 'normal';
 	// 界面节拍跳动：主菜单/故事模式/自由游玩等播放背景音乐的界面随节拍轻微缩放（整屏跳动）
 	@:keep public var menuBeatBump:Bool = true;
 	@:keep public var hideHud:Bool = false;
@@ -139,7 +142,14 @@ class SaveVariables {
 	@:keep public var noHitFuncs:Bool = false;          // 关闭 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调
 	@:keep public var iconFlyOverflow:Bool = false;     // 血条溢出图标飞出（JS 引擎同款：>100% 时图标沿填充方向滑出条外，不封顶）
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
+	// Lua 0.6.3 兼容：Psych 0.6.3 的脚本停止哨兵是数字（Function_Continue=0 / Function_Stop=1 /
+	// Function_StopLua=2），0.7.x 起改为字符串哨兵。开启后 dispatch 会数字<->字符串双向归一化，
+	// 使 0.6.3 老模组里 `return Function_StopLua` 之类的写法重新生效。默认关闭。
+	@:keep public var luaUse063Compat:Bool = false;
 	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
+	// 主题色（Meteoric 主题色功能）：固定 10 色色板的索引，0=青（默认）。
+	// 令牌派生见 backend/DesignTokens.hx；越界索引在 applyTheme 内夹取回 0，不会崩。
+	@:keep public var themeIndex:Int = 0;
 	public var gameplaySettings:Map<String, Dynamic> = [
 		'scrollspeed' => 1.0,
 		'scrolltype' => 'multiplicative', 
@@ -208,6 +218,23 @@ class ClientPrefs {
 	public static var defaultData:SaveVariables = null;
 	// 记录用户真实的 hideHud 设置，防止 Mod 脚本临时修改后污染后续对局
 	public static var savedHideHud:Bool = false;
+
+	/**
+	 * 镜头缓动档位：存储值 → **每秒增益率**（原引擎写死的强度是 2.4）。
+	 *
+	 * 强度的含义：每经过 1 秒真实时间，镜头吃掉剩余距离的比例
+	 * （经 `PlayState` 里 `/ (FlxG.updateFramerate / 60)` 折算成 60fps 等效帧率后施加）。
+	 * 各档的「95% 到位时间」由强度解析给出（T = ln(0.05) / ln(1 - SEC/60) / 60）：
+	 *   9.2  → 0.30s ｜ 5.7 → 0.50s ｜ 3.63 → 0.80s ｜ 2.4 → 1.22s（原引擎默认，已被取代）
+	 *
+	 * **唯一事实来源**：`EffectsSubState`（档位列表）与 `PlayState.cameraSmoothSpeed()`（实际生效）
+	 * 都从这里取值，禁止在任一处硬编码档位名或强度，否则设置页与实机行为会脱节。
+	 */
+	public static var camSmoothPresets:Map<String, Float> = [
+		'fast' => 9.2,     // 0.30s 到 95%
+		'normal' => 5.7,   // 0.50s 到 95%
+		'smooth' => 3.63   // 0.80s 到 95%
+	];
 
 	//Every key has two binds, add your key bind down here and then add your control on options/ControlsSubState.hx and Controls.hx
 	public static var keyBinds:Map<String, Array<FlxKey>> = [
@@ -561,6 +588,11 @@ class ClientPrefs {
 		if (data.noteJudgment == '新版' || data.noteJudgment == '旧判定')
 			data.noteJudgment = (data.noteJudgment == '新版') ? 'KE 判定' : 'PE 判定';
 
+		// 过场动画样式旧值迁移：'淡入淡出' -> '星辉'
+		// （旧版只有「移动 / 淡入淡出」两项；新版扩为「移动 / 陨星 / 星辉 / 分段」，
+		//   '淡入淡出' 对应的就是新的星辉样式。不迁移会命中 switch 的 default → 被静默改成「移动」）
+		if (data.CustomFade == '淡入淡出') data.CustomFade = '星辉';
+
 		// 帧率档位旧值迁移（2026-09-11 事故的临时处置）已**撤销**：
 		// 当时非 macOS 上没有「无上限」档位，于是把存档里遗留的 '无上限' 收回 '120'。
 		// 现在 Windows 重新提供该档位，能否真跑到 100000 改由启动自检
@@ -666,6 +698,9 @@ class ClientPrefs {
 			}
 			reloadVolumeKeys();
 		}
+
+		// 主题色：存档数据就绪后应用一次（旧存档无 themeIndex 字段 → 保留默认 0=青）
+		DesignTokens.initFromPrefs();
 	}
 
 	inline public static function getGameplaySetting(name:String, defaultValue:Dynamic = null, ?customDefaultValue:Bool = false):Dynamic {

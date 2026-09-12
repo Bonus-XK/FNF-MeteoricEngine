@@ -55,8 +55,8 @@ class OutdatedState extends MusicBeatState
 		content.add(makeText(px, py + 268, PANEL_W, "请尽快升级到最新的 ME 引擎！", 28, 0xFFFF9A9A));
 
 		// 文字链接（整行可点击，悬停高亮）
-		addLink(px, py + 360, PANEL_W, "> 前往 Github 下载更新", 0xFF9CE8FF);
-		addLink(px, py + 452, PANEL_W, "> 忽略更新", 0xFFFFD9A0);
+		addLink(px, py + 360, PANEL_W, "> 前往 Github 下载更新", DesignTokens.primary);
+		addLink(px, py + 452, PANEL_W, "> 忽略更新", DesignTokens.secondary);
 
 		content.add(makeText(px, py + PANEL_H - 40, PANEL_W, "Enter 前往下载 · Esc 忽略", 22, 0xFF6A7585));
 
@@ -146,7 +146,7 @@ class OutdatedState extends MusicBeatState
 	{
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		spr.antialiasing = true;
-		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, 0xCC161622, {color: 0x45FFFFFF, thickness: 1.5});
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, DesignTokens.panelFill, {color: DesignTokens.panelOutline, thickness: 1.5});
 		FlxSpriteUtil.drawRoundRect(spr, 14, 12, w - 28, 10, 5, 5, 0x1EFFFFFF);
 		return spr;
 	}

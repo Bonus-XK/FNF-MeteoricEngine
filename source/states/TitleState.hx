@@ -55,7 +55,9 @@ class TitleState extends MusicBeatState
 	var textGroup:FlxGroup;
 	var ngSpr:FlxSprite;
 	
-	var titleTextColors:Array<FlxColor> = [0xFF33FFFF, 0xFF3333CC];
+	// titleText 的呼吸色不再用固定色对：两端都取**当前主题色**（亮 ↔ 暗），
+	// 见 update() 里的 themeDark(DesignTokens.primary)。原来的 [0xFF33FFFF, 0xFF3333CC]
+	// 会在非青色主题下脉动出"另一种蓝"，与主题色打架。
 	var titleTextAlphas:Array<Float> = [1, .64];
 
 	var curWacky:Array<String> = [];
@@ -466,7 +468,7 @@ class TitleState extends MusicBeatState
 				
 				timer = FlxEase.quadInOut(timer);
 				
-				titleText.color = FlxColor.interpolate(titleTextColors[0], titleTextColors[1], timer);
+				titleText.color = FlxColor.interpolate(DesignTokens.primary, themeDark(DesignTokens.primary), timer);
 				titleText.alpha = FlxMath.lerp(titleTextAlphas[0], titleTextAlphas[1], timer);
 			}
 			
@@ -558,7 +560,18 @@ class TitleState extends MusicBeatState
 		super.update(elapsed);
 	}
 
-	// 开屏文字：逐行淡入上滑（大字标题用青色高亮，普通文字白色，信息行灰色）
+	/**
+	 * 由当前主题色派生"暗端"：向黑插值 55%（α 保留主色原值）。
+	 * 用于 titleText 的呼吸脉动（亮主题色 ↔ 暗主题色），替代原先写死的深蓝 0xFF3333CC。
+	 */
+	function themeDark(primary:FlxColor):FlxColor
+	{
+		var mixed:Null<FlxColor> = FlxColor.interpolate(primary, (FlxColor.BLACK : FlxColor), 0.55);
+		var c:FlxColor = (mixed == null) ? primary : mixed;
+		return (c & 0x00FFFFFF) | (primary & 0xFF000000); // 保留主色 α，只改 RGB
+	}
+
+	// 开屏文字：逐行淡入上滑（大字标题用主题色高亮，普通文字白色，信息行灰色）
 	function createCoolText(textArray:Array<String>, ?offset:Float = 0, ?size:Int = 30, ?color:Int = 0xFFFFFFFF)
 	{
 		for (i in 0...textArray.length)
@@ -632,7 +645,7 @@ class TitleState extends MusicBeatState
 					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
 					FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
-					createCoolText(['Meteoric Engine'], 40, 64, 0xFF33FFFF);
+					createCoolText(['Meteoric Engine'], 40, 64, DesignTokens.primary);
 				case 3:
 					addMoreText('by Real-bonuX', 40, 26, 0xFFFFFFFF);
 				case 4:
@@ -652,13 +665,14 @@ class TitleState extends MusicBeatState
 				case 10:
 					createCoolText([curWacky[0]], 60, 34, 0xFFFFFFFF);
 				case 12:
-					addMoreText(curWacky[1], 60, 34, 0xFF33FFFF);
+					// 蓝色系文字统一跟随主题色（运行时读取，禁止 static final 冻结取值）
+					addMoreText(curWacky[1], 60, 34, DesignTokens.primary);
 				case 13:
 					deleteCoolText();
 				case 14:
 					createCoolText(['Friday'], 60, 44, 0xFFFFFFFF);
 				case 15:
-					addMoreText('Night', 60, 44, 0xFF33FFFF);
+					addMoreText('Night', 60, 44, DesignTokens.primary);
 				case 16:
 					addMoreText("Funkin'", 60, 44, 0xFFFFFFFF);
 				case 17:

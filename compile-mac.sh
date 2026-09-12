@@ -95,6 +95,52 @@ if [ -n "$DEBUG_FLAGS" ]; then
   echo "[compile] 调试构建：启用 meteoric_debug 诊断输出"
 fi
 
+# ---- 类型检查模式：./compile-mac.sh typecheck ----
+# 只做 Haxe 类型检查，**绝不改动 app**：
+# `haxelib run lime build macos --no-output` 这个名字很有欺骗性 —— 它**不阻止写出**，
+# 仍会把 `lime.ndll`（以及 Resources 等）覆盖成构建树里的版本（实测 2026-09-12：
+# app 内 ndll 从墙钟版 9233040 字节 / 96df302c… 被换成 stable 版 8660712 字节 / 01be7172…）。
+# 而桌面端 frameRate 哨兵是 100000，缺了墙钟补丁的 ndll 会让主线程 catch-up 循环死转
+# → 100% CPU 卡在加载界面（本文件 104 行起记录的事故）。
+# 因此本模式自己负责「先备份、检查完无条件还原 + 重新签名」，使类型检查成为**只读**操作。
+# 用法：./compile-mac.sh typecheck   （退出码 0 = 通过）
+if [ "$1" = "typecheck" ]; then
+  shift
+  APP_NDLL_TC="export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll"
+  TC_BAK=""
+  if [ -f "$APP_NDLL_TC" ]; then
+    TC_BAK="$(mktemp -t meteoric_ndll_bak)"
+    cp "$APP_NDLL_TC" "$TC_BAK"
+    echo "[typecheck] 已备份 app 内 lime.ndll ($(md5 -q "$APP_NDLL_TC"))"
+  fi
+  haxelib run lime build macos --no-output "$@"
+  TC_EXIT=$?
+  # ---- 无条件还原（无论检查成功与否）----
+  if [ -n "$TC_BAK" ] && [ -f "$TC_BAK" ]; then
+    # lime 返回后仍可能有异步收尾在覆盖，先等干净
+    for attempt in $(seq 1 12); do
+      if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|no-output)|hxcpp.*Build" >/dev/null 2>&1; then break; fi
+      sleep 2
+    done
+    cp "$TC_BAK" "$APP_NDLL_TC"
+    sleep 2
+    cp "$TC_BAK" "$APP_NDLL_TC"   # 二次覆盖，防收尾进程竞态
+    if cmp -s "$TC_BAK" "$APP_NDLL_TC"; then
+      codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+      echo "[typecheck] 已还原 app 内 lime.ndll + 重新签名 ($(md5 -q "$APP_NDLL_TC"))"
+    else
+      echo "[typecheck] ✘ 还原失败：app 内 ndll 与备份不一致，请直接跑 ./compile-mac.sh 重建"
+    fi
+    rm -f "$TC_BAK"
+  fi
+  if [ $TC_EXIT -ne 0 ]; then
+    echo "[typecheck] ✘ 类型检查未通过 (exit=$TC_EXIT)"
+  else
+    echo "[typecheck] ✔ 类型检查通过（app 未被改动）"
+  fi
+  exit $TC_EXIT
+fi
+
 if [ "$1" = "test" ]; then
   haxelib run lime test macos -release $PROFILE_DEFINE $DEBUG_FLAGS
 else

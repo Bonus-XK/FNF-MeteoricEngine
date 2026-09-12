@@ -4,6 +4,45 @@
 
 ## 未发布（UI 设计系统审查修复）
 
+- **镜头换段「瞬移」—— 缓动强度写死 2.4（2026-09-12 定位）**：
+  用户反馈换段时镜头像瞬移。上一轮曾试图重构相机（自管 scroll / 改 deadzone），已全部回退；
+  本轮改为**只动一个数**。
+
+  **根因（先纠正一个误判）**：`followLerp` 本身**没有问题**。原式
+  `elapsed * 2.4 * cameraSpeed * playbackRate / (FlxG.updateFramerate / 60)` 里，
+  哨兵 `updateFramerate = 100000` 在 flixel 的「写」与「用」两侧**完全约掉**：
+  `每帧增益 = followLerp * updateFramerate / 60 = elapsed * 2.4 / 60 = 4%（@60fps）`。
+  实测 60 / 120 / 480 / 1000 / 4000 fps 收敛时间一致（1.223 ~ 1.248s），**帧率无关**；
+  且 `followLerp` 恒在 1e-5~1e-7 量级，远低于 flixel 硬阈值 `60/updateFramerate = 0.0006`，
+  **从不触发**「无缓动」分支。
+  真正的问题是**时长**：1.22s 才走完 95%；配合「死区几乎整屏 → 镜头平时完全静止」的既有语义，
+  换段那一下在观感上就是瞬移。
+
+  **修复（1 个公式 + 1 张档位表，几何行为零改动）**：
+  ① `PlayState.cameraSmoothSpeed()`：强度改由设置档位提供，原写死的 `2.4` 降为兜底值；
+     调用点公式逐字未变，只把 `2.4` 换成该函数。
+  ② `ClientPrefs.camSmoothPresets`（唯一事实来源）：`fast=9.2` / `normal=5.7` / `smooth=3.63`
+     —— 由 `k = 1 - 0.05^(1/(60T))` 反解，对应 95% 到位 **0.30s / 0.50s / 0.80s**。
+  ③ `SaveVariables.camSmooth`（默认 `'normal'`）+ `EffectsSubState` 新增「镜头缓动」选项，
+     沿用 `closeAnimStyle` 的「英文存储值 + `displayOptions` 中文显示名」模式。
+  ④ `import.hx` 补 `flixel.math.FlxRect`（工程原本未导入，新代码用到即报 `Type not found : FlxRect`）。
+
+  **⚠ 分母改不得**：`/ (FlxG.updateFramerate / 60)` 必须保留哨兵。若图省事改成写死的 `60`，
+  60fps 下 `followLerp` 会升到 1e-3 量级、**越过 0.0006 阈值**，退回无缓动瞬移。
+
+  **验证（纯数值；帧率无关性由「哨兵在分子分母约掉」结构保证，无需实机采样）**：
+
+  | 档位 | SEC | 60fps 每帧增益 | 95%@60 | 95%@1000 | 95%@4000 | 标称 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | fast | 9.2 | 15.33% | 0.300s | 0.324s | 0.325s | 0.30s |
+  | normal | 5.7 | 9.50% | 0.500s | 0.524s | 0.525s | 0.50s |
+  | smooth | 3.63 | 6.05% | 0.800s | 0.824s | 0.825s | 0.80s |
+  | 原样 | 2.4 | 4.00% | 1.223s | 1.247s | 1.248s | 复现校准基准 ✔ |
+
+  **保留语义**：`cameraSpeed` 倍率（Tank 12 / PhillyStreets 1.5~2 / 舞台 `camera_speed`）、
+  `cameraSpeed = 0` 冻结、暂停与过场冻结、`snapToTarget()` 瞬切演出、稳态落点
+  （`camFollow - 半屏`）全部未动——因为死区、`_scrollTarget`、调用点几何一行未改。
+
 - **Windows 启动黑屏卡在加载界面 —— 桌面端 100000 帧率哨兵缺前提（2026-09-11 实测事故）**：
   用户在 Windows 上启动即黑屏、卡在 Intro 不前进（无崩溃转储 → 不是异常，是**不推进**）。
 

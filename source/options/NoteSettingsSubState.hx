@@ -50,6 +50,12 @@ class NoteSettingsSubState extends BaseOptionsMenu
 			'psych063Mode',
 			'bool');
 		addOption(option);
+
+		var option:Option = new Option('Lua 0.6.3 兼容',
+			'开启后，Lua 脚本的停止哨兵按 Psych 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个',
+			'luaUse063Compat',
+			'bool');
+		addOption(option);
 		
 		var noteSplashes:Array<String> = Mods.mergeAllTextsNamed('images/noteSplashes/list.txt', 'shared');
 		if(noteSplashes.length > 0)

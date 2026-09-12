@@ -400,10 +400,10 @@ class EditorDropdown extends FlxSpriteGroup
 		scroll = 0;
 		hoveredItem = -1;
 		redraw();
-		panelBg = new FlxSprite(x, y + h).makeGraphic(Std.int(w), visibleRows * rowH + 8, 0xEE161622, true);
+		panelBg = new FlxSprite(x, y + h).makeGraphic(Std.int(w), visibleRows * rowH + 8, DesignTokens.panelFill, true);
 		panelBg.antialiasing = true;
 		panelBg.scrollFactor.set();
-		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, visibleRows * rowH + 8, 10, 10, 0xEE161622, {color: 0x55FFFFFF, thickness: 1.5});
+		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, visibleRows * rowH + 8, 10, 10, DesignTokens.panelFill, {color: 0x55FFFFFF, thickness: 1.5});
 		layer.add(panelBg);
 		rebuildItems();
 	}

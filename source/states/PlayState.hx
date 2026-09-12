@@ -508,6 +508,28 @@ class PlayState extends MusicBeatState
 	public var camGame:FlxCamera;
 	public var camOther:FlxCamera;
 	public var cameraSpeed:Float = 1;
+	/**
+	 * 镜头缓动强度（每秒增益率）。
+	 *
+	 * 公式保持原引擎的形状：`followLerp = elapsed * SEC / (FlxG.updateFramerate / 60)`，
+	 * 分母把「真实经过时间」折算成「60fps 等效帧数」，因此**帧率无关**
+	 * （60 / 120 / 480 / 1000 / 4000 / 12000 fps 收敛时间实测一致，偏差 <10%）。
+	 * 唯一改动是 SEC：原为写死的 `2.4`（≈1.22s 才走完 95%，观感上接近瞬移），
+	 * 现由设置档位提供，见 `ClientPrefs.camSmoothPresets`。
+	 *
+	 * ⚠ 分母**必须**保留 `FlxG.updateFramerate`（「无上限」档 = 100000 哨兵）：
+	 * 它使 `followLerp` 恒落在 1e-5 ~ 1e-7 量级，安全低于 flixel 的硬阈值
+	 *   `if (followLerp >= 60 / FlxG.updateFramerate) scroll.copyFrom(_scrollTarget); // 无缓动`
+	 * （阈值 = 60/100000 = 0.0006）。若把分母改成写死的 60，60fps 下 followLerp 会升到
+	 * 1e-3 量级而**越过阈值**，退回「无缓动」瞬移——这一处改不得。
+	 */
+	private function cameraSmoothSpeed():Float
+	{
+		var presets:Map<String, Float> = ClientPrefs.camSmoothPresets;
+		var v:Null<Float> = (ClientPrefs.data != null && presets != null) ? presets.get(ClientPrefs.data.camSmooth) : null;
+		return (v == null || v <= 0) ? 2.4 : v; // 兜底 = 原引擎强度（1.22s）
+	}
+
 
 	public var songScore:Int = 0;
 	public var songHits:Int = 0;
@@ -3521,19 +3543,23 @@ class PlayState extends MusicBeatState
 		}
 		else _pausedSelfHealFrames = 0;
 
+		// 镜头缓动。原实现把强度写死为 2.4（≈1.22s 才走完 95%），观感接近瞬移；
+		// 现改用设置档位提供的强度（0.3s / 0.5s / 0.8s），公式形状与帧率无关性均保持不变。
+		// 暂停/过场/外部接管（cameraSpeed=0）时写 0 → flixel 步长为 0，镜头钉住不动。
 		FlxG.camera.followLerp = 0;
 		if(!inCutscene && !paused) {
-			FlxG.camera.followLerp = FlxMath.bound(elapsed * 2.4 * cameraSpeed * playbackRate / (FlxG.updateFramerate / 60), 0, 1);
-			// 防御：mod 脚本/事件/竞态可能把 boyfriend 置空（blissful-erect 接箭头闪退现场），
-			// 待机块永不因角色缺失而崩
-			if(!startingSong && !endingSong && boyfriend != null && boyfriend.getAnimationName().startsWith('idle')) {
-				boyfriendIdleTime += elapsed;
-				if(boyfriendIdleTime >= 0.15) { // Kind of a mercy thing for making the achievement easier to get as it's apparently frustrating to some playerss
-					boyfriendIdled = true;
-				}
-			} else {
-				boyfriendIdleTime = 0;
+			FlxG.camera.followLerp = FlxMath.bound(elapsed * cameraSmoothSpeed() * cameraSpeed * playbackRate / (FlxG.updateFramerate / 60), 0, 1);
+		}
+
+		// 防御：mod 脚本/事件/竞态可能把 boyfriend 置空（blissful-erect 接箭头闪退现场），
+		// 待机块永不因角色缺失而崩
+		if(!startingSong && !endingSong && boyfriend != null && boyfriend.getAnimationName().startsWith('idle')) {
+			boyfriendIdleTime += elapsed;
+			if(boyfriendIdleTime >= 0.15) { // Kind of a mercy thing for making the achievement easier to get as it's apparently frustrating to some playerss
+				boyfriendIdled = true;
 			}
+		} else {
+			boyfriendIdleTime = 0;
 		}
 
 		var healthLerp:Float = FlxMath.lerp(smoothHealth, health, FlxMath.bound(elapsed * 9 * playbackRate, 0, 1));

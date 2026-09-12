@@ -32,7 +32,23 @@ description: Meteoric Engine（Psych 0.7.1h 基座）UI 设计总纲：手绘域
 
 ## 设计令牌（MD3 Tokens）
 
-固定色板（无壁纸动态取色）。新代码**禁止**随意写十六进制色值，必须引用下表（可先在 `backend` 建 `DesignTokens.hx` 统一放常量，或沿用现有字面量但保持同值）。
+固定色板（无壁纸动态取色）。新代码**禁止**随意写十六进制色值，必须引用下表。
+
+> **已落地（主题色功能）**：`source/backend/DesignTokens.hx` 是**唯一色彩来源**，已实现「固定 10 色 + 设置内用户可选主题色」。
+> 下表 `primary` / `secondary` / `tertiary` 的 ARGB 是**默认主题（青，themeIndex 0）**的取值；
+> 运行时会随玩家色板切换，因此：
+> - 代码里写 `DesignTokens.primary`（**运行时读取**），**禁止**写 `static final THEME = DesignTokens.primary`
+>   —— `static final` 在类初始化时取一次值就冻结，主题切换后不会更新（本功能实现时已修掉
+>   `OnlineMenuState` / `CharacterSelectState` 的这类写法）。
+> - 令牌必须在界面 **`create()` 内**读取；已创建界面不会自动重绘，切换主题后下次进入生效。
+> - 判定色（MARVELOUS/SICK/GOOD…）、成功/失败语义色（`0xFF7BFF9E` / `0xFFFF6B6B`）、
+>   音符与 KE 图颜色属**内容色例外**，永不参与主题化。
+> - 组件若要「主题色一变就跟着刷新」（例如色块选择器的选中环），用
+>   `DesignTokens.addThemeListener(fn)` 注册，并在 `destroy()` 里 `removeThemeListener(fn)` 摘除
+>   ——监听表是**静态**的，不摘会留下对已销毁精灵的僵尸回调。**禁止**在 `update()` 里轮询 `themeIndex`。
+> - 横向定位别凭感觉：`BaseOptionsMenu.swatchRowStartX()` 曾把"减单个色块直径"当成"居中整行"，
+>   整行右移 (10−1)×58/2 = 261px 冲进右面板。凡是"整行/整块居中"，减的必须是**整行总宽**，
+>   并代进常量算一遍——代码里看不出这种错。
 
 ### 色彩
 
@@ -91,6 +107,79 @@ description: Meteoric Engine（Psych 0.7.1h 基座）UI 设计总纲：手绘域
 - **不适用**：真实高斯模糊、大阴影贴图（移动端性能红线）。
 - 层级表达：半透明填充（`surfaceDim`）+ 1.5px 描边（`outline`）+ 面板间 14px 间距 + 遮罩（`scrim`）。
 - 弹层（SubState）必须压暗背景：整屏 `menuDesat` 或 0.6 黑遮罩，**禁止**无遮罩直接叠面板。
+
+## 面板与高亮令牌（磨砂玻璃，主题色随动）
+
+系统域的「双圆角磨砂玻璃面板」= `FlxSprite.makeGraphic(TRANSPARENT)` + `FlxSpriteUtil.drawRoundRect` × 2
+（填充 + 1.5px 描边），全库有 **21 份同名复制实现**（`BaseOptionsMenu` / `PauseSubState` / `ResultsSubState` /
+`ModsMenuState` / `OptionsState` / `ControlsSubState` / `FreeplayState` / 各编辑器页 …）。
+它们过去共用同一组字面量默认值，现已统一改为**引用令牌**。
+
+| 令牌 | 来源 | 用途 |
+| --- | --- | --- |
+| `DesignTokens.panelFill` | 派生：`0xFF161622` 混 **10% 当前 primary**，α 恒为 `0xCC` | 所有玻璃面板的填充底色 |
+| `DesignTokens.panelOutline` | 固定 `0x45FFFFFF`（白 27%） | 面板描边 |
+| `DesignTokens.rowHighlight` | 派生：primary @ **42%**（`0x6B……`） | 面板内**选中/激活**高亮（`selectorBar`、选中行） |
+| `DesignTokens.rowHover` | 派生：primary @ **30%**（`0x4C……`） | 面板内**悬浮**高亮（比选中更轻） |
+
+派生后各主题的 `panelFill` 实测值（α 均 `0xCC`，仅 RGB 吸收 10% 主题色）：
+
+| 主题 | primary | panelFill |
+| --- | --- | --- |
+| 青 | `0xFF9CE8FF` | `0xCC232B38` |
+| 蓝 | `0xFF7CB8FF` | `0xCC202638` |
+| 品红 | `0xFFF08CF0` | `0xCC2B2136` |
+| 橙 | `0xFFFFB27A` | `0xCC2D252A` |
+| 绿 | `0xFF8FE8A8` | `0xCC222B2F` |
+| 红 | `0xFFFF9A9A` | `0xCC2D232E` |
+
+### 硬性规则
+
+1. **面板一律用令牌，禁止再写字面量** `0xCC161622` / `0xEE161622` / `0xFF161622` 或
+   `0x3AFFFFFF` / `0x2EFFFFFF` 作为面板底色/高亮。
+2. **`makePanel` 的参数默认值必须是编译期常量** —— Haxe 拒绝 `?fill:Int = DesignTokens.panelFill`
+   （*Parameter default value should be constant*）。统一形态：
+   `?fill:Null<Int> = null, ?border:Null<Int> = null`，函数体首行解析：
+
+   ```haxe
+   if (fill == null) fill = DesignTokens.panelFill;
+   if (border == null) border = DesignTokens.panelOutline;
+   ```
+
+   顺带好处：取到的是**当前主题**的值，而非类加载时的静态快照。
+3. **嵌套在面板内的次级元素保留原半透明深色**（复选框底 `0x66161622`、进度条底、键帽、行内小块）——
+   它们的作用是"透出父面板"，换成不透明 `panelFill` 会丢掉玻璃层次。
+4. **不得用局部 `static final` 缓存面板色**：`static final PANEL_FILL = DesignTokens.panelFill`
+   会在类加载时冻结取值，主题切换后失效（本仓库已两次踩坑，见 `meteoric-system` 的硬性契约）。
+5. **脚本 API 的默认值保持中性**：`MenuScript.addBox` 的 `?color` 默认仍是 `0xCC161622`，
+   避免模组自绘 UI 随玩家主题设置漂移；脚本想跟随主题时**显式**取
+   `getThemePanelFill()` / `getThemeRowHighlight()`（Lua 三处 + HScript 均已提供）。
+
+### 特例：Gameplay HUD 的时间条（`backend/TimeBarColor.hx`）
+
+时间条是**唯一**跨越到手绘域/Gameplay 的主题色落点，取色统一走 `TimeBarColor.resolveFill(dad, modernStyle, useOpponent)`：
+
+| 条件 | 填充色 |
+| --- | --- |
+| 关闭「时间条颜色跟随对方」 | **主题色** `DesignTokens.primary` |
+| 开启 + 对手存在 + 颜色正常 | 对手 `healthColorArray` |
+| 开启 + 对手颜色过暗 | 新版 → 主题色；贴图样式 → `0xFF00FFFF`（保留 0.6.3 兼容观感） |
+| 开启 + 对手颜色过亮 | 仅贴图样式兜底青色 |
+
+**改前必读**：时间条历史上两条分支各写一套取色，导致新版样式硬编码跟随对手、开关失效（2026-09-11 实测 bug）。
+任何时间条配色改动**必须走这个单点**，不要在 `PlayState` 里新增分支；
+`HUDCustomizeState` 的预览也复用同一函数（避免预览与实机不一致）。
+
+### 不用令牌化的例外（改前必须确认，不要"顺手统一"）
+
+| 位置 | 理由 |
+| --- | --- |
+| 判定色（MARVELOUS/SICK/GOOD/BAD/SHIT/MISS）、KE 散点图 | 内容色，语义固定 |
+| 成功/失败/危险语义色（`0xFF7BFF9E` / `0xFFFF6B6B` / `0xFF8F8F`） | 语义色，与主题无关 |
+| `ControlsSubState` 的 `keyboardColor` / `gamepadColor` | 键鼠 vs 手柄的**功能性区分**色 |
+| `ModsMenuState.defaultColor = 0xFF665AFF` | Mods 界面品牌色 |
+| `MainMenuState` 的 `magenta` 线稿、`AchievementsMenuState` 的 `0xFF4A5C8C` | 手绘域涂鸦配色 / 成就界面专属品牌色 |
+| 编辑器页深灰底（`0xFF101010` / `0xFF222222`）、`ChartWidgets` 的 hover 档 | 非主题域的工具界面 |
 
 ## 动画决策框架（Adapted from Emil Kowalski + FNF 特化）
 
@@ -181,3 +270,35 @@ After: tween alpha 0.25
 - 文本组件：`source/objects/MenuText.hx`（`isMenuItem` 插值滚动）、`TypedAlphabet.hx`。
 - 输入组件：`source/objects/BackButton.hx`、`source/backend/WheelScroll.hx`、`source/objects/MobileControls.hx`。
 - 转场：`source/backend/CustomFadeTransition.hx`、`FlxTransitionableState.defaultTransIn/Out`。
+
+### 过场动画（CustomFadeTransition）契约
+
+转场既不属于纯手绘域也不属于系统域面板，属**转场例外**：可染主题色，
+但不引入 MD3 组件、不加圆角卡片。三种样式由 `ClientPrefs.data.CustomFade` 选择：
+
+| 样式键 | 观感 | 效果来源 |
+| --- | --- | --- |
+| `移动` | 左右横幅水平推拉（默认） | `loadingL/R` 素材 |
+| `陨星` | 流星斜落 → 撞击闪光 → 横幅推入 | **程序化**：拖尾渐变旋转 + 亮度头 + ADD 环形闪光 |
+| `星辉` | 径向光晕 + 星芒爆发 | **程序化**：6 层同心圆叠软边辉光 + 12 道渐变星芒 |
+
+改这个文件前必须知道的事实（全部是踩过的坑）：
+
+1. **`loadingAlpha.png` 不是光效素材**：它是不透明平面图（1925×1083、**alpha 剖面全 255**、
+   中心亮度 143 低于边缘 203）。拿它做"星辉"只能得到"贴图贴脸"。**光效一律程序化生成**：
+   径向辉光 = 多层同心圆（半径与 α 同时递减，外 2937px α0.90 → 核心 441px），
+   星芒 = 24×128「白→透明」渐变旋转多份叠加，`blend = BlendMode.ADD`。
+2. **手绘素材不可旋转 / 不可非等比拉伸**。`loadingL/R` 是**成对使用**的箭头横幅，
+   单张 `angle=-12°` + `scale.x×1.35` 会变成甩出窗口的畸形色块。斜向动感交给程序化光效。
+3. **主题色要"显式混色后染素材"**：`sprite.color = FlxColor.interpolate(WHITE, DesignTokens.primary, 0.45)`。
+   直接写 `primary` 是乘法着色，对高亮素材（平均亮度 229/212/172）几乎无效；
+   "整屏半透明覆盖层"α0.22 的色差只有个位数、肉眼不可辨 —— 两种都试过，这是唯一有效的。
+4. **收尾必须单点**：一律走 `finishOnce()`（`_finished` 闩锁），**禁止**挂到多个 tween 的 `onComplete`。
+5. **`close()` 可能是静默空操作**：它只在 `_parentState.subState == this` 时生效，而 `finishCallback()`
+   只是把新状态排队（真正交换在下一帧）→ 回调后必须**显式补一次 `close()`**，否则转场层残留。
+6. **特效编排用相位时间轴**（`steps[]` + `update()` 推进），不要堆 tween 队列：
+   多段动效（下落→撞击→推入）用 tween 的 `startDelay` 拼很容易错位且难调。
+7. **`FlxSprite.setData/getData` 在 flixel 5.2.2 不存在** —— 每实例元数据用并行数组存。
+
+其余 API 事实：`flixel 5.2.2` **没有** `FlxTween.timer`（延时用 `update()` 计时）、缓动只有
+`cubeIn/Out`（没有 `cubicIn/Out`）；`destroy()` 里必须 `removeThemeListener` + `cancel()` 所有在飞 tween。

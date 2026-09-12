@@ -66,7 +66,7 @@ class ModInstallUI extends MusicBeatSubstate
 
 		// ---- 中央圆角面板 ----
 		card = new FlxSprite(cx, cy).makeGraphic(CARD_W, CARD_H, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(card, 0, 0, CARD_W, CARD_H, 20, 20, 0xEE161622);
+		FlxSpriteUtil.drawRoundRect(card, 0, 0, CARD_W, CARD_H, 20, 20, DesignTokens.panelFill);
 		FlxSpriteUtil.drawRoundRect(card, 1, 1, CARD_W - 2, CARD_H - 2, 20, 20, FlxColor.TRANSPARENT, {color: 0x66FFFFFF, thickness: 1.5});
 		// 标题下方分隔线
 		FlxSpriteUtil.drawRect(card, 24, 116, CARD_W - 48, 1, 0x33FFFFFF);

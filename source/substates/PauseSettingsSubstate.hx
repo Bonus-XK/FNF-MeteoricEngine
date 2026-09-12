@@ -54,9 +54,14 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var scrollOffset:Int = 0;   // 可见行窗口顶部的分类索引
 	var wheelScroll:WheelScroll = new WheelScroll();
-	var mouseActive:Bool = true;
+	// 初始为 false：鼠标需真实移动超过死区、或发生点击，才被允许接管。
+	// 本页不做"悬停即选中"——悬停只用于判定点击落在哪一行，选中项只能由点击/键盘/滚轮改变。
+	var mouseActive:Bool = false;
 	var mouseLockX:Float = 0;
 	var mouseLockY:Float = 0;
+	// 上一次点击落在的行（scrollOffset 空间的绝对行号）。用于"点一次选中、再点一次打开"，
+	// 与鼠标是否悬停、选中项来自键盘还是鼠标都无关：-1 = 本次会话还没有过点击。
+	var lastClickedRow:Int = -1;
 	// 子页打开时隐藏本列表 UI（避免与子页双重显示）
 	var listUI:Array<FlxBasic> = [];
 	var listUIHidden:Bool = false;
@@ -79,6 +84,25 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 		var idx:Int = scrollOffset + r;
 		if (idx < 0 || idx >= rowsDef.length) return '';
 		return rowsDef[idx];
+	}
+
+	/** 点击落在列表某行：第一次点击只选中（**不打开**），第二次点击同一行才打开对应子页。
+	 *  判定依据是"上一次点击的行"，不是"当前悬停"也不是"选中项"：
+	 *  光标扫过列表、键盘刚移过选中项，都不会导致误开子页。 */
+	function handleRowClick():Void
+	{
+		var hoveredRow:Int = getHoveredRow();
+		if (hoveredRow < 0) return; // 点在列表外（面板空白处）：不改变选中项
+		var idx:Int = scrollOffset + hoveredRow;
+		if (idx != curSelected)
+			changeSelection(idx - curSelected, true);
+		if (idx != lastClickedRow)
+		{
+			lastClickedRow = idx;
+			return; // 第一次点击：仅选中
+		}
+		lastClickedRow = -1; // 子页打开前复位，返回后需要重新"点两次"
+		openSelectedSubstate();
 	}
 
 	function openSelectedSubstate()
@@ -129,8 +153,12 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	}
 
 	// 与暂停菜单同款圆角磨砂面板（makePanel 同实现）
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if(border != null)
@@ -172,7 +200,7 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 			rows.push(row);
 		}
 
-		selectorBar = makePanel(PANEL_X + 18, LIST_Y - 9, PANEL_W - 36, 42, 12, 0x2EFFFFFF, null);
+		selectorBar = makePanel(PANEL_X + 18, LIST_Y - 9, PANEL_W - 36, 42, 12, DesignTokens.rowHighlight, null);
 		add(selectorBar);
 
 		backBtn = new BackButton(FlxG.width - 72, 12);
@@ -308,49 +336,60 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 			accepted = true;
 		#end
 
-		// ---- 鼠标：桌面=悬停即选中+点击确认；手机=不做悬停选中（点击/按下不改变选择，
-		//      滚动只由滚轮通道驱动，避免"点击选项即高亮"导致拖动中断/卡住）----
-		if (FlxG.mouse.justPressed)
+		// ---- 键盘上下：与 PauseSubState / BaseOptionsMenu 一致 —— 键盘接管选中后**冻结鼠标跟随**，
+		//      并把锚点坐标更新到**当前**光标位置。
+		//      旧实现只在悬停分支里把 mouseActive 置 false、却不更新锚点，导致：
+		//      ① 下一帧悬停分支立刻把选中项抢回光标所在行（键盘/鼠标抢选中项）；
+		//      ② 锚点常为陈旧坐标，恒判定"已移动"，选中项被反复改写（卡选中）。----
+		if (upP)
+		{
+			mouseActive = false;
+			mouseLockX = FlxG.mouse.screenX;
+			mouseLockY = FlxG.mouse.screenY;
+			lastClickedRow = -1; // 键盘改过选中：下一次点击重新计为"第一次"（只选中，不打开）
+			changeSelection(-1);
+		}
+		if (downP)
+		{
+			mouseActive = false;
+			mouseLockX = FlxG.mouse.screenX;
+			mouseLockY = FlxG.mouse.screenY;
+			lastClickedRow = -1;
+			changeSelection(1);
+		}
+
+		// ---- 鼠标（桌面/手机同一套语义：**只有点击才改变选中项，悬停不选中**）----
+		//      点击落在某行：该行不是上一次点击的行 → 仅选中；就是上一次点击的行 → 打开对应子页。
+		//      由于判定依据是"上一次点击的行"而不是"选中项"，光标扫过列表、键盘刚移过选中项等
+		//      情况都不会误开任何子页。
+		#if !mobile
+		// 冻结期间不抢输入；需鼠标真实移动超过 10px 死区才重新接受点击/滚轮（与 PauseSubState 同参）
+		if (!mouseActive)
+		{
+			var dx:Float = FlxG.mouse.screenX - mouseLockX;
+			var dy:Float = FlxG.mouse.screenY - mouseLockY;
+			if (dx * dx + dy * dy > 10 * 10) mouseActive = true;
+		}
+		#end
+
+		if (clickPressed)
 		{
 			mouseActive = true;
 			mouseLockX = FlxG.mouse.screenX;
 			mouseLockY = FlxG.mouse.screenY;
+			handleRowClick();
 		}
-		#if !mobile
-		if (mouseActive)
-		{
-			if (upP || downP)
-				mouseActive = false;
-			else
-			{
-				var hoveredID:Int = getHoveredRow();
-				if (hoveredID >= 0)
-				{
-					var idx:Int = scrollOffset + hoveredID;
-					if (idx != curSelected)
-						changeSelection(idx - curSelected, true);
-					if (FlxG.mouse.justPressed)
-						accepted = true;
-				}
-			}
-		}
-		else
-		{
-			if (FlxG.mouse.screenX != mouseLockX || FlxG.mouse.screenY != mouseLockY)
-				mouseActive = true;
-		}
-		#end
 
 		// ---- 滚轮（全平台：桌面鼠标滚轮 / 手机触屏合成滚轮 45px/格，Freeplay 同款）----
 		var wheelStep:Int = wheelScroll.process(FlxG.mouse.wheel);
 		if (wheelStep != 0)
 		{
 			mouseActive = true;
+			mouseLockX = FlxG.mouse.screenX;
+			mouseLockY = FlxG.mouse.screenY;
+			lastClickedRow = -1; // 滚轮改过选中：下一次点击重新计为"第一次"
 			changeSelection(wheelStep);
 		}
-
-		if (upP) changeSelection(-1);
-		if (downP) changeSelection(1);
 
 		// ---- 右上角返回键：点击关闭（桌面/手机通用）----
 		backBtn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);

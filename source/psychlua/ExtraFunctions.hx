@@ -261,6 +261,44 @@ class ExtraFunctions
 			return str.trim();
 		});
 
+		// ===== 主题色（Meteoric 主题色功能；令牌定义见 backend/DesignTokens.hx）=====
+		// 语义（已与需求方确认）：默认**临时覆盖**（只影响本次运行，不写玩家存档）；
+		// 只有显式传 persist=true 才写入 ClientPrefs 并落盘。
+		Lua_helper.add_callback(lua, "setThemeColor", function(index:Int = 0, ?persist:Bool = false) {
+			DesignTokens.applyTheme(index, true, persist == true);
+			return DesignTokens.themeIndex;
+		});
+		Lua_helper.add_callback(lua, "getThemeColor", function() {
+			return DesignTokens.themeIndex;
+		});
+		Lua_helper.add_callback(lua, "getThemeColorName", function(?index:Int = -1) {
+			return DesignTokens.themeName(index < 0 ? null : index);
+		});
+		Lua_helper.add_callback(lua, "getThemeColorKey", function(?index:Int = -1) {
+			return DesignTokens.themeKey(index < 0 ? null : index);
+		});		Lua_helper.add_callback(lua, "getThemeColorCount", function() {
+			return DesignTokens.THEME_COUNT;
+		});
+		Lua_helper.add_callback(lua, "getThemeColors", function() {
+			return DesignTokens.allThemeNames();
+		});
+		// 三个令牌的当前取值：脚本要上色到自绘元素时读它们，而不是写死十六进制
+		Lua_helper.add_callback(lua, "getThemePrimary", function() {
+			return DesignTokens.primary;
+		});
+		Lua_helper.add_callback(lua, "getThemeSecondary", function() {
+			return DesignTokens.secondary;
+		});
+		Lua_helper.add_callback(lua, "getThemeTertiary", function() {
+			return DesignTokens.tertiary;
+		});
+		Lua_helper.add_callback(lua, "getThemePanelFill", function() {
+			return DesignTokens.panelFill;
+		});
+		Lua_helper.add_callback(lua, "getThemeRowHighlight", function() {
+			return DesignTokens.rowHighlight;
+		});
+
 		// Randomization
 		Lua_helper.add_callback(lua, "getRandomInt", function(min:Int, max:Int = FlxMath.MAX_VALUE_INT, exclude:String = '') {
 			var excludeArray:Array<String> = exclude.split(',');

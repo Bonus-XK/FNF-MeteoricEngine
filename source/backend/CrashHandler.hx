@@ -864,6 +864,39 @@ class CrashHandler
 		};
 	}
 
+	/**
+	 * DEBUG-ONLY: append the in-memory log ring to a dev diagnostic file, so runtime
+	 * evidence is obtainable WITHOUT crashing.
+	 *
+	 * Why this exists: logRing is only flushed to disk when a crash report is written
+	 * (see the "recent game log" section), so during normal runs nothing is persisted and
+	 * a developer cannot confirm whether a code path executed.
+	 *
+	 * Wrapped in #if meteoric_debug (the engine's debug symbol; compile-mac.sh debug sets it):
+	 * release builds do not include it.
+	 */
+	public static function dumpDevLog(?tag:String = 'dev'):Void
+	{
+		#if meteoric_debug
+		try
+		{
+			var dir:String = ensureCrashDir();
+			if (dir == null) return;
+			var sb:StringBuf = new StringBuf();
+			sb.add('===== DEV LOG DUMP (' + tag + ') @ ' + Date.now().toString() + ' =====\n');
+			sb.add('activeState=' + Std.string(Type.getClassName(Type.getClass(FlxG.state))) + '\n');
+			sb.add('activeMod=' + Std.string(Mods.currentModDirectory) + '\n');
+			sb.add('logRing.length=' + logRing.length + '\n');
+			sb.add('--- ring (last 120) ---\n');
+			var from:Int = Std.int(Math.max(0, logRing.length - 120));
+			for (i in from...logRing.length) sb.add(formatLogEntry(logRing[i]) + '\n');
+			sb.add('--- end ---\n');
+			File.saveContent(dir + '/dev_diag.txt', sb.toString());
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
 	static function buildDefines():String
 	{
 		var arr:Array<String> = [];

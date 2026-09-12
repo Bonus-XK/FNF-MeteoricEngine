@@ -117,7 +117,7 @@ class NotesSubState extends MusicBeatSubstate
 		super();
 
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
-		bg.color = 0xFFEA71FD;
+		bg.color = DesignTokens.menuTint; // 主题色（原硬编码品红 0xFFEA71FD）
 		bg.screenCenter();
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		add(bg);
@@ -147,11 +147,11 @@ class NotesSubState extends MusicBeatSubstate
 		add(rightTitle);
 
 		// ---- 选中高亮框（模式 / 音符） ----
-		modeSelector = makePanel(MODE_X - 9, MODE_Y - 9, MODE_SIZE + 18, MODE_SIZE + 18, 18, 0x3AFFFFFF, null);
+		modeSelector = makePanel(MODE_X - 9, MODE_Y - 9, MODE_SIZE + 18, MODE_SIZE + 18, 18, DesignTokens.rowHighlight, null);
 		modeSelector.visible = false;
 		add(modeSelector);
 
-		noteSelector = makePanel(NOTE_X - 8, NOTE_Y - 8, NOTE_SIZE + 16, NOTE_SIZE + 16, 20, 0x3AFFFFFF, null);
+		noteSelector = makePanel(NOTE_X - 8, NOTE_Y - 8, NOTE_SIZE + 16, NOTE_SIZE + 16, 20, DesignTokens.rowHighlight, null);
 		noteSelector.visible = false;
 		add(noteSelector);
 
@@ -858,8 +858,12 @@ class NotesSubState extends MusicBeatSubstate
 	function getShader() return Note.globalRgbShaders[curSelectedNote];
 
 	// ===== 工具 =====
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)

@@ -4,10 +4,31 @@ import substates.TextInputPrompt;
 
 class InterfaceSettingsSubState extends BaseOptionsMenu
 {
+	/** 主题色选项（onChange 需回读它的值，见 applyThemeSelection） */
+	var themeOption:Option = null;
+
 	public function new()
 	{
 		title = '界面';
 		rpcTitle = '界面设置菜单'; //for Discord Rich Presence
+
+		// ===== 主题色（固定 10 色色板；三强调令牌同步派生，见 backend/DesignTokens.hx）=====
+		// int 类型：左右键/◀▶/滚轮 每步 ±1 即换一套色板，选中项即时生效（onChange → applyThemeSelection）
+		themeOption = new Option('主题色',
+			'选择界面主题色（固定 10 色，作用于系统界面与部分强调元素的 主/次/点缀 三个令牌）：'
+			+ '\n青·蓝·紫·品红·橙·金·绿·青绿·红·粉'
+			+ '\n改动即时生效：本页当前观感马上更新，其余界面在下次进入时应用新配色。',
+			'themeIndex',
+			'int');
+		themeOption.minValue = 0;
+		themeOption.maxValue = backend.DesignTokens.THEME_COUNT - 1;
+		themeOption.changeValue = 1;
+		// 值文字显示色板名（存索引、显示中文名）：用 Option.displayFormatter，不做选项名字符串嗅探
+		themeOption.displayFormatter = function(v:Dynamic):String {
+			return backend.DesignTokens.themeName(Std.parseInt(Std.string(v)));
+		};
+		addOption(themeOption);
+		themeOption.onChange = applyThemeSelection;
 
 		var option:Option = new Option('隐藏HUD',
 			'开启后，血量条等界面元素将不会显示',
@@ -27,6 +48,8 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'scoreTxtFormat',
 			'string',
 			[ClientPrefs.data.scoreTxtFormat]);
+		// 值是一大长串格式串（含 {score}/{misses}/…），行内放不下 → 只显示入口提示
+		option.valueHint = '点击查看';
 		addOption(option);
 		option.onChange = openScoreFormatPrompt;
 
@@ -44,13 +67,15 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('新时间条样式',
-			'开启后，时间条变为黑色圆角样式，已走过部分显示对手图标颜色（颜色过暗时自动使用青色）',
+			'开启后，时间条变为黑色圆角样式。已走过部分的填充色：开启「时间条颜色跟随对方」时用对手图标颜色，'
+			+ '否则用主题色（颜色过暗时自动兜底）',
 			'newTimeBarStyle',
 			'bool');
 		addOption(option);
 
 		var option:Option = new Option('时间条颜色跟随对方',
-			'开启后，时间条（贴图样式）填充色跟随对方角色血量条颜色，颜色过暗或过亮时自动使用青色；新时间条样式不受此开关影响',
+			'开启后，时间条填充色跟随对方角色血量条颜色（过暗/过亮时自动兜底）；关闭时使用当前主题色。'
+			+ '两种时间条样式均受此开关控制',
 			'timeBarOpponentColors',
 			'bool');
 		addOption(option);
@@ -127,7 +152,26 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+
 		super();
+
+		// ⚠ 登记与挂载都必须放在 super() **之后**：
+		// hxcpp 把实例字段初始化器放在基类构造里执行，super() 之前对字段的任何赋值都会被清掉
+		// （_themeSwatchesWanted 会被重置为 false，守卫直接返回 → 什么都不会挂上）。
+		setupThemeSwatches();
+		ensureThemeSwatchesAdded();
+	}
+
+	/** 主题色选项变更：即时应用 + 写存档；Options 页自身立刻换色，其余界面下次进入时生效 */
+	function applyThemeSelection()
+	{
+		if (themeOption == null) return;
+		var idx:Null<Int> = Std.parseInt(Std.string(themeOption.getValue()));
+		if (idx == null) idx = 0;
+		if (idx < 0 || idx >= backend.DesignTokens.THEME_COUNT) idx = 0;
+		themeOption.setValue(idx);
+		// 写入存档 + 刷新本页（menuDesat tint 与值文字色板名）；显式传索引，避免依赖 curOption
+		refreshThemeVisuals(idx);
 	}
 
 	function openScoreFormatPrompt()

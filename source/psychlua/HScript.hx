@@ -48,19 +48,12 @@ class HScript extends SScript
 	public static function preprocessScript(code:String):String
 	{
 		if (code == null || code.length == 0) return code;
-		// Psych 0.7.3 模组兼容：`var x:Map<String, Dynamic> = [];` → `var x = __newMap();`
 		// （字符串级替换，保留 var 名前缀；SScript 4.0.1 类型检查器/运行时均不认这种 Map 初始化）
-		var fixed:Int = 0;
+		// 泛型通配：`:Map<String, Dynamic> = [];` / `:Map<String, FlxBackdrop> = [];` 等
+		// 统一改写为「保留类型注解 + new Map()」——注意**不能**改成 `= __newMap();` 后丢掉注解，
+		// 那会让 `var x = __newMap();` 里的 __newMap 变成未知标识符（旧的 __newMap 方案即因此必然报错）。
 		var out:String = code;
-		for (m in [':Map<String, Dynamic> = [];', ':Map<String, FlxBackdrop> = [];'])
-		{
-			if (out.indexOf(m) >= 0)
-			{
-				var cnt:Int = out.split(m).length - 1;
-				out = out.split(m).join(' = __newMap();');
-				fixed += cnt;
-			}
-		}
+		out = ~/:[ \t]*Map[ \t]*<[^>]*>[ \t]*=[ \t]*\[\][ \t]*;/g.replace(out, ' = new Map();');
 		return out;
 	}
 
@@ -208,6 +201,34 @@ class HScript extends SScript
 		set('MainMenuState', states.MainMenuState);
 		set('HScript', HScript);
 		set('CoolUtil', backend.CoolUtil);
+		// 主题色令牌中心（Meteoric 主题色功能）：HScript 可直接读 DesignTokens.primary/secondary/tertiary
+		set('DesignTokens', backend.DesignTokens);
+		// 主题色脚本 API：默认临时覆盖（不写存档），persist=true 才持久化
+		set('setThemeColor', function(index:Int = 0, ?persist:Bool = false) {
+			backend.DesignTokens.applyTheme(index, true, persist == true);
+			return backend.DesignTokens.themeIndex;
+		});
+		set('getThemeColor', function() {
+			return backend.DesignTokens.themeIndex;
+		});
+		set('getThemeColorName', function(?index:Int = -1) {
+			return backend.DesignTokens.themeName(index < 0 ? null : index);
+		});
+		set('getThemeColorKey', function(?index:Int = -1) {
+			return backend.DesignTokens.themeKey(index < 0 ? null : index);
+		});
+		set('getThemeColorCount', function() {
+			return backend.DesignTokens.THEME_COUNT;
+		});
+		set('getThemeColors', function() {
+			return backend.DesignTokens.allThemeNames();
+		});
+		set('getThemePanelFill', function() {
+			return backend.DesignTokens.panelFill;
+		});
+		set('getThemeRowHighlight', function() {
+			return backend.DesignTokens.rowHighlight;
+		});
 		set('WeekData', backend.WeekData);
 		set('Highscore', backend.Highscore);
 		set('LoadingState', states.LoadingState);
@@ -438,6 +459,8 @@ class HScript extends SScript
 		{
 			PlayState.instance.variables.set(name, value);
 		});
+		// 兜底：旧的预处理产物会引用 __newMap()，注册成真实函数，避免「Unknown variable: __newMap」
+		set('__newMap', function() return new Map<String, Dynamic>());
 		set('getVar', function(name:String)
 		{
 			var result:Dynamic = null;

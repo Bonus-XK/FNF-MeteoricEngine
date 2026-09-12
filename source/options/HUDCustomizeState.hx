@@ -157,7 +157,7 @@ class HUDCustomizeState extends MusicBeatState
 		hintText.antialiasing = ClientPrefs.data.antialiasing;
 		add(hintText);
 
-		doneBtn = makePanel(PANEL_X + PANEL_W - 176, PANEL_Y + 18, 140, 44, 12, 0x3AFFFFFF, 0x88FFFFFF);
+		doneBtn = makePanel(PANEL_X + PANEL_W - 176, PANEL_Y + 18, 140, 44, 12, DesignTokens.rowHighlight, 0x88FFFFFF);
 		doneBtn.cameras = [camOther];
 		add(doneBtn);
 
@@ -201,10 +201,9 @@ class HUDCustomizeState extends MusicBeatState
 		timeBar = new TimeBar(0, 0, function() return 0.5, 0, 1, ClientPrefs.data.newTimeBarStyle);
 		timeBar.scrollFactor.set();
 		timeBar.cameras = [camHUD];
-		if (ClientPrefs.data.newTimeBarStyle)
-			timeBar.leftBar.color = 0xFF00FFFF;
-		else
-			timeBar.leftBar.color = 0xFFFF0000;
+		// 预览色与游戏内保持一致：开启「跟随对方」→ 跟随对手图标色；否则主题色。
+		// 原先写死青/红两色只是为了区分样式，会让「自定义界面」页与游戏内所见不一致。
+		refreshTimeBarPreviewColor();
 		add(timeBar);
 
 		timeTxt = new FlxText(0, 0, 400, '1:23', 25);
@@ -425,8 +424,21 @@ class HUDCustomizeState extends MusicBeatState
 		repositionHUD();
 	}
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	/** 时间条预览取色：与 PlayState 共用 backend/TimeBarColor，避免预览与实机不一致 */
+	function refreshTimeBarPreviewColor():Void
 	{
+		if (timeBar == null) return;
+		timeBar.leftBar.color = backend.TimeBarColor.resolveFill(
+			PlayState.instance != null ? PlayState.instance.dad : null,
+			ClientPrefs.data.newTimeBarStyle, ClientPrefs.data.timeBarOpponentColors);
+	}
+
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
+	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)
@@ -438,6 +450,8 @@ class HUDCustomizeState extends MusicBeatState
 	override public function update(elapsed:Float)
 	{
 		super.update(elapsed);
+
+		refreshTimeBarPreviewColor(); // 与游戏内时间条取色保持一致（主题色 / 跟随对手）
 
 		// 图标强绑定血量条：x 跟随 barCenter（随血量增减左右滑动），y 跟随血量条，拖动血量条时整体跟随
 		var iconOffset:Int = 26;

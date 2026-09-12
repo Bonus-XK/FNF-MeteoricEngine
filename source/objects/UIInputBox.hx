@@ -24,7 +24,6 @@ import openfl.text.TextFormat;
  */
 class UIInputBox extends FlxSpriteGroup
 {
-	static inline var FOCUS_COLOR:FlxColor = 0xFF8AD7FF;   // 聚焦描边（联机主题蓝）
 	static inline var IDLE_COLOR:FlxColor = 0xFF3A3A4C;    // 未聚焦描边
 	static inline var FILL_COLOR:FlxColor = 0xE01E1E2A;    // 深色圆角底
 	static inline var PANEL_PAD:Float = 12;                // 文字内边距
@@ -67,7 +66,7 @@ class UIInputBox extends FlxSpriteGroup
 
 		// 自绘光标（聚焦时显示/闪烁；FlxInputText 的 caret 因 active=false 不更新，原生层又隐形）
 		caretSpr = new FlxSprite(0, 0);
-		caretSpr.makeGraphic(2, fontSize + 4, FOCUS_COLOR);
+		caretSpr.makeGraphic(2, fontSize + 4, DesignTokens.primary);
 		caretSpr.visible = false;
 		add(caretSpr);
 
@@ -176,7 +175,7 @@ class UIInputBox extends FlxSpriteGroup
 	{
 		bg.pixels.fillRect(bg.pixels.rect, FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(bg, 0, 0, boxW, boxH, 10, 10, FILL_COLOR,
-			{color: (focused ? FOCUS_COLOR : IDLE_COLOR), thickness: 1.5});
+			{color: (focused ? DesignTokens.primary : IDLE_COLOR), thickness: 1.5});
 		bg.dirty = true;
 	}
 

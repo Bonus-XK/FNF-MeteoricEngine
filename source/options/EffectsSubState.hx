@@ -14,10 +14,10 @@ class EffectsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('自定义过场动画',
-		    '选择过场动画的样式：',
+		    '选择过场动画的样式（三种）：移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光效淡入淡出。',
 			'CustomFade',
 			'string',
-			['移动', '淡入淡出']);
+			[CustomFadeTransition.MODE_MOVE, CustomFadeTransition.MODE_METEOR, CustomFadeTransition.MODE_STAR]);
 		addOption(option);
 
 		var option:Option = new Option('过场动画文字',
@@ -30,6 +30,16 @@ class EffectsSubState extends BaseOptionsMenu
 			'关闭后，镜头将不会随节拍缩放',
 			'camZooms',
 			'bool');
+		addOption(option);
+
+		// 镜头缓动时长：换段/事件后镜头滑到新位置所需的时间。
+		// 档位名（英文存储值）与秒数**都取自 ClientPrefs.camSmoothPresets**，此处不硬编码，避免设置页与实机脱节。
+		var option:Option = new Option('镜头缓动',
+			'换段或事件切换时镜头移动的平滑程度：迅捷=0.3 秒到位（最接近原版切换手感）；标准=0.5 秒；平滑=0.8 秒（滑行感最明显）',
+			'camSmooth',
+			'string',
+			['fast', 'normal', 'smooth']);
+		option.displayOptions = ['迅捷 0.3s', '标准 0.5s', '平滑 0.8s'];
 		addOption(option);
 
 		var option:Option = new Option('界面节拍跳动',

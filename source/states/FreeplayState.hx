@@ -200,7 +200,7 @@ class FreeplayState extends MusicBeatState
 		add(ratingText);
 
 		diffText = new FlxText(INFO_X, 114, INFO_W, '', 20);
-		diffText.setFormat(Paths.font('future.ttf'), 20, 0xFF8AD7FF, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		diffText.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		diffText.borderSize = 2;
 		diffText.scrollFactor.set();
 		add(diffText);
@@ -275,6 +275,10 @@ class FreeplayState extends MusicBeatState
 		FlxG.mouse.visible = true;
 		super.create();
 
+		// 节拍基准复位：清掉上一首歌残留的 Conductor.bpm / bpmChangeMap，
+		// 否则打完 BPM 不同的歌回到本界面，整屏节拍跳动的频率会跟着那首歌变。
+		resetMenuBeat();
+
 		#if mobile
 		// 用 virtualpad 的 T / C / L / P 键替代原来的按钮：T=试听，C=游玩设置，L=脚本管理，P=回放
 		if (objects.MobileControls.instance != null)
@@ -336,9 +340,13 @@ class FreeplayState extends MusicBeatState
 		}
 	}
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
 		// unique：面板独立位图，避免与其他界面同尺寸面板共享位图而被重复绘制叠加变黑
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if(border != null)

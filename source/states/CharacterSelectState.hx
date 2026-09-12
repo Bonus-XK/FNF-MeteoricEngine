@@ -35,11 +35,10 @@ typedef CSMouseBtn = {
 
 class CharacterSelectState extends MusicBeatState
 {
-	static final THEME:FlxColor = 0xFF8AD7FF;
+	// 主题色不再用静态常量（static final 会在类初始化时冻结取值）；统一在 create() 内读 DesignTokens.primary
 	static final TEXT_GRAY:FlxColor = 0xFFA9A9B8;
 	static final TEXT_LIGHT:FlxColor = 0xFFD7D7E0;
-	static final PANEL_FILL:FlxColor = 0xCC161622;
-	static final ROWS_VISIBLE:Int = 12;
+		static final ROWS_VISIBLE:Int = 12;
 
 	// 选曲 payload：song~diff~modDir~mv~nj~ro
 	var payload:String = '';
@@ -108,7 +107,7 @@ class CharacterSelectState extends MusicBeatState
 		// 左：角色列表
 		makePanel(60, 120, 520, 440);
 		var listTitle:FlxText = new FlxText(80, 136, 480, '角色列表（↑↓ 选择 · 点击确认）', 20);
-		listTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		listTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(listTitle);
 		listRows = [];
 		for (i in 0...ROWS_VISIBLE)
@@ -124,7 +123,7 @@ class CharacterSelectState extends MusicBeatState
 		// 中：预览
 		makePanel(600, 120, 320, 440);
 		var prevTitle:FlxText = new FlxText(620, 136, 280, '预览', 20);
-		prevTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		prevTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(prevTitle);
 		previewName = new FlxText(620, 500, 280, '', 22);
 		previewName.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -133,7 +132,7 @@ class CharacterSelectState extends MusicBeatState
 		// 右：双槽
 		makePanel(940, 120, 280, 440);
 		var slotsTitle:FlxText = new FlxText(960, 136, 240, '对局角色', 20);
-		slotsTitle.setFormat(Paths.font('future.ttf'), 20, THEME, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		slotsTitle.setFormat(Paths.font('future.ttf'), 20, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(slotsTitle);
 		mySlotText = new FlxText(960, 180, 240, '', 20);
 		mySlotText.setFormat(Paths.font('future.ttf'), 20, TEXT_LIGHT, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -141,9 +140,9 @@ class CharacterSelectState extends MusicBeatState
 		oppSlotText = new FlxText(960, 240, 240, '', 20);
 		oppSlotText.setFormat(Paths.font('future.ttf'), 20, TEXT_LIGHT, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(oppSlotText);
-		confirmBtn = addMouseBtn('确认选择', 960, 300, 240, 42, 22, tryConfirm, THEME);
+		confirmBtn = addMouseBtn('确认选择', 960, 300, 240, 42, 22, tryConfirm, DesignTokens.primary);
 		confirmBtn.visible = true;
-		startBtn = addMouseBtn('开始对局', 960, 380, 240, 42, 22, hostStart, THEME);
+		startBtn = addMouseBtn('开始对局', 960, 380, 240, 42, 22, hostStart, DesignTokens.primary);
 		startBtn.visible = false;
 
 		statusText = new FlxText(60, 585, 1160, '', 18);
@@ -491,7 +490,7 @@ class CharacterSelectState extends MusicBeatState
 	function makePanel(x:Float, y:Float, w:Float, h:Float):FlxSprite
 	{
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
-		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 20, 20, PANEL_FILL);
+		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, 20, 20, DesignTokens.panelFill);
 		spr.scrollFactor.set();
 		return spr;
 	}

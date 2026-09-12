@@ -128,11 +128,13 @@ class MobileControlsSubState extends MusicBeatSubstate
 		return label;
 	}
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null):FlxSprite
 	{
+		// 见 makePanel 注释：默认值必须编译期常量，故此处解析。
+		if (fill == null) fill = DesignTokens.panelFill;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
-		FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: 0x45FFFFFF, thickness: 1.5});
+		FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: DesignTokens.panelOutline, thickness: 1.5});
 		spr.scrollFactor.set();
 		return spr;
 	}

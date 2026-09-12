@@ -43,7 +43,7 @@ class ChartExportPrompt extends FlxSubState
 		var y:Float = (FlxG.height - h) / 2;
 		panelBg = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		panelBg.scrollFactor.set();
-		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, h, 18, 18, 0xEE161622, {color: 0x55FFFFFF, thickness: 1.5});
+		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, h, 18, 18, DesignTokens.panelFill, {color: 0x55FFFFFF, thickness: 1.5});
 		add(panelBg);
 
 		var title:FlxText = new FlxText(x + 24, y + 16, w - 48, '导出谱面…', 20);

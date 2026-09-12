@@ -242,7 +242,7 @@ class ResultsSubState extends MusicBeatSubstate
 		{
 			var newRecordText:FlxText = new FlxText(STATS_LABEL_X + 230, STATS_TITLE_Y + 4, 0, '新纪录！ New Record', 22);
 			newRecordText.scrollFactor.set();
-			newRecordText.setFormat(Paths.font('future.ttf'), 22, 0xFFFFD9A0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			newRecordText.setFormat(Paths.font('future.ttf'), 22, DesignTokens.secondary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			newRecordText.borderSize = 1.5;
 			newRecordText.antialiasing = ClientPrefs.data.antialiasing;
 			newRecordText.alpha = 0;
@@ -378,7 +378,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(pad);
 		#end
 
-		menuSelector = makePanel(x + 16, y + 9, w - 32, 44, 12, 0x3AFFFFFF, null);
+		menuSelector = makePanel(x + 16, y + 9, w - 32, 44, 12, DesignTokens.rowHighlight, null);
 		menuSelector.alpha = 0;
 		add(menuSelector);
 		FlxTween.tween(menuSelector, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
@@ -435,7 +435,7 @@ class ResultsSubState extends MusicBeatSubstate
 		var myColX:Float = scX + 30;
 		var myValX:Float = myColX + 110;
 
-		var myHeader:FlxText = makeSimText(myColX, scY + 22, '我的成绩', 22, 0xFF8AD7FF);
+		var myHeader:FlxText = makeSimText(myColX, scY + 22, '我的成绩', 22, DesignTokens.primary);
 		myHeader.alpha = 0;
 		add(myHeader);
 		FlxTween.tween(myHeader, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
@@ -589,8 +589,12 @@ class ResultsSubState extends MusicBeatSubstate
 		return txt;
 	}
 
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if(border != null)

@@ -58,8 +58,73 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 
 - 布局：左面板（40,70,680,570，选项列表 + 标题）、右面板（740,70,460,570，说明）、底部条（120,662,1040,48）。
 - 选项行：`LIST_X 108`、`LIST_Y 152`、`ROW_GAP 56`、`ROWS_VISIBLE 8`；说明文字单行，超出宽度截断为省略号。
+- **值文本（右列 VALUE_X/VALUE_W）必须单行**：`FlxText` 默认 `wordWrap = true`，固定宽 240 下长值会折行
+  压到相邻行（实测：Score 栏格式那一大串 `{score} // {misses} // …`）。
+  `BaseOptionsMenu` 已对 `valueTexts` 统一设 `wordWrap = false`，超出部分由 fieldWidth 裁掉。
+- **值放不下时用 `Option.valueHint` 显示固定提示**（如 `点击查看`），而不是硬塞真实值；
+  显示优先级：`valueHint` > `displayFormatter` > `displayFormat` / `displayOptions`。
+  三者都**只影响显示，不写回存储值**；`valueHint` 分支刻意放在读存档之前（省一次反射）。
 - `scrollIndex` 翻页：低频动效（200ms，`quadOut`）；值变化即时（不 tween）。
 - 子页（Graphics/Interface/Gameplay/Note/Controls…）继承 `BaseOptionsMenu`，禁止复制粘贴布局常量；新增子页直接继承。
+
+### 主题色（Theme Color，已落地）
+
+系统域强调色**一律走令牌**，不再写字面量；令牌中心 = `source/backend/DesignTokens.hx`。
+
+- 入口：**设置 → 界面 → 主题色**。固定 10 色：
+  青（默认）/蓝/紫/品红/橙/金/绿/青绿/红/粉；存 `ClientPrefs.data.themeIndex`（`Int`，全字段反射存档 → 无需迁移代码）。
+- **两套输入并存（三套覆盖）**：选项行负责键盘/手柄（左右调节）；色块区负责鼠标/触控（直接点）。
+  两者共用**同一条**取值链路 —— 点色块最终也是走 `changeOptionValue(1)`，
+  因此音效、存档、`onChange` 即时换色、长按连发行为完全一致，不会出现"两套行为"。
+- 色块区实现：`source/objects/ColorSwatchPicker.hx`（可复用组件）+ `BaseOptionsMenu.setupThemeSwatches()`（默认关闭的挂载点）。
+  组件只负责绘制/命中/演出，**不碰** ClientPrefs 与 Option；子类在 `super()` **之前**调用挂载
+  （基类构造末尾的 `changeSelection()` 会读 `themeSwatches`）。
+- 色块区几何（**已核算，勿随意改**）：底板 y 586 高 52、色块圆心 y 612、直径 44、步进 58、10 格总宽 522 在左面板居中。
+  末行 `selectorBar` 占 541–585，色块区必须 **≥586** 才不重叠；再往下会被底部条（662）挡住。
+  热区 44+6×2 = **56 逻辑 px**（移动端触摸目标红线）。
+  另：色板**只在该行被选中时显示整块**（`refreshSwatches()` → `ColorSwatchPicker.setVisible()`）。
+  切到其它选项时必须 `visible = false`（含底板），**不能只降 alpha**：右面板的 `descText` 自 y=170 起
+  向下延伸且无裁剪，会与 y 602–636 的色块区视觉打架，且半透明残留会让人误以为仍可点（实测反馈）。
+  `setVisible(false)` 内部需同时复位悬停态与缩放，否则重现时会出现「鼠标不在上面、环却亮着」的残留。
+- 状态表达（不得只用颜色）：选中 = 圆环（键盘焦点时主题色环 / 鼠标时白环）；悬停 = 放大 1.08；
+  按压 = 缩小 0.94；均为 100ms `quadOut`，且复用的 tween 先 `cancel`。
+  **悬停不改变选中**，只做预览放大。
+- 绘制纪律：全部在 `new()` 内一次画好（`FlxSpriteUtil.drawCircle`，BackButton 同款），
+  `update()` 里**零绘制调用**；禁止逐帧 `makeGraphic`。
+- 脚本联动：脚本 `setThemeColor` 后会经 `DesignTokens` 的监听者模式通知色块同步选中环
+  （`addThemeListener` / `removeThemeListener`）；**宿主必须在 `destroy()` 摘除监听**，否则留下僵尸回调。
+- ⚠⚠ **硬性契约（2026-09-11 两次实测事故，务必遵守）：实例字段与 display group 的一切初始化
+  都必须在 `super()` 之后。**
+  子类在 `super()` 之前**既不 `add()`、也不给实例字段赋值**——两种做法都会失效：
+  ① `add()`：`FlxGroup.members` 由 `FlxGroup.new()` 创建，`super()` 之前 `members` 为 null
+     → `Null Object Reference`（报错点是 `FlxGroup.hx` 的 `members.indexOf`，看着像渲染问题）；
+  ② **给实例字段赋值**：hxcpp 把字段初始化器（`var x = ...`）放在**基类构造**里执行，
+     `super()` 会重跑一遍初始化，把之前赋的值**清回初始值**
+     → 表现为「代码明明执行了、对象也创建了，却毫无效果」（本次事故：`themeSwatches` 被清成 null、
+     `_themeSwatchesWanted` 被清回 false，守卫直接返回，色块永不挂载）。
+  正确形态：子类 `addOption(...)` → `super()` → `setupThemeSwatches()`（登记意图）→
+  `ensureThemeSwatchesAdded()`（创建 + 挂载）；另有 `create()` 与首个 update 帧两道兜底。
+  排查建议：这类「静默失效」**不要靠读代码推断**，直接在可疑分支落盘日志（见
+  `CrashHandler.dumpDevLog()`，`#if meteoric_debug` 下可用），用事实定位。
+  原因：`FlxGroup` 的 `members` 数组是在 `FlxGroup.new()` 内 `super(); members = [];` 才创建的
+  （flixel 5.2.2 源码），而 `FlxGroup.add()` 入口就是 `members.indexOf(Object)`。
+  在 `super()` 之前 `add()` → `members` 为 null → **`Null Object Reference`**，
+  报错点正是 `FlxGroup.hx` 的 `members.indexOf` 那一行 —— 堆栈看着像渲染/绘制问题，极易误判方向。
+  正确形态：`setupThemeSwatches()` 只构造（不 add）→ `ensureThemeSwatchesAdded()` 在 `create()` 里 add。
+  flixel 的 `openSubState()` 是在**构造完成之后**才调 `create()`，那时 group 已就绪。
+  通用规则：**任何在 `super()` 之前执行的初始化代码都不得触碰 group（add/remove/insert）**。
+- 派生规则：切换色板时 **`primary` / `secondary` / `tertiary` 三个令牌同步更换**
+  （外加 `menuTint` = `menuDesat` 背景 tint）。`surface` / `outline` / 判定色 / 成功失败语义色**不参与**。
+- 生效时机：`ClientPrefs.loadPrefs()` 末尾调 `DesignTokens.initFromPrefs()`（启动应用存档值）；
+  其余界面在**下次 `create()`** 读新令牌。**Options 页内**由
+  `BaseOptionsMenu.refreshThemeVisuals()` 做即时预览（只改 menuDesat tint + 重排值文字，不重绘面板、不 tween）。
+- 新增系统域界面：颜色写 `DesignTokens.primary` / `.secondary` / `.tertiary`，**禁止**
+  `static final X = DesignTokens.primary`（静态初始化会冻结取值，主题切换即失效）。
+- 脚本 API：`setThemeColor(index, ?persist=false)` —— 默认**临时覆盖**（不写玩家存档），
+  `persist=true` 才落盘；另有 `getThemeColor/getThemeColorName/getThemeColorKey/getThemeColors/
+  getThemeColorCount/getThemePrimary/getThemeSecondary/getThemeTertiary`。
+  Lua 走 `ExtraFunctions.implement()`，界面脚本走 `MenuScript.addLocalCallback`，HScript 走 `HScript.preset()`。
+  注意：界面脚本改色后**已创建**的元素不会自动重绘，需重开界面或等下次进入。
 
 ### Pause（PauseSubState）
 

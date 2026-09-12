@@ -2,6 +2,7 @@ package flixel.system.ui;
 
 #if FLX_SOUND_SYSTEM
 import backend.Paths;
+import backend.DesignTokens;
 import flixel.FlxG;
 import flixel.system.FlxAssets;
 import openfl.Lib;
@@ -138,7 +139,7 @@ class FlxSoundTray extends Sprite
 		pctTxt.height = 30;
 		pctTxt.selectable = false;
 		pctTxt.embedFonts = true;
-		pctTxt.defaultTextFormat = new TextFormat(Paths.font('future.ttf'), 16, 0xFF54C8FF, false, null, null, null, null, TextFormatAlign.RIGHT);
+		pctTxt.defaultTextFormat = new TextFormat(Paths.font('future.ttf'), 16, 0xFFFFFFFF, false, null, null, null, null, TextFormatAlign.RIGHT);
 		pctTxt.text = "100%";
 		pctTxt.x = W_COLL - 82;
 		pctTxt.y = Math.round((H_COLL - 30) / 2) + 1;
@@ -437,6 +438,18 @@ class FlxSoundTray extends Sprite
 		}
 	}
 
+	/**
+	 * 强调色 = 当前主题色（音量条填充 / 进度条填充 / 百分比文字）。
+	 * **必须运行时读取**，禁止 static final 缓存（会冻结取值，主题切换失效）。
+	 * 每次 drawTray() 都重新解析：托盘在 FlxGame 构造期就创建（早于 ClientPrefs.loadPrefs），
+	 * 构造期取值会拿到默认主题；而 drawTray 在每次 show()/音量变化时都会跑，运行期必定正确。
+	 * MUTED 红、轨道底、圆钮、按钮底属语义/中性色，不参与主题化。
+	 */
+	inline function themeAccent():Int
+	{
+		return DesignTokens.primary;
+	}
+
 	// ===== 形变插值辅助 =====
 	inline function smoothstep(t:Float):Float
 	{
@@ -495,7 +508,7 @@ class FlxSoundTray extends Sprite
 		// 已调部分 + 圆钮
 		if (fillW > 1)
 		{
-			graphics.beginFill(0xFF54C8FF);
+			graphics.beginFill(themeAccent());
 			graphics.drawRoundRect(tx, ty, fillW, TRACK_H, TRACK_H / 2, TRACK_H / 2);
 			graphics.endFill();
 		}
@@ -564,7 +577,7 @@ class FlxSoundTray extends Sprite
 			var fillPW:Float = FlxMathBound(posMs / lenMs) * skW;
 			if (fillPW > 1)
 			{
-				graphics.beginFill(blendColor(0xFF54C8FF, t));
+				graphics.beginFill(blendColor(themeAccent(), t));
 				graphics.drawRoundRect(skX, skY, fillPW, skH, skH / 2, skH / 2);
 				graphics.endFill();
 			}
@@ -595,7 +608,7 @@ class FlxSoundTray extends Sprite
 		else
 		{
 			pctTxt.text = Math.round(FlxG.sound.volume * 100) + "%";
-			pctTxt.textColor = 0xFF54C8FF;
+			pctTxt.textColor = themeAccent();
 		}
 
 		lastDrawVol = FlxG.sound.volume;

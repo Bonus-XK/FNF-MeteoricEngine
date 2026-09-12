@@ -19,17 +19,34 @@ description: Meteoric Engine 手绘域界面规范：主菜单（经典 v2）、
 
 | 常量 | 值 | 含义 |
 | --- | --- | --- |
-| `ITEM_RIGHT` | 1220 | 菜单项右边缘（右对齐） |
-| `LIST_CENTER_Y` | 360 | 选中项中心 Y |
-| `ROW_GAP` | 130 | 相邻项间距（经典 Psych 行距，防叠压） |
+| `LIST_RIGHT_MARGIN_RATIO` | 0.12 | 右边距 = 窗口宽 × 12%（**已废弃** `ITEM_RIGHT=1220`：写死时窄窗口必被裁） |
+| `LIST_CENTER_Y` | 360 | 选中项中心 Y（滚动方案的设计前提，恒居中） |
+| `LIST_ROW_PADDING` | 0.10 | 相邻项留白比例；**行距 = 最高可见帧高 × 1.10 × rowScale**，运行时算、非固定值 |
+| `LIST_ROW_SCALE_BASE` | 0.85 | 8 项时整列缩放；项数少时自动放大（上限 1.0） |
 | `SCROLL_LERP` | 14 | 时间插值系数（与 Freeplay 同款手感） |
+| `LIST_SAFE_TOP` / `LIST_SAFE_BOTTOM` | 96 / 624 | 上下安全线（仅当整列放得下时用于纵向居中） |
 
+- **行距禁止写死**：white 帧最高 192px > 旧 `ROW_GAP=150` → 选中项会压在相邻项上（净空 **−42px**，这就是"拥挤"的量化来源）。
+  实测 8 项：`rowScale=0.85`、`rowPitch=180`、净空 **+16.8px**、屏内可见 **4–5 项**、选中项恒在 y=360。
 - 菜单项：`mainmenu/menu_<id>` Sparrow 图集，`idle` = `<id> basic`，`selected` = `<id> white`，24fps。
-- 选项顺序（`optionShit`，受编译宏影响）：`story_mode` → `freeplay` → `mods` → `awards` → `credits` → `donate` → `options`。
+- 选项顺序（`optionShit`，受编译宏影响；默认宏构建 **8 项**）：`story_mode` → `freeplay` → `mods` → `awards` → `online` → `credits` → `donate` → `options`。
 - 左上 FNF 标志：`logoBumpin` 图集 @ (30,70)，scale 0.6，仅 `ClientPrefs.data.menuBeatBump` 开启时随 `beatHit` 播放 `bump`。
-- 左下信息区：版本号（`Meteoric Engine v' + Main.meVersion`）、新版本链接（`0xFFFFD166`，可点击）、联机入口（`0xFF8AD7FF`，可点击），均 `future.ttf` 16 + 黑描边 2。
-- 底部提示：`触控/滚轮 选择 · A / Enter 确认 · Esc 返回`（`future.ttf` 16，居中，宽 1160）。
+- 左下信息区：版本号（`Meteoric Engine v' + Main.meVersion`）、新版本链接（`0xFFFFD166`，可点击）；联机入口**已是列表项** `online`（Psych Online 美术），不再有右下角文字链接。
+- 底部提示：`触控/滚轮 选择 · A / Enter 确认 · Esc 返回`（`future.ttf` 16，左对齐，宽 960）。
 - 右上返回按钮：`BackButton(FlxG.width - 72, 12)`（`< 返回标题界面`）。
+
+### 对齐换算口径（改动前必须看懂，否则整列错位）
+
+- `frame.width/height` = 被裁剪段尺寸（**可见内容**）；`sourceSize` = 含边距整帧；`frame.offset` = XML `frameX/frameY` 取负。
+- 定位一律按"可见内容"换算：`x = listRightX - itemVisPadLeft - itemVisWidth + spr.offset.x`（**均带 `*rowScale`**）；
+  排版量算（行距 / 右缘越界判定）用**原始未缩放**帧尺寸（`itemFrameVis*` 系列）。
+- 量算必须按 `<id> white` 帧（选中态最大帧），不能只按 idle 帧。
+- **建项时 `addByPrefix('selected', ...)` 会把白帧设为当前帧**，必须先 `play('idle', true)` 再 `updateHitbox()`。
+- **禁止再调 `centerOffsets()`**：它把 `offset` 重写成居中值，而对齐依赖 XML 帧偏移（旧代码此处有一行，已删）。
+- 缩放必须在 `updateHitbox()` **之前**设好（`applyRowScale()`），否则 `offset` 按错误的尺寸算。
+- 量帧尺寸用 `spr.frames.framesHash`（帧名 → 帧，帧名含 `' basic'` / `' white'`）；
+  **不要用 `sprite.animation.get()`** —— 本工程编译用的 flixel 6.x 里 `FlxAnimationController` 没有该方法。
+- 窗口尺寸变化**不重排**（`FlxState` 无 `onResize` 覆写点），布局在 `create()` 时按当时窗口尺寸算定。
 
 ### 状态机（选中/未选中）
 
@@ -37,6 +54,7 @@ description: Meteoric Engine 手绘域界面规范：主菜单（经典 v2）、
 - `changeItem()` 只做三件事：更新 `curSelected`、播放对应动画、设置 α。**禁止**在这里启动长 tween。
 - 首次进入用 `snapItems()` 直接落位（**无入场动画**；菜单是高频界面）。
 - 滚动：每帧 `FlxMath.lerp` 按 `elapsed * SCROLL_LERP` 插值到目标位置，**禁止**直接赋值造成跳帧。
+  目标 y = `LIST_CENTER_Y + (i - curSelected) * rowPitch`（`rowPitch` 为自适应行距，见上表）。
 - 确认选中：选中项走经典 `FlxFlicker`（**存量 1s，按设计总纲应收敛至 ≤0.4s**），其余项 `FlxTween.tween(alpha: 0, 0.4, quadOut)` 后 `kill()`；切换在 flicker `onComplete` 中执行，`selectedSomethin` 守卫防重复输入。
 - 背景：`menuBG` 放大 1.175 居中；彩蛋背景 `menuDesat` tint `0xFFfd719b`（`magenta`，默认隐藏）。
 

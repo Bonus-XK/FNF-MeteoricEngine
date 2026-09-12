@@ -117,7 +117,7 @@ class LoadingState extends MusicBeatState
 		bg.screenCenter();
 		add(bg);
 
-		var topLine:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, 4, 0xFF33E0FF);
+		var topLine:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, 4, DesignTokens.primary);
 		topLine.alpha = 0.85;
 		add(topLine);
 
@@ -139,7 +139,7 @@ class LoadingState extends MusicBeatState
 			diffNameText = getDiffName(backend.Highscore.formatSong(songPath, PlayState.storyDifficulty), songPath);
 		}
 		diffText = new FlxText(0, 318, FlxG.width, diffNameText, 22);
-		diffText.setFormat(Paths.font('future.ttf'), 22, 0xFF33E0FF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		diffText.setFormat(Paths.font('future.ttf'), 22, DesignTokens.primary, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		diffText.scrollFactor.set();
 		add(diffText);
 
@@ -148,7 +148,8 @@ class LoadingState extends MusicBeatState
 		loadBar.scrollFactor.set();
 		loadBar.screenCenter(X);
 		// 已走过 = 青色，未走过 = 深灰（黑色圆角底上清晰可见）
-		loadBar.setColors(0xFF33E0FF, 0xFF1C2230);
+		// 顶部线 / 难度文字 / 进度条填充统一走主题色（运行时读取；灰阶状态文字刻意压暗，不参与）
+		loadBar.setColors(DesignTokens.primary, 0xFF1C2230);
 		add(loadBar);
 
 		// ---- 百分比 ----

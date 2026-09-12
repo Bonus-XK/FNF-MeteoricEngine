@@ -26,6 +26,19 @@ class Option
 	public var decimals:Int = 1; //Only used in float/percent type
 
 	public var displayFormat:String = '%v'; //How String/Float/Percent/Int values are shown, %v = Current value, %d = Default value
+	/**
+	 * 可选：把存储值转成显示文本（优先级高于 displayFormat / displayOptions）。
+	 * 用于「存储是 Int/字符串，但展示必须是人类可读名」的选项，例如主题色存索引 0..9 而显示色板名。
+	 * 只影响显示，**不写回存储值**。
+	 */
+	public var displayFormatter:Dynamic->String = null;
+
+	/**
+	 * 可选：值位置显示的**固定提示文案**（优先于真实值），用于「值是一大长串、行内放不下」的选项
+	 * （如 Score 栏格式），改为提示可交互的入口。只影响显示，不写回存储值。
+	 * 优先级：valueHint > displayFormatter > displayFormat / displayOptions。
+	 */
+	public var valueHint:String = null;
 	public var description:String = '';
 	public var name:String = 'Unknown';
 

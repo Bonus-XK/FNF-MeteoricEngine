@@ -27,6 +27,23 @@ class MusicBeatState extends FlxUIState
 
 	public static var camBeat:FlxCamera;
 
+	/** 菜单音乐（assets/music/freakyMenu.ogg）的节拍速度。
+	 *  取自启动初值：TitleState.create() 会执行 `Conductor.bpm = titleJSON.bpm`，
+	 *  而 assets/preload/images/gfDanceTitle.json 的 bpm = 102。
+	 *  三个节拍跳动界面（主菜单/故事模式/自由游玩）都用它，保证"跳动手感 = 启动时的手感"。 */
+	public static inline var MENU_BPM:Float = 102;
+
+	/** 把 Conductor 的节拍基准复位到菜单音乐：设置 BPM 并清空上一首歌残留的换速表。
+	 *  Conductor.bpm / bpmChangeMap 是 static，PlayState 每首歌都会写入（含段落换速），
+	 *  出曲后不清就会让菜单按"上一首歌的 BPM"算拍 → 跳动频率与曲目挂钩。
+	 *  只在真正做节拍跳动的界面调用；必须在各界面设好背景音乐之后、update 之前调用。 */
+	public function resetMenuBeat():Void
+	{
+		Conductor.bpm = MENU_BPM;   // 走 setter，同步 crochet / stepCrochet
+		Conductor.bpmChangeMap = [];
+		resetBPMChangeCache();
+	}
+
 	override function create() {
 		camBeat = FlxG.camera;
 		var skip:Bool = FlxTransitionableState.skipNextTransOut;

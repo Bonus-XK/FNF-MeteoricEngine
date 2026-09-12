@@ -165,7 +165,7 @@ class ModsMenuState extends MusicBeatState
 			lastStatus.push('');
 		}
 
-		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, 0x2EFFFFFF, null);
+		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, DesignTokens.rowHighlight, null);
 		selectorBar.visible = false;
 		add(selectorBar);
 
@@ -596,7 +596,7 @@ class ModsMenuState extends MusicBeatState
 				statusTexts[r].updateHitbox();
 			}
 			statusTexts[r].alpha = isSel ? 1 : 0.75;
-			statusTexts[r].color = isOn ? 0xFF7BFF9E : 0xFF9A9AA8;
+			statusTexts[r].color = isOn ? 0xFF7BFF9E : DesignTokens.primary;
 		}
 	}
 
@@ -693,7 +693,7 @@ class ModsMenuState extends MusicBeatState
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
 		toggleBtn.setText(isOn ? '停用' : '启用');
-		toggleBtn.setLabelColor(isOn ? 0xFF7BFF9E : 0xFFFF8F8F);
+		toggleBtn.setLabelColor(isOn ? 0xFF7BFF9E : DesignTokens.primary);
 	}
 
 	function toggleSelected()
@@ -881,8 +881,12 @@ class ModsMenuState extends MusicBeatState
 	}
 
 	// ===== 工具 =====
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)

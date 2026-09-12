@@ -88,6 +88,10 @@ class StoryMenuState extends MusicBeatState
 
 		super.create();
 
+		// 节拍基准复位：清掉上一首歌残留的 Conductor.bpm / bpmChangeMap，
+		// 否则打完 BPM 不同的歌回到本界面，整屏节拍跳动的频率会跟着那首歌变。
+		resetMenuBeat();
+
 		scoreText = new FlxText(10, 10, 0, "SCORE: 49324858", 36);
 		scoreText.setFormat(Paths.font("future.ttf"), 32);
 

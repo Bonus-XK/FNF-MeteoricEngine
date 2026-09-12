@@ -172,7 +172,7 @@ class ControlsSubState extends MusicBeatSubstate
 		}
 
 		// ---- 选中行高亮条 ----
-		selectorBar = makePanel(LIST_X - 24, LIST_Y - 3, (KEY_X + KEY_GAP + KEY_W) - (LIST_X - 24), 44, 12, 0x3AFFFFFF, null);
+		selectorBar = makePanel(LIST_X - 24, LIST_Y - 3, (KEY_X + KEY_GAP + KEY_W) - (LIST_X - 24), 44, 12, DesignTokens.rowHighlight, null);
 		selectorBar.visible = false;
 		add(selectorBar);
 
@@ -260,7 +260,7 @@ class ControlsSubState extends MusicBeatSubstate
 					row.updateHitbox();
 				}
 				row.alpha = 1;
-				row.color = 0xFFFFD9A0;
+				row.color = DesignTokens.secondary;
 
 				keyBoxes[r * 2].visible = false;
 				keyBoxes[r * 2 + 1].visible = false;
@@ -571,7 +571,7 @@ class ControlsSubState extends MusicBeatSubstate
 		bindingGroup.add(title);
 
 		var tip:FlxText = new FlxText(px, py + 170, pw, '按任意键 绑定\n长按 ESC 取消 · 长按 BACKSPACE 删除\n点击 取消绑定', 22);
-		tip.setFormat(Paths.font('future.ttf'), 22, 0xFF9CE8FF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		tip.setFormat(Paths.font('future.ttf'), 22, DesignTokens.primary, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tip.borderSize = 2;
 		bindingGroup.add(tip);
 
@@ -729,8 +729,8 @@ class ControlsSubState extends MusicBeatSubstate
 
 	function refreshModeLabels()
 	{
-		modeLinks[0].color = onKeyboardMode ? FlxColor.WHITE : 0xFF9CE8FF;
-		modeLinks[1].color = onKeyboardMode ? 0xFFFFD9A0 : FlxColor.WHITE;
+		modeLinks[0].color = onKeyboardMode ? FlxColor.WHITE : DesignTokens.primary;
+		modeLinks[1].color = onKeyboardMode ? DesignTokens.secondary : FlxColor.WHITE;
 	}
 
 	function setModeHovered(idx:Int, hovered:Bool)
@@ -795,7 +795,7 @@ class ControlsSubState extends MusicBeatSubstate
 	function addModeLink(x:Float, y:Float, text:String)
 	{
 		var t:FlxText = new FlxText(x, y, 0, text, 26);
-		t.setFormat(Paths.font('future.ttf'), 26, 0xFF9CE8FF, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		t.setFormat(Paths.font('future.ttf'), 26, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		t.borderSize = 2;
 		t.antialiasing = true;
 		add(t);
@@ -804,8 +804,12 @@ class ControlsSubState extends MusicBeatSubstate
 	}
 
 	// ===== 工具 =====
-	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Int = 0xCC161622, ?border:Int = 0x45FFFFFF):FlxSprite
+	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
 	{
+		// 参数默认值必须是**编译期常量**，不能写 DesignTokens.panelFill（运行时求值会被 Haxe 拒绝），
+		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
+		if (fill == null) fill = DesignTokens.panelFill;
+		if (border == null) border = DesignTokens.panelOutline;
 		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)

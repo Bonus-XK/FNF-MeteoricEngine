@@ -43,7 +43,7 @@ class ModsDeleteConfirmSubstate extends MusicBeatSubstate
 
 		// 面板（红色边框提示危险操作）
 		var panel:FlxSprite = new FlxSprite(px, py).makeGraphic(pw, ph, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(panel, 0, 0, pw, ph, 18, 18, 0xEE161622);
+		FlxSpriteUtil.drawRoundRect(panel, 0, 0, pw, ph, 18, 18, DesignTokens.panelFill);
 		FlxSpriteUtil.drawRoundRect(panel, 1, 1, pw - 2, ph - 2, 18, 18, FlxColor.TRANSPARENT, {color: 0x66FF6B6B, thickness: 1.5});
 		panel.scrollFactor.set(0, 0);
 		add(panel);
