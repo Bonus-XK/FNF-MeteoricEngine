@@ -47,8 +47,11 @@ class Main extends Sprite
 
 	public static var fpsVar:FPS;
 
-	public static var meVersion:String = '1.1.2';
-	public static var meVersionIndex:Int = 3;
+	public static var meVersion:String = '1.1.3';
+	// 版本校验码：与仓库根目录 gitVersion.txt 第 2 行对应（1.1.3 = 4）。
+	// 更新判定见 TitleState.checkForUpdates()：远端索引 **大于** 本值才弹更新界面。
+	// （预览更新界面时把它临时改成 1 即可，改完记得还原——2026-09-12 用过一次。）
+	public static var meVersionIndex:Int = 4;
 	// 引擎关闭动画状态（仅桌面目标使用；移动端不启用、设置页也不显示）
 	static var allowWindowClose:Bool = false;
 	static var closeAnimStarted:Bool = false;

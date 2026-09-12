@@ -126,7 +126,14 @@ class ContainersMenuState extends MusicBeatState
 
 		Lib.application.window.title = "FNF':Meteoric Engine - Containers";
 
+		// 背景 = menuDesat 染**当前主题色**（令牌 menuTint，取值 = 本主题 primary，
+		// 见 DesignTokens.MENU_TINTS）。本行缺失时菜单贴图保持原始品红，
+		// 表现就是「设置里换了主题色，容器界面背景不跟着变」—— 与设置一级页
+		// （OptionsState.create）、所有设置二级页（BaseOptionsMenu.create）保持同一取色路径。
+		// 运行期改主题：令牌在 设置→界面→主题色 里即时重算，本界面下次 create() 生效
+		// （按 R 重新扫描不重建背景，不必也不应重绘）。
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+		bg.color = DesignTokens.menuTint;
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.screenCenter();
 		add(bg);
@@ -230,8 +237,11 @@ class ContainersMenuState extends MusicBeatState
 			ContainerSession.notice = null;
 		}
 
-		transIn = FlxTransitionableState.defaultTransIn;
-		transOut = FlxTransitionableState.defaultTransOut;
+		// 【转场】本界面进出都走"直接换状态、不挂转场"（见 OptionsState.enterContainersMenu
+		// 与下方 exitToOptions 的说明：转场层在新状态 create() 完成前屏上是空的，会先黑一下）。
+		// 因此这里**不再**赋 transIn/transOut —— 它们是 flixel-addons 的 TransitionData，
+		// 只在走 `FlxTransitionableState.transitionIn/Out()` 时才被读；本界面既不走那条路，
+		// 赋值就是死代码（留着会让人误以为转场仍然生效）。
 
 		// 本界面全鼠标可交互（列表行命中、双击启动、四个按钮），必须显式开鼠标：
 		// MusicBeatState 不会自动开，OptionsState 是在 destroy 里关的，谁开谁关。
@@ -676,13 +686,20 @@ class ContainersMenuState extends MusicBeatState
 		setInfo('已打开：' + target);
 	}
 
+	/**
+	 * 【返回设置 · 唯一出口】与入口（`OptionsState.enterContainersMenu()`）对称：
+	 * 直接换状态，不走 `LoadingState.loadAndSwitchState`（那条路会过渡场层 + 加载界面），
+	 * 避免返回时再出现一次"空白窗口"。设置页自带整屏背景，不需要加载界面遮丑。
+	 */
 	function exitToOptions():Void
 	{
 		if (selectedSomethin) return;
 		selectedSomethin = true;
 		FlxG.sound.play(Paths.sound('cancelMenu'));
-		LoadingState.loadAndSwitchState(new OptionsState());
 		OptionsState.onPlayState = false;
+		// 与入口对称：同样跳过设置页自己的入场转场（它有整屏背景，不需要转场遮丑）
+		FlxTransitionableState.skipNextTransOut = true;
+		FlxG.switchState(new OptionsState());
 	}
 
 	override function destroy()

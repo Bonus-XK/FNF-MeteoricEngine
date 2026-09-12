@@ -45,6 +45,22 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 - 状态层：hover `0x18` 白、pressed `0x30` 白叠加，非实体色块。
 - 新组件必须提供**键盘/鼠标/触控三套**操作路径；触控长按与键盘 hold 分别独立计时（现有 `padHoldTime` 模式）。
 
+### 绘制层级（z-order）
+
+绘制顺序 = `FlxGroup.members` 顺序 = `add()` 的先后，**后 add 的盖住先 add 的**。列表类界面的硬性顺序：
+
+```
+背景 → 面板 → 选中高亮条（selectorBar / rowBar） → 行文字 → 按钮 / 状态行
+```
+
+- 高亮条必须在**行文字之前** add。反了就是「选中框把分类文字压住/糊住」——列表文字与框在几何上必然重叠，
+  只有靠层级才不会互相打架（2026-09-12 `OptionsState` 实测：`selectorBar` 建在 rows 循环之后 → 文字被盖）。
+  已按此修正：`OptionsState`。**做新列表界面时按上面这条顺序写，不要照抄旧文件的历史顺序。**
+- 反例警示：容器列表 `ContainersMenuState` 用的是**每行一个 `rowBar`**，它把 bar 与文字写在同一个循环里
+  （`add(bar)` 在 `add(t)` 之前）—— 结果正确，但顺序是巧合而非契约，别当成模板。
+- 同类界面（`ModsMenuState`、`MasterEditorMenu`）仍是 selectorBar 后 add 的历史顺序，**尚未收敛**；
+  要动它们的层级时，按本节顺序改，别只改一处造成两套约定。
+
 ### 输入（三套，既有已验证模式）
 
 1. `WheelScroll` 滚轮限速；`mouseActive` 输入分离（键盘后冻结鼠标，移动 > 10px 恢复）。

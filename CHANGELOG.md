@@ -1,8 +1,164 @@
 # Meteoric Engine 更新日志
 
-> 版本：1.1.2
+> 版本：1.1.3
 
 ## 未发布（UI 设计系统审查修复）
+
+- **【界面】更新提示界面（`OutdatedState`）按系统域规范重做**。
+
+  **版式**（用户要求：仍是"一个大窗口"，但按 `meteoric-design` 设计）：
+  900×520 圆角玻璃面板居中；标题「发现新版本！」30 白；下方**版本对比行**
+  （当前版本 → 最新版本，箭头与最新版号走 `primary`）；说明 20 `onSurfaceVariant`；
+  底部两个**真按钮**（`前往下载更新` = filled、`忽略更新` = tonal）；
+  再下一行「稍后提醒 / 不再提示」开关；最底 16 操作提示。
+
+  **相对旧版的四类改动**：
+  ① **两条文字链接 → MD3 按钮**：新增可复用组件 `source/objects/UIButton.hx`
+     （filled / tonal / text 三语义；圆角 14；hover 叠 `0x18` 白、pressed 叠 `0x30` 白 + 缩放 0.97 / 100ms；
+     带悬停唤醒，避免开界面就"亮着"；`refreshColors()` 走令牌，主题切换即时跟随）。
+     ⚠ 组件里踩到与 `makePanel` 同类的坑：**参数默认值必须是编译期常量**，
+     不能写 `variant:String = VARIANT_TONAL`（static final 不是常量表达式，Haxe 直接报错），
+     已改为字面量默认值 + 构造内规范化。
+  ② **背景换域**：`menuBG`（手绘域）→ `menuDesat` 染主题色 + **0.6 黑遮罩**
+     （系统域弹层必须压暗；旧版没有遮罩，面板直接浮在手绘背景上）。
+  ③ **新增「稍后提醒 / 不再提示」开关**：写 `ClientPrefs.data.updateNotify`（默认 true；
+     全字段反射存档 → 旧存档缺字段自动用默认值，无需迁移代码）。关闭后 `TitleState` 不再弹本界面
+     （更新检查照旧执行），并在 **设置 → 效果 → 更新提示** 补了回程入口 ——
+     否则玩家关掉之后永远看不到更新提示。
+  ④ **对齐规范**：圆角 22 / 14、面板内边距 40、按钮高 56（触控红线）、底部不越 648；
+     入场 = 面板 α + 上移 12px 的单组 tween 250ms `quadOut`（并发动效 1 组），出场 200ms `quadIn`。
+
+  **三套输入**：键盘 ←/→/↑/↓ 切焦点 + Enter 触发 + Esc 忽略；鼠标/触控悬停高亮、点击即触发；
+  开关热区 260×56（含文字），点击翻转并落盘。
+
+  **验证**：`./compile-mac.sh typecheck` 与正式 `./compile-mac.sh` 均 `EXIT=0`；启动冒烟存活、异常行 0。
+
+  **首版实测打脸后的修复（同轮内，用户截图反馈）**：
+  1. **底部提示压进开关行、文字糊成一团**：我把写死的屏幕绝对底线 `648` 当成了**面板内相对偏移**
+     （`PANEL_BOTTOM - py - 44` → 面板内 216，正好落在版本行下方）。已改为面板内坐标
+     `py + PANEL_H - 44`，并把 `PANEL_H` 从常量改为 `panelHeight()`（`min(520, FlxG.height - 48)`），
+     窗口非 720 高时也不溢出。
+  2. **「最新版本 1.1.2 < 当前版本 1.1.3」**：更新判定原来写的是"索引**不相等**"，
+     而本地已升到 `1.1.3 / 4`、远端 `gitVersion.txt` 还是 `1.1.2 / 3` → 本地比远端新也弹更新，
+     右栏还画的是那个更旧的远端号。现在判定改为 **`onlineIndex > meVersionIndex` 才提示更新**
+     （新增 `TitleState.onlineVersionIndex`），并且版本界面按"远端是否真的更新"切换全部文案：
+     标题、右栏（`最新版本` vs `仓库版本`）、说明、主按钮（`前往下载更新` vs `前往仓库查看`）。
+  3. **白圆钮出现在面板外、胶囊夹在文字里**：圆钮初值 0 → 从面板左边插值滑入（可见伪影），
+     且初值未落位；已改为开关状态确定时**直接落位**、之后才由 `update` 插值。
+
+- **【工具链修复】`compile-mac.sh typecheck` 的 ndll 还原会"忠实地保留坏文件"（实测事故，复现两次）**。
+  typecheck 开始前 app 内 `lime.ndll` 已被**前一次构建的 lime 异步收尾**覆盖成非墙钟版
+  （8789152 字节），而旧逻辑只做「备份 → 还原 → 与原备份比对」，于是把那份坏 ndll 原样还原并打印
+  "已还原"，静默埋下**启动 100% CPU 卡加载界面**的雷（该症状本项目已两次实测）。
+  更狠的是：lime 收尾会在还原**之后**继续覆盖，第二次实测直接落到构建树里的未打补丁版
+  **8660712 字节**（缺 `HiResMs` / `WaitEventTimeout`）。
+  现在还原流程改为**多轮判据 + 复验**：① 识别已知坏指纹（8660712 字节）→ 用
+  `tools/lime.ndll.wallclock` 覆盖；② 与权威墙钟版逐字节一致 → 通过；③ 与备份一致且大小 > 9000000
+  （另一份墙钟构建）→ 通过；④ 其余先还原再验，最多 10 轮，末尾打印 `size` 便于判断。
+  提示文案也改为"已还原**墙钟版**"。`./compile-mac.sh` 正式构建的后处理本来就会恢复墙钟版，
+  所以构建产物一直是好的 —— 出问题的是 typecheck 这条本该"只读"的路径。
+  **实测**：同一次 typecheck 前后 `size` 均为 9368752、`md5` 均为 `cd890285f1d3def18d9f5aafc04a198d`。
+
+- **【界面】Mods 左面板：选中项套用与 Credits 同款「大卡片」（图标 + Mod 名 + 启用状态）**。
+
+  **实现**：行高改为不等距 —— 选中行 `CARD_H = 104`、其余 `ROW_H = 56`、留白 `ROW_GAP_S = 4`；
+  行位逐行累加（原来写死的 `LIST_Y + r * ROW_GAP` 全部删除），卡片展开时下面的行整体让位。
+  滚动窗口规则与 `CreditsState` 完全一致（按真实可用高度 `LIST_H = 476` 算容量 = 7 格；
+  `lo/hi` 夹取，卡片最多落在**倒数第二格**；`cardY` 再做一次硬夹取兜底）。
+
+  **三处必须一起改的地方**（改一处漏一处就会错位）：
+  1. **复选框与状态文字位置**：原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开整列错位 →
+     改为跟随行位表 `top`。
+  2. **选中行的复选框/状态文字收进卡片**：卡片本身承担选中视觉，行文字与复选框隐藏，
+     避免"两个选中框"（Credits 那边踩过一次）。
+  3. **`updateRows()` 的续接调用**：`changeSelection()` 末尾原来只挪 `selectorBar`、不刷新行位 →
+     现在改为调用 `updateRows() + updateInfo()`，否则卡片位置永远停在旧行位。
+
+  **卡片图标**：复用 Mod 自己的 `pack.png`（与右侧大图同源同 `iconCache`）。这里有个时序坑：
+  图标是 `updateInfo()` 首次加载时才写入 `iconCache` 的，而卡片在 `updateRows()` 里构建 →
+  所以图标由 `applyCardAvatar()` 单独负责，并在 `updateInfo()` / 卡片定位两处做**懒同步兜底**
+  （`cardAvatarApplied` 守卫，就绪后不再重复套用）。图标缺失时退化为名称首字母。
+
+  顺带清理：`updateRows()` 里每帧刷屏的 `trace('[STATUS] ...')` 调试残留已删除。
+
+  **验证**：`./compile-mac.sh` → `MAC_BUILD_EXIT=0`；静态数学自检（脚本按源码常量与算法复刻，
+  150 条 × 800 次上下切换）：卡片越界事件 **0**，卡片底边最大 **616**、底线 **628**（余量 12px）。
+
+- **【界面】Credits 左面板：选中项改为「头像 + 名字 + 职位」大卡片（下面行让位）**。
+
+  **实现**：`CreditsState` 行高改为不等距 —— 选中行 `CARD_H = 104`、未选中行 `ROW_H = 56`、
+  行间留白 `ROW_GAP_S = 4`；行位由 `computeRowYs()` **逐行累加**得出（原来写死的 `r * ROW_GAP`
+  已删除），所以卡片展开时下面的行整体让位。卡片内容 = 头像（缺图退化为磨砂圆 + 首字母，
+  与右侧大图标同款）+ 名字 + 职位（取条目描述首句，按像素宽逐字截断，不依赖 `numField.numLines`
+  这类非公开成员）。头像/名字只在选中项变化时构建一次（`cardShownIndex` 守卫），不在每帧重建。
+
+  **三个实测踩坑（都写进代码注释了）**：
+  1. **两个框**：旧的 `selectorBar`（632×46）只被卡片盖住一部分 —— 卡片 104 高、它 46 高且下移 3px，
+     会从卡片下缘露出约 55px，看起来就是"小长方形 + 大卡片"两个选中框。现改为卡片是唯一选中视觉，
+     `selectorBar.visible` 恒为 false。
+  2. **滚动后卡片消失**：滚动窗口一度被裁到"越过 `curSelected`"的非法值，行位表里根本没有选中项，
+     卡片与它的行文字一起被裁掉。窗口规则现已统一到 `changeSelection()`：
+     `hi = cur-selectedCapacity+1`、`lo = hi-1`，把旧窗口位置**夹进 [lo,hi]**（优先保持原位、越界才最小移动）。
+  3. **顶出左面板**：容量一度按"面板高度"算（偏大一格）→ 卡片被放到窗口最后一格时底边越过底线。
+     改为按**真实可用高度** `LIST_H = LIST_BOTTOM - LIST_Y = 476` 算容量（= 7 格），
+     且让卡片最多落在窗口**倒数第二格**；`layoutRows()` 里另加一道硬夹取
+     `cardY = min(cardY, LIST_BOTTOM - CARD_H)` 兜底。
+
+  **验证**：`./compile-mac.sh` → `MAC_BUILD_EXIT=0`；另做**静态数学自检**（脚本按源码常量与
+  算法逐行复刻，遍历 120 条 × 600 次上下切换）：卡片越界事件 **0**，卡片底边最大 **616**、
+  底线 **628**（永远留 12px 余量）。
+
+- **【入口修复】设置 → 容器界面：进入先黑屏再跳 —— 重写入口，改为即时换状态（不挂转场）**。
+
+  **现象**：从「设置」按 Enter 进「容器」管理页时，先黑一下、然后容器界面才跳出来。
+  探针实测排除了两类猜测：`ContainersMenuState.create()` 只花 **16ms**、容器目录扫描 **0ms**
+  （1 个容器）→ **不是加载卡顿**，是转场层本身的问题。
+
+  **根因**：`MusicBeatState.switchState()` 会先挂 `CustomFadeTransition(0.6,false)` 出场转场，
+  而 `FlxGame.switchState()` 的顺序是 `FlxG.cameras.reset()` → `FlxG.bitmap.clearCache()` →
+  旧状态 `destroy()` → 新状态 `create()` → 下一帧 `draw()`：**这一整段里屏幕上没有任何东西被绘制**，
+  玩家看到的黑屏就是这个空窗；随后新状态又自己挂一层入场转场（`MusicBeatState.create()` 里
+  `if(!skip) openSubState(new CustomFadeTransition(0.7,true))`）→ 观感「黑一下再跳出来」。
+  进曲那条路没这问题，是因为 `LoadingState.create()` 不调用 `MusicBeatState.create()`，
+  **从来不挂这个转场**。
+
+  **改法（只动入口，不动过渡动画实现）**：
+  ① `OptionsState` 新增唯一入口 `enterContainersMenu()`（`#if desktop`）：
+  `FlxTransitionableState.skipNextTransOut = true`（跳过新状态自己那层入场转场，
+  用到引擎自带的 `skip` 开关）+ `FlxG.switchState(new ContainersMenuState())`
+  （不进 `startTransition`，因此不挂出场转场）。
+  ② `ContainersMenuState.exitToOptions()` 对称处理：返回设置同样直接换状态，
+  不再走 `LoadingState.loadAndSwitchState`（那条路会过渡场 + 加载界面）。
+  ③ 删掉 `ContainersMenuState.create()` 里的 `transIn/transOut = defaultTrans*` 死代码
+  （本界面已不走 `transitionIn/Out()` 路径，留着会让人误以为转场仍生效）。
+
+  **注意（改前必读）**：**不要**为了"看起来更连贯"把入口换回 `MusicBeatState.switchState` ——
+  那正是本次要修的黑屏；要恢复转场就必须同时解决"转场层空窗"（转场层自己先铺不透明底）。
+  本轮**未改动** `source/backend/CustomFadeTransition.hx`（中途一版曾改它，判断为方向错误后整文件还原）。
+
+  **验证**：`./compile-mac.sh` → `MAC_BUILD_EXIT=0`（类型检查零错误，后处理已恢复墙钟版
+  `lime.ndll` md5 `cd890285f1d3def18d9f5aafc04a198d`）；启动冒烟未闪退、异常行 0；
+  **用户运行期实测：黑屏消失，进入即时**。
+
+- **【界面修复】容器界面背景跟随主题色 + 设置分类列表文字被选中框压住（用户实测通过）**。
+
+  **① 容器界面背景没跟随主题色 `source/states/ContainersMenuState.hx`**：背景精灵加载
+  `menuDesat` 后**缺 `bg.color` 赋值**，于是永远显示贴图原始品红，换主题色毫无反应。
+  补 `bg.color = DesignTokens.menuTint`（= 本主题 `primary`，见 `DesignTokens.MENU_TINTS`），
+  与设置一级页（`OptionsState.create`）、所有设置二级页（`BaseOptionsMenu.create`）**同一取色路径**。
+  令牌在「设置→界面→主题色」里即时重算，本界面下次 `create()` 生效；
+  按 `R` 重新扫描只刷新列表，不重建背景（无需也不应重绘）。
+
+  **② 设置分类列表文字被选中框盖住 `source/options/OptionsState.hx`**：Flixel 的绘制顺序 =
+  `FlxGroup.members` 顺序 = `add()` 先后，而后 add 的盖住先 add 的。原实现把 `selectorBar`
+  建在选项行**之后**（`add(row)` 在前、`add(selectorBar)` 在后）→ 高亮条压在所有分类文字上方，
+  表现即「选项框滑过时把文字压住/糊住」。改为**高亮条先 add、文字后 add**，文字恒在最上层，
+  高亮只从文字底下滑过。**只调整 add 顺序，不动坐标系/面板尺寸/动效**（`selectorTween` 0.12s `cubeOut` 未变）。
+  代码里已留「禁止挪回 rows 之后」的契约注释；同一条层级规则写进 `skills/meteoric-system/SKILL.md`
+  新增的「绘制层级（z-order）」小节（并登记 `ModsMenuState` / `MasterEditorMenu` 尚未收敛）。
+
+  **验证**：`./compile-mac.sh` → `MAC_BUILD_EXIT=0`（类型检查零错误，后处理已恢复墙钟版
+  `lime.ndll` md5 `cd890285f1d3def18d9f5aafc04a198d`）；运行期用户实测两项均通过。
 
 - **镜头换段「瞬移」—— 缓动强度写死 2.4（2026-09-12 定位）**：
   用户反馈换段时镜头像瞬移。上一轮曾试图重构相机（自管 scroll / 改 deadzone），已全部回退；
@@ -365,6 +521,32 @@
 - **规则库**：新增 `skills/`（兼容 skills.sh 的 Agent Skills 规则库，中文），已接入 `~/.dsh/skills`（软链接，仓库为唯一事实源）
 - **Obsolescence-spam 500 帧优化（v4：串色修复 + 密集场成员减半）**：承接 v3（密集段 frame 9.8~11.5ms → 中段 1.8~2.5ms / 400~550 FPS，但不透明爆发段仍 5.7~7.2ms、峰值 14ms）。剩余大头＝同屏数千颗精灵（渲染 + `followStrumNote` 均随成员数线性涨）。本轮：① **串色修复**：`StrumNote` 静态帧恢复 RGB 列色渲染（原实现 static 刻意“恢复素材原色”→ 灰白毛胚帧在密集墙后露出即“串色/米灰箭头”，与 PE 0.6.3/原版一致改为静态/按下/确认全部列色）；② 密集谱出生窗口 2000ms→1100ms（同屏成员近似减半；音符约 1.1s 前出现，墙略短、判定/计分零影响）；③ 密集谱视觉采样预算 1200→700、单簇下限 2→1、上限 12→8。
 - **Obsolescence-spam 500 帧优化（超密集谱自动高性能档，v3 视觉/性能修正）**：`METEORIC_PROFILE` 实测（空段 frame≈0.85ms/1100+ FPS；密集段 frame_avg 9.8~11.5ms，其中 `PlayState.update` 仅 0.66~2.14ms、`notes` 子阶段峰值 1.28ms → **瓶颈是几千颗音符的逐精灵渲染**）。改动：① 原始音符 ≥400 万（`DENSE_FORCE_MERGE`，Obsolescence-spam=1180 万）时自动启用 `densePerfMode`——Note 走 perfMode 同款 quad 合批快速路径（关 RGB 着色器），不改用户存档、非密集谱行为不变；② **视觉修正**：密集谱默认皮肤强制换 PE 0.6.3 原生贴图 `noteSkins/NOTE_assets-063` 且烘焙/着色走 raw（不叠 RGB、不叠平涂色——v1 的平涂色叠加烘焙色出现“阴间”配色，已撤销，仅用户手动 perfMode 仍平涂）；③ 密集谱视觉采样预算 1800→1200、单簇下限 3→2（纯渲染采样，覆盖 0→全跨度不变）；④ 对手命中/自动游玩批处理原「每命中全表反向扫描兄弟视觉副本」O(命中×成员) 改为登记 chartSeq、本帧一次 O(成员) 批扫（语义等价）；⑤ 撤销“密集谱自动开启重叠隐藏 10px”（隐藏真实箭头/长条头，只透传用户值）；⑥ **BF 待机恢复**：PlayState 回块改 `isAnimationFinished()`（atlas 安全），且 `Character.update` 为玩家镜像“非玩家侧已被验证”的 holdTimer 阈值回 idle + 「sing 播完被清空 curAnim 定格」兜底（双保险）；⑦ **合批路径覆盖长条头/视觉副本**：移除 `sustainLength <= 0` 子条件（非 sustain 箭头无 clipRect/无拉伸，批路径与慢路径一致，密集墙全部进 quad 批）；⑧ **密集谱自动游玩溅射节流**：每轨 250ms 最多 1 次（原 botHitBatch 仅每帧每轨 1 个，700fps 下每秒 2800 个、同屏上千个溅射精灵——既是“五颜六色”乱象也是密集段渲染大头）。注：`limitNotes`（场上上限）按 density 加权计数，密集簇密度可达数百，自动抬升会破坏判定，故一律不自动改。
+
+### 更新界面：开关圆点「飞出」+ 按钮「悬浮两个都亮」根因修复（2026-09-12）
+
+> 依据《更新》对话的 bug 清单继续修。**上一轮对"圆点飞出"的结论是误判**：
+> 探针 `knob(rel)=80,513 track=489,508` 被读成"横向是对的（80 = 轨道相对 x），只是低 5px"——
+> 实际上 `toggleKnob` 与 `toggleTrack` 是 **content 的同级子精灵（同一坐标基准）**，
+> 80 与 489 相差 409px，圆钮当时确实被画在面板外（面板从 x=190 起）。
+
+| Before | After | Why |
+| --- | --- | --- |
+| `UIButton` 的 `bg/overlay` 用 `makeGraphic(w,h,TRANSPARENT)`（无 `unique`） | 构造时 `makeGraphic(w,h,TRANSPARENT, true)`，只建一次 | flixel 的 `makeGraphic` 对 (宽,高,色) 相同的调用会命中位图缓存、返回**同一张 BitmapData**；更新界面两个按钮同为 300×56 → 悬停 A 的状态层同时出现在 B 上（「悬浮两个都亮」），两个按钮还都会画成实心（用户截图实证）。同类坑此前已在 `ChartingPanel`/`ChartWidgets` 用 `unique=true` 修过 |
+| 状态变化时 `makeGraphic` "重建" graphic | `pixels.fillRect(pixels.rect, TRANSPARENT)` 清空 → 重画 → `dirty = true` | 尺寸不变时 `makeGraphic` 不清旧像素 → 移开鼠标后白层永久留在位图里（「粘住不灭」）；"重建"实为原地叠加。（范式：`UIInputBox.redraw` / `ChartWidgets.redraw`） |
+| `toggleTrack.makeGraphic(...)` 每次翻转重建 | 首次 `unique` 创建 + 翻转时原地清空重画 | 同上：开→关后 `primary` 填充会残留在"关"态胶囊上 |
+| `toggleKnob.x = toggleKnobX`（16/80 = 轨道内相对量，直接当子精灵 x 用） | `toggleKnob.x = toggleTrack.x + 圆心 − KNOB_R(11)`；插值与夹取都在**圆心空间** | 轨道在 x=489、圆钮画在 x=80 → 「圆点飞出」。实测修复后 `dx=69 / knob.x=558 / track.x=489`（关态 dx 应为 5） |
+| 夹取用胶囊半径 16 夹**精灵左边框** | 夹**圆心** `[16,80]`，半径用 11 | 圆钮直径 22（半径 11）≠ 胶囊半径 16，两个数被当成同一个 |
+| 点击后 `setPressed(false)` 只在 `justReleased` 分支（被 `!leftState && !fading && interactable` 门控） | `goDownload()/goNext()` 开头 `clearPressed()` | 点击当帧即置 `leftState/fading` → 释放分支永不执行，按钮带 `0x30` 白层 + 0.97 缩放僵在整段转场 |
+
+**改动文件**：`source/objects/UIButton.hx`、`source/states/OutdatedState.hx`。
+
+**验证**：`./compile-mac.sh typecheck` EXIT=0（ndll 已还原墙钟版 md5 `cd890285f1d3def18d9f5aafc04a198d`）；
+`./compile-mac.sh debug` 构建 EXIT=0；实机 macOS release 产物进更新界面截图复核——
+圆钮完整落在胶囊内（右侧内缩 5px）、两按钮 filled/tonal 语义分离、三行文字不再重叠；
+探针行 `[TOGGLE] dx=69 knob.x=558 track.x=489 center=80 target=80`。用户本机复核确认已修复。
+
+**遗留**：探针留在 `#if meteoric_debug` 下（正式构建零开销，长期可用）；`Main.meVersionIndex`
+预览用的临时值 `1` **已还原为 4**。
 
 ---
 

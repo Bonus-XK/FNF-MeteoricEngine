@@ -33,6 +33,24 @@ class CreditsState extends MusicBeatState
 	static final ICON_Y:Float = 170;
 	static final ICON_SIZE:Float = 160;
 
+	// ===== 左面板：选中项「大卡片」（头像 + 名字 + 职位）=====
+	// 行高不再等距：选中行 = 卡片（CARD_H），未选中行 = ROW_H。行位由「逐行累加」算出，
+	// 因此卡片展开/收起时它下面的行会整体让位（用户指定），滚动条也按同一套行位跟随。
+	static final ROW_H:Float = 56;        // 未选中行高
+	static final CARD_H:Float = 104;      // 选中卡片高
+	static final ROW_GAP_S:Float = 4;     // 行间留白（卡片本身已有描边，留白压小避免碎片感）
+	static final CARD_X:Float = PANEL_L_X + 24;              // 卡片左缘（与面板内边距对齐）
+	static final CARD_W:Float = PANEL_L_W - 48;              // 卡片宽 632
+	static final CARD_RADIUS:Float = 14;
+	static final CARD_PAD:Float = 16;                         // 卡片内边距
+	static final AVATAR_SIZE:Float = 64;                      // 卡片内头像直径
+	static final CARD_TEXT_X:Float = CARD_X + CARD_PAD + AVATAR_SIZE + 18; // 文字起点 162
+	static final CARD_TEXT_W:Float = (CARD_X + CARD_W - CARD_PAD) - CARD_TEXT_X; // 486
+	/** 列表可用高度（第一行到底线），滚动窗口容量按它算 */
+	static final LIST_BOTTOM:Float = PANEL_L_Y + PANEL_L_H - 12; // 70 + 570 - 12 = 628
+	static final LIST_H:Float = LIST_BOTTOM - LIST_Y;            // 628 - 152 = 476
+	static final PANEL_BOTTOM:Float = LIST_BOTTOM;               // 行/卡片不得越过此线
+
 	var curSelected:Int = -1;
 	var scrollIndex:Int = 0;
 
@@ -45,6 +63,15 @@ class CreditsState extends MusicBeatState
 
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween;
+
+	// 选中卡片（左面板）
+	var cardBg:FlxSprite;        // 卡片底（圆角玻璃 + 选中高亮）
+	var cardAvatar:FlxSprite;    // 头像：圆内贴图；缺图时退化为「首字母磨砂圆」
+	var cardLetter:FlxText;      // 缺图占位首字母
+	var cardName:FlxText;        // 名字
+	var cardRole:FlxText;        // 职位（取条目描述首句，超宽截断）
+	var cardTween:FlxTween;      // 卡片出现动效（低频、可被下一次输入打断）
+	var cardShownIndex:Int = -1; // 已构建的卡片条目；-1 = 尚未构建
 
 	var iconSpr:FlxSprite;
 	var iconLetter:FlxText;
@@ -100,10 +127,48 @@ class CreditsState extends MusicBeatState
 			rows.push(row);
 		}
 
-		// ---- 选中高亮条（只做视觉，不悬停切换） ----
+		// ---- 选中高亮条 ----
+		// 现在由「选中卡片」（cardBg）承担选中视觉：它是同尺寸的圆角玻璃 + rowHighlight 填充，
+		// 只是**更高**（CARD_H 104 vs 46）。selectorBar 保留为**卡片下方的定位层**：
+		// 它跟着卡片移动、被卡片完全盖住，负责「高频滚动动效」那 0.12s 的滑动节奏，
+		// 卡片自己只用 150ms 淡入，避免每格都播一次位移动画（skill：高频滚动 ≤150ms、可被打断）。
 		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, DesignTokens.rowHighlight, null);
 		selectorBar.visible = false;
 		add(selectorBar);
+
+		// ---- 左面板：选中卡片（先建，才能被行文字盖住？不 —— 卡片必须在**文字之下**）----
+		// 绘制顺序契约：卡片 → 头像 → 行文字（refreshRows 里文字在 create 期已 add，
+		// 故这里用 add 顺序保证卡片在下层）。文字始终画在卡片之上，不会被卡片边缘压住。
+		cardBg = makePanel(CARD_X, LIST_Y, CARD_W, CARD_H, CARD_RADIUS, DesignTokens.rowHighlight, DesignTokens.panelOutline);
+		cardBg.visible = false;
+		add(cardBg);
+
+		cardAvatar = new FlxSprite(0, 0);
+		cardAvatar.antialiasing = ClientPrefs.data.antialiasing;
+		cardAvatar.scrollFactor.set();
+		cardAvatar.visible = false;
+		add(cardAvatar);
+
+		cardLetter = new FlxText(0, 0, AVATAR_SIZE, '', 30);
+		cardLetter.setFormat(Paths.font('future.ttf'), 30, FlxColor.WHITE, CENTER);
+		cardLetter.scrollFactor.set();
+		cardLetter.visible = false;
+		add(cardLetter);
+
+		cardName = new FlxText(CARD_TEXT_X, LIST_Y, CARD_TEXT_W, '', 32);
+		cardName.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		cardName.borderSize = 2;
+		cardName.wordWrap = false;
+		cardName.scrollFactor.set();
+		cardName.visible = false;
+		add(cardName);
+
+		cardRole = new FlxText(CARD_TEXT_X, LIST_Y, CARD_TEXT_W, '', 18);
+		cardRole.setFormat(Paths.font('future.ttf'), 18, 0xFFD7D7E0, LEFT);
+		cardRole.wordWrap = false;
+		cardRole.scrollFactor.set();
+		cardRole.visible = false;
+		add(cardRole);
 
 		// ---- 右侧：大图标 ----
 		iconSpr = new FlxSprite(ICON_X, ICON_Y);
@@ -335,11 +400,34 @@ class CreditsState extends MusicBeatState
 				curSelected = 0;
 		} while (unselectableCheck(curSelected));
 
-		// 滚动窗口：只有越过可见区时才整页滚动
-		if (curSelected < scrollIndex)
-			scrollIndex = curSelected;
-		else if (curSelected > scrollIndex + ROWS_VISIBLE - 1)
-			scrollIndex = curSelected - ROWS_VISIBLE + 1;
+		// 滚动窗口：**选中项必须始终在窗口内**，且窗口里要装得下"更高的选中卡片"。
+		// 旧的 `ROWS_VISIBLE - 1` 规则不再成立：选中行占 CARD_H（104）而不是 ROW_H（56），
+		// 所以按实际高度算每页能装几行（cardRowCapacity），保证
+		//   ① 选到窗口底部时整页下移（否则选中项会跑出左面板，正是"顶出左面板"的现象）
+		//   ② 卡片展开后下面仍有行可显示（卡片多占的 48px 只挤掉一行，不会挤掉整页）
+		// ⚠ 这里必须用 `curSelected` 自己那一行占 CARD_H 来算容量 —— 窗口里永远只有 1 张卡片。
+		// ⚠ 容量必须按**真实可用高度 LIST_H** 算（第一行到底线），不是面板高度：
+		//   用面板高度算过一次，容量偏大 → 卡片被放到最后一格时底边越过底线 → 顶出左面板。
+		var slotH:Float = CARD_H + ROW_GAP_S;
+		var rowsCapacity:Int = 1 + Math.floor((LIST_H - slotH) / (ROW_H + ROW_GAP_S));
+		if (rowsCapacity < 1) rowsCapacity = 1;
+		if (rowsCapacity > ROWS_VISIBLE) rowsCapacity = ROWS_VISIBLE;
+
+		// 合法窗口区间 [lo, hi]：
+		//   hi = curSelected - capacity + 1 —— 选中项落在窗口最后一格；
+		//   lo = curSelected - capacity + 2 —— 选中项落在窗口**倒数第二格**。
+		// 为什么 lo 要多一格：卡片占窗口最后一格时底边几乎贴住底线，任何常量偏差都会越界
+		// （实测 capacity=7 时最后两格分别越界 96px / 36px）。让卡片最多落在倒数第二格，
+		// 底边就留出一整行的余量。capacity=1 时 lo 会大于 hi，做保护夹取。
+		var hi:Int = curSelected - rowsCapacity + 1;
+		var lo:Int = curSelected - rowsCapacity + 2;
+		if (lo > hi) lo = hi;
+		if (lo < 0) lo = 0;
+
+		// 把旧窗口位置**夹进合法区间**：优先保持原位（避免每选一格整屏乱跳），越界才移动最小距离。
+		// 这样同时满足两条约束：① 选中项在窗口内（否则卡片与行文字一起消失）
+		// ② 卡片一定放得下面板（否则顶出左面板）。
+		scrollIndex = Std.int(Math.max(lo, Math.min(hi, scrollIndex)));
 
 		var newColor:FlxColor = CoolUtil.colorFromString(creditsStuff[curSelected][4]);
 		if (newColor != intendedColor)
@@ -404,10 +492,45 @@ class CreditsState extends MusicBeatState
 
 	function refreshRows()
 	{
+		// 选中卡片只构建一次：内容没变就别重复构建（每格重设贴图 = 无谓开销）
+		if (cardShownIndex != curSelected)
+		{
+			cardShownIndex = curSelected;
+			buildCard();
+		}
+		layoutRows();
+	}
+
+	/**
+	 * 行位表：选中行占 CARD_H，其余占 ROW_H，逐行累加。
+	 * 这是"下面行给卡片让位"的唯一实现点 —— 任何行位计算都必须走这里，不要再写 `r * ROW_GAP`。
+	 */
+	function computeRowYs():Array<Float>
+	{
+		var ys:Array<Float> = [];
+		var y:Float = LIST_Y;
+		for (r in 0...ROWS_VISIBLE)
+		{
+			ys.push(y);
+			var idx:Int = scrollIndex + r;
+			var isCard:Bool = (idx == curSelected);
+			y += (isCard ? CARD_H : ROW_H) + ROW_GAP_S;
+		}
+		return ys;
+	}
+
+	/** 应用行位 + 卡片位置/内容开关。所有尺寸都按当前行高动态算，不依赖等距 ROW_GAP。 */
+	function layoutRows()
+	{
+		var ys:Array<Float> = computeRowYs();
+		var isCardVisible:Bool = false;
+
 		for (r in 0...ROWS_VISIBLE)
 		{
 			var idx:Int = scrollIndex + r;
 			var row:FlxText = rows[r];
+			var top:Float = ys[r];
+			var isSel:Bool = (idx == curSelected);
 
 			if (idx >= creditsStuff.length)
 			{
@@ -416,38 +539,210 @@ class CreditsState extends MusicBeatState
 			}
 
 			var isTitle:Bool = unselectableCheck(idx);
-			var isSel:Bool = (idx == curSelected);
+			var rowH:Float = isSel ? CARD_H : ROW_H;
+
+			// 越过面板底线的**普通行**隐藏（卡片展开会把下面的行推下去），避免压到底部提示条。
+			// ⚠ 选中行（卡片）**绝不能**走这条裁剪：卡片比普通行高 48px，滚动窗口又按 ROWS_VISIBLE 算，
+			//   一旦卡片被推到面板底线以下，这里会把它整个隐藏 —— 实测表现就是
+			//   「向下选中并滚动后大卡片不显示」。卡片位置由 changeSelection 的窗口规则 +
+			//   layoutRows 的行位表共同保证：选中项永远落在窗口内，卡片永远在面板底线之上。
+			if (!isSel && top + rowH > PANEL_BOTTOM)
+			{
+				row.visible = false;
+				continue;
+			}
 
 			row.visible = true;
 			row.text = creditsStuff[idx][0];
+			row.updateHitbox(); // 先按新文本刷新尺寸，行内垂直居中才用的是**新**高度
+
 			if (isTitle)
 			{
 				row.fieldWidth = PANEL_L_W - 48;
 				row.x = PANEL_L_X + 24;
 				row.alignment = CENTER;
+				row.y = top + (ROW_H - row.height) * 0.5; // 栏目标题在行内居中
 				row.alpha = 0.9;
 				row.color = DesignTokens.secondary;
+			}
+			else if (isSel)
+			{
+				// 选中行：名字交给卡片里的 cardName；行文字隐藏（避免与卡片内容重复渲染）
+				row.visible = false;
+				isCardVisible = true;
 			}
 			else
 			{
 				row.fieldWidth = 0;
 				row.x = LIST_X;
 				row.alignment = LEFT;
-				row.alpha = isSel ? 1 : 0.55;
-				row.color = isSel ? FlxColor.WHITE : 0xFFB8B8C8;
+				row.y = top + (rowH - row.height) * 0.5;
+				row.alpha = 0.55;
+				row.color = 0xFFB8B8C8;
 			}
-			row.updateHitbox();
 		}
 
-		var barY:Float = LIST_Y - 3 + ((curSelected - scrollIndex) * ROW_GAP);
-		selectorBar.visible = true;
+		// ---- 卡片定位 + 内部内容 ----
+		cardBg.visible = isCardVisible;
+		cardAvatar.visible = isCardVisible && cardAvatar.graphic != null;
+		cardLetter.visible = isCardVisible && (cardAvatar.graphic == null);
+		cardName.visible = isCardVisible;
+		cardRole.visible = isCardVisible;
+
+		if (isCardVisible)
+		{
+			// 窗口内下标：由 changeSelection 的 rowsCapacity 规则保证落在 0..ROWS_VISIBLE-1，
+			// 这里再夹取一次作硬防护（越界会把卡片画到屏幕外，且 Haxe 数组越界在 cpp 上是崩而不是报错）
+			var slot:Int = curSelected - scrollIndex;
+			if (slot < 0) slot = 0;
+			if (slot > ROWS_VISIBLE - 1) slot = ROWS_VISIBLE - 1;
+			var cardY:Float = ys[slot];
+
+			// 【硬约束】卡片底边绝不允许越过面板底线 —— 越界就是用户看到的「卡片顶出左面板、
+			// 压在底部提示条上」。行位表是自顶向下累加的，窗口容量只是"尽量"保证放得下；
+			// 一旦估算偏差（常量/字号/行距任何一处改动都会重新引入），这里直接夹住：
+			// 宁可让卡片与下面某一行视觉重叠，也绝不允许它越出面板（重叠只影响观感，越界是破图）。
+			var cardMaxY:Float = PANEL_BOTTOM - CARD_H;
+			if (cardY > cardMaxY) cardY = cardMaxY;
+			if (cardY < LIST_Y) cardY = LIST_Y;
+
+			var cy:Float = cardY + CARD_H * 0.5;
+
+			cardBg.y = cardY;
+			if (cardBg.alpha < 1) cardBg.alpha = 1;
+
+			// 头像：贴图存在则等比缩放居中放进圆内；缺图时用磨砂圆 + 首字母（与右侧大图标同款退化）
+			var avCx:Float = CARD_X + CARD_PAD + AVATAR_SIZE * 0.5;
+			if (cardAvatar.graphic != null)
+			{
+				cardAvatar.x = avCx - cardAvatar.width * 0.5;
+				cardAvatar.y = cy - cardAvatar.height * 0.5;
+			}
+			if (cardLetter.visible)
+			{
+				cardLetter.fieldWidth = AVATAR_SIZE;
+				cardLetter.x = CARD_X + CARD_PAD;
+				cardLetter.y = cy - 20;
+			}
+
+			// 名字 + 职位：两行文字整体在卡片内垂直居中
+			cardName.x = CARD_TEXT_X;
+			cardName.y = cy - 26;
+			cardName.fieldWidth = CARD_TEXT_W;
+			cardName.color = FlxColor.WHITE;
+
+			cardRole.x = CARD_TEXT_X;
+			cardRole.y = cy + 8;
+			cardRole.fieldWidth = CARD_TEXT_W;
+			cardRole.color = 0xFFD7D7E0;
+		}
+
+		// ---- 高亮条 ----
+		// 已废弃：卡片（cardBg）就是选中视觉。原先保留它当"卡片下方的定位层"是错的 ——
+		// 卡片 104 高、它只有 46 高且下移 3px，会从卡片下缘露出约 55px，
+		// 表现为「同时出现一个小长方形和一个大卡片」（用户实测）。这里彻底不显示。
+		selectorBar.visible = false;
 		if (selectorTween != null)
 		{
 			selectorTween.cancel();
 			selectorTween = null;
 		}
-		if (selectorBar.y != barY)
-			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
+	}
+
+	/**
+	 * 构建选中卡片的内容：头像（`credits/<icon>`）+ 名字 + 职位。
+	 * 只在选中项变化时调用（见 refreshRows 的 cardShownIndex 守卫）：
+	 * 头像贴图每格重设属于无谓开销，且 `Paths.image` 已带缓存，切换回来的成本只是查表。
+	 */
+	function buildCard()
+	{
+		if (curSelected < 0 || curSelected >= creditsStuff.length) return;
+
+		var info:Array<String> = creditsStuff[curSelected];
+		var letter:String = (info[0] != null && info[0].length > 0) ? info[0].substring(0, 1) : '?';
+
+		cardName.text = info[0];
+		cardName.updateHitbox();
+
+		// 职位 = 条目描述的首句（数据里没有独立职位字段；用户确认「只用现有数据」）
+		cardRole.text = firstSentence(info[2]);
+		cardRole.updateHitbox();
+
+		#if MODS_ALLOWED
+		if (info[5] != null) Mods.currentModDirectory = info[5];
+		#end
+
+		var graphic = Paths.image('credits/' + info[1]);
+		if (graphic == null)
+		{
+			// 缺图：磨砂圆 + 首字母（与右侧大图标同款退化表现）
+			cardAvatar.makeGraphic(Std.int(AVATAR_SIZE), Std.int(AVATAR_SIZE), FlxColor.TRANSPARENT);
+			FlxSpriteUtil.drawCircle(cardAvatar, AVATAR_SIZE * 0.5, AVATAR_SIZE * 0.5, AVATAR_SIZE * 0.5 - 2,
+				0x2EFFFFFF, {color: 0x8CFFFFFF, thickness: 2});
+			cardAvatar.updateHitbox();
+			cardLetter.text = letter;
+		}
+		else
+		{
+			// 有图：**短边**贴到圆内直径并居中（长边会被圆/卡片边界自然裁掉，脸不会变形）
+			cardAvatar.loadGraphic(graphic);
+			var k:Float = AVATAR_SIZE / Math.min(graphic.width, graphic.height);
+			cardAvatar.setGraphicSize(Std.int(graphic.width * k), Std.int(graphic.height * k));
+			cardAvatar.updateHitbox();
+			cardLetter.text = '';
+		}
+
+		#if MODS_ALLOWED
+		Mods.currentModDirectory = '';
+		#end
+
+		// 低频、可打断的出现动效（skill：150ms quadOut；复用的 tween 先 kill）
+		if (cardTween != null)
+		{
+			cardTween.cancel();
+			cardTween = null;
+		}
+		cardBg.alpha = 0.4;
+		cardTween = FlxTween.tween(cardBg, {alpha: 1}, 0.15, {
+			ease: FlxEase.quadOut,
+			onComplete: function(_) cardTween = null
+		});
+	}
+
+	/** 取描述首句（按换行/句号/问叹号切），并用 getTextWidth 逐字收敛到卡片可用宽度。 */
+	static function firstSentence(s:String):String
+	{
+		if (s == null) return '';
+		var out:String = s.split('\n')[0];
+		for (p in ['。', '！', '？', '.', '!', '?'])
+		{
+			var i:Int = out.indexOf(p);
+			if (i > 0)
+			{
+				out = out.substring(0, i);
+				break;
+			}
+		}
+		return fitToWidth(out.trim(), CARD_TEXT_W, 18);
+	}
+
+	/** 逐字截断到指定像素宽（超宽补省略号）。不依赖 TextField.numLines 之类的非公开成员。 */
+	static function fitToWidth(s:String, maxPx:Float, size:Int):String
+	{
+		if (s == null || s.length < 1) return '';
+		var probe:FlxText = new FlxText(0, 0, 0, s, size);
+		probe.setFormat(Paths.font('future.ttf'), size, FlxColor.WHITE, LEFT);
+		var t:String = s;
+		var n:Int = s.length;
+		while (n > 1)
+		{
+			probe.text = t + '…';
+			if (probe.textField.textWidth <= maxPx) break;
+			n--;
+			t = s.substring(0, n);
+		}
+		probe.destroy();
+		return (n < s.length) ? (t + '…') : s;
 	}
 
 	#if MODS_ALLOWED

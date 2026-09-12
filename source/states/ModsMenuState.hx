@@ -41,6 +41,20 @@ class ModsMenuState extends MusicBeatState
 	static final VALUE_X:Float = 540;
 	static final VALUE_W:Float = 160;
 
+	// ===== 左面板：选中项「大卡片」（与 CreditsState 同一套尺寸语义）=====
+	static final ROW_H:Float = 56;        // 未选中行高
+	static final CARD_H:Float = 104;      // 选中卡片高
+	static final ROW_GAP_S:Float = 4;     // 行间留白
+	static final CARD_X:Float = PANEL_L_X + 24;
+	static final CARD_W:Float = PANEL_L_W - 48;
+	static final CARD_RADIUS:Float = 14;
+	static final CARD_PAD:Float = 16;
+	static final CARD_ICON_SIZE:Float = 64;                    // 卡片内图标（等比）
+	static final CARD_TEXT_X:Float = CARD_X + CARD_PAD + CARD_ICON_SIZE + 18; // 162
+	static final CARD_TEXT_W:Float = (CARD_X + CARD_W - CARD_PAD) - CARD_TEXT_X; // 486
+	static final LIST_BOTTOM:Float = PANEL_L_Y + PANEL_L_H - 12; // 628
+	static final LIST_H:Float = LIST_BOTTOM - LIST_Y;            // 476
+
 	static final INFO_X:Float = 772;
 	static final INFO_W:Float = 400;
 
@@ -59,6 +73,21 @@ class ModsMenuState extends MusicBeatState
 	var scrollIndex:Int = 0;
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween;
+
+	// 选中卡片（左面板）：图标 + Mod 名 + 启用状态
+	var cardBg:FlxSprite;
+	var cardIcon:FlxSprite;
+	var cardLetter:FlxText;
+	var cardName:FlxText;
+	var cardStatus:FlxText;
+	var cardTween:FlxTween;
+	var cardShownFolder:String = '';
+	/** 当前卡片是否已套用 Mod 图标（图标首次加载发生在 updateInfo 里，见该函数的懒同步） */
+	var cardAvatarApplied:Bool = false;
+	/** 卡片当前显示的启用状态（状态变化要重建文案） */
+	var cardShownOn:Bool = false;
+	/** 卡片是否已经出现过一次（只有首次做淡入，之后即时重建，避免每格都播动画） */
+	var cardEverShown:Bool = false;
 
 	var iconSpr:FlxSprite;
 	var iconCache:Map<String, BitmapData> = [];
@@ -168,6 +197,41 @@ class ModsMenuState extends MusicBeatState
 		selectorBar = makePanel(PANEL_L_X + 24, LIST_Y - 3, PANEL_L_W - 48, 46, 14, DesignTokens.rowHighlight, null);
 		selectorBar.visible = false;
 		add(selectorBar);
+
+		// ---- 左面板：选中项「大卡片」（图标 + Mod 名 + 启用状态）----
+		// 与 Credits 左面板同一套语言（见 CreditsState 的同名实现与注释）：
+		// 选中行占 CARD_H，其余行占 ROW_H，行位逐行累加 → 卡片展开时下面的行整体让位。
+		// 卡片必须**最先 add**（画在行文字下方），文字才不会压住描边。
+		cardBg = makePanel(CARD_X, LIST_Y, CARD_W, CARD_H, CARD_RADIUS, DesignTokens.rowHighlight, DesignTokens.panelOutline);
+		cardBg.visible = false;
+		add(cardBg);
+
+		cardIcon = new FlxSprite(0, 0);
+		cardIcon.antialiasing = ClientPrefs.data.antialiasing;
+		cardIcon.scrollFactor.set();
+		cardIcon.visible = false;
+		add(cardIcon);
+
+		cardLetter = new FlxText(0, 0, CARD_ICON_SIZE, '', 30);
+		cardLetter.setFormat(Paths.font('future.ttf'), 30, FlxColor.WHITE, CENTER);
+		cardLetter.scrollFactor.set();
+		cardLetter.visible = false;
+		add(cardLetter);
+
+		cardName = new FlxText(CARD_TEXT_X, LIST_Y, CARD_TEXT_W, '', 32);
+		cardName.setFormat(Paths.font('future.ttf'), 32, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		cardName.borderSize = 2;
+		cardName.wordWrap = false;
+		cardName.scrollFactor.set();
+		cardName.visible = false;
+		add(cardName);
+
+		cardStatus = new FlxText(CARD_TEXT_X, LIST_Y, CARD_TEXT_W, '', 18);
+		cardStatus.setFormat(Paths.font('future.ttf'), 18, 0xFFD7D7E0, LEFT);
+		cardStatus.wordWrap = false;
+		cardStatus.scrollFactor.set();
+		cardStatus.visible = false;
+		add(cardStatus);
 
 		// ---- 右侧信息 ----
 		iconSpr = new FlxSprite(772, 190);
@@ -533,10 +597,20 @@ class ModsMenuState extends MusicBeatState
 		else if(curSelected >= mods.length)
 			curSelected = 0;
 
-		if (curSelected < scrollIndex)
-			scrollIndex = curSelected;
-		else if (curSelected > scrollIndex + ROWS_VISIBLE - 1)
-			scrollIndex = curSelected - ROWS_VISIBLE + 1;
+		// 滚动窗口：选中行占 CARD_H（104）而不是 ROW_H（56），容量必须按**真实可用高度**算，
+		// 再把旧窗口位置**夹进合法区间**（优先保持原位、越界才最小移动）。与 CreditsState 同款：
+		//   hi = cur - capacity + 1（选中项落在窗口最后一格）
+		//   lo = hi - 1           （卡片最多落在**倒数第二格**，底边留一行余量，不会顶出左面板）
+		var slotH:Float = CARD_H + ROW_GAP_S;
+		var rowsCapacity:Int = 1 + Math.floor((LIST_H - slotH) / (ROW_H + ROW_GAP_S));
+		if (rowsCapacity < 1) rowsCapacity = 1;
+		if (rowsCapacity > ROWS_VISIBLE) rowsCapacity = ROWS_VISIBLE;
+
+		var hi:Int = curSelected - rowsCapacity + 1;
+		var lo:Int = curSelected - rowsCapacity + 2;
+		if (lo > hi) lo = hi;
+		if (lo < 0) lo = 0;
+		scrollIndex = Std.int(Math.max(lo, Math.min(hi, scrollIndex)));
 
 		var newColor:Int = mods[curSelected].color;
 		if(newColor != intendedColor)
@@ -546,19 +620,48 @@ class ModsMenuState extends MusicBeatState
 			colorTween = FlxTween.color(bg, 0.4, bg.color, intendedColor, {ease: FlxEase.quadOut});
 		}
 
-		var barY:Float = LIST_Y - 3 + ((curSelected - scrollIndex) * ROW_GAP);
-		selectorBar.visible = true;
+		// 选中视觉已由「大卡片」承担（旧 selectorBar 会从卡片下缘露出一截，形成两个选中框）。
+		selectorBar.visible = false;
 		if (selectorTween != null) { selectorTween.cancel(); selectorTween = null; }
-		if (selectorBar.y != barY)
-			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
+
+		updateRows();     // 行位 / 卡片内容随选中项重排
+		updateInfo();     // 右侧信息 + 卡片图标懒同步（见 updateInfo 里的说明）
 	}
 
 	function updateRows()
 	{
+		// 行位：选中行占 CARD_H、其余占 ROW_H，逐行累加 —— 卡片展开时下面的行整体让位。
+		var ys:Array<Float> = [];
+		var y:Float = LIST_Y;
+		for (r in 0...ROWS_VISIBLE)
+		{
+			ys.push(y);
+			var idx0:Int = scrollIndex + r;
+			y += ((idx0 == curSelected) ? CARD_H : ROW_H) + ROW_GAP_S;
+		}
+
+		// 卡片内容：选中项变化或启用状态变化时重建（cardShownFolder + 状态双守卫）
+		if (mods.length > 0 && curSelected >= 0 && curSelected < mods.length)
+		{
+			var sel:ModMetadata = mods[curSelected];
+			var selOn:Bool = (modsList[curSelected][1] == true);
+			if (cardShownFolder != sel.folder || cardShownOn != selOn)
+			{
+				cardShownFolder = sel.folder;
+				cardShownOn = selOn;
+				cardAvatarApplied = false;
+				buildCard();
+			}
+		}
+
+		var isCardVisible:Bool = false;
+
 		for (r in 0...ROWS_VISIBLE)
 		{
 			var idx:Int = scrollIndex + r;
 			var row:MenuText = rows[r];
+			var top:Float = ys[r];
+
 			if (idx >= mods.length)
 			{
 				row.visible = false;
@@ -570,6 +673,29 @@ class ModsMenuState extends MusicBeatState
 
 			var mod:ModMetadata = mods[idx];
 			var isSel:Bool = (idx == curSelected);
+
+			// 越过面板底线的**普通行**隐藏；选中行（卡片）绝不能走这条裁剪，
+			// 否则卡片会被整个隐藏（Credits 那边踩过一次，见 CreditsState 注释）。
+			if (!isSel && top + ROW_H > LIST_BOTTOM)
+			{
+				row.visible = false;
+				checkBgs[r].visible = false;
+				checkFills[r].visible = false;
+				statusTexts[r].visible = false;
+				continue;
+			}
+
+			if (isSel)
+			{
+				// 选中行：名称/状态/复选框都收进卡片，行本身隐藏（避免与卡片重复渲染）
+				row.visible = false;
+				checkBgs[r].visible = false;
+				checkFills[r].visible = false;
+				statusTexts[r].visible = false;
+				isCardVisible = true;
+				continue;
+			}
+
 			var isOn:Bool = (modsList[idx][1] == true);
 
 			row.visible = true;
@@ -578,16 +704,24 @@ class ModsMenuState extends MusicBeatState
 				lastRowText[r] = mod.name;
 				clipText(row, mod.name, VALUE_X - LIST_X - 24);
 			}
-			row.alpha = isSel ? 1 : 0.78;
-			row.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+			row.alpha = 0.78;
+			row.color = 0xFFCFCFDC;
+			row.y = top + (ROW_H - row.height) * 0.5; // 行内垂直居中
 
+			// 复选框位置随行位走（原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开就会错位）
 			checkBgs[r].visible = true;
-			checkBgs[r].alpha = isSel ? 1 : 0.85;
+			checkBgs[r].x = CHECK_X;
+			checkBgs[r].y = top + 4;
+			checkBgs[r].alpha = 0.85;
 			checkFills[r].visible = isOn;
+			if (isOn)
+			{
+				checkFills[r].x = CHECK_X + 6;
+				checkFills[r].y = top + 10;
+			}
 
 			statusTexts[r].visible = true;
-			statusTexts[r].y = rows[r].y + 2; // 始终与所在行对齐
-			trace('[STATUS] r=' + r + ' y=' + statusTexts[r].y + ' h=' + statusTexts[r].height + ' th=' + statusTexts[r].textField.textHeight);
+			statusTexts[r].y = top + 2; // 始终与所在行对齐
 			var status:String = isOn ? '已启用' : '已停用';
 			if (lastStatus[r] != status)
 			{
@@ -595,9 +729,141 @@ class ModsMenuState extends MusicBeatState
 				statusTexts[r].text = status;
 				statusTexts[r].updateHitbox();
 			}
-			statusTexts[r].alpha = isSel ? 1 : 0.75;
+			statusTexts[r].alpha = 0.75;
 			statusTexts[r].color = isOn ? 0xFF7BFF9E : DesignTokens.primary;
 		}
+
+		// ---- 卡片定位 ----
+		cardBg.visible = isCardVisible;
+		cardIcon.visible = isCardVisible && cardIcon.graphic != null;
+		cardLetter.visible = isCardVisible && !cardIcon.visible;
+		cardName.visible = isCardVisible;
+		cardStatus.visible = isCardVisible;
+
+		if (isCardVisible)
+		{
+			var slot:Int = curSelected - scrollIndex;
+			if (slot < 0) slot = 0;
+			if (slot > ROWS_VISIBLE - 1) slot = ROWS_VISIBLE - 1;
+			var cardY:Float = ys[slot];
+
+			// 【硬约束】卡片底边绝不越过面板底线（越界就是"卡片顶出左面板"）。窗口容量只是"尽量"
+			// 保证放得下；任何常量/字号改动都可能让估算失效，这里直接夹住兜底。
+			var cardMaxY:Float = LIST_BOTTOM - CARD_H;
+			if (cardY > cardMaxY) cardY = cardMaxY;
+			if (cardY < LIST_Y) cardY = LIST_Y;
+
+			var cy:Float = cardY + CARD_H * 0.5;
+
+			cardBg.y = cardY;
+			if (cardBg.alpha < 1) cardBg.alpha = 1;
+
+			// 图标：等比缩放居中放进卡片左端
+			var icCx:Float = CARD_X + CARD_PAD + CARD_ICON_SIZE * 0.5;
+			if (cardIcon.graphic != null)
+			{
+				cardIcon.x = icCx - cardIcon.width * 0.5;
+				cardIcon.y = cy - cardIcon.height * 0.5;
+			}
+			if (cardLetter.visible)
+			{
+				cardLetter.fieldWidth = CARD_ICON_SIZE;
+				cardLetter.x = CARD_X + CARD_PAD;
+				cardLetter.y = cy - 20;
+			}
+
+			// 名字 + 状态：两行整体在卡片内垂直居中
+			cardName.x = CARD_TEXT_X;
+			cardName.y = cy - 26;
+			cardName.color = FlxColor.WHITE;
+
+			cardStatus.x = CARD_TEXT_X;
+			cardStatus.y = cy + 8;
+			// 下标防护：curSelected 越界时不要读 modsList（cpp 上越界是崩，不是报错）
+			if (curSelected >= 0 && curSelected < modsList.length)
+				cardStatus.color = (modsList[curSelected][1] == true) ? 0xFF7BFF9E : DesignTokens.primary;
+
+			// 卡片图标懒同步兜底：图标可能在这一帧之后才由 updateInfo 写入 iconCache
+			if (curSelected >= 0 && curSelected < mods.length
+				&& !cardAvatarApplied && iconCache.exists(mods[curSelected].folder))
+				applyCardAvatar(iconCache.get(mods[curSelected].folder));
+		}
+	}
+
+	/**
+	 * 构建卡片文本：Mod 名 + 启用状态。**不碰图标** —— 图标统一由 applyCardAvatar() 负责，
+	 * 因为 Mod 图标是懒加载进 iconCache 的（见 updateInfo），构建时机与图标就绪时机并不同步。
+	 */
+	function buildCard()
+	{
+		if (curSelected < 0 || curSelected >= mods.length) return;
+
+		var mod:ModMetadata = mods[curSelected];
+		cardName.text = fitToWidth(mod.name, CARD_TEXT_W, 32);
+		cardName.updateHitbox();
+
+		var isOn:Bool = (modsList[curSelected][1] == true);
+		cardStatus.text = isOn ? '已启用' : '已停用（按 Enter 或点击启用）';
+		cardStatus.updateHitbox();
+
+		// 首次出现做一次克制的淡入（skill：低频、150ms quadOut、可被打断）；之后即时重建
+		if (cardTween != null)
+		{
+			cardTween.cancel();
+			cardTween = null;
+		}
+		if (!cardEverShown)
+		{
+			cardEverShown = true;
+			cardBg.alpha = 0.4;
+			cardTween = FlxTween.tween(cardBg, {alpha: 1}, 0.15, {
+				ease: FlxEase.quadOut,
+				onComplete: function(_) cardTween = null
+			});
+		}
+		else
+			cardBg.alpha = 1;
+	}
+
+	/** 把 Mod 图标套到卡片图标上（短边贴齐后居中；缺图时退化为名称首字母）。 */
+	function applyCardAvatar(icon:BitmapData):Void
+	{
+		if (icon == null || curSelected < 0 || curSelected >= mods.length) return;
+
+		cardAvatarApplied = true;
+		if (icon.width >= 150 && icon.height >= 150)
+		{
+			// pack.png 常见是 150×150 一帧的多帧图集：卡片上用第一帧
+			cardIcon.loadGraphic(icon, true, 150, 150);
+			cardIcon.animation.add('icon', [0], 10);
+			cardIcon.animation.play('icon');
+		}
+		else
+			cardIcon.loadGraphic(icon);
+
+		var k:Float = CARD_ICON_SIZE / Math.min(cardIcon.frameWidth, cardIcon.frameHeight);
+		cardIcon.setGraphicSize(Std.int(cardIcon.frameWidth * k), Std.int(cardIcon.frameHeight * k));
+		cardIcon.updateHitbox();
+		cardLetter.text = '';
+	}
+
+	/** 逐字截断到指定像素宽（超宽补省略号）。Card 上不用非公开的 TextField.numLines。 */
+	static function fitToWidth(s:String, maxPx:Float, size:Int):String
+	{
+		if (s == null || s.length < 1) return '';
+		var probe:FlxText = new FlxText(0, 0, 0, s, size);
+		probe.setFormat(Paths.font('future.ttf'), size, FlxColor.WHITE, LEFT);
+		var t:String = s;
+		var n:Int = s.length;
+		while (n > 1)
+		{
+			probe.text = t + '…';
+			if (probe.textField.textWidth <= maxPx) break;
+			n--;
+			t = s.substring(0, n);
+		}
+		probe.destroy();
+		return (n < s.length) ? (t + '…') : s;
 	}
 
 	function updateInfo()
@@ -626,6 +892,12 @@ class ModsMenuState extends MusicBeatState
 
 		restartText.visible = mod.restart;
 
+		// 【卡片懒同步】卡片构建时该 Mod 的图标可能还没进 iconCache（首次进入界面时图标是在这里
+		// 才加载并写入缓存的），所以卡片图标在这里补一次；图标就绪后置位 cardAvatarApplied，
+		// 后续切回来不再重复套用。
+		if (cardShownFolder == mod.folder && !cardAvatarApplied && iconCache.exists(mod.folder))
+			applyCardAvatar(iconCache.get(mod.folder));
+
 		// 图标（带帧动画的 pack.png / unknownMod）
 		if (lastIconFolder != mod.folder)
 		{
@@ -646,12 +918,18 @@ class ModsMenuState extends MusicBeatState
 				var totalFrames:Int = Math.floor(loadedIcon.width / 150) * Math.floor(loadedIcon.height / 150);
 				if (totalFrames > 1)
 				{
+					if (!cardAvatarApplied) applyCardAvatar(loadedIcon); // 卡片图标与右侧同源同缓存
+					cardAvatarApplied = true;
 					iconSpr.loadGraphic(loadedIcon, true, 150, 150);
 					iconSpr.animation.add("icon", [for (i in 0...totalFrames) i], 10);
 					iconSpr.animation.play("icon");
 				}
 				else
+				{
+					if (!cardAvatarApplied) applyCardAvatar(loadedIcon);
+					cardAvatarApplied = true;
 					iconSpr.loadGraphic(loadedIcon);
+				}
 			}
 			else
 				iconSpr.loadGraphic(Paths.image('unknownMod'));

@@ -4,6 +4,7 @@ import backend.WheelScroll;
 import objects.BackButton;
 import states.MainMenuState;
 import backend.StageData;
+import flixel.addons.transition.FlxTransitionableState; // 容器界面入口要用它跳过入场转场
 import openfl.Lib;
 import flixel.util.FlxSpriteUtil;
 
@@ -83,8 +84,7 @@ class OptionsState extends MusicBeatState
 			case '容器':
 				// 容器管理是独立全屏界面（列表 + 详情 + 操作条），直接切状态而不是 openSubState：
 				// 会话启动后 Meteoric 会整机重启，子状态挂在父状态上的层级关系会带来无意义的恢复成本
-				pendingSelectLabel = '容器';
-				MusicBeatState.switchState(new states.ContainersMenuState());
+				enterContainersMenu();
 			#end
 			#if mobile
 			case '移动触控':
@@ -92,6 +92,40 @@ class OptionsState extends MusicBeatState
 			#end
 		}
 	}
+
+	/**
+	 * 【容器界面入口 · 唯一入口】从设置进入「容器」管理页。
+	 *
+	 * 为什么单独抽成入口函数、而不是就地 `MusicBeatState.switchState(...)`：
+	 *   `MusicBeatState.switchState()` 会先挂 `CustomFadeTransition(0.6,false)` 出场转场，
+	 *   而转场层在**新状态 create() 完成之前**屏上是空的（`FlxGame.switchState()`：
+	 *   cameras.reset() → bitmap.clearCache() → 旧状态 destroy() → 新状态 create()），
+	 *   玩家看到的就是「先黑一下，容器界面再跳出来」。容器页自带整屏不透明背景（menuDesat），
+	 *   并不需要出场转场遮丑；进曲那条路（`LoadingState.loadAndSwitchState`）同理，
+	 *   `LoadingState.create()` 不调用 `MusicBeatState.create()`，所以它从来不挂这个转场。
+	 *
+	 * 做法：用 `FlxG.switchState()` 直接换状态（等价于 `skipNextTransIn` 路径），
+	 *   **不再挂出场转场** ⇒ 不存在"转场层空窗"，入口是即时的。
+	 *   同理 `states.ContainersMenuState.create()` 里也不再挂入场转场（见该文件）。
+	 *
+	 * ⚠ 若以后要恢复转场：不要只把这一行换回 `MusicBeatState.switchState`，
+	 *   那正是本次要修的症状；要恢复就得同时解决"转场层空窗"（转场层自己先铺一层不透明底），
+	 *   否则黑屏立刻回归。
+	 */
+	#if desktop
+	function enterContainersMenu():Void
+	{
+		// 返回时按标签恢复选中（列表顺序若变动，光靠 static 索引会错位）
+		pendingSelectLabel = '容器';
+		// ① 明确要求"这次不要入场转场"：`MusicBeatState.create()` 里是
+		//    `if(!skip) openSubState(new CustomFadeTransition(0.7, true))`，
+		//    而 `skip` 取自 `FlxTransitionableState.skipNextTransOut`（引擎自带开关）。
+		//    不置位的话，即使入口用 FlxG.switchState 直接换状态，新状态仍会自己挂一层入场转场。
+		FlxTransitionableState.skipNextTransOut = true;
+		// ② 直接换状态：不进 `MusicBeatState.startTransition`（那会挂出场转场 → 空窗黑屏）
+		FlxG.switchState(new states.ContainersMenuState());
+	}
+	#end
 
 	override function create() {
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
@@ -120,6 +154,16 @@ class OptionsState extends MusicBeatState
 		title.scrollFactor.set();
 		add(title);
 
+		// ---- 选中高亮条（**必须先 add**，见下）----
+		// 【绘制层级契约】FlxGroup 的绘制顺序 = members 数组顺序 = add() 先后。
+		// 原实现把 selectorBar 放在选项行**之后** add → 高亮条盖在分类文字上方，
+		// 表现就是「选项框滑过时把文字压住/糊住」（用户反馈实拍）。
+		// 现在高亮条先 add（画在文字下面、面板上面），文字后 add ⇒ 永远在最上层，
+		// 高亮只从文字底下滑过。**禁止**把本段挪回 rows 循环之后 —— 一挪回去就复发。
+		selectorBar = makePanel(PANEL_X + 60, LIST_Y - 5, PANEL_W - 120, 48, 14, DesignTokens.rowHighlight, null);
+		selectorBar.visible = false;
+		add(selectorBar);
+
 		// ---- 选项行（静态行，选中高亮条移动） ----
 		for (r in 0...ROWS_VISIBLE)
 		{
@@ -131,10 +175,6 @@ class OptionsState extends MusicBeatState
 			add(row);
 			rows.push(row);
 		}
-
-		selectorBar = makePanel(PANEL_X + 60, LIST_Y - 5, PANEL_W - 120, 48, 14, DesignTokens.rowHighlight, null);
-		selectorBar.visible = false;
-		add(selectorBar);
 
 		// ---- 返回按钮 ----
 		backBtn = new BackButton(FlxG.width - 72, 12);

@@ -107,6 +107,13 @@ class SaveVariables {
 	@:keep public var hitsoundVolume:Float = 0;
 	@:keep public var pauseMusic:String = 'Tea Time';
 	@:keep public var checkForUpdates:Bool = true;
+	/**
+	 * 更新提醒开关（更新界面「稍后提醒 / 不再提示」）：
+	 *  true  = 稍后提醒（玩家选择暂不更新，下次启动仍会看到提示）
+	 *  false = 不再提示（玩家明确表态，更新界面不再弹出）
+	 * 返回旧版需恢复提示时，删掉存档里的 `updateNotify` 字段即可（缺字段 → 用默认 true）。
+	 */
+	@:keep public var updateNotify:Bool = true;
 	@:keep public var comboStacking:Bool = false;
 	@:keep public var comboStackMigrated:Bool = false;
 	@:keep public var gpuCacheMigrated:Bool = false; // GPU 缓存旧默认迁移标记（一次性）

@@ -79,6 +79,8 @@ class TitleState extends MusicBeatState
 	var titleJSON:TitleData;
 
 	public static var updateVersion:String = '';
+	/** 远端校验索引（null = 没取到）。更新界面用它判断"远端是不是真的更新"。 */
+	public static var onlineVersionIndex:Null<Int> = null;
 
 	override public function create():Void
 	{
@@ -223,10 +225,17 @@ class TitleState extends MusicBeatState
 			var onlineIndex:Null<Int> = lines.length > 1 ? Std.parseInt(lines[1].trim()) : null;
 			trace('version online: ' + updateVersion + ', online index: ' + onlineIndex + ', your index: ' + Main.meVersionIndex);
 			mainNewVer = updateVersion;
-			if(onlineIndex != Main.meVersionIndex) {
+			onlineVersionIndex = onlineIndex;
+			// 【判定】只有远端索引**大于**本地才提示更新。
+			// 曾用 `!= 比较` → 本地版本比远端新时（例如新版本已构建、gitVersion.txt 还没推上去）
+			// 也会弹「发现新版本」，而且右栏画的是那个更旧的远端号，出现"最新版本 1.1.2 < 当前 1.1.3"。
+			if (onlineIndex != null && onlineIndex > Main.meVersionIndex) {
 				trace('versions arent matching!');
 				mustUpdate = true;
 				mainUpdateCheck = mustUpdate;
+			}
+			else if (onlineIndex != null && onlineIndex < Main.meVersionIndex) {
+				trace('local build is ahead of published index (' + Main.meVersionIndex + ' > ' + onlineIndex + ') — no update prompt');
 			}
 		}
 
@@ -487,7 +496,9 @@ class TitleState extends MusicBeatState
 
 				new FlxTimer().start(1, function(tmr:FlxTimer)
 				{
-					if (mustUpdate) {
+					// updateNotify = 玩家在更新界面选了「不再提示」（或 设置→效果→更新提示 里关掉）：
+					// 更新检查照旧进行，只是不再弹更新界面，直接进主菜单。
+					if (mustUpdate && ClientPrefs.data.updateNotify) {
 						MusicBeatState.switchState(new OutdatedState());
 					} else {
 						MusicBeatState.switchState(new MainMenuState());

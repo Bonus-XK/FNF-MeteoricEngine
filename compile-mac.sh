@@ -115,7 +115,7 @@ if [ "$1" = "typecheck" ]; then
   fi
   haxelib run lime build macos --no-output "$@"
   TC_EXIT=$?
-  # ---- 无条件还原（无论检查成功与否）----
+  # 无条件还原（无论检查成功与否）
   if [ -n "$TC_BAK" ] && [ -f "$TC_BAK" ]; then
     # lime 返回后仍可能有异步收尾在覆盖，先等干净
     for attempt in $(seq 1 12); do
@@ -125,11 +125,42 @@ if [ "$1" = "typecheck" ]; then
     cp "$TC_BAK" "$APP_NDLL_TC"
     sleep 2
     cp "$TC_BAK" "$APP_NDLL_TC"   # 二次覆盖，防收尾进程竞态
-    if cmp -s "$TC_BAK" "$APP_NDLL_TC"; then
+
+    # ---- 交叉校验：还原目标必须是"墙钟版"，不能只是"和备份一样" ----
+    # 2026-09-12 实测事故（复现两次）：lime 收尾进程会在还原**之后**继续覆盖 app 内 ndll，
+    # 把它换成构建树里的未打补丁版（8660712 字节，缺 HiResMs/WaitEventTimeout）→
+    # 下次启动 100% CPU 卡加载界面。且 app 内那份"本地墙钟拷贝"自身也可能已被覆盖，
+    # 所以判据不能只看"是否等于备份"，要识别**已知坏指纹**并用权威副本兜底 + 复验。
+    BAD_SIZE=8660712          # build 日志实测的未打补丁版大小
+    TC_OK=0
+    for attempt in $(seq 1 10); do
+      APP_SIZE=$(stat -f%z "$APP_NDLL_TC" 2>/dev/null || echo 0)
+
+      # ① 命中已知坏指纹 → 用权威墙钟版覆盖后再看一轮
+      if [ "$APP_SIZE" = "$BAD_SIZE" ]; then
+        echo "[typecheck] ⚠ app 内 ndll 命中已知坏指纹（size=$APP_SIZE）→ 用 tools/lime.ndll.wallclock 覆盖"
+        cp "tools/lime.ndll.wallclock" "$APP_NDLL_TC"
+        sleep 2
+        continue
+      fi
+
+      # ② 与权威墙钟版一致 → 通过
+      if cmp -s "tools/lime.ndll.wallclock" "$APP_NDLL_TC"; then TC_OK=1; break; fi
+
+      # ③ 与备份一致且大小明显不是坏版（可能是另一份墙钟构建）→ 通过
+      if cmp -s "$TC_BAK" "$APP_NDLL_TC" && [ "$APP_SIZE" -gt 9000000 ]; then TC_OK=1; break; fi
+
+      # ④ 其余：先还原备份，下一轮再验
+      cp "$TC_BAK" "$APP_NDLL_TC"
+      sleep 2
+    done
+
+    if [ "$TC_OK" = "1" ]; then
       codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
-      echo "[typecheck] 已还原 app 内 lime.ndll + 重新签名 ($(md5 -q "$APP_NDLL_TC"))"
+      echo "[typecheck] 已还原墙钟版 lime.ndll + 重新签名 (md5: $(md5 -q "$APP_NDLL_TC"), size: $(stat -f%z "$APP_NDLL_TC"))"
     else
-      echo "[typecheck] ✘ 还原失败：app 内 ndll 与备份不一致，请直接跑 ./compile-mac.sh 重建"
+      echo "[typecheck] ✘ 还原失败：app 内 ndll 始终不稳定（size=$(stat -f%z "$APP_NDLL_TC" 2>/dev/null)）"
+      echo "[typecheck]   → 请直接跑 ./compile-mac.sh 重建（其 post-build 会恢复墙钟版）"
     fi
     rm -f "$TC_BAK"
   fi

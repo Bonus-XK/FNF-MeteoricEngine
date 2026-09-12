@@ -62,6 +62,14 @@ class EffectsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		// 更新提示开关的「回程入口」：更新界面上的「稍后提醒 / 不再提示」把 updateNotify 置 false 后，
+		// 更新界面不再弹出 —— 必须在这里留一条路能重新打开，否则玩家永远看不到更新提示。
+		var option:Option = new Option('更新提示',
+			'关闭后，检测到新版本时不再弹出更新界面（仍会继续检查更新）',
+			'updateNotify',
+			'bool');
+		addOption(option);
+
 		#if desktop
 		var option:Option = new Option('Discord在线状态',
 			'关闭后，Discord 的“正在游玩”状态将不再显示本应用，避免意外泄露',
