@@ -211,7 +211,7 @@ class PlayState extends MusicBeatState
 	 *  任何一次改动都无法推理"此刻的 SONG 是谁装的"。
 	 *
 	 *  ⚠ **契约范围 = 引擎源码**：字段保持 `public`。脚本侧可写路径确实存在 ——
-	 *  HScript 侧 `HScript.hx` 的 `set('PlayState', PlayState)` 让 `PlayState.SONG = x` 在脚本里语法有效；
+	 *  HScript 侧 `HScript.hx:94` 的 `set('PlayState', PlayState)` 让 `PlayState.SONG = x` 在脚本里语法有效；
 	 *  Lua 侧走 `setPropertyFromClass('PlayState','SONG',…)` 反射。
 	 *  **但本仓库语料内未见任何写 SONG 的脚本实例**（这一点与 `Conductor.songPosition` 不同，后者有 2 处实例）——
 	 *  故"脚本会写 SONG"属**结构性成立、未被实例佐证**。无论是否被使用，**不得**为让"唯一写点"好看而私有化
