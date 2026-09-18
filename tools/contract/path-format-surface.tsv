@@ -1,0 +1,164 @@
+# Meteoric Engine mods/存档/容器 路径与格式基线 —— 自动生成，请勿手改
+# generator: tools/contract/gen_path_format.py
+# schema: 1
+# columns: verdict<TAB>kind<TAB>base<TAB>raw_token<TAB>source_location<TAB>purpose_or_reason
+# counts: rows=156 contract=70 excluded=86 structural=16 unclassified=0 checklist_covered=17/17
+# checklist_missing: (none)
+# 口径: 扫描 source/**/*.hx 中带引号的候选 token（含扩展名/json|txt|zip|cnz|log|dat、保留目录名、以及 /meoptions 这类无扩展名文件）；每个候选必须归入 contract 或 exclude，出现 unclassified 即判 FAIL。
+# 不变量：contract 行的 base 名与所属路径/格式语义只增不减；删除或改名 = 破坏 mod/存档/容器兼容。
+contract	format	.cnz	.cnz	source/cne/CneZipStore.hx:32	CNE mod 打包扩展名（CneZipStore.hx:32）
+contract	format	.zip	.zip	source/backend/ModInstaller.hx:243	mod 打包扩展名（ModInstaller.hx:243 / CneZipStore.hx:32）
+contract	format	.zip	.zip	source/cne/CneZipStore.hx:32	mod 打包扩展名（ModInstaller.hx:243 / CneZipStore.hx:32）
+contract	module	ContainerInfo	ContainerInfo	source/backend/ContainerInfo.hx:1	容器模块（§5 容器行）
+contract	module	ContainerLauncher	ContainerLauncher	source/backend/ContainerLauncher.hx:1	容器模块（§5 容器行）
+contract	module	ContainerManifest	ContainerManifest	source/backend/ContainerManifest.hx:1	容器模块（§5 容器行）
+contract	module	ContainerManifestData	ContainerManifestData	source/backend/ContainerManifestData.hx:1	容器模块（§5 容器行）
+contract	module	ContainerManifestParser	ContainerManifestParser	source/backend/ContainerManifestParser.hx:1	容器模块（§5 容器行）
+contract	module	ContainerProcess	ContainerProcess	source/backend/ContainerProcess.hx:1	容器模块（§5 容器行）
+contract	module	ContainerResourceSpec	ContainerResourceSpec	source/backend/ContainerResourceSpec.hx:1	容器模块（§5 容器行）
+contract	module	ContainerSession	ContainerSession	source/backend/ContainerSession.hx:1	容器模块（§5 容器行）
+contract	module	ContainerStore	ContainerStore	source/backend/ContainerStore.hx:1	容器模块（§5 容器行）
+contract	module	ContainersMenuState	ContainersMenuState	source/states/ContainersMenuState.hx:1	容器菜单入口（§5 容器行）
+contract	hook	Main.hx	Container	source/Main.hx:436	容器每帧钩子/会话驱动（§5 容器行）
+contract	hook	Main.hx	Container	source/Main.hx:62	容器每帧钩子/会话驱动（§5 容器行）
+contract	hook	Main.hx	Container	source/Main.hx:70	容器每帧钩子/会话驱动（§5 容器行）
+contract	hook	Main.hx	Container	source/Main.hx:72	容器每帧钩子/会话驱动（§5 容器行）
+contract	hook	Main.hx	Container	source/Main.hx:77	容器每帧钩子/会话驱动（§5 容器行）
+contract	save	Offsets.txt	Offsets.txt	source/states/editors/CharacterEditorState.hx:1292	角色偏移存档（CharacterEditorState.hx:1292）
+contract	module	Phase	Phase	source/backend/Phase.hx:1	容器模块（§5 容器行）
+contract	path	_cnestage	_cnestage	source/backend/Mods.hx:42	CNE 暂存目录保留名，不得被扫成假 mod（CneZipStore.hx:29 / Mods.hx:42）
+contract	path	_cnestage	_cnestage	source/cne/CneZipStore.hx:29	CNE 暂存目录保留名，不得被扫成假 mod（CneZipStore.hx:29 / Mods.hx:42）
+contract	path	_containers	_containers	source/backend/ContainerStore.hx:24	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	path	_containers	_containers	source/backend/ContainerStore.hx:25	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	path	_containers	_containers	source/backend/ContainerStore.hx:30	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	path	_containers	_containers	source/backend/Mods.hx:38	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	path	_containers	_containers	source/backend/Mods.hx:39	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	format	cmd.txt	cmd.txt	source/backend/ContainerStore.hx:42	容器命令通道（ContainerStore.hx:42）
+contract	format	container.json	container.json	source/backend/ContainerManifestParser.hx:17	容器清单文件名（ContainerManifestParser.hx:17）
+contract	format	container.log	container.log	source/backend/ContainerStore.hx:32	容器运行日志（ContainerStore.hx:32）
+contract	format	dialogue.json	dialogue.json	source/states/editors/DialogueEditorState.hx:533	对话数据（DialogueEditorState.hx:533）
+contract	format	events.json	events.json	source/states/editors/ChartingState.hx:2997	事件数据（ChartingState.hx:2997）
+contract	format	exit.txt	exit.txt	source/backend/ContainerStore.hx:34	容器退出码（ContainerStore.hx:34）
+contract	save	meoptions	/meoptions	source/backend/ClientPrefs.hx:352	Android 权威设置文件：无扩展名 + JSON（写 ClientPrefs.hx:352 / 读 :585）
+contract	save	meoptions	/meoptions	source/backend/ClientPrefs.hx:585	Android 权威设置文件：无扩展名 + JSON（写 ClientPrefs.hx:352 / 读 :585）
+contract	format	meteoric_dpi_mode.txt	/meteoric_dpi_mode.txt	source/backend/ClientPrefs.hx:749	高清渲染档位落盘：单字符 '1'/'0'（ClientPrefs.hx:748-749）
+contract	path	mods	mods	source/backend/AndroidStorage.hx:123	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/AndroidStorage.hx:167	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/ContainerLauncher.hx:286	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ContainerStore.hx:96	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModInstallUI.hx:17	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModInstaller.hx:348	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModInstaller.hx:445	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModInstaller.hx:652	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:112	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:119	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:124	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:128	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:142	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:153	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:167	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:196	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:79	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/backend/ModZipPlanner.hx:82	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	PsychEngine/mods/	source/backend/Mods.hx:141	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/Multiplayer.hx:705	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/Multiplayer.hx:791	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	/mods/	source/backend/Paths.hx:1016	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/Paths.hx:1016	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	/mods/	source/backend/Paths.hx:1019	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/backend/Paths.hx:1019	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/states/MainMenuState.hx:66	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods	source/states/MainMenuState.hx:845	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	save	modsList.txt	/modsList.txt	source/backend/Mods.hx:184	mod 清单：Android 落 AndroidStorage.root()+'/modsList.txt'，桌面落 'modsList.txt'（Mods.hx:184-186）
+contract	save	modsList.txt	modsList.txt	source/backend/Mods.hx:186	mod 清单：Android 落 AndroidStorage.root()+'/modsList.txt'，桌面落 'modsList.txt'（Mods.hx:184-186）
+contract	format	pack.json	pack.json	source/backend/ModZipPlanner.hx:19	mod 包描述（Mods.hx:161 / ModZipPlanner.hx:19）
+contract	format	pack.json	/pack.json	source/backend/Mods.hx:161	mod 包描述（Mods.hx:161 / ModZipPlanner.hx:19）
+contract	format	phase.txt	phase.txt	source/backend/ContainerStore.hx:43	容器会话相位（ContainerStore.hx:43）
+contract	save	weekList.txt	weeks/weekList.txt	source/backend/WeekData.hx:100	周目清单（WeekData.hx:100、:128）
+contract	save	weekList.txt	weekList.txt	source/backend/WeekData.hx:128	周目清单（WeekData.hx:100、:128）
+exclude	excluded	.json	.json	source/backend/Multiplayer.hx:701	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Multiplayer.hx:747	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Multiplayer.hx:772	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Paths.hx:1030	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Paths.hx:1057	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Paths.hx:1079	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Replay.hx:161	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/Replay.hx:196	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/StageData.hx:91	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/StageData.hx:94	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/WeekData.hx:103	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/WeekData.hx:131	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/backend/WeekData.hx:141	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/cne/CneModCompat.hx:167	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/cne/CneModCompat.hx:731	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/cne/CneModCompat.hx:744	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/cutscenes/DialogueCharacter.hx:59	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/cutscenes/DialogueCharacter.hx:69	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/flxanimate/PsychFlxAnimate.hx:26	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/flxanimate/PsychFlxAnimate.hx:37	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/Character.hx:106	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/Character.hx:131	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/Character.hx:137	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/MenuCharacter.hx:50	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/MenuCharacter.hx:60	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/objects/MenuCharacter.hx:67	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/CharacterSelectState.hx:176	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/LoadingState.hx:455	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/LoadingState.hx:482	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/CharacterEditorState.hx:1114	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/CharacterEditorState.hx:1352	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/CharacterEditorState.hx:900	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:2449	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:2462	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:2970	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:3028	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:3034	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:3040	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:483	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/ChartingState.hx:538	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/DialogueCharacterEditorState.hx:798	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/MenuCharacterEditorState.hx:423	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/states/editors/WeekEditorState.hx:578	文件名拼接片段（非完整契约 token）
+exclude	excluded	.luagraph.json	.luagraph.json	source/luagraph/LuaGraphIO.hx:22	LuaGraph 工具自有保存格式（非 mod/存档/容器契约）
+exclude	excluded	.txt	.txt	source/backend/CrashHandler.hx:652	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/backend/CrashHandler.hx:711	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/backend/CrashHandler.hx:713	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/backend/Multiplayer.hx:820	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/backend/Multiplayer.hx:820	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/backend/Paths.hx:1065	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/states/editors/CharacterEditorState.hx:898	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/states/editors/ChartingState.hx:1003	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/states/editors/ChartingState.hx:934	文件名拼接片段（非完整契约 token）
+exclude	excluded	.txt	.txt	source/states/editors/NoteSplashDebugState.hx:304	文件名拼接片段（非完整契约 token）
+exclude	excluded	Animation.json	assets/TEST/Animation.json	source/animateatlas/Main.hx:37	示例资源路径
+exclude	excluded	Animation.json	/Animation.json	source/objects/Character.hx:145	角色图集元数据路径
+exclude	excluded	Animation.json	/Animation.json	source/objects/Character.hx:146	角色图集元数据路径
+exclude	excluded	Animation.json	/Animation.json	source/objects/Character.hx:149	角色图集元数据路径
+exclude	excluded	Animation.json	/Animation.json	source/states/editors/CharacterEditorState.hx:896	角色图集元数据路径
+exclude	excluded	characterList.txt	data/characterList.txt	source/states/editors/ChartingState.hx:469	编辑器素材清单
+exclude	excluded	credits.txt	/data/credits.txt	source/states/CreditsState.hx:752	引擎内置内容清单
+exclude	excluded	credits.txt	data/credits.txt	source/states/CreditsState.hx:753	引擎内置内容清单
+exclude	excluded	dev_diag.txt	/dev_diag.txt	source/backend/CrashHandler.hx:894	开发诊断落盘（CrashHandler:894）
+exclude	excluded	freeplaySonglist.txt	data/config/freeplaySonglist.txt	source/cne/CneModCompat.hx:548	引擎内置曲单
+exclude	excluded	freeplaySonglist.txt	data/freeplaySonglist.txt	source/cne/CneModCompat.hx:548	引擎内置曲单
+exclude	excluded	gfDanceTitle.json	images/gfDanceTitle.json	source/states/TitleState.hx:152	标题画面素材路径
+exclude	excluded	heartbeat.txt	/heartbeat.txt	source/backend/CrashHandler.hx:961	心跳诊断落盘（CrashHandler:961）
+exclude	excluded	introText.txt	data/introText.txt	source/states/TitleState.hx:447	引擎内置文案
+exclude	excluded	last_stage.txt	/last_stage.txt	source/backend/CrashHandler.hx:1000	崩溃诊断落盘（CrashHandler）
+exclude	excluded	last_stage.txt	/last_stage.txt	source/backend/CrashHandler.hx:985	崩溃诊断落盘（CrashHandler）
+exclude	excluded	library.json	/library.json	source/states/LoadingState.hx:1001	图集运行时元数据
+exclude	excluded	list.txt	images/noteSkins/list.txt	source/options/NoteSettingsSubState.hx:70	皮肤素材清单
+exclude	excluded	list.txt	images/noteSplashes/list.txt	source/options/NoteSettingsSubState.hx:90	溅射素材清单
+exclude	excluded	meta.json	/meta.json	source/cne/CneModCompat.hx:202	CNE 图集元数据路径
+exclude	excluded	meta.json	/meta.json	source/cne/CneModCompat.hx:212	CNE 图集元数据路径
+exclude	excluded	meta.json	/meta.json	source/cne/CneModCompat.hx:594	CNE 图集元数据路径
+exclude	excluded	meta.json	/meta.json	source/cne/CneModCompat.hx:600	CNE 图集元数据路径
+exclude	excluded	profile.txt	/profile.txt	source/backend/MeteoricProfile.hx:75	性能探针输出（MeteoricProfile:75）
+exclude	excluded	readme.txt	readme.txt	source/states/editors/ChartingState.hx:1003	编辑器导出说明文件的过滤项（ChartingState.hx:934）
+exclude	excluded	readme.txt	readme.txt	source/states/editors/ChartingState.hx:934	编辑器导出说明文件的过滤项（ChartingState.hx:934）
+exclude	excluded	spritemap.json	assets/TEST/spritemap.json	source/animateatlas/Main.hx:38	示例资源路径
+exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:158	角色图集元数据路径
+exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:162	角色图集元数据路径
+exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:166	角色图集元数据路径
+exclude	excluded	stageList.txt	data/stageList.txt	source/states/editors/ChartingState.hx:524	编辑器素材清单
+exclude	excluded	weeks.txt	/data/weeks/weeks.txt	source/cne/CneModCompat.hx:402	内置周目素材清单
