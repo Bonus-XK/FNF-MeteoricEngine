@@ -87,9 +87,10 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		//   （2026-09-11 实测事故）。
 		//   处置方式（2026-09-11 之后重做）：
 		//     · macOS —— 构建后恢复 tools/lime.ndll.wallclock 保证补丁在位，档位常驻；
-		//     · Windows —— 档位重新提供，但实际取值由启动自检决定：补丁版 lime.ndll
-		//       （含原生导出符号 lime_meteoric_frame_loop_patch）→ 100000；
-		//       老 ndll → 自动退回 480。见 ClientPrefs.hasWallclockFrameLoop()。
+		//     · 全平台（mac/Windows）—— 档位常驻，实际取值由启动自检决定：补丁版 lime.ndll
+		//       （文件内含 SDL3_DYNAMIC_API 标记 = 出自 ci/lime-sdl3-patch 移植树）→ 100000；
+		//       老 ndll → 自动回退安全上限 1000（不再黑屏，也不再白丢 520 帧）。
+		//       见 ClientPrefs.hasWallclockFrameLoop() / unlimitedFramerateValue()。
 		var frameRateOptions:Array<String> = ['120', '240', '480'];
 		#if (mac || windows)
 		frameRateOptions.push('无上限');

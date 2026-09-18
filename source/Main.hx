@@ -35,7 +35,7 @@ class Main extends Sprite
 		//   （Preloader 阶段就已发生，改设置里的默认值来不及）。
 		//   · macOS  —— 构建后恢复 tools/lime.ndll.wallclock 保证补丁在位 → 100000；
 		//   · Windows —— 不再靠"假定 ndll 有补丁"，而是启动时探测原生能力标记：
-		//                补丁版 ndll 给 100000，老 ndll 退回 480（= 实测可用档位）。
+		//                补丁版 ndll 给 100000，老 ndll 回退 1000（老 ndll 上实测安全上限）。
 		//                这是"加标记 + 启动自检"的落点，取代了此前"Windows 一律 120"的硬编码。
 		//   注意：ClientPrefs 的静态字段此时已初始化（Haxe 静态初始化先于本类的实例化），
 		//   所以第 365 行把它同时用于 update/draw 帧率时，两侧取值一致、不会触发 flixel 的

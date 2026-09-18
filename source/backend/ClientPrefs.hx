@@ -21,7 +21,7 @@ class SaveVariables {
 	//   Windows = 120 —— 交付包历史上是没打墙钟补丁的 64 位 lime.ndll，存档默认给 100000 会
 	//   在启动阶段就死循环卡黑屏（2026-09-11 实测事故）。所以 Windows 默认仍是 120，
 	//   但「无上限」档位**重新可用**：选它以后由启动自检（hasWallclockFrameLoop()）决定
-	//   真给 100000（补丁版 ndll）还是退回 480（老 ndll）。
+	//   真给 100000（补丁版 ndll）还是回退 1000（老 ndll）。
 	@:keep public var framerateMode:String = #if mac '无上限' #elseif desktop '120' #else '120' #end;
 	@:keep public var showScrollSpeed:Bool = true; // FPS 计数器下方显示当前滚动速度（颜色随速度变化）
 	@:keep public var showNPS:Bool = false; // FPS 计数器下方显示每秒收到的音符数（NPS）
@@ -473,35 +473,37 @@ class ClientPrefs {
 	// 把档位解析为实际帧率并接管 FlxG 步长/绘制帧率（FlxG.drawFramerate setter 会同步 stage.frameRate）。
 	// 移动端默认 120（防过热）；「无上限」= 100000 哨兵（只是"无人工限制"的标记，非字面目标帧率），
 	// 只受 CPU/GPU 限制 —— 前提是原生帧循环带「墙钟补丁」，见 hasWallclockFrameLoop()。
-	#if windows
-	/** 带「墙钟帧循环补丁」的那份 lime.ndll 的 SHA1（tools/lime.ndll.win64.wallclock）。
-	 *  换新 ndll 时**必须**同步更新这个常量，否则「无上限」会退回 480。 */
-	static inline var WALLCLOCK_NDLL_SHA1:String = 'af8663cd2beeddf2cd16ad5179d78acba2c8501e';
+	#if (mac || windows)
+	/** 判据串：只有 `ci/lime-sdl3-patch` 那棵 SDL3 移植树编出来的 `lime.ndll` 才含它。
+	 *  实测（2026-08-18 之后的三份 SDL3 ndll 与两份 SDL2 ndll，按字节计数）：
+	 *    mac SDL3 三份 = 命中；SDL2 两份 = 0；tools/lime.ndll.win64.wallclock = 命中。
+	 *
+	 *  用它取代旧的「SHA1 文件身份」判据，理由：
+	 *    ① SHA1 常量每换一次 ndll 就必须手改（旧 WALLCLOCK_NDLL_SHA1），漏改即静默降级；
+	 *    ② 本判据与 ndll 版本无关，任何"从移植树编出来"的新 ndll 自动被认出；
+	 *    ③ 不需要 cffi —— `cpp.Lib._loadPrime` 底层是 `__hxcpp_get_proc_address(..., inNdll=false)`，
+	 *       查的是**主程序的 cffi 原语表**，永远查不到 ndll 里的纯 C 导出符号
+	 *       （旧注释里的两条死路：传 null → std::string(nullptr) → 启动闪退；传空串 → 恒为"无"）。 */
+	static inline var SDL3_PATCH_MARKER:String = 'SDL3_DYNAMIC_API';
+
+	/** 未打补丁的原生帧循环里 `framePeriod = 1000 / frameRate` 被截断成整数毫秒：
+	 *    frameRate <= 1000 → 1ms，`nextUpdate += 1` 正常前进（安全）；
+	 *    frameRate >  1000 → 0ms，`nextUpdate` 永不前进 → catch-up 死循环（启动黑屏）。
+	 *  所以老 ndll 上「无上限」的安全上限是 **1000**，而不是过去的 480（白丢 ~520 帧）。 */
+	static inline var SAFE_UNCAPPED_FALLBACK:Int = 1000;
 
 	/**
-	 * 探测当前 `lime.ndll` 是否带「墙钟帧循环补丁」（Windows 专属判据）。
+	 * 探测当前 `lime.ndll` 是否带「墙钟帧循环补丁」（**全平台同一判据**，含 macOS）。
 	 *
-	 * 判据 = **文件身份**：读可执行文件旁边的 `lime.ndll`，算 SHA1 与
-	 * `WALLCLOCK_NDLL_SHA1` 比对。对上 → 100000；对不上/读不到 → 退回 480。
+	 * 判据 = **文件内容标记**：读可执行文件同目录的 `lime.ndll`，全字节搜索
+	 * `SDL3_DYNAMIC_API`。命中 → 认定来自 SDL3 移植树，其帧循环为
+	 * `HiResMs + WaitEventTimeout + SDL_DelayNS` 的双精度版本 → 可安全使用 100000 哨兵；
+	 * 未命中 → 老整数帧循环 → 回退 `SAFE_UNCAPPED_FALLBACK`。
 	 *
-	 * 为什么不用原生符号探测（走过两条死路，别再回头）：
-	 *   ① `cpp.Lib._loadPrime(null, …)`：第一个参数是非空 String，传 null 会让 C++ 侧
-	 *      构造 `std::string(nullptr)` → `std::logic_error: basic_string: construction
-	 *      from null is not valid` → `terminate` → **启动即闪退**（实测）。
-	 *   ② 改成空串/模块名后不崩了，但 `_loadPrime` 底层是
-	 *      `__hxcpp_get_proc_address(inLib, inPrim, inNdll=false, …)`，而 hxcpp 的
-	 *      `CFFILoader.h` 写明了它取的是**主程序里的 cffi 原语表**
-	 *      （"Via 'GetProcAddress' on the exe"），不是"按名字去已加载的 DLL 里查符号"。
-	 *      于是纯 C 导出符号 `lime_meteoric_frame_loop_patch` 永远查不到 →
-	 *      **探测恒为"无"**（用户实测日志：`档位=120 墙钟补丁探测=无 无上限档取值=480`）。
-	 *   原生符号本身仍然有用：`compile-windows.sh` 用 `objdump` 查它做**构建期门禁**，
-	 *   保证交付的 ndll 是补丁版；运行期判据改用文件身份，确定性与版本无关。
-	 *
-	 * 为什么必须探测而不能假定：64 位 Windows 交付包长期带着**没打补丁**的 lime.ndll
-	 * （8,281,088 字节、无 SDL3 标记），配上 100000 哨兵时原生帧循环里
-	 * `nextUpdate += framePeriod` 被整型截断成 +0 → catch-up 循环永不前进 →
-	 * 启动即 100% 死循环、黑屏卡在加载界面（2026-09-11 实测事故）。
-	 * 探测不到补丁就把帧率压回 480（实测可用档位）：宁可跑不出极限帧率，也绝不启动死循环。
+	 * 为什么必须探测而不能假定：老 ndll 配 100000 哨兵时 `framePeriod` 被整型截断成 0，
+	 * catch-up 循环 `while (nextUpdate <= currentUpdate)` 永不前进 → 启动即 100% 死循环、
+	 * 黑屏卡在加载界面（2026-09-11 事故）。
+	 * 探测不到就把档位压回安全上限：宁可跑不出极限帧率，也绝不启动死循环。
 	 */
 	static var _wallclockFrameLoopProbe:Int = -1;
 	public static function hasWallclockFrameLoop():Bool
@@ -518,10 +520,11 @@ class ClientPrefs {
 			if (sys.FileSystem.exists(ndllPath))
 			{
 				var input:sys.io.FileInput = sys.io.File.read(ndllPath, true);
-				var bytes:haxe.io.Bytes = input.readAll(); // ~11MB，启动只算一次
+				var bytes:haxe.io.Bytes = input.readAll(); // ~9MB，启动只算一次
 				input.close();
-				var digest:String = haxe.crypto.Sha1.make(bytes).toHex().toLowerCase();
-				if (digest == WALLCLOCK_NDLL_SHA1)
+				// Bytes → Latin-1 字符串（逐字节 1:1）后做子串搜索；不做哈希，
+				// 避免"每换一份 ndll 就要更新常量"的维护陷阱。
+				if (bytes.toString().indexOf(SDL3_PATCH_MARKER) >= 0)
 					_wallclockFrameLoopProbe = 1;
 			}
 		}
@@ -533,10 +536,10 @@ class ClientPrefs {
 		return _wallclockFrameLoopProbe == 1;
 	}
 
-	/** 「无上限」档位在本机的实际取值：补丁版 ndll 给 100000 哨兵，否则退回 480。 */
+	/** 「无上限」档位在本机的实际取值：补丁版 ndll 给 100000 哨兵，否则回退安全上限 1000。 */
 	public static function unlimitedFramerateValue():Int
 	{
-		return hasWallclockFrameLoop() ? 100000 : 480;
+		return hasWallclockFrameLoop() ? 100000 : SAFE_UNCAPPED_FALLBACK;
 	}
 	#end
 
@@ -546,12 +549,11 @@ class ClientPrefs {
 		{
 			case '240': 240;
 			case '480': 480;
-			#if mac
-			case '无上限': 100000;
-			#end
-			#if windows
-			// Windows 的「无上限」由启动自检决定：补丁版 ndll → 100000（与 macOS 同款墙钟帧循环）；
-			// 老 ndll → 480 兜底（见 hasWallclockFrameLoop 注释）
+			// 「无上限」全平台走同一探测：补丁版 ndll → 100000 哨兵（真·无人工限制）；
+			// 老 ndll → SAFE_UNCAPPED_FALLBACK(1000) 兜底，绝不启动死循环。
+			// （旧实现 mac 分支写死 100000、无任何探测 —— 这正是"每次构建后必须手工恢复
+			//   tools/lime.ndll.wallclock，否则黑屏卡加载"的根因。）
+			#if (mac || windows)
 			case '无上限': unlimitedFramerateValue();
 			#end
 			default: 120;
@@ -627,7 +629,7 @@ class ClientPrefs {
 		// 帧率档位旧值迁移（2026-09-11 事故的临时处置）已**撤销**：
 		// 当时非 macOS 上没有「无上限」档位，于是把存档里遗留的 '无上限' 收回 '120'。
 		// 现在 Windows 重新提供该档位，能否真跑到 100000 改由启动自检
-		// （hasWallclockFrameLoop()）决定：补丁版 lime.ndll 用 100000，老 ndll 自动退回 480。
+		// （hasWallclockFrameLoop()）决定：补丁版 lime.ndll 用 100000，老 ndll 自动回退 1000。
 		// 保留用户存档里的选择本身（不再改写 data.framerateMode），避免"选项列表里没有任何项被选中"。
 
 		// 连击堆叠旧值迁移：新默认不堆叠（评级/连击数字图片不再叠成一片），只迁移一次，之后尊重用户手动选择
