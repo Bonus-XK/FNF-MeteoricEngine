@@ -71,7 +71,7 @@ class GameOverSubstate extends MusicBeatSubstate
 
 		PlayState.instance.setOnScripts('inGameOver', true);
 
-		Conductor.songPosition = 0;
+		Conductor.setPosition(0);
 
 		boyfriend = new Character(x, y, characterName, true);
 		boyfriend.x += boyfriend.positionArray[0];
@@ -165,7 +165,7 @@ class GameOverSubstate extends MusicBeatSubstate
 
 		if (FlxG.sound.music.playing)
 		{
-			Conductor.songPosition = FlxG.sound.music.time;
+			Conductor.syncToMusic();
 		}
 		PlayState.instance.callOnScripts('onUpdatePost', [elapsed]);
 	}

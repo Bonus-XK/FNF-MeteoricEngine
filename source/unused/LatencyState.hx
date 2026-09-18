@@ -37,7 +37,7 @@ class LatencyState extends FlxState
 	{
 		offsetText.text = "Offset: " + Conductor.offset + "ms";
 
-		Conductor.songPosition = FlxG.sound.music.time - Conductor.offset;
+		Conductor.setPosition(FlxG.sound.music.time - Conductor.offset);
 
 		var multiply:Float = 1;
 

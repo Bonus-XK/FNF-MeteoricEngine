@@ -391,7 +391,7 @@ class FreeplayState extends MusicBeatState
 	{
 		// 菜单音乐时间同步到 Conductor：节拍事件（beatHit）才能随背景音乐触发（试听/菜单曲均可）
 		if (FlxG.sound.music != null)
-			Conductor.songPosition = FlxG.sound.music.time;
+			Conductor.syncToMusic();
 
 		#if mobile
 		#if FLX_SOUND_TRAY

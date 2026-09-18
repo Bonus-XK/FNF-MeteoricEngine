@@ -77,7 +77,7 @@ class EditorPlayState extends MusicBeatSubstate
 		this.startPos = Conductor.songPosition;
 
 		Conductor.safeZoneOffset = (ClientPrefs.data.safeFrames / 60) * 1000 * playbackRate;
-		Conductor.songPosition -= startOffset;
+		Conductor.advance(-startOffset);
 		startOffset = Conductor.crochet;
 		timerToStart = startOffset;
 		
@@ -157,10 +157,10 @@ class EditorPlayState extends MusicBeatSubstate
 		if (startingSong)
 		{
 			timerToStart -= elapsed * 1000;
-			Conductor.songPosition = startPos - timerToStart;
+			Conductor.setPosition(startPos - timerToStart);
 			if(timerToStart < 0) startSong();
 		}
-		else Conductor.songPosition += elapsed * 1000 * playbackRate;
+		else Conductor.advance(elapsed * 1000 * playbackRate);
 
 		if (unspawnNotes[0] != null)
 		{
@@ -655,7 +655,7 @@ class EditorPlayState extends MusicBeatSubstate
 		{
 			//more accurate hit time for the ratings?
 			var lastTime:Float = Conductor.songPosition;
-			if(Conductor.songPosition >= 0) Conductor.songPosition = FlxG.sound.music.time;
+			if(Conductor.songPosition >= 0) Conductor.syncToMusic();
 
 			// heavily based on my own code LOL if it aint broke dont fix it
 			var pressNotes:Array<Note> = [];
@@ -694,7 +694,7 @@ class EditorPlayState extends MusicBeatSubstate
 				}
 			}
 			//more accurate hit time for the ratings? part 2 (Now that the calculations are done, go back to the time it was before for not causing a note stutter)
-			Conductor.songPosition = lastTime;
+			Conductor.setPosition(lastTime);
 		}
 
 		var spr:StrumNote = playerStrums.members[key];
@@ -862,7 +862,7 @@ class EditorPlayState extends MusicBeatSubstate
 
 		FlxG.sound.music.play();
 		FlxG.sound.music.pitch = playbackRate;
-		Conductor.songPosition = FlxG.sound.music.time;
+		Conductor.syncToMusic();
 		if (Conductor.songPosition <= vocals.length)
 		{
 			vocals.time = Conductor.songPosition;

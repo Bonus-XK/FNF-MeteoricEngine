@@ -18,7 +18,42 @@ class Conductor
 	public static var bpm(default, set):Float = 100;
 	public static var crochet:Float = ((60 / bpm) * 1000); // beats in milliseconds
 	public static var stepCrochet:Float = crochet / 4; // steps in milliseconds
+	/** 歌曲播放位置（毫秒）。
+	 *  ⚠ **所有权契约**：本字段的写入者**只有 Conductor 自己**，外部一律经下面三个
+	 *  意图命名的方法改动（`syncToMusic` / `setPosition` / `advance`）。
+	 *  这样做的目的不是形式统一，而是让"谁在推时钟"变成可审计的单一事实来源：
+	 *  此前 10 个文件、31 处直接赋值横跨 UI/菜单/编辑器/结算，任何一次改动都无法推理后果
+	 *  （收敛后：外部裸赋值 0 处，读取站点数量不变）。
+	 *
+	 *  ⚠ **契约的可审计范围 = 引擎源码**。字段必须保持 `public` —— Lua/HScript 可经
+	 *  `setPropertyFromClass('Conductor','songPosition', …)` 直写它，这是既有 mod 生态的
+	 *  一部分（仓库内至少 2 处实例：`tools/user_mods_prev/mods/66666/scripts/fast forward script.lua:51`、
+	 *  `tools/user_mods_prev/mods/66666/data/s49-subleader/fast forward script.lua:37`），
+	 *  **不得**为了让"单写者"好看而把字段私有化（那会破坏 mod 兼容）。
+	 *  因此：引擎内改动受本契约约束并可静态审计；脚本侧写入**不受约束、也不被本契约覆盖**。
+	 *  若将来要收敛脚本侧，只能"新增只读/受控访问器 + 保留字段可写"，不能收窄兼容面。
+	 *
+	 *  三个方法均为 `inline`，编译后与原来的裸赋值**零开销等价**、数值语义完全不变。 */
 	public static var songPosition:Float = 0;
+
+	/** 把时钟同步到当前音乐播放器位置（对应原 `= FlxG.sound.music.time`）。
+	 *  调用方若有 `if (FlxG.sound.music != null)`/`>= 0` 等前置守卫，请**原样保留**在调用处。 */
+	@:keep public static inline function syncToMusic():Void
+	{
+		songPosition = FlxG.sound.music.time;
+	}
+
+	/** 直接设定时钟（对应原 `= <表达式>`）：重置(0 / -5000 / -crochet*5)、回退、编辑器跳转等。 */
+	@:keep public static inline function setPosition(ms:Float):Void
+	{
+		songPosition = ms;
+	}
+
+	/** 按增量推进时钟（对应原 `+= <表达式>`；负值即原 `-=`）。 */
+	@:keep public static inline function advance(ms:Float):Void
+	{
+		songPosition += ms;
+	}
 	public static var offset:Float = 0;
 
 	//public static var safeFrames:Int = 10;

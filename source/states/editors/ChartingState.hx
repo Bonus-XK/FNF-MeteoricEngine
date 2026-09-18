@@ -1351,7 +1351,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		}
 		generateSong();
 		FlxG.sound.music.pause();
-		Conductor.songPosition = sectionStartTime();
+		Conductor.setPosition(sectionStartTime());
 		FlxG.sound.music.time = Conductor.songPosition;
 
 		var curTime:Float = 0;
@@ -1405,7 +1405,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		FlxG.sound.music.onComplete = function()
 		{
 			FlxG.sound.music.pause();
-			Conductor.songPosition = 0;
+			Conductor.setPosition(0);
 			if(vocals != null) {
 				vocals.pause();
 				vocals.time = 0;
@@ -1460,7 +1460,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 			FlxG.sound.music.time = 0;
 			changeSection();
 		}
-		Conductor.songPosition = FlxG.sound.music.time;
+		Conductor.syncToMusic();
 		_song.song = UI_songTitle.field.text;
 
 		strumLineUpdateY();
@@ -1856,7 +1856,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 			FlxG.sound.music.time = 0;
 			changeSection();
 		}
-		Conductor.songPosition = FlxG.sound.music.time;
+		Conductor.syncToMusic();
 		strumLineUpdateY();
 		camPos.y = strumLine.y;
 		for (i in 0...8){
@@ -2396,7 +2396,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		{
 			changeSection();
 		}
-		Conductor.songPosition = FlxG.sound.music.time;
+		Conductor.syncToMusic();
 		if(!waveformChanged) updateWaveform();
 	}
 

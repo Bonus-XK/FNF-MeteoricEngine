@@ -951,7 +951,7 @@ class PlayState extends MusicBeatState
 				gf.visible = false;
 		}
 
-		Conductor.songPosition = -5000;
+		Conductor.setPosition(-5000);
 
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
 		add(strumLineNotes);
@@ -1592,7 +1592,7 @@ class PlayState extends MusicBeatState
 			}
 
 			startedCountdown = true;
-			Conductor.songPosition = -Conductor.crochet * 5;
+			Conductor.setPosition(-Conductor.crochet * 5);
 			setOnScripts('startedCountdown', true);
 			callOnScripts('onCountdownStarted', null);
 
@@ -1826,7 +1826,7 @@ class PlayState extends MusicBeatState
 		}
 		vocals.play();
 		opponentVocals.play();
-		Conductor.songPosition = time;
+		Conductor.setPosition(time);
 	}
 
 	public function startNextDialogue() {
@@ -2883,7 +2883,7 @@ class PlayState extends MusicBeatState
 
 		FlxG.sound.music.play();
 		FlxG.sound.music.pitch = playbackRate;
-		Conductor.songPosition = FlxG.sound.music.time;
+		Conductor.syncToMusic();
 		if (Conductor.songPosition <= vocals.length)
 		{
 			vocals.time = Conductor.songPosition;
@@ -3589,7 +3589,7 @@ class PlayState extends MusicBeatState
 			if (rewindElapsed >= rewindDuration)
 			{
 				rewinding = false;
-				Conductor.songPosition = 0;
+				Conductor.setPosition(0);
 				trace('[Rewind] FINISH, elapsed=' + rewindElapsed);
 				finishRestart();
 			}
@@ -3598,7 +3598,7 @@ class PlayState extends MusicBeatState
 				// 变速回溯：一开始快、越接近终点越慢（cubicOut）；
 				// 终点 = 场上清空的位置（最早音符飞出出生窗口后），收尾正好落在最后几个箭头上
 				var rewindProgress:Float = rewindElapsed / rewindDuration;
-				Conductor.songPosition = FlxMath.lerp(rewindFromPos, rewindEndPos, FlxEase.cubeOut(rewindProgress));
+				Conductor.setPosition(FlxMath.lerp(rewindFromPos, rewindEndPos, FlxEase.cubeOut(rewindProgress)));
 
 				// 回溯中：箭头退回到“出生窗口”之外后回收，场上只保留正在倒流的箭头
 				var rewindWindow:Float = spawnTime * playbackRate;
@@ -3625,7 +3625,7 @@ class PlayState extends MusicBeatState
 				if (notes.length == 0)
 				{
 					rewinding = false;
-					Conductor.songPosition = 0;
+					Conductor.setPosition(0);
 					trace('[Rewind] FINISH (field empty), elapsed=' + rewindElapsed);
 					finishRestart();
 				}
@@ -3666,7 +3666,7 @@ class PlayState extends MusicBeatState
 			openCharacterEditor();
 		
 		if (startedCountdown && !paused && !rewinding)
-			Conductor.songPosition += FlxG.elapsed * 1000 * playbackRate;
+			Conductor.advance(FlxG.elapsed * 1000 * playbackRate);
 
 		if (startingSong)
 		{
@@ -3676,7 +3676,7 @@ class PlayState extends MusicBeatState
 				startSong();
 			}
 			else if(!startedCountdown)
-				Conductor.songPosition = -Conductor.crochet * 5;
+				Conductor.setPosition(-Conductor.crochet * 5);
 		}
 		else if (!paused && updateTime)
 		{
@@ -4903,7 +4903,7 @@ class PlayState extends MusicBeatState
 		generatedMusic = false;
 		updateTime = (ClientPrefs.data.timeBarType != '禁用');
 		startOnTime = 0;
-		Conductor.songPosition = 0;
+		Conductor.setPosition(0);
 		Conductor.mapBPMChanges(SONG);
 		Conductor.bpm = SONG.bpm;
 
@@ -5554,7 +5554,7 @@ class PlayState extends MusicBeatState
 			{
 				//more accurate hit time for the ratings?
 				var lastTime:Float = Conductor.songPosition;
-				if(Conductor.songPosition >= 0) Conductor.songPosition = FlxG.sound.music.time;
+				if(Conductor.songPosition >= 0) Conductor.syncToMusic();
 
 				var canMiss:Bool = !ClientPrefs.data.ghostTapping;
 
@@ -5662,7 +5662,7 @@ class PlayState extends MusicBeatState
 				}
 
 				//more accurate hit time for the ratings? part 2 (Now that the calculations are done, go back to the time it was before for not causing a note stutter)
-				Conductor.songPosition = lastTime;
+				Conductor.setPosition(lastTime);
 			}
 
 			var spr:StrumNote = playerStrums.members[key];

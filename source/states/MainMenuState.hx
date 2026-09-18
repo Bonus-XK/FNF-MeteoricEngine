@@ -338,7 +338,7 @@ class MainMenuState extends MusicBeatState
 	{
 		// 菜单音乐时间同步到 Conductor：节拍事件（beatHit）才能随背景音乐触发
 		if (FlxG.sound.music != null)
-			Conductor.songPosition = FlxG.sound.music.time;
+			Conductor.syncToMusic();
 
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.begin();

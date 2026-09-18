@@ -324,7 +324,7 @@ class MusicBeatState extends FlxUIState
 	/**
 	 * 界面节拍跳动：主菜单/故事模式/自由游玩等播放背景音乐的界面，
 	 * 每个节拍让整屏轻微放大再回弹（由设置「界面节拍跳动」menuBeatBump 控制）。
-	 * 调用方需已同步 Conductor.songPosition = FlxG.sound.music.time（否则节拍事件不触发）。
+	 * 调用方需已同步时钟（`Conductor.syncToMusic()`，否则节拍事件不触发）。
 	 */
 	public function menuBeatBump():Void
 	{

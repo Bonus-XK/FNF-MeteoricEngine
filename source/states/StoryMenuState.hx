@@ -265,7 +265,7 @@ class StoryMenuState extends MusicBeatState
 	{
 		// 菜单音乐时间同步到 Conductor：节拍事件（beatHit）才能随背景音乐触发
 		if (FlxG.sound.music != null)
-			Conductor.songPosition = FlxG.sound.music.time;
+			Conductor.syncToMusic();
 
 		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, FlxMath.bound(elapsed * 30, 0, 1)));
 		if (Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
