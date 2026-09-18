@@ -2,6 +2,349 @@
 
 > 版本：1.1.3
 
+## 未发布（打击特效预览 + 皮肤解析修复 + CNE 模组兼容）
+
+- **【新增】「CNE 模组兼容」：Codename Engine 格式的 mod 可直接在 Meteoric 里加载**（设置 → 编程 → **CNE 模组兼容**，
+  **默认关**；关闭时 mod 加载路径与改动前完全一致）。与上一轮落地的「CNE 式 HScript 编程层」是两条独立的线：
+  `cneScripting` 管脚本能不能跑，`cneModCompat` 管 CNE 布局能不能读进来。覆盖：
+  - **谱面转换**：`songs/<song>/charts/[<variant>/]<难度>.json`（`codenameChart`）→ **psych_v1**。新增
+    `states/editors/content/CneExport.cneToPsych` / `isCneFormat`：`strumLines` type 1 → 玩家列 `<4`、
+    type 0 → 对手列 `>=4`、type 2（GF 线）→ 取 `mustHitSection` 同向列并置 `gfSection`；
+    `Camera Movement`（params[0] = strumLine 索引，type==1 → `mustHitSection`）、`BPM Change`、
+    `Time Signature Change`、`Alt Animation Toggle` 烘焙进 section（归属规则对齐 CNE
+    `funkin/backend/chart/FNFLegacyParser.hx` 的 `__convertToSwagSections`：事件落在本段窗口内即属本段）；
+    `Scroll Speed Change`↔`Change Scroll Speed`、`Add Camera Zoom`、`Play Animation`、自定义事件透传；
+    `No Anim Note`/`Alt Anim Note` 别名到 Psych 内建 `No Animation`/`Alt Animation`。
+    ⚠ 两条刻意的"不照搬"：① 不用 CNE `FNFLegacyParser.encode` 的 0.6.x「相对 mustHitSection」老语义
+    （Meteoric/Psych 1.0.4 的 psych_v1 是绝对列号，照搬会把对手段音符翻到玩家侧，见 `PlayState.hx:2156-2198`）；
+    ② 指定难度缺谱时**不**回退 `normal`（CNE 自己直接报缺谱，静默换难度会让玩家玩到错谱）。
+  - **音频**：Psych 路径 `songs/<song>/Inst.ogg` 缺失时回退 CNE `songs/<song>/song/Inst|Voices<suffix>[-<难度>]`
+    （`.ogg` 优先、`.mp3` 兜底）；`suffix` 取 `meta.json` 的 `instSuffix`/`vocalsSuffix`，难度取当前难度（小写优先）；
+    不接管 Psych 的 `Voices-Player/-Opponent`（拆分人声由调用方按既有逻辑回退）。
+  - **人物**：`data/characters/<名>.xml`（CNE 人物定义）→ Psych 人物 JSON
+    （`sprite`/`icon`/`color`/`holdTime`/`scale`/`flipX`/`x`/`y`/`camx`/`camy`/`antialiasing` +
+    `<anim name anim x y fps loop indices>`，`indices="2..12,0,1"` 按 CNE `CoolUtil.parseNumberRange` 语义展开）。
+  - **周目**：`data/weeks/weeks/*.xml` + `data/weeks/weeks.txt` → Psych `WeekFile`
+    （`chars`→`weekCharacters`、`<song>`→`songs`、`<difficulty name>`→`difficulties`、`bgColor`→`freeplayColor`），
+    使 CNE mod 的歌出现在 Story/Freeplay；无 `menubackgrounds/menu_<sprite>` 时 `weekBackground` 置空
+    （不拼一个不存在的贴图路径去加载）。
+  - **zip 包**：`mods/<名>.zip`（CNE 根级即 mod 根）被识别为 mod；首次访问透明解包到 `mods/_cnestage/<名>/`
+    （指纹 = 体积 + mtime；Mod 列表刷新时 `CneModCompat.clearCaches()` 让运行中替换的 zip 重新解包；
+    同名真实文件夹优先；`_cnestage` 已登记进 `Mods.ignoreModFolders`；zip mod 的启用状态在开关关闭时也不会被 `modsList.txt` 重写抹掉）。
+    之所以是"落盘暂存"而不是内存挂载：Meteoric/Psych 的资源管线全是真实文件路径
+    （`sys.io.File` / `FileSystem` / `FlxGraphic.fromFile` / `Sound.fromFile`），内存挂载等于重写整条资源管线
+    （CNE 的 `AssetsLibraryList` + `__proxy` 那套）；暂存目录可随时整个删掉，下次自动重建。
+  - **Mod 列表**：卡片与右侧信息区标注「CNE 格式」，开关未开时提示开关位置（`states/ModsMenuState.hx`）。
+  - **未覆盖（本版明确不做，等实机测试后再排期）**：CNE 舞台 `data/stages/*.xml|.hx`、人物 `.hx` 扩展
+    （`pico-speakers.hx`/`spirit.hx`）、`data/notes/*.hx` 自定义音符行为、`.pack` 脚本包、
+    独立 `events.json`（CNE 格式 `{events:[...]}` 不喂给 Psych 解析器；谱面内嵌 `events` 已转换）、
+    CNE 自定义难度在 Freeplay 的档位扩展（Story 里按周目 `<difficulty>` 生效）。
+  - **验证**（本轮无 CNE 样本 mod，且按用户要求"只构建、不启动"）：新增
+    `tools/cne_mod_compat_test/run.sh` —— 把**仓库真实源码**逐字节复制进临时工程、只替换 flixel/lime/backend 替身后
+    `haxe --interp` 直跑：谱面转换 34 条 + 兼容层 47 条 = **81 条断言全过、0 失败**
+    （含 CNE 官方 base 谱面 118 音符守恒、玩家 59 / 对手 59 列号分布、zip 指纹失效重解）；
+    `./compile-mac.sh typecheck` 通过、`./compile-mac.sh` release 构建通过（exit 0），
+    产物内字符串含 `CNE 模组兼容`/`codenameChart`/`mods/_cnestage`/`cneModCompat`；实机由用户第二轮测试。
+    证据：`tools/cne_mod_compat_test/{EVIDENCE.md,out/*.log}`。
+  - **第二轮补充（CNE 模组实测后）**：① **CNE 舞台 XML** → 背景图层 + 角色站位/相机偏移/zoom
+    （新增 `cne/CneModCompat.stageFile/stageSpriteNodes` + `states/stages/CneXmlStage.hx`，
+    挂点 `StageData.getStageFile` 与 `PlayState` 舞台 switch 的 default 分支）；
+    ② **人物加载优先级修正**：mod 的 CNE `data/characters/<名>.xml` 现在排在**引擎内置 JSON 之前**
+    （CNE 是 mod 覆盖引擎；旧顺序下 mod 的同名人物 gf/bf/dad 永远读不到，实测 SMA 的 GF 一直用引擎内置贴图）；
+    ③ 事件布尔参数归一化为 `'1'/'0'`（Psych 事件值是数字字符串约定）。
+    ④ 顺带定位一个**既有引擎 bug**（与本兼容层无关）：谱面事件名命中 `custom_events/<名>.lua` 时进曲 SEGV
+    （空 body 也崩；CNE 关闭 + 纯 Psych 谱面同样复现），已在 `PROGRAMMING.md` 第 8 节记录并给出规避方式。
+    测试断言 41+66=107 条全过；本轮按要求只构建、不启动，实机由用户截图验证。
+
+- **【修复】设置里「音符打击特效」的 4 个非默认皮肤此前全部静默失效**：`NoteSplash.defaultNoteSplash`
+  在 v5 性能改动里被改成 `'noteSplashes/noteSplashes-063'`，而 `getSplashSkinPostfix()` 会给它拼 `-<skin>`
+  后缀 → 解析成 `noteSplashes-063-vanilla`（仓库无此文件），`loadAnims` 回退链于是一律回退到 063：
+  选 Diamond / Electric / Sparkles / Vanilla 与选默认皮肤看到的是同一张图。
+  **修复**：`defaultNoteSplash` 回到 Psych Engine 0.7.3 的约定 `'noteSplashes/noteSplashes'`
+  （PE 0.7.3 `objects/NoteSplash.hx:24` 与 `states/editors/NoteSplashDebugState.hx` 的 `defaultTexture` 同值），
+  后缀拼出来即 `noteSplashes-vanilla` / `noteSplashes-diamond` / … 真实文件；
+  `images/noteSplashes/list.txt` 新增 `063` → 063 成为**可选皮肤**，选中时按 `use063Raw` 判据
+  （贴图名含 `noteSplashes-063`）**不挂着色器**，预染色四色 raw 直出。
+  - 行为变化（**须知晓**）：默认皮肤（Psych）从"强制 063 raw"变回 `noteSplashes` + 各轨 RGB 着色
+    （即 v5 之前的行为）。想保留 063 观感，把「音符打击特效」选成 `063` 即可。
+  - 迁移：老存档 `splashSkin = "Psych"` 仍有效；已失效的自定义皮肤名按既有逻辑重置为默认。
+
+- **【新增】选中「音符打击特效」行时，内容区预览带显示 4 轨打击特效预览**：排版与精灵形态照搬
+  Psych Engine 0.7.3 `states/editors/NoteSplashDebugState.hx`（站立箭头 `alpha 0.75`、`x = i * 220 + 240`、
+  溅射位 = 箭头位 − `(swagWidth*0.95, swagWidth)`、`offset = (10,10) + config 偏移`、
+  帧率取 config 区间随机值、着色器取该轨箭头的 RGB 调色板）；与调试界面的唯一差别是动画设为循环。
+  - **尺寸（用户确认保留原行数后的必然结果）**：`OptionsPane` 预览带改为跟随分区行窗口
+    `[ROW_Y + rowsVisible * ROW_GAP, STRIP_Y − 6]`（6 行 = 464..572 = 108px，与既有常量逐像素一致）。
+    6 行下 108px 装不下最高的 splash 皮肤（`noteSplashes-vanilla` 整段动画包络 316px），
+    因此**预览带路径整体等比缩小到 0.33×**（316 × 0.33 ≈ 104px，上下各留 ~2px）；暂停内嵌路径
+    没有预览带约束，仍是 PE 0.7.3 的**全尺寸**。要全尺寸只能二选一：行窗口缩到 2 行（预览带 316px），
+    或让预览浮在选项行之上（会压住行文字，违反 system 域排版契约）。
+  - **量测用整段动画包络、不用首帧**：sparrow 每帧 trim/rect 都不同（063 的 trim.y 在动画里从 87 变到 30），
+    首帧只有峰值帧的 ~85% —— 拿首帧当尺寸会让峰值帧顶出预览带。宿主的包围盒（`x + width`）
+    也据此来，配合"打击特效整组与箭头预览同心"，三种选中态、任意皮肤的落位逐像素一致（不跳位）。
+
+- **【修复】单界面设置里的预览此前走错了分支（实机截图定位）**：`BaseOptionsMenu.headless` 只在**构造期**
+  为 true（`OptionsState.sectionInstance` 构造完就还原），而 `NoteSettingsSubState.onPaneSelectionChange`
+  拿它判断"我在不在预览带里" → 换行时误走整屏分支：箭头被 tween 到 `noteY = 90` 压到选项行上、
+  溅射被摆到 `y = −22` 顶出面板。**修复**：新增常驻标志 `BaseOptionsMenu.paneHosted`（由
+  `OptionsPane.setSection` 置位），预览联动一律以它为准；单界面里只切显隐、y 交给宿主摆位。
+
+## 未发布（设置界面融合：一个界面 + 侧边栏切分区）
+
+- **【重写】设置界面从"两级界面"变成"一个界面"**：左侧 `SettingsRail`（230 宽）切分区，
+  右侧 `OptionsPane`（956 宽）就地渲染该分区的选项行 —— 不再"进二级页 → 退出 → 再进下一页"。
+  分区**选中即切换**（navigation rail 预览手感），焦点用 `Tab` 在"分区栏/内容区"之间迁移；
+  鼠标点分区行 = 切分区并接管焦点；触控点分区行同理，◀▶/A 仍作用于内容区。
+  - 新增：`source/options/SettingsRail.hx`（分区栏）、`OptionsPane.hx`（内容区宿主）、
+    `OptionsUi.hx`（令牌化面板绘制）、`OptionValue.hx`（取值/显示单点）、`SettingsCanvas.hx`（画布基类）。
+  - 重写：`source/options/OptionsState.hx`（唯一入口）。
+  - 布局（1280×720 基准，已核算）：侧栏 40,70,230,570；内容 284,70,956,570（右缘 1240）；
+    选项行首 y 152、行距 52、可见 8 行；说明行与主题色板条共用底部 578..632 条带（互斥显示）；
+    底部提示条 40,662,1200,48。层级仍是**面板 → 高亮条 → 行文字**（高亮条先 `add()`）。
+
+- **【关键机制】选项定义只有一份，不存在两套表漂移**：`BaseOptionsMenu` 新增 `headless` 模式 ——
+  7 个选项分区（音符/界面/画面/效果/玩法/判定/性能）由各自子类**照旧在构造里 `addOption()` 并挂 `onChange`**，
+  只是不建任何 UI（背景/面板/行/按钮/pad 全部跳过），选项表与回调由 `OptionsPane` 渲染与驱动。
+  `formatValue` 抽成 `OptionValue.display()`（显示优先级）供两条路径共用；`onPaneSelectionChange()` 是
+  预览类联动的新钩子（分页路径的 `changeSelection` 覆写体改为调用它）。
+
+- **【就地化】两块自带绝对布局的画布搬进内容区**：`NotesSubState` → `NotesPane`、`ControlsSubState` → `ControlsPane`，
+  两者都接受一个内容区矩形（`hosted` 分支）：
+  - `ControlsPane`：清单左缩进 = 内容区 x+40，键位列右贴（`KEY_X = 右缘 − 500`），绑定弹层在内容区居中；
+  - `NotesPane`：左右面板重排为 560/382（中间 14 间距），模式列与箭头列在左面板内居中，
+    色轮 300→250 且亮度渐变条移到色轮**右侧**（382 宽放不下原始的"渐变条 46 + 16 间距 + 色轮 300"横向排布），
+    RGB/HEX 三列按面板宽度等比压缩。
+  - 两个 `*SubState` 变成**薄壳**：`new XXXPane(null)`（null = 整屏几何，像素级不变）+ `onExit = close()`。
+    暂停菜单内的设置路径（`PauseSettingsSubstate`）因此与改造前完全一致，且不再有第二份实现。
+  - 焦点不在内容区时，宿主把画布 `inputEnabled = false`（只绘制不吃键），
+    避免 ↑↓/Esc 被"画布内部列表"与"分区栏"同时消费。
+
+- **【边界，明确声明】**「调整延迟与Combo」「自定义界面」「容器」「移动触控」仍是**独立整屏页出口**：
+  侧栏列出，**点分区栏即一步直达**（键盘选中后 Enter 直达；内容区确认同样可开），
+  容器自带引擎界面、启动会整机重启，因此不做就地嵌入；
+  音符皮肤预览 / 抗锯齿 BF 预览在融合界面里**未显示**（headless 分区不创建预览精灵；预览承载位待做）。
+
+- **【兼容契约不变】**：`OptionsState.onPlayState`（曲目内进入设置后返回要重载曲目）、
+  `pendingSelectLabel`（容器界面返回按标签恢复分区）、`enterContainersMenu()`（容器入口"不挂转场"修复）。
+  单界面没有"关子页"这一步，因此落盘点从 `closeSubState()` 改为 `goBack()` / `openCurrentExternal()` /
+  `destroy()`（否则 `destroy()` 里的 `loadPrefs()` 会把本次改动读没）。
+
+- 证据：`tools/evidence/settings-single-ui-20260915/`（类型检查/构建日志、静态契约自查、用户实测截图）。
+
+- **【滚动】侧栏滚轮 = 页面滚动**（一格滚轮翻一整页，桌面 9 项；两端自然夹取，不回卷）：
+  翻页过程走**时间插值**（`FlxMath.lerp(..., elapsed * SCROLL_LERP)`，与 Freeplay/MainMenu 同款），
+  所以是"整栏滑过去"而不是"一行一行闪"；窗口位置跟随选中项居中，因此翻页时**高亮条停在同一屏幕行、列表在它下面滑**。
+  键盘 ↑↓/长按仍是一行一行；点击分区行仍是单击直达。移动端触屏拖动会合成大量滚轮事件，故移动端一格 = 一行（只桌面翻页）。
+  翻页间隔 ≥110ms（连续飞滚不会一帧翻好几页）；跨行 >2（如回卷）直接吸附，不做长距离滑动。
+  行不越列表带：面板没有裁剪遮罩，靠近上下边缘的行按位置隐藏（否则文字会压到「设置」标题）。
+
+- **【修复】色板选中环残留在别的分区/别的选项行**：`ColorSwatchPicker.setSelectedVisual()` 点亮"当前档位环"时
+  **不看整行是否隐藏**，而它会由 `keyboardFocus`（宿主切焦点）与 DesignTokens 主题监听（改主题色）回调触发 ——
+  于是切到「音符」等没有主题色选项的分区后，那里会留下一个孤零零的白圈。现在该方法以 `isVisible` 为闸门
+  （整行隐藏就不点亮任何环）；`OptionsPane.set_focused` 也只在"色板确实显示着"时才动 `keyboardFocus`。
+
+- **【新增】音符皮肤（箭头样式）预览进内容区**：`OptionsPane` 新增**预览带**（y 464..572，高 108），
+  带预览的分区把选项行窗口从 8 行缩到 6 行（`BaseOptionsMenu.previewRows`），省下的空间给预览；
+  预览容器由宿主按**叶子精灵包围盒**在预览带内居中（普通 `FlxGroup` 没有 x/y，且分区往往再套一层自己的
+  `FlxTypedGroup`，所以递归收集叶子、逐个平移，且同一容器只摆一次以免偏移累加）。
+  `NoteSettingsSubState` 现在两种路径都创建预览：整屏路径仍是"从屏幕上方滑入"，单界面路径只做显隐
+  （内容区没有裁剪遮罩，滑入会画到选项行上面）。
+
+- **【修复】预览带上残留"两个没有文字的空开关"**：给音符分区开预览带后选项行窗口从 8 行缩到 6 行，
+  但 `setRowsVisible(true)` 会把**全部 8 行**的行文字/开关/值文字都显示出来，而 `refreshRows()` 只遍历 `rowsVisible` 行
+  → 第 7、8 行的开关被留在预览带位置、文字却从未填过（用户实测截图）。现在 `refreshRows()` 末尾显式隐藏尾部未用行
+  并复位文本缓存。
+
+- **【样式统一】布尔选项的开关改为「更新界面」同款 toggle**：新增可复用组件 `source/objects/ToggleSwitch.hx`
+  （胶囊轨道 96×32 + 22px 白圆钮；开 = `primary` 填充 + primary 描边，关 = `0x66161622` + `panelOutline`；
+  圆心空间插值 `elapsed*18`、首次落位吸附；轨道**原地重绘**避免同尺寸位图串图）。
+  设置内容区（`OptionsPane`）的方框复选框整体替换为它，`switchCols` 取代 `checkBgs/checkFills`；
+  命中区外扩 12px → 32+24 = **56 高**（触控红线）。开关比旧方框宽（96 vs 26），因此选项名起点右移
+  到 `PANEL_X+130`（开关右缘 402 + 12 间距），名字可用宽 486px 仍充足。
+  （暂停菜单内的设置页仍用旧方框复选框，属另一条已验证路径；后续可收敛为共用本组件。）
+
+- **【全库统一】所有系统域界面的开关 = 胶囊 toggle**（`objects/ToggleSwitch`）：
+  融合设置内容区 `OptionsPane`、分页设置页 `BaseOptionsMenu`（暂停内嵌 7 页）、模组列表 `ModsMenuState`
+  三处把 26px 方框复选框整体替换（`checkBgs/checkFills` 引用归零）；更新界面 `OutdatedState` 的**私有胶囊实现
+  收敛为共用组件**（圆钮坐标模型 / 原地重绘 / 首次落位都随之固化，那段临时探针也一并删除）。
+  - 因开关比方框宽（96 vs 26），三处名字列右移：融合内容区 `NAME_X` → `PANEL_X+130`；
+    `BaseOptionsMenu.LIST_X` 108 → **164**；`ModsMenuState.LIST_X` 88 → **164**（值列不动）。
+  - 模组列表行位是动态的 → 新增 `ToggleSwitch.setPosition(x, y)` 整组移动（轨道 + 圆钮一起，避免圆钮留在旧行高）。
+  - 4 个编辑器页（对话/角色/周目编辑器）的 `FlxUICheckBox` **不动**：meteoric-design 明列它们属非主题域工具界面。
+  - Skill 已同步：`meteoric-system` 新增「开关（胶囊 toggle）」规范条目 + 「开关统一清单」+ 单界面设置章节；
+    `meteoric-design` 形状表把「复选框」改为「开关（布尔项）」。
+
+## 未发布（Lua 图形化编程 · 第一版界面缺陷修复）
+
+- **【修复】第一版截图复核出的画布/底栏界面缺陷**（用户实机截图 + 源码定位，逐条根因如下）：
+
+  1. **画布空提示与事件积木叠字**（截图左上"…木」面板拖一块事件积木…"被帽块压掉前半句）：
+     `rebuildCanvas()` 用 `doc.isEmpty()` 控空提示，而它的语义是"没有任何**非事件**积木"——
+     画布默认带 2 条空事件栈（`LuaGraphTemplates.blank`）→ 它恒为 `true`，提示常显；
+     且提示 y = `CAN_Y+90` 正好落在第一条事件栈上。
+     改为新增 `hasDrawableStack()`（有无可绘制事件栈）判定 + 提示移到画布中部空区；
+     **`GDoc.isEmpty()` 语义保持不动**（`LuaCodeGen.validate` 的"画布上还没有任何积木"还要用它）。
+
+  2. **底部按钮「保存生成」折行、「预览 Lua」被截**（截图里"保存生/成"两行 + 底部孤立的"成"）：
+     `UIButton` 标签字号硬编码 26px，而本仓库 `FlxText.set_fieldWidth()` 在 `fieldWidth > 0` 时
+     **强制 `wordWrap = true`**（`source/flixel/text/FlxText.hx:521-540`）→ 26px 下 96px 只放得下 3 个汉字。
+     `UIButton` 新增可选 `labelSize`（默认 26，存量调用零变化）+ 标签强制单行；本界面底栏传 18。
+
+  3. **画布右上「模组/脚本」折三行压进画布内容区**：`nameText` 宽 280 且未关 `wordWrap`。
+     改为画布顶部固定两行（标题行 + 状态行），状态行宽 `CAN_W-32`、`wordWrap=false`、
+     超长走新增 `fitText()` 加省略号；内容起始 y 提为 `CAN_CONTENT_Y = CAN_Y + 78`，
+     `cullOne()` 上界跟着走（滚出顶部的积木不再压标题/状态行）。
+
+  4. **帽块下的空凹槽被当成"另一块小积木"**：`LuaBlockSprite.EMPTY_BODY_H` 32→44、
+     槽底 `0x33000000`→`0x59000000`、描边 `0x22FFFFFF`→`0x33FFFFFF`，
+     并给**空**凹槽加底部对齐的占位文案（"把积木拖进这个凹槽"/"把积木拖进「否则」凹槽"）；
+     帽块的"槽是空的"由 `stack.blocks.length == 0` 传入（模型里栈内积木与帽块同级，`block.body` 恒空）。
+
+  5. **【可用性】"不知道怎么把第二块接到第一块上"**：`addGap()` 只塞了一个 16px 高的**不可见**命中带，
+     插入点没有任何视觉；且从调色板拖出的积木**在画布外松手会静默丢弃**。
+     新增拖拽插入指示（⑥）：`showDropHints()` 给每个插入点画插入线、`updateDropHints()` 用 primary
+     高亮最近的插入点（拖拽期间不重建，只移动高亮条）；画布外松手改为红色状态提示 + 取消音，
+     不再静默丢弃；新增事件栈的提示文案也改为"拖积木到凹槽或插入线上松手即接入"。
+     并为**引擎内自检加了"模拟拖拽"一步**（`selfTestDragHold` 门控，不设 `ME_LUAGRAPH_SELFTEST` 时零影响）：
+     走与鼠标拖拽完全相同的路径，使插入线/最近插入点高亮能在无人操作的环境里被截图复核。
+
+  6. **【层级契约缺口·神秘堆叠】弹层/预览层会被画布积木压住**：`rebuildCanvas()` 每次都把积木 `add()`
+     到 `members` 末尾 —— 只要弹层早已打开，一次重建就把积木画到**弹层之上**（实测截图：保存被拒弹层上
+     压着「当脚本创建时」帽块与「把积木拖进这个凹槽」占位文案，弹层错误行被拦腰盖住）。
+     新增 `raiseOverlay()` / `moveToFront()`：每次重建后把打开中的浮层（弹层 + 预览层）摘除再追加回末尾。
+     依据 `FlxGroup.remove(o, true)` 只从 `members` 摘除、**不销毁对象**（flixel 5.2.2 `FlxGroup.hx:396-420`），
+     所以"摘掉再 add"是安全的非破坏性抬层。
+
+  7. **【可用性缺陷】程序块放上去就删不掉**：
+     - 事件帽块的 `blockPath` 是 `[栈下标]`（长度 1、奇数），而 `GDoc.detach()` 首行即
+       `if (blockPath.length < 2 || blockPath.length % 2 != 0) return null;` → `deleteSelected()`
+       在此**静默返回**；更关键的是**全工程没有任何删除事件栈的代码**
+       （`grep stacks.splice|removeStack|deleteStack` = 0 处），而点一下「事件」积木就会新增一条栈
+       ⇒ 事件栈"只能加、不能减"（用户实测反馈：放置后无法删除）。
+     - 修法：`deleteSelected()` 增加**奇数路径 = 事件栈**分支（`doc.stacks.splice(si,1)`，含撤销与
+       "已删除事件栈：X（含 N 块积木）"反馈）；点击帽块 = 选中该栈并提示"Del 删除整条栈"
+       （`startDragMove` 对奇数路径不再走 detach，避免帽块被误判可拖动）；未选中时按 Del 也给提示，
+       不再静默。自检新增 `stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes` 回归项。
+
+  8. **【可用性缺陷】底部快捷键提示永远显示不全**（用户实测截图：提示止于"Enter 编"）：
+     完整键位文案实测约 **1100px**，而底栏左侧可用宽度只有 **636px**（右侧 512px 被 5 个按钮占掉），
+     `wordWrap=false` 下超宽部分被静默裁掉。修法：底栏 **48→58 高**（顶边 662→652，仍 ≥ 设计规范的
+     底部安全线 648）并把提示**均衡拆成两行**（鼠标/拖拽一行、键盘一行，两行实测约 479px / 564px）；
+     不采用"缩写丢键位"方案。另加两道防回归：
+     ① `create()` 对每行跑 `fitText()` 兜底（真超宽时截断出**可见的省略号**，不再静默裁切）；
+     ② 引擎内自检打印 `hint fit: row1=…/636 row2=…/636 truncated=no barBottom=710`。
+
+  9. **【内存】`remove()` 不销毁 ⇒ unique 位图只增不减**：`FlxGroup.remove(o, true)` 只把对象从 `members`
+     摘除、**不调用 destroy**（flixel 5.2.2 `FlxGroup.hx:396-420`），而旧代码以为它会销毁 ⇒ 每次重建画布 /
+     拖一次幽灵块 / 弹层翻一页 / 切一次分类都留下新的 unique 位图（`makeGraphic(..., true)` 的结果仍在
+     `FlxG.bitmap` 缓存里）。空画布下按 Del/切分类反复操作最明显。
+     新增 `disposeSprite()` / `disposeAll()`：摘除 + `destroy()`，并对**纯 FlxSprite** 显式
+     `FlxG.bitmap.removeIfNoUse(graphic)` —— `FlxSprite.destroy()` 只做 `graphic = null` + `useCount--`
+     （haxelib `FlxSprite.hx:1490-1502`），不会摘缓存；而 Meteoric 版 `FlxText.set_graphic` 已自带
+     `removeIfNoUse`（`FlxText.hx:739`），故对文本不再二次摘除（避免重复调用）。
+     覆盖点：`rebuildCanvas`（顺序：先摘除全部成员 → 按 `canvasBits` 销毁 texts/chips → 清空
+     `spr.texts/chips` 引用 → 销毁底图；顺序颠倒会对同一对象二次 destroy）、`clearGhost`、`clearDropHints`、
+     `renderPopup`/`closePopup`、`rebuildPreview`/`closePreview`、`rebuildCategories`/`rebuildPalette`
+     （含旧高亮条 `catBar`/`palBar`）、`closeInputBox`（`UIInputBox.destroy()` 才会把**原生输入框**从 stage
+     摘掉并解绑监听，只 remove 会每次编辑参数留一个僵尸原生框）。
+     另把 `openParamEditor` 的枚举闭包改为捕获 `blockPath` **副本** —— 销毁语义变真之后，捕获 sprite 本身
+     会在"弹层开着又重建画布"时读到已销毁对象。
+
+  10. **【可用性】新增 `F1` 操作说明弹层**：底栏两行只放高频键位，完整键位表（10 行）走 `F1` 打开。
+      复用通用弹层 ⇒ 自动获得 `raiseOverlay()`（永远在积木之上）、滚轮/↑↓ 翻页、Enter/点击确认、Esc 关闭。
+      自检新增宽度断言 `help fit: max=…/556 rows=10`（超宽会在弹层内折行、把正文挤出面板）。
+
+  11. **【界面】编辑器菜单（`MasterEditorMenu`）背景改为主题色**：原实现把 `menuDesat` 染成**当前选中条目
+      自带的强调色**（`optionShit[r][4]`）并做 0.4s `FlxTween.color` 过渡 —— 于是"看哪个选项、整屏就是什么色"，
+      与玩家选的主题色无关。现改为 `bg.color = DesignTokens.menuTint`（= 当前主题 primary），
+      与 Options / Pause / Lua 图形化编辑器统一；随之删掉逐选项的颜色过渡与 `colorTween` 字段
+      （否则会留一个 `newColor` 恒等于 `bg.color` 的空转 tween）。
+      条目自带强调色保留在表中但不再驱动背景；令牌在 `create()` 读取 ⇒ 切换主题后下次进入生效。
+      边界写进 `meteoric-system`：**菜单**属系统域可主题化，**编辑器页本体**仍是非主题域深灰工具界面，未改动。
+
+- **本轮验证（第一版界面缺陷修复 ①-⑩，全部为真产物验证）**
+  - 编译：`./compile-mac.sh` 共 8 次 **EXIT=0 / 0 error**（post-build 每次均还原墙钟版 `lime.ndll`
+    `cd890285f1d3def18d9f5aafc04a198d` + 重签）；另跑本仓库只读模式 `./compile-mac.sh typecheck`
+    **✔ 通过且 app 未被改动**。最后产物 `Meteoric`：20176320 字节，mtime > 全部源码修改时间。
+  - 引擎内自检（`ME_LUAGRAPH_SELFTEST=1`，零行为影响的门控入口）。**已实测观测到**（build 6/7 运行日志）：
+    `hint fit: row1=505/636 row2=564/636 truncated=no barBottom=710` ｜ `edit ok … undoRedoMatch=yes` ｜
+    `stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes` ｜
+    `hat select: selPath=[0] status=已选中事件栈：当脚本创建时（Del 删除整条栈）` ｜
+    `stack delete via Del: stacks 2 -> 1` ｜ `drag hints: gaps=2 lines=2 cursor=on` ｜
+    `overlay restack: popupOpen=true popupIdx=52 > lastBlockIdx=51` ｜ `DONE`。
+    **尚未运行、仅按估宽推算**（build 8 新增/变更项，待下次自检日志确认）：行 1 追加「F1 说明」后 ≈576/636；
+    `help fit: max≈520/556 rows=10`。
+  - 视觉复核（逐张 read_image，非摘要）：静止态（无叠字 / 按钮单行 / 状态行单行 / 空凹槽占位文案）、
+    拖拽态（插入线 + primary 高亮最近插入点）、弹层层级（复现"弹层开着又重建画布"）、底栏两行提示完整。
+    证据留档：`tools/evidence/luagraph-ui-20260915/`（含各图 sha256 与自检/构建日志）。
+  - **用户实测确认：功能正常**（事件栈可删除、拖拽接入可用），本轮无遗留阻塞项。
+
+- **已知项**：画布没有真正的裁剪遮罩，向上滚动时积木仍可能贴近标题行（`cullOne()` 已收窄上界缓解）。
+- **已知项**：引擎无上限帧率（窗口标题实测 FPS 500~990、CPU ~84%），以及状态切换时 flixel 只 `clear()`
+  不销毁成员的固有行为；两者都不是本界面引入，未在本轮处理。
+
+## 未发布（Lua 图形化编程）
+
+- **【新功能】Lua 图形化编程编辑器（积木块 → Lua，桌面端）**：用积木拼出 Lua 脚本，一次生成 `.lua` + 图文件。
+
+  **入口与落点**
+  - 编辑器菜单（主菜单按 `7` = debug_1）新增第 8 项「Lua 图形化编程」；Android 上该条目隐藏（`#if mobile` 裁剪）。
+    进入走 `LoadingState.loadAndSwitchState`，与 Chart / Character / Dialogue 编辑器一致。
+  - 产物：`mods/<当前模组>/scripts/<名字>.lua` + 同名 `<名字>.luagraph.json`；脚本目录不存在自动创建。
+    未选择模组时**拒绝保存**并提示，不会误写别的模组；`.json` 不会被当脚本加载（`PlayState.create` 的 `scripts/` 扫描只认 `.lua` / `.hx`）。
+
+  **界面（系统域：遵循 `meteoric-design` / `meteoric-system`）**
+  - 分类（156）／积木（300）／画布（720）三面板 + 底部状态条与 5 个 MD3 按钮；圆角磨砂面板、令牌化配色、底图一次绘制。
+  - 画布为**多栈**结构：每个事件帽块 = 生成文件里的一个真实回调，帽块凹槽内装整条栈。
+  - 高亮条先 `add`、行文字后 `add`（层级契约）；语义色用局部 `COLOR_OK` / `COLOR_ERROR`
+    （`DesignTokens` 没有 `error` 字段）。
+  - 输入：鼠标拖拽放置/移动 + 点击参数就地编辑（枚举弹清单、数字/文本走 `UIInputBox`，为此给该组件加了可选
+    `maxLength` 参数，默认 24 保持既有调用不变）+ 键盘全路径（`[ ]` 分类、`,/./PgUp/PgDn` 选块、`Insert` 插入、
+    `←/→` 选参数并微调、`Enter` 编辑、`Del` 删除、`Ctrl+Z/Y/C/X/V/S/O`、`Tab` 预览、`Esc` 返回）。
+
+  **积木库**：10 类 **81 块** —— 事件 9 / 流程 6 / 变量 5 / 精灵 16 / 补间 8 / 相机 5 / 音频 10 / 文本 10 / 杂项 10 / 兜底 2。
+  全部函数名与参数序逐条核对自 `source/psychlua/**` 的 `add_callback` 注册原文（203 个注册函数）；
+  缓动、混合模式、相机名取自 `LuaUtils` 的**接受值集合**（写别的会静默回落）。
+  兜底两块（「调用任意 Lua 函数」「直接写一行 Lua」）覆盖全部引擎 API。
+
+  **语义要点（改动时勿破）**
+  - 「等待 N 秒后继续」= `runTimer` + 续接闭包 + 本编辑器生成的 `onTimerCompleted` 调度器
+    （仅当图里真的用了等待块才生成）；自定义区若也定义 `onTimerCompleted`，保存前会告警"等待将失效"。
+  - 变量为脚本级 `local`，声明在文件顶部；被引用但未声明时自动补 `local x = 0` 并告警。
+  - 生成文件分「受管区」与「底部自定义代码区」：受管区整体重写，**自定义区永不覆盖**；
+    目标 `.lua` 已存在且**不含标记**（手写脚本）时先弹确认，再把原内容整体搬进自定义区（不丢手写代码）。
+  - 预览层只读、不自动执行；保存前静态校验（错误阻止保存、警告只提示）。
+
+  **新增文件**：`source/luagraph/`（15 个：模型 `GBlock`/`GStack`/`GVar`/`GDoc`、目录 `GKind`/`PDef`/`BlockDef`/`LuaBlockDefs`、
+  生成器 `LuaCodeGen`、模板 `LuaGraphTemplates`、落盘 `LuaGraphIO`、视觉 `SlotHit`/`BlockMetrics`/`LuaBlockSprite`、`JsonModel`）、
+  `source/states/editors/LuaGraphEditorState.hx`；改动：`MasterEditorMenu.hx`（新条目）、`UIInputBox.hx`（maxLength）、
+  `TitleState.hx`（自检入口）、`skills/meteoric-system/SKILL.md`（新增该界面小节）。
+
+  **验证（真产物 + 引擎内自检 + 真 LuaJIT）**
+  - `./compile-mac.sh` **EXIT=0**（0 类型错误），post-build 已还原墙钟版 `lime.ndll`（9368752 字节 / `cd890285…`）并重签。
+  - 引擎内自检（`ME_LUAGRAPH_SELFTEST=1`，环境变量门控、零行为影响的 CI 入口）：
+    载入 15 块 / 3 栈 / 1 变量的图 → 插入 → 删除/撤销/重做（edit ok: delete=15 undo=16 redo=15）→ 生成 61 行 **0 issue** →
+    保存成功 → 预览 61 行。
+  - 生成的 Lua 用**与引擎同源的 LuaJIT**：语法/编译通过，且行为断言全通过（回调齐备、参数无引号污染、
+    等待续接为一次性、10 次命中恰好触发 1 次条件分支、`onDestroy` 清理、自定义区在载入期执行）。
+  - 手写保护实测：手改自定义区后重新生成，手写内容（含多行）保留且仍可编译。
+  - 视觉复核：三面板 / 分类与积木列表 / 画布多栈（含 if-else 双井嵌套与参数槽）/ 预览层 / 状态条与按钮，逐张人工看图。
+
+  **本轮验证中发现并修掉的真实缺陷（记录以免回归）**
+  1. **事件名与积木 id 不一致**：栈里存回调名（`onCreatePost`）、目录按 id（`ev_onCreatePost`）查 → 任何图都会"未知事件"、保存被拒。
+     新增 `LuaBlockDefs.eventName()` / `byEvent()` 做正式映射（GUI 拖拽与键盘插入两处同步）。
+  2. **帽块模板未展开 `$BODY$`**：帽块走"整段字符串 push"，绕过了负责替换占位符的行处理 → 生成物残留 `$BODY$`（LuaJIT 直接拒绝）。
+     重构为统一的 `emitTemplate`（帽块与普通积木共用）。
+  3. **字符串参数被双重加引号**：模板已写 `'{p:x}'`，`quote()` 又补一层 `"` → `makeLuaSprite('"tag"', '"img"')` 会查不到贴图。
+     改为「模板负责引号、生成器只做转义」（`esc` / `sq`）。
+  4. **预览层代码行与底部提示重叠**、**状态条文字宽度越界压到按钮区** → 可见行数按面板高度反算、宽度收到按钮区左侧。
+  5. **在某个 State 的 `create()` 期间 `switchState` 会原生崩溃（SIGSEGV）**：自检入口改为 `update()` 首帧派发；
+     菜单入口改用 `LoadingState.loadAndSwitchState`（与其它重型编辑器一致）。
+
+  **已知限制**：① Android 上入口隐藏（拖拽+键盘为主，触屏没有完整操作路径）；
+  ② 仅单向「图 → Lua」，不逆向解析已有 `.lua`（手写脚本仍可整体保留进自定义区）；
+  ③ 预览层沿用系统域玻璃面板（半透明），下方编辑器文字会轻微透出（令牌化规范内的既定观感）。
+
 ## 未发布（UI 设计系统审查修复）
 
 - **【界面】更新提示界面（`OutdatedState`）按系统域规范重做**。

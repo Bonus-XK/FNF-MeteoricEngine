@@ -31,13 +31,13 @@ class ModsMenuState extends MusicBeatState
 	static final PANEL_R_W:Float = 460;
 	static final PANEL_R_H:Float = 570;
 
-	static final LIST_X:Float = 88;
+	static final LIST_X:Float = 164;  // 选项名 X（原 88：胶囊开关 96 宽后必须右移让位）
 	static final LIST_Y:Float = 152;
 	static final ROW_GAP:Float = 56;
 	static final ROWS_VISIBLE:Int = 8;
 
-	static final CHECK_X:Float = 56;
-	static final CHECK_SIZE:Float = 26;
+	static final CHECK_X:Float = 56;      // 开关 X（objects.ToggleSwitch，96×32 胶囊）
+	static final SWITCH_ROW_OFF:Float = 6; // 开关在行内垂直偏移
 	static final VALUE_X:Float = 540;
 	static final VALUE_W:Float = 160;
 
@@ -65,8 +65,8 @@ class ModsMenuState extends MusicBeatState
 	public static var defaultColor:FlxColor = 0xFF665AFF;
 
 	var rows:Array<MenuText> = [];
-	var checkBgs:Array<FlxSprite> = [];
-	var checkFills:Array<FlxSprite> = [];
+	/** 行内开关（与更新界面同款胶囊，见 objects.ToggleSwitch）；行位动态，靠 setPosition 跟随 */
+	var switchCols:Array<objects.ToggleSwitch> = [];
 	var statusTexts:Array<FlxText> = [];
 	var lastRowText:Array<String> = [];
 	var lastStatus:Array<String> = [];
@@ -172,15 +172,10 @@ class ModsMenuState extends MusicBeatState
 			add(row);
 			rows.push(row);
 
-			var checkBg:FlxSprite = makePanel(CHECK_X, LIST_Y + 4 + (r * ROW_GAP), CHECK_SIZE, CHECK_SIZE, 7, 0x66161622, 0x8CFFFFFF);
-			checkBg.visible = false;
-			add(checkBg);
-			checkBgs.push(checkBg);
-
-			var checkFill:FlxSprite = makePanel(CHECK_X + 6, LIST_Y + 10 + (r * ROW_GAP), CHECK_SIZE - 12, CHECK_SIZE - 12, 4, 0xFFFFFFFF, null);
-			checkFill.visible = false;
-			add(checkFill);
-			checkFills.push(checkFill);
+			var sw:objects.ToggleSwitch = new objects.ToggleSwitch(CHECK_X, LIST_Y + SWITCH_ROW_OFF + (r * ROW_GAP));
+			sw.setVisible(false);
+			for (spr in sw.sprites) add(spr);
+			switchCols.push(sw);
 
 			var statusText:FlxText = new FlxText(VALUE_X, LIST_Y + 2 + (r * ROW_GAP), VALUE_W, '', 22);
 			statusText.setFormat(Paths.font('future.ttf'), 22, 0xFFD7D7E0, RIGHT);
@@ -339,6 +334,10 @@ class ModsMenuState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		// 开关滑块逐帧插值（行位动态，滑块位置由组件的圆心模型自己跟着轨道走）
+		for (sw in switchCols)
+			if (sw != null && sw.track != null && sw.track.visible) sw.animate(elapsed);
+
 		// 本界面打开期间拖入了新 mod 并安装完成 → 自动刷新列表
 		var instTime:Float = ModInstaller.get().lastInstallTime;
 		if (instTime > lastInstallSeen)
@@ -525,10 +524,9 @@ class ModsMenuState extends MusicBeatState
 		var my:Float = FlxG.mouse.screenY;
 		for (r in 0...ROWS_VISIBLE)
 		{
-			var bgSpr:FlxSprite = checkBgs[r];
-			if (!bgSpr.visible) continue;
-			if (mx >= bgSpr.x - 6 && mx <= bgSpr.x + bgSpr.width + 6 && my >= bgSpr.y - 6 && my <= bgSpr.y + bgSpr.height + 6)
-				return scrollIndex + r;
+			var sw:objects.ToggleSwitch = switchCols[r];
+			if (sw.track == null || !sw.track.visible) continue;
+			if (sw.hits(mx, my, 12)) return scrollIndex + r; // 外扩 12 → 命中高 56（触控红线）
 		}
 		return -1;
 	}
@@ -545,6 +543,9 @@ class ModsMenuState extends MusicBeatState
 
 		mods = [];
 		modsList = [];
+		#if (MODS_ALLOWED && sys)
+		cne.CneModCompat.clearCaches(); // mod 列表变化 → CNE songs/ 目录名缓存作废
+		#end
 		var list:ModsList = Mods.parseList();
 		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
 
@@ -665,8 +666,7 @@ class ModsMenuState extends MusicBeatState
 			if (idx >= mods.length)
 			{
 				row.visible = false;
-				checkBgs[r].visible = false;
-				checkFills[r].visible = false;
+				switchCols[r].setVisible(false);
 				statusTexts[r].visible = false;
 				continue;
 			}
@@ -679,8 +679,7 @@ class ModsMenuState extends MusicBeatState
 			if (!isSel && top + ROW_H > LIST_BOTTOM)
 			{
 				row.visible = false;
-				checkBgs[r].visible = false;
-				checkFills[r].visible = false;
+				switchCols[r].setVisible(false);
 				statusTexts[r].visible = false;
 				continue;
 			}
@@ -689,8 +688,7 @@ class ModsMenuState extends MusicBeatState
 			{
 				// 选中行：名称/状态/复选框都收进卡片，行本身隐藏（避免与卡片重复渲染）
 				row.visible = false;
-				checkBgs[r].visible = false;
-				checkFills[r].visible = false;
+				switchCols[r].setVisible(false);
 				statusTexts[r].visible = false;
 				isCardVisible = true;
 				continue;
@@ -708,17 +706,12 @@ class ModsMenuState extends MusicBeatState
 			row.color = 0xFFCFCFDC;
 			row.y = top + (ROW_H - row.height) * 0.5; // 行内垂直居中
 
-			// 复选框位置随行位走（原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开就会错位）
-			checkBgs[r].visible = true;
-			checkBgs[r].x = CHECK_X;
-			checkBgs[r].y = top + 4;
-			checkBgs[r].alpha = 0.85;
-			checkFills[r].visible = isOn;
-			if (isOn)
-			{
-				checkFills[r].x = CHECK_X + 6;
-				checkFills[r].y = top + 10;
-			}
+			// 开关位置随行位走（原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开就会错位）
+			switchCols[r].setVisible(true);
+			switchCols[r].setAlpha(0.85);
+			switchCols[r].setPosition(CHECK_X, top + SWITCH_ROW_OFF);
+			switchCols[r].setOn(isOn);      // 目标态；滑块由 update 的 animate 滑过去
+			switchCols[r].refreshTheme();   // primary 是运行时令牌：主题切换后重绘
 
 			statusTexts[r].visible = true;
 			statusTexts[r].y = top + 2; // 始终与所在行对齐
@@ -804,6 +797,11 @@ class ModsMenuState extends MusicBeatState
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
 		cardStatus.text = isOn ? '已启用' : '已停用（按 Enter 或点击启用）';
+		#if (MODS_ALLOWED && sys)
+		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
+		if (cne.CneModCompat.isCneMod(mod.folder))
+			cardStatus.text += (cne.CneModCompat.isEnabled() ? '   ·   CNE 格式' : '   ·   CNE 格式（需在设置→编程开启「CNE 模组兼容」）');
+		#end
 		cardStatus.updateHitbox();
 
 		// 首次出现做一次克制的淡入（skill：低频、150ms quadOut、可被打断）；之后即时重建
@@ -877,7 +875,13 @@ class ModsMenuState extends MusicBeatState
 
 		var mod:ModMetadata = mods[curSelected];
 		clipText(nameText, mod.name, INFO_W - 20);
-		clipText(folderText, '文件夹：' + mod.folder, INFO_W - 20);
+		var folderLabel:String = '文件夹：' + mod.folder;
+		#if (MODS_ALLOWED && sys)
+		// 右侧信息：CNE 格式 mod 且兼容开关未开时给出可操作的提示（开关位置写在提示里）
+		if (cne.CneModCompat.isCneMod(mod.folder) && !cne.CneModCompat.isEnabled())
+			folderLabel += '   ·   CNE 格式，需开启「设置 → 编程 → CNE 模组兼容」';
+		#end
+		clipText(folderText, folderLabel, INFO_W - 20);
 
 		var enabledCount:Int = 0;
 		for (values in modsList) if (values[1] == true) enabledCount++;
@@ -1175,6 +1179,10 @@ class ModsMenuState extends MusicBeatState
 
 	override function destroy()
 	{
+		for (sw in switchCols)
+			if (sw != null) sw.destroy();
+		switchCols = [];
+
 		FlxG.mouse.visible = false;
 		super.destroy();
 	}

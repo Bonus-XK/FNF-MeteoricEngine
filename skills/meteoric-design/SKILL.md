@@ -77,7 +77,8 @@ description: Meteoric Engine（Psych 0.7.1h 基座）UI 设计总纲：手绘域
 | 大面板（列表/统计） | 20–22px（存量 Pause/Results 20、Options 22；新代码统一 22） | `BaseOptionsMenu` `makePanel(..., 22)`；Pause/Results `makePanel(..., 20)` |
 | 底部条/小卡片 | 14px | `makePanel(x, 662, 1040, 48, 14)` |
 | 按钮 | 10px（或全圆 pill） | 新按钮组件 |
-| 复选框 | 小圆角 6px / 现 26px 方框 | `BaseOptionsMenu` `CHECK_SIZE = 26` |
+| **开关（布尔项）** | 全圆胶囊（圆角 = 高的一半） | `objects/ToggleSwitch`：96×32 胶囊 + 22px 白圆钮；开 = `primary`、关 = `0x66161622` + `panelOutline`。**系统域布尔项一律用它，禁止方框复选框** |
+| 旧方框复选框（存量） | 小圆角 6px / `CHECK_SIZE` 26 | 已于 2026-09-16 全部替换为上面的胶囊开关（编辑器页的 `FlxUICheckBox` 除外，见例外表） |
 
 - 系统域**不允许 0 圆角**的面板/按钮；小组件圆角不小于 6px。
 - 禁止为圆角生成临时贴图/实时模糊；统一用 `FlxSpriteUtil.drawRoundRect` 静态绘制（现有 `makePanel` 模式）。

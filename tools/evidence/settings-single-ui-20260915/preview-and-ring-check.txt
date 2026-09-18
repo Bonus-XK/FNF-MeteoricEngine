@@ -1,0 +1,26 @@
+== 第四轮：色板环残留修复 + 音符皮肤预览进内容区 ==
+构建: BUILD_EXIT=0 / 0 error；产物 Sep 16 12:41:15 2026
+
+-- 1) 色板环残留（根因：setSelectedVisual 不看整行可见性）--
+  230:		var rowVisible:Bool = isVisible;
+  234:			var on:Bool = rowVisible && (i == index);
+  923:			var show:Bool = (swatches.isVisible && themeOpt != null && themeOpt == currentOption());
+
+-- 2) 预览带（行窗口 8→6 + 容器按叶子包围盒居中）--
+  49:	static final PREVIEW_Y:Float = 464;
+  50:	static final PREVIEW_H:Float = 108;
+  247:		rowsVisible = (previewRowCount <= 0) ? ROWS_VISIBLE : previewRowCount;
+  274:		collectSprites(preview, leaves);
+  286:		var dy:Float = PREVIEW_Y + (PREVIEW_H - (maxY - minY)) / 2 - minY;
+  292:		placedPreview = preview;
+  296:	function collectSprites(group:flixel.group.FlxGroup, out:Array<FlxSprite>, depth:Int = 0):Void
+  303:			if (sub != null) collectSprites(sub, out, depth + 1);
+  25:			var note:StrumNote = new StrumNote(100 + (520 / Note.colArray.length) * i, BaseOptionsMenu.headless ? 0 : -200, i, 0);
+  90:		if (notes != null) addVisual(notes);
+  93:		if (BaseOptionsMenu.headless) previewRows = 6; // 预览带占 2 行（8 行 → 6 行）
+  308:			else if (sec.previewRows > 0) pane.setSection(sec, e.title, e.previewHost, sec.previewRows);
+
+-- 3) 几何核算（内容区 284..1240，行首 152、行距 52）--
+  6 行窗口末行底 = 456 < 预览带顶 464  OK
+  预览带 = 464..572；箭头摆到 x 516..1008 / y 467..569
+  预览底 569 ≤ 说明条顶 578；左/右留白对称 = 232px  OK

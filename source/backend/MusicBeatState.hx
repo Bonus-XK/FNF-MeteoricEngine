@@ -11,6 +11,13 @@ class MusicBeatState extends FlxUIState
 	public var uiScripts:Array<psychlua.MenuScript> = [];
 	#end
 
+	#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+	/** CNE 式状态脚本组（编程层；总开关关闭时恒为 null） */
+	public var cneScripts:cne.ScriptPack = null;
+	/** ModState/ModSubState 指定的脚本名；null = 用类名 */
+	public var cneScriptName:String = null;
+	#end
+
 	private var curSection:Int = 0;
 	private var stepsToDo:Int = 0;
 
@@ -67,6 +74,10 @@ class MusicBeatState extends FlxUIState
 		}
 		FlxTransitionableState.skipNextTransOut = false;
 		timePassedOnState = 0;
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onStateCreate(this);
+		#end
 	}
 
 	public static var timePassedOnState:Float = 0;
@@ -138,6 +149,10 @@ class MusicBeatState extends FlxUIState
 		for(script in uiScripts)
 			script.update(elapsed);
 		#end
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onStateUpdate(this, elapsed);
+		#end
 	}
 
 	/**
@@ -177,6 +192,9 @@ class MusicBeatState extends FlxUIState
 		for(script in uiScripts)
 			script.destroy();
 		uiScripts = [];
+		#end
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onStateDestroy(this);
 		#end
 		super.destroy();
 	}
@@ -280,6 +298,10 @@ class MusicBeatState extends FlxUIState
 			stage.stepHit();
 		});
 
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onStateStep(this, curStep);
+		#end
+
 		if (curStep % 4 == 0)
 			beatHit();
 	}
@@ -293,6 +315,10 @@ class MusicBeatState extends FlxUIState
 			stage.curDecBeat = curDecBeat;
 			stage.beatHit();
 		});
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onStateBeat(this, curBeat);
+		#end
 	}
 
 	/**

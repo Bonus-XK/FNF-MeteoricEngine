@@ -59,8 +59,12 @@ class UIButton extends FlxSpriteGroup
 	 *   默认值必须是**编译期常量**，不能写 `VARIANT_TONAL`（static final 不是常量表达式，
 	 *   Haxe 会报 "Parameter default value should be constant" —— 与 makePanel 的 panelFill 同类坑）。
 	 *   调用点可以照常传 `UIButton.VARIANT_FILLED`，那是运行期实参，不受此限制。
+	 * @param labelSize 标签字号，默认 26（历史值，宽按钮足够）。**窄按钮必须显式传小字号**：
+	 *   本仓库 `FlxText.set_fieldWidth()` 在 `fieldWidth > 0` 时会强制 `wordWrap = true`
+	 *   （source/flixel/text/FlxText.hx:521-540），26px 下 96px 宽只放得下 3 个汉字 →
+	 *   "保存生成" 折成两行、"预览 Lua" 被截（Lua 图形化编辑器 2026-09-15 实测）。
 	 */
-	public function new(x:Float, y:Float, w:Float, h:Float, text:String, variant:String = 'tonal', ?cb:Void->Void)
+	public function new(x:Float, y:Float, w:Float, h:Float, text:String, variant:String = 'tonal', ?cb:Void->Void, labelSize:Int = 26)
 	{
 		super(x, y);
 		this.variant = variant;
@@ -84,8 +88,13 @@ class UIButton extends FlxSpriteGroup
 		overlay.makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
 		add(overlay);
 
-		label = new FlxText(0, 0, Std.int(w), text, 26);
-		label.setFormat(Paths.font('future.ttf'), 26, FlxColor.WHITE, CENTER);
+		// 字号：< 10 视为误传，回退历史默认 26（避免出现 0 号字这种"按钮还在、字没了"的静默故障）
+		var ls:Int = (labelSize < 10) ? 26 : labelSize;
+		label = new FlxText(0, 0, Std.int(w), text, ls);
+		label.setFormat(Paths.font('future.ttf'), ls, FlxColor.WHITE, CENTER);
+		// 标签永远单行：宽度不够时宁可横向溢出（调用方按文案宽度定按钮宽），
+		// 也不允许折行后第二行掉到按钮/界面安全区之外（见 labelSize 注释的实测缺陷）。
+		label.wordWrap = false;
 		label.textField.height = Std.int(h);
 		label.y = Math.max(0, (h - label.textField.textHeight) / 2);
 		label.scrollFactor.set();

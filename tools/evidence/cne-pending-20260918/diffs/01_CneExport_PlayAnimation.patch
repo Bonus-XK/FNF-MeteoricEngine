@@ -1,0 +1,50 @@
+--- a/source/states/editors/content/CneExport.hx
++++ b/source/states/editors/content/CneExport.hx
+@@ -565,7 +565,15 @@
+ 							var flashColor:String = colorText(params.length > 1 ? params[1] : null);
+ 							subEvents.push(['Camera Flash', paramText(flashDur), flashColor]);
+ 						case 'Play Animation':
+-							subEvents.push(['Play Animation', (params.length > 1 ? paramText(params[1]) : ''), 'bf']);
++							// CNE 的 `Play Animation` 参数是 [StrumLine 索引, 动画名, 强制?, 上下文]，
++							// 而 Psych 同名事件用 value2 指定角色（'bf' → 玩家、'gf' → GF、其余 → dad）。
++							// 这里此前硬编码 'bf'，于是对手 strumLine（type 0）的变身动画被打到玩家身上：
++							// SMA `Really Happy` 的 `Play Animation [0,"dance"]` / `[0,"death"]` 目标是
++							// `reallyhappyrat`，硬编码 'bf' 却让 bfsma 去播 dance/death —— bfsma.xml 里
++							// 没有这两个动画 → 实机表现为「人物中途不变身」。改为按 strumLine.type 映射。
++							subEvents.push(['Play Animation',
++								(params.length > 1 ? paramText(params[1]) : ''),
++								animTarget(params, lineTypes)]);
+ 						default:
+ 							if (en.length > 0)
+ 								subEvents.push([en,
+@@ -655,6 +663,30 @@
+ 		if (idx >= 0 && idx < lineTypes.length) return lineTypes[idx] == 1;
+ 		var s:String = Std.string(raw).toLowerCase();
+ 		return (s == 'true' || s == 'boyfriend' || s == 'player' || s == 'bf');
++	}
++
++	/**
++	 * CNE `Play Animation` 的目标角色 → Psych 同名事件的 value2。
++	 *
++	 * CNE 的 params[0] 是 **strumLine 索引**（`EventsData.hx` 的 `TStrumLine`），CNE 会
++	 * 对该 strumLine 的**全部** `characters` 逐个 `playAnim`（`PlayState.hx` 的
++	 * `case "Play Animation"`）；Psych 没有「按行索引选角色」的概念，只有
++	 * boyfriend / gf / dad 三个角色，所以按该行的 type 映射：
++	 *   0（对手，FNFLegacyParser 的 DAD）→ 'dad'
++	 *   1（玩家，BOYFRIEND）             → 'bf'
++	 *   2（GF）                          → 'gf'
++	 * 越界或未知 type 按 0 处理（与 `camTargetsPlayer` 的默认一致）。
++	 */
++	static function animTarget(params:Array<Dynamic>, lineTypes:Array<Int>):String
++	{
++		var idx:Int = (params != null && params.length > 0) ? intOf(params[0], 0) : 0;
++		var lt:Int = (idx >= 0 && idx < lineTypes.length) ? lineTypes[idx] : 0;
++		return switch (lt)
++		{
++			case 1: 'bf';
++			case 2: 'gf';
++			default: 'dad';
++		};
+ 	}
+ 
+ 	static function eventTime(e:Dynamic):Float

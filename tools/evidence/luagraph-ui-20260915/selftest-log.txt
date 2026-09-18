@@ -1,0 +1,16 @@
+source/states/TitleState.hx:228: version online: 1.1.3, online index: 4, your index: 4
+[SELFTEST] start: mod=NewFall Tracks with chart
+[SELFTEST] load graph FAILED: 图文件不存在：mods/NewFall Tracks with chart/scripts/demo.luagraph.json
+[SELFTEST] hint fit: row1=505/636 row2=564/636 truncated=no barBottom=710
+[SELFTEST] insert ok: blocks=1
+[SELFTEST] edit ok: delete=0 undo=1 redo=0 undoRedoMatch=yes
+[SELFTEST] stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes
+[SELFTEST] generate ok: lines=18 issues=1 first=错误：画布上还没有任何积木，请至少放一块到事件栈里
+[SELFTEST] save status: 无法保存：请先修正以下问题
+[SELFTEST] preview opened: lines=18
+[SELFTEST] drag hints: gaps=2 lines=2 cursor=on
+[SELFTEST] overlay restack: popupOpen=true blocks=0 popupIdx=53 lastBlockIdx=52
+[SELFTEST] hat select: selPath=[0] status=已选中事件栈：当脚本创建时（Del 删除整条栈）
+[SELFTEST] stack delete via Del: stacks 2 -> 1 status=已删除事件栈：当脚本创建时（Ctrl+Z 可撤销）
+[SELFTEST] stack delete undo: stacks=2 status=已撤销
+[SELFTEST] DONE

@@ -1,0 +1,23 @@
+== 第三轮：侧栏滚轮 = 页面滚动（本轮）==
+产物: export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric  构建时间: Sep 16 12:31:51 2026  BUILD_EXIT=0 / 0 error
+
+-- 代码路径（source/options/SettingsRail.hx）--
+  18: *  - 翻页过程仍然**有滑动动画**：窗口位置用**时间插值**逐帧 `FlxMath.lerp(..., elapsed * SCROLL_LERP)`
+  50:	static final ROWS_RENDER:Int = ROWS_VISIBLE + 2;
+  58:	static final SCROLL_LERP:Float = 14;
+  60:	static final PAGE_INTERVAL_MS:Float = 110;
+  95:		for (r in 0...ROWS_RENDER)
+  140:	 * 限速 = 翻页间隔 ≥ `PAGE_INTERVAL_MS`，避免一次飞滚连翻好几页；滑动动画由 update 的时间插值负责。
+  142:	public function addWheel(wheelDelta:Float):Void
+  146:		if (now < lastPageTime + PAGE_INTERVAL_MS) return;
+  158:	public function pageStep(dir:Int):Void
+  201:			scrollAnim = FlxMath.lerp(scrollAnim, target, Math.min(1, elapsed * SCROLL_LERP));
+
+-- 宿主接线（OptionsState.hx）--
+  260:		rail.snapScroll(); // 初始定位不滑动（进入界面时不该看到列表在滑）
+  453:			rail.addWheel(FlxG.mouse.wheel);
+
+-- 数值断言 --
+  翻页步长 = 9 项；列表带 166..616（面板底 640）OK
+  翻页动画位移 = 450px；插值系数 SCROLL_LERP=14（时间插值，非 tween）
+  翻页最小间隔 = 110ms（≤9 页/秒）

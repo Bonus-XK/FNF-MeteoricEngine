@@ -1,0 +1,3099 @@
+# CNE 模组兼容 · 工作副本 vs HEAD 的完整补丁（含本轮改动与同一批文件里此前未提交的改动）
+# 生成于 2026-09-18 12:10:24，基线 master@70c358a2
+# 应用：git apply --check tools/cne_mod_compat_test/cne_mod_compat.patch && git apply tools/cne_mod_compat_test/cne_mod_compat.patch
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e0a209e..ee832a5 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,340 @@
+ 
+ > 版本：1.1.3
+ 
++## 未发布（打击特效预览 + 皮肤解析修复 + CNE 模组兼容）
++
++- **【新增】「CNE 模组兼容」：Codename Engine 格式的 mod 可直接在 Meteoric 里加载**（设置 → 编程 → **CNE 模组兼容**，
++  **默认关**；关闭时 mod 加载路径与改动前完全一致）。与上一轮落地的「CNE 式 HScript 编程层」是两条独立的线：
++  `cneScripting` 管脚本能不能跑，`cneModCompat` 管 CNE 布局能不能读进来。覆盖：
++  - **谱面转换**：`songs/<song>/charts/[<variant>/]<难度>.json`（`codenameChart`）→ **psych_v1**。新增
++    `states/editors/content/CneExport.cneToPsych` / `isCneFormat`：`strumLines` type 1 → 玩家列 `<4`、
++    type 0 → 对手列 `>=4`、type 2（GF 线）→ 取 `mustHitSection` 同向列并置 `gfSection`；
++    `Camera Movement`（params[0] = strumLine 索引，type==1 → `mustHitSection`）、`BPM Change`、
++    `Time Signature Change`、`Alt Animation Toggle` 烘焙进 section（归属规则对齐 CNE
++    `funkin/backend/chart/FNFLegacyParser.hx` 的 `__convertToSwagSections`：事件落在本段窗口内即属本段）；
++    `Scroll Speed Change`↔`Change Scroll Speed`、`Add Camera Zoom`、`Play Animation`、自定义事件透传；
++    `No Anim Note`/`Alt Anim Note` 别名到 Psych 内建 `No Animation`/`Alt Animation`。
++    ⚠ 两条刻意的"不照搬"：① 不用 CNE `FNFLegacyParser.encode` 的 0.6.x「相对 mustHitSection」老语义
++    （Meteoric/Psych 1.0.4 的 psych_v1 是绝对列号，照搬会把对手段音符翻到玩家侧，见 `PlayState.hx:2156-2198`）；
++    ② 指定难度缺谱时**不**回退 `normal`（CNE 自己直接报缺谱，静默换难度会让玩家玩到错谱）。
++  - **音频**：Psych 路径 `songs/<song>/Inst.ogg` 缺失时回退 CNE `songs/<song>/song/Inst|Voices<suffix>[-<难度>]`
++    （`.ogg` 优先、`.mp3` 兜底）；`suffix` 取 `meta.json` 的 `instSuffix`/`vocalsSuffix`，难度取当前难度（小写优先）；
++    不接管 Psych 的 `Voices-Player/-Opponent`（拆分人声由调用方按既有逻辑回退）。
++  - **人物**：`data/characters/<名>.xml`（CNE 人物定义）→ Psych 人物 JSON
++    （`sprite`/`icon`/`color`/`holdTime`/`scale`/`flipX`/`x`/`y`/`camx`/`camy`/`antialiasing` +
++    `<anim name anim x y fps loop indices>`，`indices="2..12,0,1"` 按 CNE `CoolUtil.parseNumberRange` 语义展开）。
++  - **周目**：`data/weeks/weeks/*.xml` + `data/weeks/weeks.txt` → Psych `WeekFile`
++    （`chars`→`weekCharacters`、`<song>`→`songs`、`<difficulty name>`→`difficulties`、`bgColor`→`freeplayColor`），
++    使 CNE mod 的歌出现在 Story/Freeplay；无 `menubackgrounds/menu_<sprite>` 时 `weekBackground` 置空
++    （不拼一个不存在的贴图路径去加载）。
++  - **zip 包**：`mods/<名>.zip`（CNE 根级即 mod 根）被识别为 mod；首次访问透明解包到 `mods/_cnestage/<名>/`
++    （指纹 = 体积 + mtime；Mod 列表刷新时 `CneModCompat.clearCaches()` 让运行中替换的 zip 重新解包；
++    同名真实文件夹优先；`_cnestage` 已登记进 `Mods.ignoreModFolders`；zip mod 的启用状态在开关关闭时也不会被 `modsList.txt` 重写抹掉）。
++    之所以是"落盘暂存"而不是内存挂载：Meteoric/Psych 的资源管线全是真实文件路径
++    （`sys.io.File` / `FileSystem` / `FlxGraphic.fromFile` / `Sound.fromFile`），内存挂载等于重写整条资源管线
++    （CNE 的 `AssetsLibraryList` + `__proxy` 那套）；暂存目录可随时整个删掉，下次自动重建。
++  - **Mod 列表**：卡片与右侧信息区标注「CNE 格式」，开关未开时提示开关位置（`states/ModsMenuState.hx`）。
++  - **未覆盖（本版明确不做，等实机测试后再排期）**：CNE 舞台 `data/stages/*.xml|.hx`、人物 `.hx` 扩展
++    （`pico-speakers.hx`/`spirit.hx`）、`data/notes/*.hx` 自定义音符行为、`.pack` 脚本包、
++    独立 `events.json`（CNE 格式 `{events:[...]}` 不喂给 Psych 解析器；谱面内嵌 `events` 已转换）、
++    CNE 自定义难度在 Freeplay 的档位扩展（Story 里按周目 `<difficulty>` 生效）。
++  - **验证**（本轮无 CNE 样本 mod，且按用户要求"只构建、不启动"）：新增
++    `tools/cne_mod_compat_test/run.sh` —— 把**仓库真实源码**逐字节复制进临时工程、只替换 flixel/lime/backend 替身后
++    `haxe --interp` 直跑：谱面转换 34 条 + 兼容层 47 条 = **81 条断言全过、0 失败**
++    （含 CNE 官方 base 谱面 118 音符守恒、玩家 59 / 对手 59 列号分布、zip 指纹失效重解）；
++    `./compile-mac.sh typecheck` 通过、`./compile-mac.sh` release 构建通过（exit 0），
++    产物内字符串含 `CNE 模组兼容`/`codenameChart`/`mods/_cnestage`/`cneModCompat`；实机由用户第二轮测试。
++    证据：`tools/cne_mod_compat_test/{EVIDENCE.md,out/*.log}`。
++
++- **【修复】设置里「音符打击特效」的 4 个非默认皮肤此前全部静默失效**：`NoteSplash.defaultNoteSplash`
++  在 v5 性能改动里被改成 `'noteSplashes/noteSplashes-063'`，而 `getSplashSkinPostfix()` 会给它拼 `-<skin>`
++  后缀 → 解析成 `noteSplashes-063-vanilla`（仓库无此文件），`loadAnims` 回退链于是一律回退到 063：
++  选 Diamond / Electric / Sparkles / Vanilla 与选默认皮肤看到的是同一张图。
++  **修复**：`defaultNoteSplash` 回到 Psych Engine 0.7.3 的约定 `'noteSplashes/noteSplashes'`
++  （PE 0.7.3 `objects/NoteSplash.hx:24` 与 `states/editors/NoteSplashDebugState.hx` 的 `defaultTexture` 同值），
++  后缀拼出来即 `noteSplashes-vanilla` / `noteSplashes-diamond` / … 真实文件；
++  `images/noteSplashes/list.txt` 新增 `063` → 063 成为**可选皮肤**，选中时按 `use063Raw` 判据
++  （贴图名含 `noteSplashes-063`）**不挂着色器**，预染色四色 raw 直出。
++  - 行为变化（**须知晓**）：默认皮肤（Psych）从"强制 063 raw"变回 `noteSplashes` + 各轨 RGB 着色
++    （即 v5 之前的行为）。想保留 063 观感，把「音符打击特效」选成 `063` 即可。
++  - 迁移：老存档 `splashSkin = "Psych"` 仍有效；已失效的自定义皮肤名按既有逻辑重置为默认。
++
++- **【新增】选中「音符打击特效」行时，内容区预览带显示 4 轨打击特效预览**：排版与精灵形态照搬
++  Psych Engine 0.7.3 `states/editors/NoteSplashDebugState.hx`（站立箭头 `alpha 0.75`、`x = i * 220 + 240`、
++  溅射位 = 箭头位 − `(swagWidth*0.95, swagWidth)`、`offset = (10,10) + config 偏移`、
++  帧率取 config 区间随机值、着色器取该轨箭头的 RGB 调色板）；与调试界面的唯一差别是动画设为循环。
++  - **尺寸（用户确认保留原行数后的必然结果）**：`OptionsPane` 预览带改为跟随分区行窗口
++    `[ROW_Y + rowsVisible * ROW_GAP, STRIP_Y − 6]`（6 行 = 464..572 = 108px，与既有常量逐像素一致）。
++    6 行下 108px 装不下最高的 splash 皮肤（`noteSplashes-vanilla` 整段动画包络 316px），
++    因此**预览带路径整体等比缩小到 0.33×**（316 × 0.33 ≈ 104px，上下各留 ~2px）；暂停内嵌路径
++    没有预览带约束，仍是 PE 0.7.3 的**全尺寸**。要全尺寸只能二选一：行窗口缩到 2 行（预览带 316px），
++    或让预览浮在选项行之上（会压住行文字，违反 system 域排版契约）。
++  - **量测用整段动画包络、不用首帧**：sparrow 每帧 trim/rect 都不同（063 的 trim.y 在动画里从 87 变到 30），
++    首帧只有峰值帧的 ~85% —— 拿首帧当尺寸会让峰值帧顶出预览带。宿主的包围盒（`x + width`）
++    也据此来，配合"打击特效整组与箭头预览同心"，三种选中态、任意皮肤的落位逐像素一致（不跳位）。
++
++- **【修复】单界面设置里的预览此前走错了分支（实机截图定位）**：`BaseOptionsMenu.headless` 只在**构造期**
++  为 true（`OptionsState.sectionInstance` 构造完就还原），而 `NoteSettingsSubState.onPaneSelectionChange`
++  拿它判断"我在不在预览带里" → 换行时误走整屏分支：箭头被 tween 到 `noteY = 90` 压到选项行上、
++  溅射被摆到 `y = −22` 顶出面板。**修复**：新增常驻标志 `BaseOptionsMenu.paneHosted`（由
++  `OptionsPane.setSection` 置位），预览联动一律以它为准；单界面里只切显隐、y 交给宿主摆位。
++
++## 未发布（设置界面融合：一个界面 + 侧边栏切分区）
++
++- **【重写】设置界面从"两级界面"变成"一个界面"**：左侧 `SettingsRail`（230 宽）切分区，
++  右侧 `OptionsPane`（956 宽）就地渲染该分区的选项行 —— 不再"进二级页 → 退出 → 再进下一页"。
++  分区**选中即切换**（navigation rail 预览手感），焦点用 `Tab` 在"分区栏/内容区"之间迁移；
++  鼠标点分区行 = 切分区并接管焦点；触控点分区行同理，◀▶/A 仍作用于内容区。
++  - 新增：`source/options/SettingsRail.hx`（分区栏）、`OptionsPane.hx`（内容区宿主）、
++    `OptionsUi.hx`（令牌化面板绘制）、`OptionValue.hx`（取值/显示单点）、`SettingsCanvas.hx`（画布基类）。
++  - 重写：`source/options/OptionsState.hx`（唯一入口）。
++  - 布局（1280×720 基准，已核算）：侧栏 40,70,230,570；内容 284,70,956,570（右缘 1240）；
++    选项行首 y 152、行距 52、可见 8 行；说明行与主题色板条共用底部 578..632 条带（互斥显示）；
++    底部提示条 40,662,1200,48。层级仍是**面板 → 高亮条 → 行文字**（高亮条先 `add()`）。
++
++- **【关键机制】选项定义只有一份，不存在两套表漂移**：`BaseOptionsMenu` 新增 `headless` 模式 ——
++  7 个选项分区（音符/界面/画面/效果/玩法/判定/性能）由各自子类**照旧在构造里 `addOption()` 并挂 `onChange`**，
++  只是不建任何 UI（背景/面板/行/按钮/pad 全部跳过），选项表与回调由 `OptionsPane` 渲染与驱动。
++  `formatValue` 抽成 `OptionValue.display()`（显示优先级）供两条路径共用；`onPaneSelectionChange()` 是
++  预览类联动的新钩子（分页路径的 `changeSelection` 覆写体改为调用它）。
++
++- **【就地化】两块自带绝对布局的画布搬进内容区**：`NotesSubState` → `NotesPane`、`ControlsSubState` → `ControlsPane`，
++  两者都接受一个内容区矩形（`hosted` 分支）：
++  - `ControlsPane`：清单左缩进 = 内容区 x+40，键位列右贴（`KEY_X = 右缘 − 500`），绑定弹层在内容区居中；
++  - `NotesPane`：左右面板重排为 560/382（中间 14 间距），模式列与箭头列在左面板内居中，
++    色轮 300→250 且亮度渐变条移到色轮**右侧**（382 宽放不下原始的"渐变条 46 + 16 间距 + 色轮 300"横向排布），
++    RGB/HEX 三列按面板宽度等比压缩。
++  - 两个 `*SubState` 变成**薄壳**：`new XXXPane(null)`（null = 整屏几何，像素级不变）+ `onExit = close()`。
++    暂停菜单内的设置路径（`PauseSettingsSubstate`）因此与改造前完全一致，且不再有第二份实现。
++  - 焦点不在内容区时，宿主把画布 `inputEnabled = false`（只绘制不吃键），
++    避免 ↑↓/Esc 被"画布内部列表"与"分区栏"同时消费。
++
++- **【边界，明确声明】**「调整延迟与Combo」「自定义界面」「容器」「移动触控」仍是**独立整屏页出口**：
++  侧栏列出，**点分区栏即一步直达**（键盘选中后 Enter 直达；内容区确认同样可开），
++  容器自带引擎界面、启动会整机重启，因此不做就地嵌入；
++  音符皮肤预览 / 抗锯齿 BF 预览在融合界面里**未显示**（headless 分区不创建预览精灵；预览承载位待做）。
++
++- **【兼容契约不变】**：`OptionsState.onPlayState`（曲目内进入设置后返回要重载曲目）、
++  `pendingSelectLabel`（容器界面返回按标签恢复分区）、`enterContainersMenu()`（容器入口"不挂转场"修复）。
++  单界面没有"关子页"这一步，因此落盘点从 `closeSubState()` 改为 `goBack()` / `openCurrentExternal()` /
++  `destroy()`（否则 `destroy()` 里的 `loadPrefs()` 会把本次改动读没）。
++
++- 证据：`tools/evidence/settings-single-ui-20260915/`（类型检查/构建日志、静态契约自查、用户实测截图）。
++
++- **【滚动】侧栏滚轮 = 页面滚动**（一格滚轮翻一整页，桌面 9 项；两端自然夹取，不回卷）：
++  翻页过程走**时间插值**（`FlxMath.lerp(..., elapsed * SCROLL_LERP)`，与 Freeplay/MainMenu 同款），
++  所以是"整栏滑过去"而不是"一行一行闪"；窗口位置跟随选中项居中，因此翻页时**高亮条停在同一屏幕行、列表在它下面滑**。
++  键盘 ↑↓/长按仍是一行一行；点击分区行仍是单击直达。移动端触屏拖动会合成大量滚轮事件，故移动端一格 = 一行（只桌面翻页）。
++  翻页间隔 ≥110ms（连续飞滚不会一帧翻好几页）；跨行 >2（如回卷）直接吸附，不做长距离滑动。
++  行不越列表带：面板没有裁剪遮罩，靠近上下边缘的行按位置隐藏（否则文字会压到「设置」标题）。
++
++- **【修复】色板选中环残留在别的分区/别的选项行**：`ColorSwatchPicker.setSelectedVisual()` 点亮"当前档位环"时
++  **不看整行是否隐藏**，而它会由 `keyboardFocus`（宿主切焦点）与 DesignTokens 主题监听（改主题色）回调触发 ——
++  于是切到「音符」等没有主题色选项的分区后，那里会留下一个孤零零的白圈。现在该方法以 `isVisible` 为闸门
++  （整行隐藏就不点亮任何环）；`OptionsPane.set_focused` 也只在"色板确实显示着"时才动 `keyboardFocus`。
++
++- **【新增】音符皮肤（箭头样式）预览进内容区**：`OptionsPane` 新增**预览带**（y 464..572，高 108），
++  带预览的分区把选项行窗口从 8 行缩到 6 行（`BaseOptionsMenu.previewRows`），省下的空间给预览；
++  预览容器由宿主按**叶子精灵包围盒**在预览带内居中（普通 `FlxGroup` 没有 x/y，且分区往往再套一层自己的
++  `FlxTypedGroup`，所以递归收集叶子、逐个平移，且同一容器只摆一次以免偏移累加）。
++  `NoteSettingsSubState` 现在两种路径都创建预览：整屏路径仍是"从屏幕上方滑入"，单界面路径只做显隐
++  （内容区没有裁剪遮罩，滑入会画到选项行上面）。
++
++- **【修复】预览带上残留"两个没有文字的空开关"**：给音符分区开预览带后选项行窗口从 8 行缩到 6 行，
++  但 `setRowsVisible(true)` 会把**全部 8 行**的行文字/开关/值文字都显示出来，而 `refreshRows()` 只遍历 `rowsVisible` 行
++  → 第 7、8 行的开关被留在预览带位置、文字却从未填过（用户实测截图）。现在 `refreshRows()` 末尾显式隐藏尾部未用行
++  并复位文本缓存。
++
++- **【样式统一】布尔选项的开关改为「更新界面」同款 toggle**：新增可复用组件 `source/objects/ToggleSwitch.hx`
++  （胶囊轨道 96×32 + 22px 白圆钮；开 = `primary` 填充 + primary 描边，关 = `0x66161622` + `panelOutline`；
++  圆心空间插值 `elapsed*18`、首次落位吸附；轨道**原地重绘**避免同尺寸位图串图）。
++  设置内容区（`OptionsPane`）的方框复选框整体替换为它，`switchCols` 取代 `checkBgs/checkFills`；
++  命中区外扩 12px → 32+24 = **56 高**（触控红线）。开关比旧方框宽（96 vs 26），因此选项名起点右移
++  到 `PANEL_X+130`（开关右缘 402 + 12 间距），名字可用宽 486px 仍充足。
++  （暂停菜单内的设置页仍用旧方框复选框，属另一条已验证路径；后续可收敛为共用本组件。）
++
++- **【全库统一】所有系统域界面的开关 = 胶囊 toggle**（`objects/ToggleSwitch`）：
++  融合设置内容区 `OptionsPane`、分页设置页 `BaseOptionsMenu`（暂停内嵌 7 页）、模组列表 `ModsMenuState`
++  三处把 26px 方框复选框整体替换（`checkBgs/checkFills` 引用归零）；更新界面 `OutdatedState` 的**私有胶囊实现
++  收敛为共用组件**（圆钮坐标模型 / 原地重绘 / 首次落位都随之固化，那段临时探针也一并删除）。
++  - 因开关比方框宽（96 vs 26），三处名字列右移：融合内容区 `NAME_X` → `PANEL_X+130`；
++    `BaseOptionsMenu.LIST_X` 108 → **164**；`ModsMenuState.LIST_X` 88 → **164**（值列不动）。
++  - 模组列表行位是动态的 → 新增 `ToggleSwitch.setPosition(x, y)` 整组移动（轨道 + 圆钮一起，避免圆钮留在旧行高）。
++  - 4 个编辑器页（对话/角色/周目编辑器）的 `FlxUICheckBox` **不动**：meteoric-design 明列它们属非主题域工具界面。
++  - Skill 已同步：`meteoric-system` 新增「开关（胶囊 toggle）」规范条目 + 「开关统一清单」+ 单界面设置章节；
++    `meteoric-design` 形状表把「复选框」改为「开关（布尔项）」。
++
++## 未发布（Lua 图形化编程 · 第一版界面缺陷修复）
++
++- **【修复】第一版截图复核出的画布/底栏界面缺陷**（用户实机截图 + 源码定位，逐条根因如下）：
++
++  1. **画布空提示与事件积木叠字**（截图左上"…木」面板拖一块事件积木…"被帽块压掉前半句）：
++     `rebuildCanvas()` 用 `doc.isEmpty()` 控空提示，而它的语义是"没有任何**非事件**积木"——
++     画布默认带 2 条空事件栈（`LuaGraphTemplates.blank`）→ 它恒为 `true`，提示常显；
++     且提示 y = `CAN_Y+90` 正好落在第一条事件栈上。
++     改为新增 `hasDrawableStack()`（有无可绘制事件栈）判定 + 提示移到画布中部空区；
++     **`GDoc.isEmpty()` 语义保持不动**（`LuaCodeGen.validate` 的"画布上还没有任何积木"还要用它）。
++
++  2. **底部按钮「保存生成」折行、「预览 Lua」被截**（截图里"保存生/成"两行 + 底部孤立的"成"）：
++     `UIButton` 标签字号硬编码 26px，而本仓库 `FlxText.set_fieldWidth()` 在 `fieldWidth > 0` 时
++     **强制 `wordWrap = true`**（`source/flixel/text/FlxText.hx:521-540`）→ 26px 下 96px 只放得下 3 个汉字。
++     `UIButton` 新增可选 `labelSize`（默认 26，存量调用零变化）+ 标签强制单行；本界面底栏传 18。
++
++  3. **画布右上「模组/脚本」折三行压进画布内容区**：`nameText` 宽 280 且未关 `wordWrap`。
++     改为画布顶部固定两行（标题行 + 状态行），状态行宽 `CAN_W-32`、`wordWrap=false`、
++     超长走新增 `fitText()` 加省略号；内容起始 y 提为 `CAN_CONTENT_Y = CAN_Y + 78`，
++     `cullOne()` 上界跟着走（滚出顶部的积木不再压标题/状态行）。
++
++  4. **帽块下的空凹槽被当成"另一块小积木"**：`LuaBlockSprite.EMPTY_BODY_H` 32→44、
++     槽底 `0x33000000`→`0x59000000`、描边 `0x22FFFFFF`→`0x33FFFFFF`，
++     并给**空**凹槽加底部对齐的占位文案（"把积木拖进这个凹槽"/"把积木拖进「否则」凹槽"）；
++     帽块的"槽是空的"由 `stack.blocks.length == 0` 传入（模型里栈内积木与帽块同级，`block.body` 恒空）。
++
++  5. **【可用性】"不知道怎么把第二块接到第一块上"**：`addGap()` 只塞了一个 16px 高的**不可见**命中带，
++     插入点没有任何视觉；且从调色板拖出的积木**在画布外松手会静默丢弃**。
++     新增拖拽插入指示（⑥）：`showDropHints()` 给每个插入点画插入线、`updateDropHints()` 用 primary
++     高亮最近的插入点（拖拽期间不重建，只移动高亮条）；画布外松手改为红色状态提示 + 取消音，
++     不再静默丢弃；新增事件栈的提示文案也改为"拖积木到凹槽或插入线上松手即接入"。
++     并为**引擎内自检加了"模拟拖拽"一步**（`selfTestDragHold` 门控，不设 `ME_LUAGRAPH_SELFTEST` 时零影响）：
++     走与鼠标拖拽完全相同的路径，使插入线/最近插入点高亮能在无人操作的环境里被截图复核。
++
++  6. **【层级契约缺口·神秘堆叠】弹层/预览层会被画布积木压住**：`rebuildCanvas()` 每次都把积木 `add()`
++     到 `members` 末尾 —— 只要弹层早已打开，一次重建就把积木画到**弹层之上**（实测截图：保存被拒弹层上
++     压着「当脚本创建时」帽块与「把积木拖进这个凹槽」占位文案，弹层错误行被拦腰盖住）。
++     新增 `raiseOverlay()` / `moveToFront()`：每次重建后把打开中的浮层（弹层 + 预览层）摘除再追加回末尾。
++     依据 `FlxGroup.remove(o, true)` 只从 `members` 摘除、**不销毁对象**（flixel 5.2.2 `FlxGroup.hx:396-420`），
++     所以"摘掉再 add"是安全的非破坏性抬层。
++
++  7. **【可用性缺陷】程序块放上去就删不掉**：
++     - 事件帽块的 `blockPath` 是 `[栈下标]`（长度 1、奇数），而 `GDoc.detach()` 首行即
++       `if (blockPath.length < 2 || blockPath.length % 2 != 0) return null;` → `deleteSelected()`
++       在此**静默返回**；更关键的是**全工程没有任何删除事件栈的代码**
++       （`grep stacks.splice|removeStack|deleteStack` = 0 处），而点一下「事件」积木就会新增一条栈
++       ⇒ 事件栈"只能加、不能减"（用户实测反馈：放置后无法删除）。
++     - 修法：`deleteSelected()` 增加**奇数路径 = 事件栈**分支（`doc.stacks.splice(si,1)`，含撤销与
++       "已删除事件栈：X（含 N 块积木）"反馈）；点击帽块 = 选中该栈并提示"Del 删除整条栈"
++       （`startDragMove` 对奇数路径不再走 detach，避免帽块被误判可拖动）；未选中时按 Del 也给提示，
++       不再静默。自检新增 `stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes` 回归项。
++
++  8. **【可用性缺陷】底部快捷键提示永远显示不全**（用户实测截图：提示止于"Enter 编"）：
++     完整键位文案实测约 **1100px**，而底栏左侧可用宽度只有 **636px**（右侧 512px 被 5 个按钮占掉），
++     `wordWrap=false` 下超宽部分被静默裁掉。修法：底栏 **48→58 高**（顶边 662→652，仍 ≥ 设计规范的
++     底部安全线 648）并把提示**均衡拆成两行**（鼠标/拖拽一行、键盘一行，两行实测约 479px / 564px）；
++     不采用"缩写丢键位"方案。另加两道防回归：
++     ① `create()` 对每行跑 `fitText()` 兜底（真超宽时截断出**可见的省略号**，不再静默裁切）；
++     ② 引擎内自检打印 `hint fit: row1=…/636 row2=…/636 truncated=no barBottom=710`。
++
++  9. **【内存】`remove()` 不销毁 ⇒ unique 位图只增不减**：`FlxGroup.remove(o, true)` 只把对象从 `members`
++     摘除、**不调用 destroy**（flixel 5.2.2 `FlxGroup.hx:396-420`），而旧代码以为它会销毁 ⇒ 每次重建画布 /
++     拖一次幽灵块 / 弹层翻一页 / 切一次分类都留下新的 unique 位图（`makeGraphic(..., true)` 的结果仍在
++     `FlxG.bitmap` 缓存里）。空画布下按 Del/切分类反复操作最明显。
++     新增 `disposeSprite()` / `disposeAll()`：摘除 + `destroy()`，并对**纯 FlxSprite** 显式
++     `FlxG.bitmap.removeIfNoUse(graphic)` —— `FlxSprite.destroy()` 只做 `graphic = null` + `useCount--`
++     （haxelib `FlxSprite.hx:1490-1502`），不会摘缓存；而 Meteoric 版 `FlxText.set_graphic` 已自带
++     `removeIfNoUse`（`FlxText.hx:739`），故对文本不再二次摘除（避免重复调用）。
++     覆盖点：`rebuildCanvas`（顺序：先摘除全部成员 → 按 `canvasBits` 销毁 texts/chips → 清空
++     `spr.texts/chips` 引用 → 销毁底图；顺序颠倒会对同一对象二次 destroy）、`clearGhost`、`clearDropHints`、
++     `renderPopup`/`closePopup`、`rebuildPreview`/`closePreview`、`rebuildCategories`/`rebuildPalette`
++     （含旧高亮条 `catBar`/`palBar`）、`closeInputBox`（`UIInputBox.destroy()` 才会把**原生输入框**从 stage
++     摘掉并解绑监听，只 remove 会每次编辑参数留一个僵尸原生框）。
++     另把 `openParamEditor` 的枚举闭包改为捕获 `blockPath` **副本** —— 销毁语义变真之后，捕获 sprite 本身
++     会在"弹层开着又重建画布"时读到已销毁对象。
++
++  10. **【可用性】新增 `F1` 操作说明弹层**：底栏两行只放高频键位，完整键位表（10 行）走 `F1` 打开。
++      复用通用弹层 ⇒ 自动获得 `raiseOverlay()`（永远在积木之上）、滚轮/↑↓ 翻页、Enter/点击确认、Esc 关闭。
++      自检新增宽度断言 `help fit: max=…/556 rows=10`（超宽会在弹层内折行、把正文挤出面板）。
++
++  11. **【界面】编辑器菜单（`MasterEditorMenu`）背景改为主题色**：原实现把 `menuDesat` 染成**当前选中条目
++      自带的强调色**（`optionShit[r][4]`）并做 0.4s `FlxTween.color` 过渡 —— 于是"看哪个选项、整屏就是什么色"，
++      与玩家选的主题色无关。现改为 `bg.color = DesignTokens.menuTint`（= 当前主题 primary），
++      与 Options / Pause / Lua 图形化编辑器统一；随之删掉逐选项的颜色过渡与 `colorTween` 字段
++      （否则会留一个 `newColor` 恒等于 `bg.color` 的空转 tween）。
++      条目自带强调色保留在表中但不再驱动背景；令牌在 `create()` 读取 ⇒ 切换主题后下次进入生效。
++      边界写进 `meteoric-system`：**菜单**属系统域可主题化，**编辑器页本体**仍是非主题域深灰工具界面，未改动。
++
++- **本轮验证（第一版界面缺陷修复 ①-⑩，全部为真产物验证）**
++  - 编译：`./compile-mac.sh` 共 8 次 **EXIT=0 / 0 error**（post-build 每次均还原墙钟版 `lime.ndll`
++    `cd890285f1d3def18d9f5aafc04a198d` + 重签）；另跑本仓库只读模式 `./compile-mac.sh typecheck`
++    **✔ 通过且 app 未被改动**。最后产物 `Meteoric`：20176320 字节，mtime > 全部源码修改时间。
++  - 引擎内自检（`ME_LUAGRAPH_SELFTEST=1`，零行为影响的门控入口）。**已实测观测到**（build 6/7 运行日志）：
++    `hint fit: row1=505/636 row2=564/636 truncated=no barBottom=710` ｜ `edit ok … undoRedoMatch=yes` ｜
++    `stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes` ｜
++    `hat select: selPath=[0] status=已选中事件栈：当脚本创建时（Del 删除整条栈）` ｜
++    `stack delete via Del: stacks 2 -> 1` ｜ `drag hints: gaps=2 lines=2 cursor=on` ｜
++    `overlay restack: popupOpen=true popupIdx=52 > lastBlockIdx=51` ｜ `DONE`。
++    **尚未运行、仅按估宽推算**（build 8 新增/变更项，待下次自检日志确认）：行 1 追加「F1 说明」后 ≈576/636；
++    `help fit: max≈520/556 rows=10`。
++  - 视觉复核（逐张 read_image，非摘要）：静止态（无叠字 / 按钮单行 / 状态行单行 / 空凹槽占位文案）、
++    拖拽态（插入线 + primary 高亮最近插入点）、弹层层级（复现"弹层开着又重建画布"）、底栏两行提示完整。
++    证据留档：`tools/evidence/luagraph-ui-20260915/`（含各图 sha256 与自检/构建日志）。
++  - **用户实测确认：功能正常**（事件栈可删除、拖拽接入可用），本轮无遗留阻塞项。
++
++- **已知项**：画布没有真正的裁剪遮罩，向上滚动时积木仍可能贴近标题行（`cullOne()` 已收窄上界缓解）。
++- **已知项**：引擎无上限帧率（窗口标题实测 FPS 500~990、CPU ~84%），以及状态切换时 flixel 只 `clear()`
++  不销毁成员的固有行为；两者都不是本界面引入，未在本轮处理。
++
++## 未发布（Lua 图形化编程）
++
++- **【新功能】Lua 图形化编程编辑器（积木块 → Lua，桌面端）**：用积木拼出 Lua 脚本，一次生成 `.lua` + 图文件。
++
++  **入口与落点**
++  - 编辑器菜单（主菜单按 `7` = debug_1）新增第 8 项「Lua 图形化编程」；Android 上该条目隐藏（`#if mobile` 裁剪）。
++    进入走 `LoadingState.loadAndSwitchState`，与 Chart / Character / Dialogue 编辑器一致。
++  - 产物：`mods/<当前模组>/scripts/<名字>.lua` + 同名 `<名字>.luagraph.json`；脚本目录不存在自动创建。
++    未选择模组时**拒绝保存**并提示，不会误写别的模组；`.json` 不会被当脚本加载（`PlayState.create` 的 `scripts/` 扫描只认 `.lua` / `.hx`）。
++
++  **界面（系统域：遵循 `meteoric-design` / `meteoric-system`）**
++  - 分类（156）／积木（300）／画布（720）三面板 + 底部状态条与 5 个 MD3 按钮；圆角磨砂面板、令牌化配色、底图一次绘制。
++  - 画布为**多栈**结构：每个事件帽块 = 生成文件里的一个真实回调，帽块凹槽内装整条栈。
++  - 高亮条先 `add`、行文字后 `add`（层级契约）；语义色用局部 `COLOR_OK` / `COLOR_ERROR`
++    （`DesignTokens` 没有 `error` 字段）。
++  - 输入：鼠标拖拽放置/移动 + 点击参数就地编辑（枚举弹清单、数字/文本走 `UIInputBox`，为此给该组件加了可选
++    `maxLength` 参数，默认 24 保持既有调用不变）+ 键盘全路径（`[ ]` 分类、`,/./PgUp/PgDn` 选块、`Insert` 插入、
++    `←/→` 选参数并微调、`Enter` 编辑、`Del` 删除、`Ctrl+Z/Y/C/X/V/S/O`、`Tab` 预览、`Esc` 返回）。
++
++  **积木库**：10 类 **81 块** —— 事件 9 / 流程 6 / 变量 5 / 精灵 16 / 补间 8 / 相机 5 / 音频 10 / 文本 10 / 杂项 10 / 兜底 2。
++  全部函数名与参数序逐条核对自 `source/psychlua/**` 的 `add_callback` 注册原文（203 个注册函数）；
++  缓动、混合模式、相机名取自 `LuaUtils` 的**接受值集合**（写别的会静默回落）。
++  兜底两块（「调用任意 Lua 函数」「直接写一行 Lua」）覆盖全部引擎 API。
++
++  **语义要点（改动时勿破）**
++  - 「等待 N 秒后继续」= `runTimer` + 续接闭包 + 本编辑器生成的 `onTimerCompleted` 调度器
++    （仅当图里真的用了等待块才生成）；自定义区若也定义 `onTimerCompleted`，保存前会告警"等待将失效"。
++  - 变量为脚本级 `local`，声明在文件顶部；被引用但未声明时自动补 `local x = 0` 并告警。
++  - 生成文件分「受管区」与「底部自定义代码区」：受管区整体重写，**自定义区永不覆盖**；
++    目标 `.lua` 已存在且**不含标记**（手写脚本）时先弹确认，再把原内容整体搬进自定义区（不丢手写代码）。
++  - 预览层只读、不自动执行；保存前静态校验（错误阻止保存、警告只提示）。
++
++  **新增文件**：`source/luagraph/`（15 个：模型 `GBlock`/`GStack`/`GVar`/`GDoc`、目录 `GKind`/`PDef`/`BlockDef`/`LuaBlockDefs`、
++  生成器 `LuaCodeGen`、模板 `LuaGraphTemplates`、落盘 `LuaGraphIO`、视觉 `SlotHit`/`BlockMetrics`/`LuaBlockSprite`、`JsonModel`）、
++  `source/states/editors/LuaGraphEditorState.hx`；改动：`MasterEditorMenu.hx`（新条目）、`UIInputBox.hx`（maxLength）、
++  `TitleState.hx`（自检入口）、`skills/meteoric-system/SKILL.md`（新增该界面小节）。
++
++  **验证（真产物 + 引擎内自检 + 真 LuaJIT）**
++  - `./compile-mac.sh` **EXIT=0**（0 类型错误），post-build 已还原墙钟版 `lime.ndll`（9368752 字节 / `cd890285…`）并重签。
++  - 引擎内自检（`ME_LUAGRAPH_SELFTEST=1`，环境变量门控、零行为影响的 CI 入口）：
++    载入 15 块 / 3 栈 / 1 变量的图 → 插入 → 删除/撤销/重做（edit ok: delete=15 undo=16 redo=15）→ 生成 61 行 **0 issue** →
++    保存成功 → 预览 61 行。
++  - 生成的 Lua 用**与引擎同源的 LuaJIT**：语法/编译通过，且行为断言全通过（回调齐备、参数无引号污染、
++    等待续接为一次性、10 次命中恰好触发 1 次条件分支、`onDestroy` 清理、自定义区在载入期执行）。
++  - 手写保护实测：手改自定义区后重新生成，手写内容（含多行）保留且仍可编译。
++  - 视觉复核：三面板 / 分类与积木列表 / 画布多栈（含 if-else 双井嵌套与参数槽）/ 预览层 / 状态条与按钮，逐张人工看图。
++
++  **本轮验证中发现并修掉的真实缺陷（记录以免回归）**
++  1. **事件名与积木 id 不一致**：栈里存回调名（`onCreatePost`）、目录按 id（`ev_onCreatePost`）查 → 任何图都会"未知事件"、保存被拒。
++     新增 `LuaBlockDefs.eventName()` / `byEvent()` 做正式映射（GUI 拖拽与键盘插入两处同步）。
++  2. **帽块模板未展开 `$BODY$`**：帽块走"整段字符串 push"，绕过了负责替换占位符的行处理 → 生成物残留 `$BODY$`（LuaJIT 直接拒绝）。
++     重构为统一的 `emitTemplate`（帽块与普通积木共用）。
++  3. **字符串参数被双重加引号**：模板已写 `'{p:x}'`，`quote()` 又补一层 `"` → `makeLuaSprite('"tag"', '"img"')` 会查不到贴图。
++     改为「模板负责引号、生成器只做转义」（`esc` / `sq`）。
++  4. **预览层代码行与底部提示重叠**、**状态条文字宽度越界压到按钮区** → 可见行数按面板高度反算、宽度收到按钮区左侧。
++  5. **在某个 State 的 `create()` 期间 `switchState` 会原生崩溃（SIGSEGV）**：自检入口改为 `update()` 首帧派发；
++     菜单入口改用 `LoadingState.loadAndSwitchState`（与其它重型编辑器一致）。
++
++  **已知限制**：① Android 上入口隐藏（拖拽+键盘为主，触屏没有完整操作路径）；
++  ② 仅单向「图 → Lua」，不逆向解析已有 `.lua`（手写脚本仍可整体保留进自定义区）；
++  ③ 预览层沿用系统域玻璃面板（半透明），下方编辑器文字会轻微透出（令牌化规范内的既定观感）。
++
+ ## 未发布（UI 设计系统审查修复）
+ 
+ - **【界面】更新提示界面（`OutdatedState`）按系统域规范重做**。
+diff --git a/source/backend/ClientPrefs.hx b/source/backend/ClientPrefs.hx
+index 2b9f2a0..7a46b05 100644
+--- a/source/backend/ClientPrefs.hx
++++ b/source/backend/ClientPrefs.hx
+@@ -214,6 +214,30 @@ class SaveVariables {
+ 	@:keep public var containerExitKeys:Array<FlxKey> = [CONTROL, C];
+ 	#end
+ 
++	// ===== 编程分区：CNE 式 HScript 编程层（默认保守开关）=====
++	// 总开关：关闭时引擎行为与改动前完全一致（不加载 CNE 风格脚本、不注册状态改写钩子）。
++	@:keep public var cneScripting:Bool = false;
++	// 状态脚本：data/states/<界面类名>/LIB_<mod>.hx
++	@:keep public var cneStateScripts:Bool = true;
++	// 全局脚本：data/global/LIB_<mod>.hx
++	@:keep public var cneGlobalScripts:Bool = true;
++	// ModState / ModSubState：允许 HScript 写完整界面
++	@:keep public var cneModStates:Bool = true;
++	// 界面重定向：flags.ini [StateRedirects] 改写引擎界面（默认关）
++	@:keep public var cneStateRedirects:Bool = false;
++	// 脚本热重载：F5 重载当前界面脚本；Shift+F5 重建全局脚本
++	@:keep public var cneHotReload:Bool = true;
++	// 脚本定义/继承类：SScript EX 模式
++	@:keep public var cneScriptClasses:Bool = true;
++	// 脚本加载日志
++	@:keep public var cneScriptLogs:Bool = false;
++	// CNE 模组兼容：让 Codename Engine 格式的 mod（data/characters/*.xml、songs/<song>/charts/*.json、
++	// songs/<song>/song/Inst|Voices-*、data/weeks/weeks/*.xml，文件夹或 .zip 包）能在 Meteoric 里加载。
++	// 默认关：关闭时 mod 加载路径与改动前完全一致（不扫 CNE 布局、不挂 zip 暂存、不翻译谱面/人物/周目）。
++	@:keep public var cneModCompat:Bool = false;
++	// 热重载键位：放在编程专属字段而不是 keyBinds，避免改动 ControlsSubState 的 keyBinds 表结构
++	@:keep public var cneHotReloadKeys:Array<FlxKey> = [F5];
++
+ 	public function new()
+ 	{
+ 		//Why does haxe needs this again?
+diff --git a/source/backend/Mods.hx b/source/backend/Mods.hx
+index cafa7c2..3cc4af2 100644
+--- a/source/backend/Mods.hx
++++ b/source/backend/Mods.hx
+@@ -36,7 +36,10 @@ class Mods
+ 		// 多版本容器仓库（backend.ContainerStore.CONTAINERS_DIR）。
+ 		// 必须显式登记：getModDirectories 只按本白名单过滤，**没有**「下划线前缀自动跳过」这条规则，
+ 		// 不写进来 mods/_containers 会被扫成一个名为 "_containers" 的假模组。
+-		'_containers'
++		'_containers',
++		// CNE zip mod 暂存目录（cne/CneZipStore.STAGE_DIR）：同样必须显式登记，
++		// 否则 mods/_cnestage 会被扫成假模组，里面的每个子目录也会被当成 mod。
++		'_cnestage'
+ 	];
+ 
+ 	private static var globalMods:Array<String> = [];
+@@ -74,6 +77,16 @@ class Mods
+ 				var path = haxe.io.Path.join([modsFolder, folder]);
+ 				if (sys.FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
+ 					list.push(folder);
++				#if sys
++				// CNE 模组兼容：mods/<名>.zip（或 .cnz）也算一个 mod（内容是 CNE 布局）。
++				// 只在开关打开时登记；关闭时 zip 不进列表，但 modsList.txt 里的启用状态仍会保留。
++				else if (cne.CneModCompat.isEnabled() && !sys.FileSystem.isDirectory(path))
++				{
++					var zipName:String = haxe.io.Path.withoutExtension(folder);
++					if (cne.CneZipStore.zipPath(zipName) != null && !ignoreModFolders.contains(zipName.toLowerCase()) && !list.contains(zipName))
++						list.push(zipName);
++				}
++				#end
+ 			}
+ 		}
+ 		#end
+@@ -210,7 +223,14 @@ class Mods
+ 			{
+ 				var dat:Array<String> = mod.split("|");
+ 				var folder:String = dat[0];
+-				if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) && !added.contains(folder))
++				var knownMod:Bool = FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder));
++				#if sys
++				// zip mod：即使「CNE 模组兼容」当前关闭，也要保留它在 modsList.txt 里的启用状态，
++				// 否则关一下开关就把玩家的启用选择抹掉（下次打开全变默认关闭）。
++				if(!knownMod && folder.trim().length > 0 && cne.CneZipStore.zipPath(folder) != null)
++					knownMod = true;
++				#end
++				if(folder.trim().length > 0 && knownMod && !added.contains(folder))
+ 				{
+ 					added.push(folder);
+ 					list.push([folder, (dat[1] == "1")]);
+diff --git a/source/backend/Paths.hx b/source/backend/Paths.hx
+index f3e73b0..fa0b58b 100644
+--- a/source/backend/Paths.hx
++++ b/source/backend/Paths.hx
+@@ -986,7 +986,20 @@ class Paths
+ 	}
+ 
+ 	#if MODS_ALLOWED
++	/**
++	 * `mods/...` 路径入口（全引擎唯一入口）。
++	 * CNE 模组兼容开启时，`mods/<zip mod 名>/...` 会被重映射到暂存目录
++	 * `mods/_cnestage/<mod 名>/...`（见 `cne/CneZipStore.hx`）；其余情况与改动前完全一致。
++	 */
+ 	static public function mods(key:String = '') {
++		#if sys
++		var remapped:String = cne.CneZipStore.remapKey(key);
++		if(remapped != null) return remapped;
++		#end
++		return modsRaw(key);
++	}
++
++	static public function modsRaw(key:String = '') {
+ 		var p:String = #if android backend.AndroidStorage.root() + '/mods/' + key #else 'mods/' + key #end;
+ 		// 兼容模组大小写命名（icon-Oswald.png 等）：原样找不到时尝试全小写
+ 		if(!FileSystem.exists(p)) {
+@@ -1015,6 +1028,11 @@ class Paths
+ 			var p2:String = modFolders(path + '/' + key.toLowerCase() + '.' + SOUND_EXT);
+ 			if(FileSystem.exists(p2)) return p2;
+ 		}
++		#if sys
++		// CNE 模组兼容：songs/<song>/song/Inst|Voices[-难度后缀][-难度].<ext>
++		var cneFound:String = cne.CneModCompat.resolveCneSound(path, key);
++		if(cneFound != null) return cneFound;
++		#end
+ 		return p;
+ 	}
+ 
+diff --git a/source/backend/Song.hx b/source/backend/Song.hx
+index 5cb2843..bc6bbb7 100644
+--- a/source/backend/Song.hx
++++ b/source/backend/Song.hx
+@@ -298,6 +298,13 @@ class Song
+ 		// 必须用 FileSystem 检查，否则外部谱面永远判为缺失
+ 		if(FileSystem.exists(baseFile)) return baseFile;
+ 		if(Assets.exists(baseFile, TEXT)) return baseFile;
++
++		#if (MODS_ALLOWED && sys)
++		// CNE 模组兼容：Psych 布局（data/<song>/<song>-<难度>.json）找不到时，
++		// 退回 CNE 布局 songs/<song>/charts/<难度>.json（由 cne.CneModCompat 负责定位 + 布局换算）。
++		var cnePath:String = cne.CneModCompat.resolveChartPath(jsonInput, folder);
++		if(cnePath != null) return cnePath;
++		#end
+ 		return null;
+ 	}
+ 
+@@ -350,6 +357,28 @@ class Song
+ 			rawJson = rawJson.substr(0, rawJson.length - 1);
+ 			// LOL GOING THROUGH THE BULLSHIT TO CLEAN IDK WHATS STRANGE
+ 		}
++
++		#if (MODS_ALLOWED && sys)
++		// CNE 模组兼容：codenameChart 谱面先转成 psych_v1（列号绝对方向），再走下面既有管线。
++		// 转换失败保持原样，由通用解析路径决定行为（不会把错误数据静默当成功）。
++		if (rawJson.indexOf('"codenameChart"') != -1 && cne.CneModCompat.isEnabled()
++			&& states.editors.content.CneExport.isCneFormat(rawJson))
++		{
++			var converted:SwagSong = states.editors.content.CneExport.cneToPsych(
++				rawJson, cne.CneModCompat.metaJsonForChart(filePath));
++			if (converted != null)
++			{
++				cne.CneModCompat.log('converted CNE chart → psych_v1: ' + filePath
++					+ ' (' + converted.notes.length + ' sections, bpm ' + converted.bpm + ')');
++				rawJson = haxe.Json.stringify(converted);
++			}
++			else
++			{
++				trace('[CNE] CNE chart conversion failed, reading raw: ' + filePath);
++			}
++		}
++		#end
++
+ 		var songJson:Dynamic = parseJSONshit(rawJson);
+ 		onLoadJson(songJson);
+ 
+diff --git a/source/backend/WeekData.hx b/source/backend/WeekData.hx
+index 9dde927..2627e20 100644
+--- a/source/backend/WeekData.hx
++++ b/source/backend/WeekData.hx
+@@ -146,6 +146,31 @@ class WeekData {
+ 			}
+ 		}
+ 		#end
++
++		#if (MODS_ALLOWED && sys)
++		// CNE 模组兼容：把已启用 CNE mod 的周目（`data/weeks/weeks/*.xml`，顺序取
++		// `data/weeks/weeks.txt`）翻译成 Psych 周目 —— 否则 CNE mod 的歌不会出现在
++		// Story/Freeplay（Meteoric 的选曲列表完全由周目驱动，见 FreeplayState.create）。
++		if (cne.CneModCompat.isEnabled())
++		{
++			for (mod in Mods.parseList().enabled)
++			{
++				for (entry in cne.CneModCompat.cneWeekFiles(mod))
++				{
++					var weekId:String = entry.name;
++					if (weekId == null || weekId.length == 0 || weeksLoaded.exists(weekId)) continue;
++
++					var cneWeek:WeekData = new WeekData(cast entry.week, weekId);
++					cneWeek.folder = mod;
++					if (isStoryMode == null || (isStoryMode && !cneWeek.hideStoryMode) || (!isStoryMode && !cneWeek.hideFreeplay))
++					{
++						weeksLoaded.set(weekId, cneWeek);
++						weeksList.push(weekId);
++					}
++				}
++			}
++		}
++		#end
+ 	}
+ 
+ 	private static function addWeek(weekToCheck:String, path:String, directory:String, i:Int, originalLength:Int)
+diff --git a/source/objects/Character.hx b/source/objects/Character.hx
+index c213edb..8ef5359 100644
+--- a/source/objects/Character.hx
++++ b/source/objects/Character.hx
+@@ -111,18 +111,33 @@ class Character extends FlxSprite
+ 					path = Paths.getPreloadPath(characterPath);
+ 				}
+ 
+-				if (!FileSystem.exists(path))
+-				#else
+-				var path:String = Paths.getPreloadPath(characterPath);
+-				if (!Assets.exists(path))
+-				#end
++				var rawJson:String = null;
++				#if sys
++				// CNE 模组兼容：Psych JSON 人物缺失时，尝试把 CNE 人物
++				// （`mods/<mod>/data/characters/<name>.xml` + `images/characters/<sprite>.png`）
++				// 现场转换成 Psych 人物 JSON（见 cne/CneModCompat.characterJson）。
++				// 转换失败/开关关闭时 rawJson 仍为 null，走下面既有的人物回退。
++				if (!FileSystem.exists(path) && cne.CneModCompat.isEnabled())
+ 				{
+-					path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
++					var cneChar:String = cne.CneModCompat.characterJson(curCharacter);
++					if (cneChar != null)
++					{
++						rawJson = cneChar;
++						path = null;
++					}
+ 				}
++				#end
+ 
+-				#if MODS_ALLOWED
+-				var rawJson = File.getContent(path);
++				if (rawJson == null)
++				{
++					if (!FileSystem.exists(path))
++						path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
++					rawJson = File.getContent(path);
++				}
+ 				#else
++				var path:String = Paths.getPreloadPath(characterPath);
++				if (!Assets.exists(path))
++					path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json');
+ 				var rawJson = Assets.getText(path);
+ 				#end
+ 
+diff --git a/source/states/ModsMenuState.hx b/source/states/ModsMenuState.hx
+index e0dee22..73275aa 100644
+--- a/source/states/ModsMenuState.hx
++++ b/source/states/ModsMenuState.hx
+@@ -31,13 +31,13 @@ class ModsMenuState extends MusicBeatState
+ 	static final PANEL_R_W:Float = 460;
+ 	static final PANEL_R_H:Float = 570;
+ 
+-	static final LIST_X:Float = 88;
++	static final LIST_X:Float = 164;  // 选项名 X（原 88：胶囊开关 96 宽后必须右移让位）
+ 	static final LIST_Y:Float = 152;
+ 	static final ROW_GAP:Float = 56;
+ 	static final ROWS_VISIBLE:Int = 8;
+ 
+-	static final CHECK_X:Float = 56;
+-	static final CHECK_SIZE:Float = 26;
++	static final CHECK_X:Float = 56;      // 开关 X（objects.ToggleSwitch，96×32 胶囊）
++	static final SWITCH_ROW_OFF:Float = 6; // 开关在行内垂直偏移
+ 	static final VALUE_X:Float = 540;
+ 	static final VALUE_W:Float = 160;
+ 
+@@ -65,8 +65,8 @@ class ModsMenuState extends MusicBeatState
+ 	public static var defaultColor:FlxColor = 0xFF665AFF;
+ 
+ 	var rows:Array<MenuText> = [];
+-	var checkBgs:Array<FlxSprite> = [];
+-	var checkFills:Array<FlxSprite> = [];
++	/** 行内开关（与更新界面同款胶囊，见 objects.ToggleSwitch）；行位动态，靠 setPosition 跟随 */
++	var switchCols:Array<objects.ToggleSwitch> = [];
+ 	var statusTexts:Array<FlxText> = [];
+ 	var lastRowText:Array<String> = [];
+ 	var lastStatus:Array<String> = [];
+@@ -172,15 +172,10 @@ class ModsMenuState extends MusicBeatState
+ 			add(row);
+ 			rows.push(row);
+ 
+-			var checkBg:FlxSprite = makePanel(CHECK_X, LIST_Y + 4 + (r * ROW_GAP), CHECK_SIZE, CHECK_SIZE, 7, 0x66161622, 0x8CFFFFFF);
+-			checkBg.visible = false;
+-			add(checkBg);
+-			checkBgs.push(checkBg);
+-
+-			var checkFill:FlxSprite = makePanel(CHECK_X + 6, LIST_Y + 10 + (r * ROW_GAP), CHECK_SIZE - 12, CHECK_SIZE - 12, 4, 0xFFFFFFFF, null);
+-			checkFill.visible = false;
+-			add(checkFill);
+-			checkFills.push(checkFill);
++			var sw:objects.ToggleSwitch = new objects.ToggleSwitch(CHECK_X, LIST_Y + SWITCH_ROW_OFF + (r * ROW_GAP));
++			sw.setVisible(false);
++			for (spr in sw.sprites) add(spr);
++			switchCols.push(sw);
+ 
+ 			var statusText:FlxText = new FlxText(VALUE_X, LIST_Y + 2 + (r * ROW_GAP), VALUE_W, '', 22);
+ 			statusText.setFormat(Paths.font('future.ttf'), 22, 0xFFD7D7E0, RIGHT);
+@@ -339,6 +334,10 @@ class ModsMenuState extends MusicBeatState
+ 
+ 	override function update(elapsed:Float)
+ 	{
++		// 开关滑块逐帧插值（行位动态，滑块位置由组件的圆心模型自己跟着轨道走）
++		for (sw in switchCols)
++			if (sw != null && sw.track != null && sw.track.visible) sw.animate(elapsed);
++
+ 		// 本界面打开期间拖入了新 mod 并安装完成 → 自动刷新列表
+ 		var instTime:Float = ModInstaller.get().lastInstallTime;
+ 		if (instTime > lastInstallSeen)
+@@ -525,10 +524,9 @@ class ModsMenuState extends MusicBeatState
+ 		var my:Float = FlxG.mouse.screenY;
+ 		for (r in 0...ROWS_VISIBLE)
+ 		{
+-			var bgSpr:FlxSprite = checkBgs[r];
+-			if (!bgSpr.visible) continue;
+-			if (mx >= bgSpr.x - 6 && mx <= bgSpr.x + bgSpr.width + 6 && my >= bgSpr.y - 6 && my <= bgSpr.y + bgSpr.height + 6)
+-				return scrollIndex + r;
++			var sw:objects.ToggleSwitch = switchCols[r];
++			if (sw.track == null || !sw.track.visible) continue;
++			if (sw.hits(mx, my, 12)) return scrollIndex + r; // 外扩 12 → 命中高 56（触控红线）
+ 		}
+ 		return -1;
+ 	}
+@@ -545,6 +543,9 @@ class ModsMenuState extends MusicBeatState
+ 
+ 		mods = [];
+ 		modsList = [];
++		#if (MODS_ALLOWED && sys)
++		cne.CneModCompat.clearCaches(); // mod 列表变化 → CNE songs/ 目录名缓存作废
++		#end
+ 		var list:ModsList = Mods.parseList();
+ 		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
+ 
+@@ -665,8 +666,7 @@ class ModsMenuState extends MusicBeatState
+ 			if (idx >= mods.length)
+ 			{
+ 				row.visible = false;
+-				checkBgs[r].visible = false;
+-				checkFills[r].visible = false;
++				switchCols[r].setVisible(false);
+ 				statusTexts[r].visible = false;
+ 				continue;
+ 			}
+@@ -679,8 +679,7 @@ class ModsMenuState extends MusicBeatState
+ 			if (!isSel && top + ROW_H > LIST_BOTTOM)
+ 			{
+ 				row.visible = false;
+-				checkBgs[r].visible = false;
+-				checkFills[r].visible = false;
++				switchCols[r].setVisible(false);
+ 				statusTexts[r].visible = false;
+ 				continue;
+ 			}
+@@ -689,8 +688,7 @@ class ModsMenuState extends MusicBeatState
+ 			{
+ 				// 选中行：名称/状态/复选框都收进卡片，行本身隐藏（避免与卡片重复渲染）
+ 				row.visible = false;
+-				checkBgs[r].visible = false;
+-				checkFills[r].visible = false;
++				switchCols[r].setVisible(false);
+ 				statusTexts[r].visible = false;
+ 				isCardVisible = true;
+ 				continue;
+@@ -708,17 +706,12 @@ class ModsMenuState extends MusicBeatState
+ 			row.color = 0xFFCFCFDC;
+ 			row.y = top + (ROW_H - row.height) * 0.5; // 行内垂直居中
+ 
+-			// 复选框位置随行位走（原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开就会错位）
+-			checkBgs[r].visible = true;
+-			checkBgs[r].x = CHECK_X;
+-			checkBgs[r].y = top + 4;
+-			checkBgs[r].alpha = 0.85;
+-			checkFills[r].visible = isOn;
+-			if (isOn)
+-			{
+-				checkFills[r].x = CHECK_X + 6;
+-				checkFills[r].y = top + 10;
+-			}
++			// 开关位置随行位走（原来写死 `LIST_Y + 4 + r * ROW_GAP`，卡片一展开就会错位）
++			switchCols[r].setVisible(true);
++			switchCols[r].setAlpha(0.85);
++			switchCols[r].setPosition(CHECK_X, top + SWITCH_ROW_OFF);
++			switchCols[r].setOn(isOn);      // 目标态；滑块由 update 的 animate 滑过去
++			switchCols[r].refreshTheme();   // primary 是运行时令牌：主题切换后重绘
+ 
+ 			statusTexts[r].visible = true;
+ 			statusTexts[r].y = top + 2; // 始终与所在行对齐
+@@ -804,6 +797,11 @@ class ModsMenuState extends MusicBeatState
+ 
+ 		var isOn:Bool = (modsList[curSelected][1] == true);
+ 		cardStatus.text = isOn ? '已启用' : '已停用（按 Enter 或点击启用）';
++		#if (MODS_ALLOWED && sys)
++		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
++		if (cne.CneModCompat.isCneMod(mod.folder))
++			cardStatus.text += (cne.CneModCompat.isEnabled() ? '   ·   CNE 格式' : '   ·   CNE 格式（需在设置→编程开启「CNE 模组兼容」）');
++		#end
+ 		cardStatus.updateHitbox();
+ 
+ 		// 首次出现做一次克制的淡入（skill：低频、150ms quadOut、可被打断）；之后即时重建
+@@ -877,7 +875,13 @@ class ModsMenuState extends MusicBeatState
+ 
+ 		var mod:ModMetadata = mods[curSelected];
+ 		clipText(nameText, mod.name, INFO_W - 20);
+-		clipText(folderText, '文件夹：' + mod.folder, INFO_W - 20);
++		var folderLabel:String = '文件夹：' + mod.folder;
++		#if (MODS_ALLOWED && sys)
++		// 右侧信息：CNE 格式 mod 且兼容开关未开时给出可操作的提示（开关位置写在提示里）
++		if (cne.CneModCompat.isCneMod(mod.folder) && !cne.CneModCompat.isEnabled())
++			folderLabel += '   ·   CNE 格式，需开启「设置 → 编程 → CNE 模组兼容」';
++		#end
++		clipText(folderText, folderLabel, INFO_W - 20);
+ 
+ 		var enabledCount:Int = 0;
+ 		for (values in modsList) if (values[1] == true) enabledCount++;
+@@ -1175,6 +1179,10 @@ class ModsMenuState extends MusicBeatState
+ 
+ 	override function destroy()
+ 	{
++		for (sw in switchCols)
++			if (sw != null) sw.destroy();
++		switchCols = [];
++
+ 		FlxG.mouse.visible = false;
+ 		super.destroy();
+ 	}
+diff --git a/source/states/editors/content/CneExport.hx b/source/states/editors/content/CneExport.hx
+index 10c25e8..b35c8eb 100644
+--- a/source/states/editors/content/CneExport.hx
++++ b/source/states/editors/content/CneExport.hx
+@@ -3,6 +3,7 @@ package states.editors.content;
+ import haxe.Json;
+ import flixel.util.FlxSort;
+ import backend.Song.SwagSong;
++import backend.Section.SwagSection;
+ 
+ /**
+  * Codename Engine (CNE) 谱面导出 —— 从 Seiun Engine 移植（export 部分）。
+@@ -230,4 +231,400 @@ class CneExport
+ 
+ 		return chart;
+ 	}
++
++	// ========================================================================
++	// CNE → Psych（「CNE 模组兼容」谱面导入；导出部分的镜像）
++	//
++	// 语义依据（不要凭印象改）：
++	//  - CNE 段结构来源：`CodenameEngine-main/source/funkin/backend/chart/FNFLegacyParser.hx`
++	//    · mustHitSection 由 `Camera Movement` 事件的 params[0]（strumLine 索引）决定：
++	//      `chart.strumLines[params[0]].type == PLAYER`；
++	//    · sectionBeats 由 `Time Signature Change`（params[0]）决定；bpm 由 `BPM Change` 决定；
++	//    · altAnim 由 `Alt Animation Toggle` 决定。
++	//  - 输出必须是 **psych_v1**：列号 <4 = 玩家、>=4 = 对手，mustHitSection 只管镜头
++	//    （Meteoric `PlayState.hx:2156-2198`）。CNE 自家 `FNFLegacyParser.encode` 产的是
++	//    0.6.x「相对 mustHitSection」的老语义，若照搬会让对手段音符翻到玩家侧。
++	//  - gf 段落：与 mustHitSection 同方向的列由 GF 演奏（同 PlayState.hx:2196-2198）。
++	// ========================================================================
++
++	public static function isCneFormat(jsonStr:String):Bool
++	{
++		if (jsonStr == null || jsonStr.indexOf('"codenameChart"') == -1) return false;
++		try
++		{
++			var data:Dynamic = Json.parse(jsonStr);
++			return data != null && (data.codenameChart == true || data.codenameChart == "true") && data.strumLines != null;
++		}
++		catch (e:Dynamic)
++		{
++			return false;
++		}
++	}
++
++	/**
++	 * CNE 谱面（codenameChart）→ psych_v1 SwagSong。
++	 * @param metaJsonStr CNE `songs/<song>/meta.json` 内容（bpm / needsVoices / instSuffix …）；
++	 *                    只在谱面内嵌 meta 缺字段时用于补齐（bpm 是必须的，否则时间轴全错）。
++	 */
++	public static function cneToPsych(jsonStr:String, ?metaJsonStr:String):SwagSong
++	{
++		if (jsonStr == null) return null;
++		try
++		{
++			var data:Dynamic = Json.parse(jsonStr);
++			if (data == null || data.strumLines == null) return null;
++			return buildPsychSong(data, metaJsonStr);
++		}
++		catch (e:Dynamic)
++		{
++			trace('[CNE] chart convert failed: ' + Std.string(e));
++			return null;
++		}
++	}
++
++	static function buildPsychSong(data:Dynamic, metaJsonStr:String):SwagSong
++	{
++		var meta:Dynamic = (data.meta != null) ? data.meta : {};
++		if (metaJsonStr != null && metaJsonStr.length > 0)
++		{
++			var external:Dynamic = null;
++			try external = Json.parse(metaJsonStr) catch (e:Dynamic) { external = null; }
++			if (external != null)
++			{
++				for (field in ['name', 'bpm', 'needsVoices', 'instSuffix', 'vocalsSuffix', 'icon',
++					'coopAllowed', 'opponentModeAllowed', 'beatsPerMeasure', 'stepsPerBeat'])
++				{
++					if (Reflect.field(meta, field) == null && Reflect.hasField(external, field))
++						Reflect.setField(meta, field, Reflect.field(external, field));
++				}
++			}
++		}
++
++		var bpm:Float = numOf(meta.bpm, 0);
++		if (bpm <= 0) bpm = 150; // CNE 正常都有 meta.json bpm；这里只是不崩兜底
++		var beatsPerMeasure:Float = numOf(meta.beatsPerMeasure, 4);
++		if (beatsPerMeasure <= 0) beatsPerMeasure = 4;
++
++		var songName:String = (meta.name != null) ? Std.string(meta.name) : "Unknown";
++		var needsVoices:Bool = (meta.needsVoices != false);
++		var speed:Float = numOf(data.scrollSpeed, 1);
++		if (speed <= 0) speed = 1;
++		var stage:String = (data.stage != null && Std.string(data.stage).length > 0) ? Std.string(data.stage) : "stage";
++
++		var noteTypes:Array<String> = [];
++		if (data.noteTypes != null)
++			for (t in cast(data.noteTypes, Array<Dynamic>)) noteTypes.push((t == null) ? '' : Std.string(t));
++
++		var player1:String = "bf";
++		var player2:String = "dad";
++		var gfVersion:String = "gf";
++		var playerNotes:Array<Dynamic> = [];
++		var opponentNotes:Array<Dynamic> = [];
++		var gfNotes:Array<Dynamic> = [];
++		var lineTypes:Array<Int> = [];
++
++		var lines:Array<Dynamic> = cast data.strumLines;
++		if (lines != null)
++		{
++			for (line in lines)
++			{
++				if (line == null) continue;
++				var lt:Int = intOf(line.type, 0);
++				lineTypes.push(lt);
++
++				var chars:Array<Dynamic> = cast line.characters;
++				if (chars != null && chars.length > 0 && chars[0] != null)
++				{
++					var cname:String = Std.string(chars[0]);
++					if (cname.length > 0)
++					{
++						switch (lt)
++						{
++							case 1: player1 = cname;
++							case 0: player2 = cname;
++							case 2: gfVersion = cname;
++							default:
++						}
++					}
++				}
++
++				var notes:Array<Dynamic> = cast line.notes;
++				if (notes == null) continue;
++				for (n in notes)
++				{
++					if (n == null) continue;
++					var typeIdx:Int = intOf(n.type, 0);
++					var typeName:String = '';
++					if (typeIdx > 0 && typeIdx - 1 < noteTypes.length) typeName = noteTypes[typeIdx - 1];
++					var mapped:Dynamic = {
++						time: numOf(n.time, 0),
++						id: intOf(n.id, 0),
++						sLen: numOf(n.sLen, 0),
++						typeName: aliasNoteType(typeName)
++					};
++					switch (lt)
++					{
++						case 1: playerNotes.push(mapped);
++						case 2: gfNotes.push(mapped);
++						default: opponentNotes.push(mapped);
++					}
++				}
++			}
++		}
++		playerNotes.sort(sortByTime);
++		opponentNotes.sort(sortByTime);
++		gfNotes.sort(sortByTime);
++
++		var events:Array<Dynamic> = cast data.events;
++		var bpmEvents:Array<Dynamic> = [];
++		var camEvents:Array<Dynamic> = [];
++		var sigEvents:Array<Dynamic> = [];
++		var altEvents:Array<Dynamic> = [];
++		if (events != null)
++		{
++			for (e in events)
++			{
++				if (e == null) continue;
++				var en:String = (e.name != null) ? Std.string(e.name) : '';
++				switch (en)
++				{
++					case 'BPM Change': bpmEvents.push(e);
++					case 'Camera Movement': camEvents.push(e);
++					case 'Time Signature Change': sigEvents.push(e);
++					case 'Alt Animation Toggle': altEvents.push(e);
++					default:
++				}
++			}
++		}
++		bpmEvents.sort(sortByTime);
++		camEvents.sort(sortByTime);
++		sigEvents.sort(sortByTime);
++		altEvents.sort(sortByTime);
++
++		var lastNoteTime:Float = 0;
++		for (arr in [playerNotes, opponentNotes, gfNotes])
++			if (arr.length > 0 && arr[arr.length - 1].time > lastNoteTime) lastNoteTime = arr[arr.length - 1].time;
++
++		var sections:Array<SwagSection> = [];
++		var curTime:Float = 0;
++		var curBpm:Float = bpm;
++		var curBeats:Float = beatsPerMeasure;
++		var mustHit:Bool = false; // 与 CNE FNFLegacyParser 一致：无 Camera Movement 事件时默认看对手
++		var altAnim:Bool = false;
++		var pIdx:Int = 0;
++		var oIdx:Int = 0;
++		var gIdx:Int = 0;
++		var bIdx:Int = 0;
++		var cIdx:Int = 0;
++		var sIdx:Int = 0;
++		var aIdx:Int = 0;
++		var guard:Int = 0;
++
++		while (curTime <= lastNoteTime + 1 && guard < 200000)
++		{
++			guard++;
++
++			var crochet:Float = (60 / curBpm) * 1000;
++			var sectionEnd:Float = curTime + crochet * curBeats;
++
++			// 事件归属规则与 CNE `FNFLegacyParser.__convertToSwagSections` 一致：
++			// 落在本段窗口内（time < sectionEnd）的事件属于本段，并覆盖更早的值。
++			// 本段时长仍按进入本段时的 bpm/拍号算，改动从下一段生效（Psych section 语义）。
++			while (bIdx < bpmEvents.length && eventTime(bpmEvents[bIdx]) < sectionEnd)
++			{
++				var v:Float = firstParam(bpmEvents[bIdx], 0);
++				if (v > 0) curBpm = v;
++				bIdx++;
++			}
++			while (sIdx < sigEvents.length && eventTime(sigEvents[sIdx]) < sectionEnd)
++			{
++				var v:Float = firstParam(sigEvents[sIdx], 0);
++				if (v > 0) curBeats = v;
++				sIdx++;
++			}
++			while (cIdx < camEvents.length && eventTime(camEvents[cIdx]) < sectionEnd)
++			{
++				mustHit = camTargetsPlayer(camEvents[cIdx], lineTypes);
++				cIdx++;
++			}
++			while (aIdx < altEvents.length && eventTime(altEvents[aIdx]) < sectionEnd)
++			{
++				altAnim = firstParam(altEvents[aIdx], 0) != 0;
++				aIdx++;
++			}
++
++			var sectionNotes:Array<Dynamic> = [];
++			var hasGf:Bool = false;
++
++			while (gIdx < gfNotes.length && gfNotes[gIdx].time < sectionEnd)
++			{
++				var n:Dynamic = gfNotes[gIdx];
++				sectionNotes.push([n.time, n.id + (mustHit ? 0 : 4), n.sLen, n.typeName]);
++				hasGf = true;
++				gIdx++;
++			}
++			while (pIdx < playerNotes.length && playerNotes[pIdx].time < sectionEnd)
++			{
++				var n:Dynamic = playerNotes[pIdx];
++				sectionNotes.push([n.time, n.id, n.sLen, n.typeName]);
++				pIdx++;
++			}
++			while (oIdx < opponentNotes.length && opponentNotes[oIdx].time < sectionEnd)
++			{
++				var n:Dynamic = opponentNotes[oIdx];
++				sectionNotes.push([n.time, n.id + 4, n.sLen, n.typeName]);
++				oIdx++;
++			}
++			sectionNotes.sort(function(a:Array<Dynamic>, b:Array<Dynamic>):Int {
++				var t1:Float = numOf(a[0], 0);
++				var t2:Float = numOf(b[0], 0);
++				return (t1 < t2) ? -1 : ((t1 > t2) ? 1 : 0);
++			});
++
++			var prevBpm:Float = (sections.length > 0) ? sections[sections.length - 1].bpm : bpm;
++			sections.push({
++				sectionNotes: sectionNotes,
++				sectionBeats: curBeats,
++				typeOfSection: 0,
++				mustHitSection: mustHit,
++				gfSection: hasGf,
++				altAnim: altAnim,
++				changeBPM: (sections.length == 0) ? (curBpm != bpm) : (prevBpm != curBpm),
++				bpm: curBpm
++			});
++
++			curTime = sectionEnd;
++		}
++
++		if (sections.length == 0)
++		{
++			sections.push({
++				sectionNotes: [],
++				sectionBeats: 4,
++				typeOfSection: 0,
++				mustHitSection: true,
++				gfSection: false,
++				altAnim: false,
++				changeBPM: false,
++				bpm: bpm
++			});
++		}
++
++		// 事件转换：镜头/变速/拍号/交替动画已烘焙进 section，不再重复导出
++		var psychEvents:Array<Dynamic> = [];
++		if (events != null)
++		{
++			var sorted:Array<Dynamic> = events.copy();
++			sorted.sort(sortByTime);
++			var i:Int = 0;
++			while (i < sorted.length)
++			{
++				var t:Float = eventTime(sorted[i]);
++				var subEvents:Array<Dynamic> = [];
++				while (i < sorted.length && eventTime(sorted[i]) == t)
++				{
++					var e:Dynamic = sorted[i];
++					var en:String = (e.name != null) ? Std.string(e.name) : '';
++					var params:Array<Dynamic> = cast e.params;
++					if (params == null) params = [];
++
++					switch (en)
++					{
++						case 'Camera Movement', 'BPM Change', 'Time Signature Change', 'Alt Animation Toggle':
++							// 已烘焙进 section
++						case 'Scroll Speed Change':
++							subEvents.push(['Change Scroll Speed',
++								(params.length > 1 ? Std.string(params[1]) : '1'),
++								(params.length > 2 ? Std.string(params[2]) : '0')]);
++						case 'Add Camera Zoom':
++							subEvents.push(['Add Camera Zoom',
++								(params.length > 0 ? Std.string(params[0]) : '0.015'),
++								(params.length > 1 ? Std.string(params[1]) : '0.03')]);
++						case 'Play Animation':
++							subEvents.push(['Play Animation', (params.length > 1 ? Std.string(params[1]) : ''), 'bf']);
++						default:
++							if (en.length > 0)
++								subEvents.push([en,
++									(params.length > 0 ? Std.string(params[0]) : ''),
++									(params.length > 1 ? Std.string(params[1]) : '')]);
++					}
++					i++;
++				}
++				if (subEvents.length > 0) psychEvents.push([t, subEvents]);
++			}
++		}
++
++		var result:SwagSong = {
++			song: songName,
++			notes: sections,
++			events: psychEvents,
++			bpm: bpm,
++			needsVoices: needsVoices,
++			speed: speed,
++			player1: player1,
++			player2: player2,
++			gfVersion: gfVersion,
++			stage: stage,
++			format: "psych_v1"
++		};
++		return result;
++	}
++
++	/** CNE 默认音符类型名 → Psych 内建类型名（`PlayState.hx:2211-2212` 只认后者的字面量）。 */
++	static function aliasNoteType(name:String):String
++	{
++		if (name == null) return '';
++		switch (name)
++		{
++			case 'No Anim Note': return 'No Animation';
++			case 'Alt Anim Note': return 'Alt Animation';
++			default: return name;
++		}
++	}
++
++	static function camTargetsPlayer(e:Dynamic, lineTypes:Array<Int>):Bool
++	{
++		var params:Array<Dynamic> = cast e.params;
++		if (params == null || params.length == 0) return false;
++		var raw:Dynamic = params[0];
++		var idx:Int = intOf(raw, -1);
++		if (idx >= 0 && idx < lineTypes.length) return lineTypes[idx] == 1;
++		var s:String = Std.string(raw).toLowerCase();
++		return (s == 'true' || s == 'boyfriend' || s == 'player' || s == 'bf');
++	}
++
++	static function eventTime(e:Dynamic):Float
++	{
++		if (e == null) return 0;
++		return numOf(e.time, 0);
++	}
++
++	static function firstParam(e:Dynamic, index:Int):Float
++	{
++		if (e == null) return 0;
++		var params:Array<Dynamic> = cast e.params;
++		if (params == null || index >= params.length) return 0;
++		return numOf(params[index], 0);
++	}
++
++	static function numOf(v:Dynamic, def:Float):Float
++	{
++		if (v == null) return def;
++		if (Std.isOfType(v, Bool)) return (cast v) ? 1 : 0;
++		if (Std.isOfType(v, Float)) return cast v;
++		if (Std.isOfType(v, Int)) return cast v;
++		var f:Null<Float> = Std.parseFloat(Std.string(v));
++		if (f == null || Math.isNaN(f)) return def;
++		return f;
++	}
++
++	static function intOf(v:Dynamic, def:Int):Int
++	{
++		return Std.int(numOf(v, def));
++	}
++
++	static function sortByTime(a:Dynamic, b:Dynamic):Int
++	{
++		return FlxSort.byValues(FlxSort.ASCENDING, a.time, b.time);
++	}
+ }
+--- /dev/null
++++ b/source/cne/CneModCompat.hx
+@@ -0,0 +1,630 @@
++package cne;
++
++#if (MODS_ALLOWED && sys)
++import backend.ClientPrefs;
++import backend.Mods;
++import backend.Paths;
++import haxe.io.Path;
++import sys.FileSystem;
++import sys.io.File;
++
++using StringTools;
++
++/**
++ * 「CNE 模组兼容」——让 Codename Engine（CNE）格式的 mod 能在 Meteoric 里跑起来。
++ *
++ * 权威依据（按仓库内可查证的一手源码，不靠猜）：
++ *  - CNE 资源布局：`CodenameEngine-main/source/funkin/backend/assets/Paths.hx`
++ *      chart  = `songs/<song>/charts/[<variant>/]<difficulty>.json`
++ *      inst   = `songs/<song>/song/Inst<suffix>[-<difficulty>].<ext>`
++ *      vocals = `songs/<song>/song/Voices<suffix>[-<difficulty>].<ext>`
++ *      meta   = `songs/<song>/meta.json`（bpm / difficulties / instSuffix / vocalsSuffix …）
++ *      char   = `data/characters/<name>.xml`（Sparrow 图集 + `<anim>` 节点）
++ *      week   = `data/weeks/weeks/<week>.xml` + `data/weeks/weeks.txt`
++ *  - CNE 资源库：`funkin/backend/assets/ModsFolder.hx`（文件夹 / zip 都是 mod，zip 根级即 mod 根）
++ *  - CNE→legacy 段结构：`funkin/backend/chart/FNFLegacyParser.hx`（mustHitSection 来自
++ *    `Camera Movement` 事件的 strumLine 索引；note 方向由 strumLine type 决定）
++ *
++ * 输出语义（必须与 Meteoric 一致，勿想当然）：
++ *  - 谱面一律产出 **psych_v1**：列号 `<4` = 玩家、`>=4` = 对手，`mustHitSection` 只管镜头；
++ *    gf 段落里与 mustHitSection 同方向的列由 GF 演奏（`PlayState.hx:2156-2198`）。
++ *    （CNE 自家 `FNFLegacyParser.encode` 产的是 0.6.x 老语义，直接照搬会方向翻转。）
++ *  - 任何转换失败都返回 null，引擎退回“找不到资源”的既有行为，不抛异常。
++ *
++ * 开关：设置 → 编程 → 「CNE 模组兼容」（`ClientPrefs.data.cneModCompat`，默认关）。
++ * 调试构建下 `METEORIC_CNE_MOD_FORCE=1` 可无视存档强制开启。
++ */
++class CneModCompat
++{
++	/** 缓存：`<mod>|<songKey>` → CNE songs/ 下的真实目录名（找不到记空串）。 */
++	static var songDirCache:Map<String, String> = new Map();
++
++	public static function isEnabled():Bool
++	{
++		#if meteoric_debug
++		if (Sys.getEnv('METEORIC_CNE_MOD_FORCE') == '1') return true;
++		#end
++		return ClientPrefs.data != null && ClientPrefs.data.cneModCompat;
++	}
++
++	public static function log(msg:String):Void
++	{
++		var on:Bool = ClientPrefs.data != null && ClientPrefs.data.cneScriptLogs;
++		#if meteoric_debug
++		if (Sys.getEnv('METEORIC_CNE_MOD_FORCE') == '1' || Sys.getEnv('METEORIC_CNE_FORCE') == '1') on = true;
++		#end
++		if (on) Sys.println('[CNE-MOD] ' + msg);
++	}
++
++	// ==================== 歌曲目录定位 ====================
++
++	/**
++	 * CNE 的歌曲目录名保留空格（`songs/philly nice/`），而 Psych 侧一律格式化成
++	 * `philly-nice`。这里扫描已启用 mod 的 `songs/`，用 `Paths.formatToSongPath` 归一化后匹配，
++	 * 返回**真实目录名**。找不到返回 null（调用方退回格式化名）。
++	 */
++	public static function cneSongDir(songKey:String):String
++	{
++		if (songKey == null || songKey.length == 0) return null;
++
++		var mod:String = (Mods.currentModDirectory != null) ? Mods.currentModDirectory : '';
++		var cacheKey:String = mod + '|' + songKey;
++		if (songDirCache.exists(cacheKey))
++		{
++			var cached:String = songDirCache.get(cacheKey);
++			return (cached != null && cached.length > 0) ? cached : null;
++		}
++
++		var dirs:Array<String> = [];
++		if (mod.length > 0) dirs.push(mod);
++		for (m in Mods.getGlobalMods()) if (!dirs.contains(m)) dirs.push(m);
++		dirs.push(''); // mods 根：`mods/songs/...` 这种全局资源写法
++
++		for (d in dirs)
++		{
++			var songsRoot:String = Paths.mods((d.length > 0 ? d + '/' : '') + 'songs');
++			if (!FileSystem.exists(songsRoot) || !FileSystem.isDirectory(songsRoot)) continue;
++
++			var entries:Array<String> = null;
++			try entries = FileSystem.readDirectory(songsRoot) catch (e:Dynamic) { entries = []; }
++			for (entry in entries)
++			{
++				if (entry == null || entry.length == 0) continue;
++				if (!FileSystem.isDirectory(songsRoot + '/' + entry)) continue;
++				if (Paths.formatToSongPath(entry) == songKey)
++				{
++					songDirCache.set(cacheKey, entry);
++					return entry;
++				}
++			}
++		}
++
++		songDirCache.set(cacheKey, '');
++		return null;
++	}
++
++	/** mod 切换/重进选歌/Mod 列表刷新时清缓存（songDir 目录名缓存 + zip 暂存指纹校验）。 */
++	public static function clearCaches():Void
++	{
++		songDirCache = new Map();
++		CneZipStore.invalidate();
++	}
++
++	// ==================== 谱面 ====================
++
++	/** CNE 谱面路径（mod 优先）；无则 null。jsonInput 形如 `song` / `song-hard`。 */
++	public static function resolveChartPath(jsonInput:String, folder:String):String
++	{
++		if (!isEnabled() || jsonInput == null || jsonInput.length == 0) return null;
++
++		var songKey:String = Paths.formatToSongPath((folder != null && folder.length > 0) ? folder : jsonInput);
++		var difficulty:String = difficultyFromInput(jsonInput, folder);
++
++		var songDirs:Array<String> = [];
++		var real:String = cneSongDir(songKey);
++		if (real != null) songDirs.push(real);
++		if (!songDirs.contains(songKey)) songDirs.push(songKey);
++
++		var diffs:Array<String> = [];
++		if (difficulty != null && difficulty.length > 0)
++		{
++			diffs.push(difficulty);
++			if (difficulty.toLowerCase() != difficulty) diffs.push(difficulty.toLowerCase());
++		}
++		// 刻意**不**回退到 normal：CNE 的 `Chart.parse` 在指定难度缺谱时直接报
++		// "Chart for song ... was not found"；静默改用别的难度会让玩家玩到错误的谱面。
++
++		for (sd in songDirs)
++		{
++			for (d in diffs)
++			{
++				var p:String = Paths.modFolders('songs/' + sd + '/charts/' + d + '.json');
++				if (FileSystem.exists(p) && !FileSystem.isDirectory(p))
++				{
++					log('CNE chart: ' + p);
++					return p;
++				}
++			}
++		}
++		return null;
++	}
++
++	/**
++	 * 从 `jsonInput`（Psych 侧 `<song>` 或 `<song>-<difficulty>`）解析 CNE 难度名。
++	 * Psych 默认难度不带后缀（`Difficulty.defaultDifficulty = 'Normal'`），CNE 默认难度为
++	 * `Flags.DEFAULT_DIFFICULTY = 'normal'`，两者在此对齐。
++	 */
++	static function difficultyFromInput(jsonInput:String, folder:String):String
++	{
++		var fKey:String = Paths.formatToSongPath(folder != null ? folder : jsonInput);
++		var jKey:String = Paths.formatToSongPath(jsonInput);
++		if (folder == null || jKey == fKey) return 'normal';
++		if (fKey.length > 0 && jKey.length > fKey.length + 1 && jKey.substr(0, fKey.length + 1) == fKey + '-')
++			return jKey.substr(fKey.length + 1);
++		return jKey; // 调用方直接传了难度名（如编谱器）
++	}
++
++	/** 由谱面路径回溯 CNE `meta.json`（`songs/<song>/charts/[<variant>/]x.json` → `songs/<song>/meta.json`）。 */
++	public static function metaJsonForChart(chartPath:String):String
++	{
++		if (chartPath == null || chartPath.length == 0) return null;
++		var dir:String = Path.directory(chartPath);
++		if (dir == null || dir.length == 0) return null;
++
++		var base:String = Path.withoutDirectory(dir);
++		var songDir:String = (base == 'charts') ? Path.directory(dir) : Path.directory(Path.directory(dir));
++		var metaPath:String = songDir + '/meta.json';
++		if (!FileSystem.exists(metaPath)) return null;
++		try return File.getContent(metaPath) catch (e:Dynamic) { return null; }
++	}
++
++	/** 读 `<CNE 歌曲目录>/meta.json`（`songKey` 为格式化后的曲名）。 */
++	public static function metaJsonForSong(songKey:String):String
++	{
++		var dir:String = cneSongDir(songKey);
++		if (dir == null) dir = songKey;
++		var metaPath:String = Paths.modFolders('songs/' + dir + '/meta.json');
++		if (!FileSystem.exists(metaPath)) return null;
++		try return File.getContent(metaPath) catch (e:Dynamic) { return null; }
++	}
++
++	// ==================== 音频 ====================
++
++	/**
++	 * CNE 音频回退：`songs/<song>/song/Inst<suffix>[-<diff>]` / `Voices<suffix>[-<diff>]`。
++	 * 只在 Psych 路径（`songs/<song>/Inst.ogg`）不存在时调用；只接管无 postfix 的
++	 * `Inst` / `Voices`（Psych 的 `Voices-Player/-Opponent` 拆分人声由调用方自己回退）。
++	 */
++	public static function resolveCneSound(path:String, key:String):String
++	{
++		if (!isEnabled() || path != 'songs' || key == null) return null;
++
++		var slash:Int = key.lastIndexOf('/');
++		if (slash <= 0) return null;
++		var file:String = key.substr(slash + 1);
++		if (file != 'Inst' && file != 'Voices') return null;
++
++		var songKey:String = key.substr(0, slash);
++		var songDir:String = cneSongDir(songKey);
++		if (songDir == null) songDir = songKey;
++
++		var suffix:String = '';
++		var meta:Dynamic = null;
++		var metaRaw:String = metaJsonForSong(songKey);
++		if (metaRaw != null)
++		{
++			try meta = haxe.Json.parse(metaRaw) catch (e:Dynamic) { meta = null; }
++		}
++		if (meta != null)
++		{
++			var f:Dynamic = (file == 'Inst') ? Reflect.field(meta, 'instSuffix') : Reflect.field(meta, 'vocalsSuffix');
++			if (f != null) suffix = Std.string(f);
++		}
++
++		var diffs:Array<String> = [];
++		var d:String = currentDifficulty();
++		if (d != null && d.length > 0)
++		{
++			diffs.push(d.toLowerCase());
++			if (d != d.toLowerCase()) diffs.push(d);
++		}
++
++		var names:Array<String> = [];
++		for (dd in diffs) names.push(file + suffix + '-' + dd);
++		names.push(file + suffix);
++		if (suffix.length > 0)
++		{
++			for (dd in diffs) names.push(file + '-' + dd);
++			names.push(file);
++		}
++
++		var exts:Array<String> = (Paths.SOUND_EXT == 'ogg') ? ['ogg', 'mp3'] : [Paths.SOUND_EXT];
++		for (n in names)
++		{
++			for (ext in exts)
++			{
++				var p:String = Paths.modFolders('songs/' + songDir + '/song/' + n + '.' + ext);
++				if (FileSystem.exists(p) && !FileSystem.isDirectory(p))
++				{
++					log('CNE audio: ' + p);
++					return p;
++				}
++			}
++		}
++		return null;
++	}
++
++	static function currentDifficulty():String
++	{
++		try
++		{
++			return backend.Difficulty.getString();
++		}
++		catch (e:Dynamic)
++		{
++			return null;
++		}
++	}
++
++	// ==================== 人物 ====================
++
++	/**
++	 * CNE 人物 XML → Psych 人物 JSON 字符串（`data/characters/<name>.xml`）。
++	 * 找不到或解析失败返回 null，`Character.hx` 再退回引擎默认人物。
++	 * 映射依据：`CodenameEngine-main/source/funkin/game/Character.hx` +
++	 * `funkin/backend/utils/XMLUtil.hx`（属性名 / anim 节点字段）。
++	 */
++	public static function characterJson(name:String):String
++	{
++		if (!isEnabled() || name == null || name.length == 0) return null;
++
++		var xmlPath:String = Paths.modFolders('data/characters/' + name + '.xml');
++		if (!FileSystem.exists(xmlPath)) return null;
++
++		var raw:String = null;
++		try raw = File.getContent(xmlPath) catch (e:Dynamic) { return null; }
++
++		try
++		{
++			var xml:Xml = Xml.parse(raw).firstElement();
++			if (xml == null || xml.nodeName != 'character') return null;
++
++			var sprite:String = attr(xml, 'sprite');
++			if (sprite == null || sprite.length == 0) sprite = name;
++			var image:String = (sprite.indexOf('/') >= 0) ? sprite : 'characters/' + sprite;
++
++			var icon:String = attr(xml, 'icon');
++			if (icon == null || icon.length == 0) icon = name;
++
++			var scaleV:Float = parseFloat(attr(xml, 'scale'), 1);
++			var holdTime:Float = parseFloat(attr(xml, 'holdTime'), 4);
++			var posX:Float = parseFloat(attr(xml, 'x'), 0);
++			var posY:Float = parseFloat(attr(xml, 'y'), 0);
++			var camX:Float = parseFloat(attr(xml, 'camx'), 0);
++			var camY:Float = parseFloat(attr(xml, 'camy'), 0);
++			var flipX:Bool = (attr(xml, 'flipX') == 'true');
++			var antialiasing:Bool = (attr(xml, 'antialiasing') != 'false');
++			var colors:Array<Int> = parseHexColor(attr(xml, 'color'));
++			if (colors == null) colors = [255, 255, 255];
++
++			var anims:Array<Dynamic> = [];
++			for (node in xml.elements())
++			{
++				if (node.nodeName != 'anim') continue;
++				var animName:String = attr(node, 'name');
++				if (animName == null || animName.length == 0) continue;
++
++				var prefix:String = attr(node, 'anim');
++				if (prefix == null || prefix.length == 0) prefix = animName;
++
++				var fps:Float = parseFloat(attr(node, 'fps'), 24);
++				var loop:Bool = (attr(node, 'loop') == 'true');
++				var offsets:Array<Int> = [
++					Std.int(parseFloat(attr(node, 'x'), 0)),
++					Std.int(parseFloat(attr(node, 'y'), 0))
++				];
++				anims.push({
++					anim: animName,
++					name: prefix,
++					fps: Std.int(fps),
++					loop: loop,
++					indices: parseNumberRange(attr(node, 'indices')),
++					offsets: offsets
++				});
++			}
++			if (anims.length == 0) return null;
++
++			var json:Dynamic = {
++				animations: anims,
++				image: image,
++				scale: scaleV,
++				sing_duration: holdTime,
++				healthicon: icon,
++				position: [posX, posY],
++				camera_position: [camX, camY],
++				flip_x: flipX,
++				no_antialiasing: !antialiasing,
++				healthbar_colors: colors,
++				vocals_file: ''
++			};
++			log('CNE character: ' + xmlPath + ' → Psych JSON (' + anims.length + ' anims)');
++			return haxe.Json.stringify(json);
++		}
++		catch (e:Dynamic)
++		{
++			log('CNE character parse failed (' + xmlPath + '): ' + Std.string(e));
++			return null;
++		}
++	}
++
++	// ==================== 周目 ====================
++
++	/**
++	 * 把某个 mod 的 CNE 周目（`data/weeks/weeks/*.xml`，顺序取 `data/weeks/weeks.txt`）
++	 * 翻译成 Psych `WeekFile`，返回 `[{name, week}]`。失败/无周目返回空数组。
++	 */
++	public static function cneWeekFiles(mod:String):Array<Dynamic>
++	{
++		var out:Array<Dynamic> = [];
++		if (!isEnabled() || mod == null || mod.length == 0) return out;
++
++		var weeksDir:String = Paths.mods(mod + '/data/weeks/weeks');
++		if (!FileSystem.exists(weeksDir) || !FileSystem.isDirectory(weeksDir)) return out;
++
++		var names:Array<String> = [];
++		var seen:Map<String, Bool> = new Map();
++		var orderFile:String = Paths.mods(mod + '/data/weeks/weeks.txt');
++		if (FileSystem.exists(orderFile))
++		{
++			var lines:Array<String> = null;
++			try lines = backend.CoolUtil.coolTextFile(orderFile) catch (e:Dynamic) { lines = null; }
++			if (lines != null)
++			{
++				for (line in lines)
++				{
++					var l:String = StringTools.trim(line);
++					if (l.length == 0 || l.charAt(0) == '#') continue;
++					if (seen.exists(l)) continue;
++					seen.set(l, true);
++					names.push(l);
++				}
++			}
++		}
++
++		var entries:Array<String> = null;
++		try entries = FileSystem.readDirectory(weeksDir) catch (e:Dynamic) { entries = []; }
++		for (f in entries)
++		{
++			var lower:String = f.toLowerCase();
++			if (lower.length <= 4 || lower.substr(lower.length - 4) != '.xml') continue;
++			var n:String = f.substr(0, f.length - 4);
++			if (seen.exists(n)) continue;
++			seen.set(n, true);
++			names.push(n);
++		}
++
++		for (n in names)
++		{
++			var weekFile:Dynamic = parseWeekXml(Paths.mods(mod + '/data/weeks/weeks/' + n + '.xml'), n);
++			if (weekFile != null) out.push({name: n, week: weekFile});
++		}
++		return out;
++	}
++
++	static function parseWeekXml(path:String, id:String):Dynamic
++	{
++		if (!FileSystem.exists(path)) return null;
++		var raw:String = null;
++		try raw = File.getContent(path) catch (e:Dynamic) { return null; }
++
++		try
++		{
++			var xml:Xml = Xml.parse(raw).firstElement();
++			if (xml == null || xml.nodeName != 'week') return null;
++
++			var weekName:String = attr(xml, 'name');
++			if (weekName == null || weekName.length == 0) return null;
++
++			var chars:Array<String> = [];
++			var charsAttr:String = attr(xml, 'chars');
++			if (charsAttr != null)
++			{
++				for (c in charsAttr.split(','))
++				{
++					var t:String = StringTools.trim(c);
++					chars.push((t == '' || t == 'none' || t == 'null') ? '' : t);
++				}
++			}
++			while (chars.length < 3) chars.push('');
++
++			var sprite:String = attr(xml, 'sprite');
++			if (sprite == null) sprite = id;
++
++			var colors:Array<Int> = parseHexColor(attr(xml, 'bgColor'));
++			if (colors == null) colors = [146, 113, 253];
++
++			var songs:Array<Dynamic> = [];
++			var diffs:Array<String> = [];
++			for (node in xml.elements())
++			{
++				if (node.nodeName == 'song')
++				{
++					var songName:String = childText(node);
++					if (songName.length == 0) continue;
++					songs.push([songName, (chars[1].length > 0 ? chars[1] : 'bf'), colors]);
++				}
++				else if (node.nodeName == 'difficulty')
++				{
++					var dn:String = attr(node, 'name');
++					if (dn != null && dn.length > 0 && !diffs.contains(dn)) diffs.push(dn);
++				}
++			}
++			if (songs.length == 0) return null;
++
++			// Psych 的周目背景是 `images/menubackgrounds/menu_<weekBackground>.png`；
++			// CNE 用 `images/menus/storymenu/weeks/<sprite>.png`。找不到对应图就用空串
++			// （StoryMenuState 会隐藏背景），绝不拼一个不存在的贴图路径导致加载失败。
++			var background:String = '';
++			if (storyBackgroundExists(sprite)) background = sprite;
++
++			var weekFile:Dynamic = {
++				songs: songs,
++				weekCharacters: chars,
++				weekBackground: background,
++				weekBefore: '',
++				storyName: weekName,
++				weekName: weekName,
++				freeplayColor: colors,
++				startUnlocked: true,
++				hiddenUntilUnlocked: false,
++				hideStoryMode: false,
++				hideFreeplay: false,
++				difficulties: diffs.join(',')
++			};
++			log('CNE week: ' + id + ' (' + songs.length + ' songs)');
++			return weekFile;
++		}
++		catch (e:Dynamic)
++		{
++			log('CNE week parse failed (' + path + '): ' + Std.string(e));
++			return null;
++		}
++	}
++
++	static function storyBackgroundExists(sprite:String):Bool
++	{
++		if (sprite == null || sprite.length == 0) return false;
++		var key:String = 'images/menubackgrounds/menu_' + sprite + '.png';
++		if (FileSystem.exists(Paths.modFolders(key))) return true;
++		return FileSystem.exists(Paths.getPreloadPath(key));
++	}
++
++	// ==================== 类型识别（Mods 界面用） ====================
++
++	/**
++	 * 该 mod 是否是 CNE 格式（用于 Mods 管理与提示）。只做廉价的目录/文件存在性探测，
++	 * 命中即返回，不做全量扫描。判定依据是 CNE 独有布局（Psych 模组不会有）。
++	 */
++	public static function isCneMod(folder:String):Bool
++	{
++		if (folder == null || folder.length == 0) return false;
++
++		if (FileSystem.exists(Paths.mods(folder + '/data/weeks/weeks'))) return true;
++		if (FileSystem.exists(Paths.mods(folder + '/data/global'))) return true;
++		if (FileSystem.exists(Paths.mods(folder + '/data/states'))) return true;
++
++		var songsRoot:String = Paths.mods(folder + '/songs');
++		if (FileSystem.exists(songsRoot) && FileSystem.isDirectory(songsRoot))
++		{
++			var entries:Array<String> = null;
++			try entries = FileSystem.readDirectory(songsRoot) catch (e:Dynamic) { entries = []; }
++			var checked:Int = 0;
++			for (e in entries)
++			{
++				if (checked >= 40) break;
++				checked++;
++				if (!FileSystem.isDirectory(songsRoot + '/' + e)) continue;
++				if (FileSystem.exists(songsRoot + '/' + e + '/charts')) return true;
++			}
++		}
++
++		var charsRoot:String = Paths.mods(folder + '/data/characters');
++		if (FileSystem.exists(charsRoot) && FileSystem.isDirectory(charsRoot))
++		{
++			var entries:Array<String> = null;
++			try entries = FileSystem.readDirectory(charsRoot) catch (e:Dynamic) { entries = []; }
++			for (e in entries)
++			{
++				if (e.toLowerCase().endsWith('.xml')) return true;
++			}
++		}
++		return false;
++	}
++
++	// ==================== 工具 ====================
++
++	static function attr(node:Xml, name:String):String
++	{
++		if (node == null || !node.exists(name)) return null;
++		var v:String = node.get(name);
++		return v == null ? null : StringTools.trim(v);
++	}
++
++	static function childText(node:Xml):String
++	{
++		if (node == null) return '';
++		var sb:StringBuf = new StringBuf();
++		for (child in node)
++		{
++			if (child != null && child.nodeType == Xml.PCData) sb.add(child.nodeValue);
++		}
++		return StringTools.trim(sb.toString());
++	}
++
++	static function parseFloat(value:String, def:Float):Float
++	{
++		if (value == null || value.length == 0) return def;
++		var f:Null<Float> = Std.parseFloat(value);
++		if (f == null || Math.isNaN(f)) return def;
++		return f;
++	}
++
++	/** `#RRGGBB` / `#RRGGBBAA` / `RRGGBB` / `0xAARRGGBB` → [r, g, b]；无法解析返回 null。 */
++	static function parseHexColor(value:String):Array<Int>
++	{
++		if (value == null) return null;
++		var s:String = StringTools.trim(value);
++		if (s.length == 0) return null;
++		if (s.substr(0, 2).toLowerCase() == '0x') s = s.substr(2);
++		if (s.charAt(0) == '#') s = s.substr(1);
++		if (s.length != 6 && s.length != 8) return null;
++		for (i in 0...s.length)
++		{
++			var c:String = s.charAt(i).toLowerCase();
++			var ok:Bool = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
++			if (!ok) return null;
++		}
++		var offset:Int = (s.length == 8) ? 2 : 0; // 8 位按 AARRGGBB 处理，取后 6 位
++		var r:Int = Std.parseInt('0x' + s.substr(offset, 2));
++		var g:Int = Std.parseInt('0x' + s.substr(offset + 2, 2));
++		var b:Int = Std.parseInt('0x' + s.substr(offset + 4, 2));
++		return [r, g, b];
++	}
++
++	/** CNE `CoolUtil.parseNumberRange`：`"2..12,0,1"` → [2,3,…,12,0,1]（含反向区间）。 */
++	static function parseNumberRange(input:String):Array<Int>
++	{
++		var result:Array<Int> = [];
++		if (input == null || input.length == 0) return result;
++
++		for (part in input.split(','))
++		{
++			var p:String = StringTools.trim(part);
++			if (p.length == 0) continue;
++			var idx:Int = p.indexOf('..');
++			if (idx != -1)
++			{
++				var startNull:Null<Int> = Std.parseInt(StringTools.trim(p.substr(0, idx)));
++				var endNull:Null<Int> = Std.parseInt(StringTools.trim(p.substr(idx + 2)));
++				if (startNull == null || endNull == null) continue;
++				var start:Int = cast startNull;
++				var end:Int = cast endNull;
++				if (start < end)
++				{
++					for (j in start...(end + 1)) result.push(j);
++				}
++				else
++				{
++					for (j in end...(start + 1)) result.push(start + end - j);
++				}
++			}
++			else
++			{
++				var numNull:Null<Int> = Std.parseInt(p);
++				if (numNull != null) result.push(cast numNull);
++			}
++		}
++		return result;
++	}
++}
++#end
+--- /dev/null
++++ b/source/cne/CneZipStore.hx
+@@ -0,0 +1,255 @@
++package cne;
++
++#if (MODS_ALLOWED && sys)
++import haxe.io.Path;
++import sys.FileSystem;
++import sys.io.File;
++
++using StringTools;
++
++/**
++ * CNE mod 的 ZIP 装载层（「CNE 模组兼容」开关的包管理底层）。
++ *
++ * 为什么要暂存而不是直接挂载：
++ *  - Meteoric/Psych 的资源管线是**文件系统路径**管线（`Paths.image/sound/json` 全部走
++ *    `FileSystem.exists` + `File.getContent` + `FlxGraphic.fromFile` / `Sound.fromFile`），
++ *    没有 CNE 那种 `AssetsLibraryList` + `__proxy` 的虚拟资源树，内存挂载意味着重写整条
++ *    资源管线；因此 zip mod 首次被访问时透明解包到 `mods/_cnestage/<mod>/`，之后与普通
++ *    文件夹 mod 完全同构（`Paths.mods()` 只做一次前缀重映射，48 处调用点无需改动）。
++ *  - 暂存目录带指纹文件（zip 体积 + mtime），zip 被替换后自动重解；`_cnestage` 已登记进
++ *    `Mods.ignoreModFolders`，不会出现在 Mod 列表里，玩家可以随时整个删掉。
++ *
++ * 设计纪律：
++ *  - 同名真实文件夹永远优先（`remapKey` 只在 `mods/<name>` 不是目录时才劫持）。
++ *  - 任何失败都不抛异常到调用方：返回 null，引擎退回"找不到该 mod 资源"的既有行为。
++ */
++class CneZipStore
++{
++	/** 暂存根目录名（相对 `mods/`），同时登记在 `Mods.ignoreModFolders`。 */
++	public static final STAGE_DIR:String = '_cnestage';
++
++	/** 允许被识别为 zip mod 的扩展名（小写比较）。 */
++	static final ZIP_EXTS:Array<String> = ['.zip', '.cnz'];
++
++	/** mod 名 → 暂存目录（解析失败记录为空串，避免反复重试大包解压）。 */
++	static var stageDirs:Map<String, String> = new Map();
++
++	/** mod 名 → 解包失败的 zip 指纹：同指纹不重试，zip 变了才重试。 */
++	static var failedFingerprints:Map<String, String> = new Map();
++
++	/**
++	 * 丢弃暂存缓存（**不删文件**），下次访问重新校验 zip 指纹。
++	 * 引擎在 Mod 列表刷新时调用（`cne.CneModCompat.clearCaches`）：玩家在运行中替换 zip
++	 * 后打开 Mod 列表即可生效，不必重启。
++	 */
++	public static function invalidate():Void
++	{
++		stageDirs = new Map();
++		failedFingerprints = new Map();
++	}
++
++	/**
++	 * `mods/` 根目录 —— 必须与 `Paths.modsRaw('')` 同源（安卓是外部存储根 + `/mods/`），
++	 * 否则 zip mod 的暂存目录会和引擎实际读资源的根目录不一致。
++	 */
++	public static function modsRoot():String
++	{
++		return backend.Paths.modsRaw('');
++	}
++
++	/** `mods/` 下所有 zip mod 名（不含扩展名，按目录顺序）。 */
++	public static function zipNames():Array<String>
++	{
++		var out:Array<String> = [];
++		var root:String = modsRoot();
++		if (!FileSystem.exists(root) || !FileSystem.isDirectory(root)) return out;
++
++		var entries:Array<String> = null;
++		try entries = FileSystem.readDirectory(root) catch (e:Dynamic) return out;
++		for (entry in entries)
++		{
++			if (entry == null || entry.length == 0) continue;
++			var full:String = root + entry;
++			if (FileSystem.isDirectory(full)) continue;
++			if (zipPathOf(entry) != null) out.push(Path.withoutExtension(entry));
++		}
++		return out;
++	}
++
++	/** 该 mod 名是否存在对应的 zip 包。 */
++	public static function isZipMod(name:String):Bool
++	{
++		return zipPath(name) != null;
++	}
++
++	/**
++	 * 把 `Paths.mods()` 的 key（`<mod>/<rel>` 或 `<mod>`）重映射到暂存目录。
++	 * 非 zip mod（含同名真实文件夹、非 mod 前缀的裸 key）返回 null，调用方原样处理。
++	 */
++	public static function remapKey(key:String):String
++	{
++		if (!enabled() || key == null || key.length == 0) return null;
++
++		var slash:Int = key.indexOf('/');
++		var seg:String = slash < 0 ? key : key.substr(0, slash);
++		if (seg.length == 0 || seg == STAGE_DIR) return null;
++
++		var root:String = modsRoot();
++		var plain:String = root + seg;
++		// 真实文件夹优先：同名文件夹与 zip 并存时不劫持
++		if (FileSystem.exists(plain) && FileSystem.isDirectory(plain)) return null;
++		if (zipPath(seg) == null) return null;
++
++		var dir:String = stage(seg);
++		if (dir == null) return null;
++
++		var rest:String = slash < 0 ? '' : key.substr(slash); // 含前导 '/'
++		return dir + rest;
++	}
++
++	/** 确保 zip mod 已暂存，返回暂存目录（失败返回 null）。 */
++	public static function stage(name:String):String
++	{
++		if (stageDirs.exists(name)) {
++			var cached:String = stageDirs.get(name);
++			return (cached != null && cached.length > 0) ? cached : null;
++		}
++
++		var zip:String = zipPath(name);
++		if (zip == null) return null;
++
++		var root:String = modsRoot();
++		var stageRoot:String = root + STAGE_DIR + '/';
++		var dir:String = stageRoot + name;
++		var stampPath:String = stageRoot + name + '.stamp';
++		var fp:String = fingerprint(zip);
++
++		// 同一份坏 zip 只报一次错、只试一次解包（否则每次资源查找都会重试）
++		if (failedFingerprints.exists(name) && failedFingerprints.get(name) == fp) return null;
++
++		if (FileSystem.exists(dir) && FileSystem.isDirectory(dir) && stampMatches(stampPath, fp))
++		{
++			stageDirs.set(name, dir);
++			return dir;
++		}
++
++		try
++		{
++			deleteRecursive(dir);
++			if (!FileSystem.exists(stageRoot)) FileSystem.createDirectory(stageRoot);
++			FileSystem.createDirectory(dir);
++
++			cne.CneModCompat.log('staging zip mod "' + name + '" → ' + dir);
++			var t0:Float = haxe.Timer.stamp();
++			backend.ZipReader.extract(zip, dir);
++			flattenSingleTop(dir);
++			File.saveContent(stampPath, fp);
++			cne.CneModCompat.log('zip mod "' + name + '" staged in ' + Std.int((haxe.Timer.stamp() - t0) * 1000) + 'ms');
++		}
++		catch (e:Dynamic)
++		{
++			cne.CneModCompat.log('failed to stage zip mod "' + name + '": ' + Std.string(e));
++			deleteRecursive(dir);
++			failedFingerprints.set(name, fp);
++			stageDirs.set(name, '');
++			return null;
++		}
++
++		stageDirs.set(name, dir);
++		return dir;
++	}
++
++	/** zip 包路径（不存在返回 null）。 */
++	public static function zipPath(name:String):String
++	{
++		if (name == null || name.length == 0) return null;
++		var root:String = modsRoot();
++		for (ext in ZIP_EXTS)
++		{
++			var p:String = root + name + ext;
++			if (FileSystem.exists(p) && !FileSystem.isDirectory(p)) return p;
++		}
++		return null;
++	}
++
++	// ==================== 内部 ====================
++
++	static function enabled():Bool
++	{
++		return cne.CneModCompat.isEnabled();
++	}
++
++	static function zipPathOf(entry:String):String
++	{
++		var lower:String = entry.toLowerCase();
++		for (ext in ZIP_EXTS)
++			if (lower.length > ext.length && lower.endsWith(ext)) return entry;
++		return null;
++	}
++
++	static function fingerprint(zip:String):String
++	{
++		try
++		{
++			var stat = FileSystem.stat(zip);
++			return Std.string(stat.size) + '|' + Std.string(stat.mtime.getTime());
++		}
++		catch (e:Dynamic)
++		{
++			return 'unknown';
++		}
++	}
++
++	static function stampMatches(stampPath:String, fp:String):Bool
++	{
++		if (!FileSystem.exists(stampPath)) return false;
++		try
++		{
++			return StringTools.trim(File.getContent(stampPath)) == fp;
++		}
++		catch (e:Dynamic)
++		{
++			return false;
++		}
++	}
++
++	static function deleteRecursive(path:String):Void
++	{
++		if (path == null || path.length == 0 || !FileSystem.exists(path)) return;
++		if (FileSystem.isDirectory(path))
++		{
++			var entries:Array<String> = null;
++			try entries = FileSystem.readDirectory(path) catch (e:Dynamic) { entries = []; }
++			for (f in entries) deleteRecursive(path + '/' + f);
++			try FileSystem.deleteDirectory(path) catch (e:Dynamic) {}
++		}
++		else
++		{
++			try FileSystem.deleteFile(path) catch (e:Dynamic) {}
++		}
++	}
++
++	/**
++	 * 玩家把 zip 打成"外面再套一层文件夹"时（`mod.zip/my mod/data/...`），
++	 * 把唯一顶层目录的内容上提一层。只处理"顶层恰好一个目录"的情况，避免误伤。
++	 */
++	static function flattenSingleTop(dir:String):Void
++	{
++		var entries:Array<String> = null;
++		try entries = FileSystem.readDirectory(dir) catch (e:Dynamic) return;
++		if (entries.length != 1) return;
++
++		var only:String = entries[0];
++		var inner:String = dir + '/' + only;
++		if (!FileSystem.isDirectory(inner)) return;
++
++		var children:Array<String> = null;
++		try children = FileSystem.readDirectory(inner) catch (e:Dynamic) return;
++		for (c in children)
++		{
++			try FileSystem.rename(inner + '/' + c, dir + '/' + c) catch (e:Dynamic) {}
++		}
++		try FileSystem.deleteDirectory(inner) catch (e:Dynamic) {}
++	}
++}
++#end
+--- /dev/null
++++ b/PROGRAMMING.md
+@@ -0,0 +1,159 @@
++# Meteoric 编程层（CNE 式 HScript）
++
++> 实现参考：Codename Engine（CodenameCrew，Apache-2.0）的 `Script` / `ScriptPack` / `GlobalScript` / `ModState` 语义。
++> Meteoric 不复制 CNE 的 hscript 引擎，而是复用自身 `psychlua.HScript`（SScript 4.0.1 + 184 项 preset API）。
++> 入口：设置 → **编程**（主设置与暂停内设置两个入口都在）。
++
++## 1. 开关
++
++| 选项 | 存档字段 | 默认 | 作用 |
++|---|---|---|---|
++| CNE 式 HScript 编程层 | `cneScripting` | 关 | 总开关；关闭时以下所有能力都不加载，引擎行为与改动前一致 |
++| 状态脚本 | `cneStateScripts` | 开 | 允许 `data/states/<界面类名>/LIB_<mod>.hx` |
++| 全局脚本 | `cneGlobalScripts` | 开 | 允许 `data/global/LIB_<mod>.hx` |
++| ModState / ModSubState | `cneModStates` | 开 | 允许用 HScript 写完整界面 |
++| 界面重定向 | `cneStateRedirects` | 关 | 允许 mod 用 `flags.ini [StateRedirects]` 把引擎界面替换成自己的 HScript 界面 |
++| 脚本热重载 | `cneHotReload` | 开 | F5 原地重建当前界面脚本；Shift+F5 重建全局脚本 |
++| 脚本定义/继承类 | `cneScriptClasses` | 开 | 仅当脚本文件里真的出现 `class` 时才启用 SScript EX 模式 |
++| 脚本加载日志 | `cneScriptLogs` | 关 | 控制台打印 `[CNE]` 加载/重载/错误日志 |
++| CNE 模组兼容 | `cneModCompat` | 关 | 加载 **CNE 格式的 mod**（CNE 谱面/音频/人物/周目/zip 包）；与编程层相互独立，详见第 8 节 |
++
++> 安全提示：HScript 可访问 `Sys` / `File` / `FileSystem` 等引擎能力，只在信任 mod 时打开总开关。
++
++## 2. 目录约定
++
++```
++mods/<mod>/data/global/LIB_<mod>.hx                  # 全局脚本（常驻）
++mods/<mod>/data/states/<界面类名>/LIB_<mod>.hx        # 状态脚本（该界面）
++mods/<mod>/data/states/<界面类名>.hx                  # 状态脚本简写（可选）
++```
++
++- 扩展名支持 `.hx` / `.hscript` / `.hsc` / `.hxs`。
++- `<界面类名>` 是 Haxe 类名末段，例如 `TitleState`、`MainMenuState`、`PlayState`。
++- 每个启用的 mod 各自提供一个 `LIB_<mod>` 文件；多个 mod 的脚本会在同一个界面里同时运行。
++- 当前只支持文件夹 mod；zip 内脚本未验证。
++
++## 3. 脚本可用的变量与生命周期
++
++脚本内可用：
++
++- `state`：当前宿主界面对象（`TitleState` / `MainMenuState` / `PlayState` …）。
++- `game`：PlayState 宿主（仅 PlayState 脚本；与 `state` 同对象）。
++- `CNE`：`cne.ProgrammingManager` 静态入口，可调用：
++  - `CNE.reloadCurrentStateScripts()`：原地重建当前界面脚本组。
++  - `CNE.reloadGlobalScripts()`：重建全局脚本组。
++- 其余变量/类沿用 `psychlua.HScript.preset()` 的 184 项 API（`FlxG`、`Paths`、`ClientPrefs`、`Character`、`Note`、`Mods`、`DesignTokens`、`setThemeColor`、`runTimer` …）。
++
++生命周期回调（在脚本顶层定义同名函数即可）：
++
++| 回调 | 时机 |
++|---|---|
++| `create()` | 界面创建后、脚本加载完成 |
++| `update(elapsed)` | 每帧（状态脚本由宿主 state 的 update 驱动；全局脚本由 `FlxG.signals.postUpdate` 驱动） |
++| `stepHit(step)` | 步进变化 |
++| `beatHit(beat)` | 节拍变化 |
++| `postUpdate(elapsed)` | 全局脚本专用，`update` 之后 |
++| `destroy()` | 界面销毁或热重载替换旧脚本之前 |
++
++未定义的回调会被静默跳过；单个脚本报错不会中断同一组内其它脚本。
++
++## 4. 热重载语义
++
++- **F5**：原地重建当前界面的脚本组。
++  - 先对旧脚本调用 `destroy()`，再销毁实例；随后从磁盘重新读取并 `create()` 新脚本。
++  - 宿主 state 与其视觉对象**不重建**、不重进关卡。
++  - 新脚本组构建失败（文件被删/全部解析失败）时保留旧脚本组。
++- **Shift+F5**：只重建全局脚本组，当前界面不受影响。
++- 键位存 `ClientPrefs.data.cneHotReloadKeys`（默认 `[F5]`），与 `keyBinds` 表分离。
++- 脚本必须在 `destroy()` 里清理自己创建的对象，否则热重载会留下旧对象。
++
++> 与 CNE 的差异：CNE 默认 F5 是 `FlxG.resetState()`（重进 state），其 in-place 分支 `EXPERMENTAL_SCRIPT_RELOADING` 在本仓库所参照的 CNE 快照中未定义且静态上有 `didLoad` 缺陷。Meteoric 采用“替换脚本组”的原地重建，不采用 `FlxG.resetState()`。
++
++## 5. 用 HScript 写完整界面
++
++```haxe
++// 在任意脚本里：
++MusicBeatState.switchState(new cne.ModState("MyState"));
++// 或子状态：
++openSubState(new cne.ModSubState("MySubState"));
++```
++
++`ModState` / `ModSubState` 会按传入的 `stateName` 查找：
++
++```
++mods/<mod>/data/states/MyState/LIB_<mod>.hx
++```
++
++`ModState.lastName` / `lastData` 与 CNE 同语义（同类状态间保持最后的数据）。
++
++## 7. 界面重定向（StateRedirects）
++
++在 `mods/<mod>/flags.ini` 里写：
++
++```ini
++[StateRedirects]
++MainMenuState = DemoState
++
++[StateRedirects.force]
++MainMenuState = AnotherDemoState
++```
++
++- 键 = 引擎界面类名末段（`MainMenuState` / `TitleState` / `PlayState` …）。
++- 值 = Haxe 类全名（`Type.resolveClass` 能解析时直接实例化）或 HScript 状态名（交给 `cne.ModState(value)`，按 `data/states/<value>/LIB_<mod>.hx` 找脚本）。
++- `[StateRedirects]` 先到先得；`[StateRedirects.force]` 后到覆盖并压过普通段。
++- 仅在设置 → 编程 → **界面重定向** 打开时生效（默认关）；改写点在 `FlxG.signals.preStateSwitch`，与 CNE 的 `GlobalScript.preStateSwitch` 同点。
++- 链式指向最多解析 8 跳；成环或指回自身时放弃重定向。
++
++## 8. CNE 模组兼容（CNE 格式 mod 的加载）
++
++> 与上面 1–7 节的「CNE 式编程层」是两条独立的线：
++> `cneScripting` 管的是**脚本能不能跑**，`cneModCompat` 管的是**CNE 格式的 mod 能不能被识别与读进来**。
++> 两个开关相互独立：只开编程层不会去读 CNE 布局；只开模组兼容也不会执行 CNE 脚本。
++
++开关：设置 → 编程 → **CNE 模组兼容**（`ClientPrefs.data.cneModCompat`，**默认关**）。
++关闭时 mod 加载路径与改动前逐字节一致（不扫 CNE 布局、不挂 zip 暂存、不翻译谱面/人物/周目）。
++
++### 覆盖范围（v1）
++
++| CNE 布局 | Meteoric 侧处理 | 实现位置 |
++|---|---|---|
++| 谱面 `songs/<song>/charts/<难度>.json` | 解析 `codenameChart`（`strumLines`）→ **psych_v1**（列号绝对方向，`mustHitSection` 只管镜头）；难度缺省对齐 `normal`；`Camera Movement` / `BPM Change` / `Time Signature Change` / `Alt Animation Toggle` 烘焙进 section | `states/editors/content/CneExport.hx`（`cneToPsych`/`isCneFormat`）+ `backend/Song.hx` |
++| 歌曲元数据 `songs/<song>/meta.json` | 提供 bpm（**必需**，否则时间轴错）；补 `needsVoices` / `instSuffix` / `vocalsSuffix` | `cne/CneModCompat.hx` |
++| 音频 `songs/<song>/song/Inst<suffix>[-<难度>]`、`Voices<suffix>[-<难度>]` | 在 Psych 路径 `songs/<song>/Inst.ogg` 缺失时回退；`.ogg` 优先、`.mp3` 兜底 | `backend/Paths.modsSounds` |
++| 人物 `data/characters/<name>.xml` | 解析 `<character sprite/icon/color/holdTime/scale/flipX/x/y/camx/camy>` + `<anim name/anim/x/y/fps/loop/indices>` → Psych 人物 JSON（含 `2..12` 区间索引展开） | `cne/CneModCompat.characterJson` + `objects/Character.hx` |
++| 周目 `data/weeks/weeks/*.xml` + `data/weeks/weeks.txt` | 翻译成 Psych `WeekFile`（`chars`→`weekCharacters`、`<song>` 列表、`<difficulty name>`→`difficulties`、`bgColor`→`freeplayColor`），进 Story/Freeplay 列表 | `cne/CneModCompat.cneWeekFiles` + `backend/WeekData.hx` |
++| zip 包 `mods/<名>.zip`（根级即 mod 根） | 识别为 mod；首次访问时透明解包到 `mods/_cnestage/<名>/`（指纹 = zip 体积+mtime，zip 换了自动重解）；`_cnestage` 不进 Mod 列表 | `cne/CneZipStore.hx` + `backend/Mods.hx` + `backend/Paths.mods` |
++| Mod 列表识别 | 卡片/信息区标注「CNE 格式」，兼容开关未开时提示开关位置 | `states/ModsMenuState.hx` |
++
++### 尚未覆盖（v1 明确不做，等第二轮实机测试后再排期）
++
++- CNE 舞台 `data/stages/*.xml|*.hx`：CNE mod 的舞台不会加载，会退回 Psych 默认舞台（人物位置/构图可能偏）。
++- CNE 人物 `.hx` 扩展（如 `pico-speakers.hx`、`spirit.hx`）与 CNE 人物编辑器字段。
++- CNE 自定义音符行为 `data/notes/*.hx`：谱面里的类型名会透传（`No Anim Note`/`Alt Anim Note` 已别名到 Psych 内建 `No Animation`/`Alt Animation`），但脚本行为不执行。
++- CNE 独立事件文件 `songs/<song>/events.json`（CNE 格式 `{events:[...]}`）：不加载，避免把 CNE 事件喂给 Psych 解析器；谱面内嵌 `events` 已转换。
++- CNE `.pack` 脚本包、`addons/`、语言文件、`data/config/*` 菜单定制。
++- 自定义难度名（非 Easy/Normal/Hard）：Freeplay 里仍按 Psych 三档难度列；CNE 周目声明的 `<difficulty>` 会在 Story 里生效。
++- zip 暂存是**落盘解包**（不是内存挂载）：Meteoric/Psych 的资源管线全部基于真实文件路径（`File`/`FileSystem`/`FlxGraphic.fromFile`/`Sound.fromFile`），内存挂载需要重写整条资源管线。暂存目录可随时删除，下次自动重建。
++
++### 排查
++
++- 设置 → 编程 → **脚本加载日志** 打开后，控制台输出 `[CNE-MOD] ...`（谱面转换 / 音频回退 / 人物与周目翻译 / zip 暂存）。
++- 调试构建下 `METEORIC_CNE_MOD_FORCE=1` 可无视存档强制开启模组兼容。
++
++## 9. 调试
++
++- 设置 → 编程 → **脚本加载日志** 打开后控制台输出 `[CNE] ...`。
++- 调试构建（`./compile-mac.sh debug`）下可用环境变量：
++  - `METEORIC_CNE_FORCE=1`：无视存档总开关；
++  - `METEORIC_CNE_REDIRECT_FORCE=1`：无视界面重定向子开关；
++  - `METEORIC_CNE_MOD_FORCE=1`：无视「CNE 模组兼容」开关。
++- 冒烟脚本与证据见 `tools/cne_test_mod/`、`tools/cne_smoke_evidence/`。
++
++## 10. 当前限制
++
++- 不含 Lua：CNE 本身不支持 Lua；本编程层只作用于 HScript，Lua 仍走 Meteoric 原有管线。
++- `.pack` 合并脚本格式未移植。
++- zip mod 内脚本未验证（zip mod 的包层已支持，见第 8 节）。
++- 界面重定向已实现但尚未做实机 smoke（等 UI 测试结束后统一验收）。
++- **CNE 模组兼容（第 8 节）尚未做 CNE mod 实机验证**：本轮只过了类型检查与构建，没有 CNE 样本 mod，第二轮由你实机测试。
++- 未在 Android / Windows 实机验证。
+--- /dev/null
++++ b/tools/cne_mod_compat_test/README.md
+@@ -0,0 +1,61 @@
++# CNE 模组兼容层 · 算法级实跑测试（无样本 mod、不启动游戏）
++
++## 这是什么
++
++`「CNE 模组兼容」`（设置 → 编程 → CNE 模组兼容）把 Codename Engine 格式的 mod 加载进 Meteoric：
++CNE 谱面（`codenameChart`）转 psych_v1、CNE 音频布局回退、CNE 人物 XML → Psych 人物 JSON、
++CNE 周目 XML → Psych 周目、`mods/*.zip` 透明暂存。
++
++本轮**没有 CNE 样本 mod、也不允许启动游戏**（用户要求"只构建，不启动"），所以这里用另一种
++可复核的验证方式：把**仓库真实源码逐字节复制**进 `/tmp` 临时工程，只把 flixel / lime / backend
++依赖换成字段与语义一致的替身，然后 `haxe --interp` **直接执行真实代码**并跑断言。
++
++| 被执行的**真实源码**（每次运行时从仓库复制，不在本目录留副本，避免与源码漂移） | 替身（本目录 `stubs/`） |
++|---|---|
++| `source/states/editors/content/CneExport.hx`（`cneToPsych` / `isCneFormat`） | `flixel/util/FlxSort.hx`（与 flixel 6.2.0 逐行一致）、`backend/Song.hx`+`backend/Section.hx`（typedef 逐字段一致） |
++| `source/cne/CneModCompat.hx`（人物/周目/谱面定位/音频回退） | `backend/Paths.hx`（`formatToSongPath`/`modFolders`/`mods`/`modsRaw` 按仓库原文语义，仅根目录可注入）、`ClientPrefs`/`Mods`/`Difficulty`/`CoolUtil` |
++| `source/cne/CneZipStore.hx`（zip 暂存/指纹/重映射） | `lime/utils/Bytes.hx`（deflate 分支替身，本测试的 zip 用 `zip -0` stored，**不覆盖 deflate 路径**） |
++| `source/backend/ZipReader.hx`（解包） | — |
++
++## 运行
++
++```sh
++tools/cne_mod_compat_test/run.sh
++```
++
++- 依赖：`haxe`（4.2.5 已验证）、`zip` / `unzip`。
++- CNE 源码快照位置：默认 `~/Documents/CodenameEngine-main`（读它的官方 base 谱面做真实数据断言），
++  可用 `CNE_SRC=/path/to/CodenameEngine-main` 覆盖。
++- 输出：`out/chart_convert.log`、`out/mod_compat.log`；两个测试全过时退出码 0。
++
++## 覆盖的断言
++
++`chart_convert.log`（34 条，CNE 谱面 → psych_v1）
++
++- 官方 base 谱面 `songs/bopeebo/charts/normal.json`：音符总数守恒、玩家线音符全部落列 `<4`、
++  对手线全部落列 `>=4`、bpm 取自 `meta.json`、`format=psych_v1`、角色槽/stage 透传、类型名别名。
++- 合成谱面覆盖全部分支：`Camera Movement`（strumLine 索引→`mustHitSection`）、`BPM Change`、
++  `Time Signature Change`、`Alt Animation Toggle`、GF 线音符（取 mustHit 同向列 + `gfSection`）、
++  长按长度、`Scroll Speed Change`↔`Change Scroll Speed`、自定义事件透传、
++  镜头/变速/拍号/交替动画不再重复出现在 `events`。
++
++`mod_compat.log`（47 条，兼容层）
++
++- 人物：`sprite/icon/color/holdTime/scale/x/y/camx/camy/flipX/antialiasing` 全字段映射；
++  `<anim>` 的 `name/anim/x/y/fps/loop` 与 `indices="2..4,0"` 区间展开。
++- 谱面定位：默认难度 → `charts/normal.json`；指定难度缺谱 → **返回 null（不静默回退 normal）**。
++- 音频回退：`songs/<song>/song/Inst|Voices` 命中；不接管 `Voices-Player`；非 `songs` 目录不接管；
++  开关关闭时全部返回 null（零行为变化）。
++- 周目：`<week name/chars/sprite/bgColor>` + `<song>` + `<difficulty name>` → Psych WeekFile；
++  无 storymenu 背景图时 `weekBackground` 置空（不拼不存在的贴图路径）。
++- zip：`mods/<名>.zip` 识别、`Paths.mods()` 入口重映射到 `mods/_cnestage/<名>/`、同名真实文件夹优先、
++  `_cnestage` 自身不被重映射、zip 更新后（经 `clearCaches()`）指纹失效并重新解包。
++
++## 明确未覆盖（不要当成已验证）
++
++- **deflate（压缩）zip**：本测试只用 `zip -0`（stored）；真实引擎走 lime 原生 zlib（`ZipReader.hx:438-442`）。
++- **实机运行**：本测试不启动游戏、不碰 `.app`；`Mods.updateModList`/`ModsMenuState`/`Character.hx`/
++  `Song.hx`/`WeekData.hx` 的接线只经过 release 配置的类型检查，**运行时行为等第二轮实机测试**。
++- CNE 舞台 `data/stages/*`、人物 `.hx`、`data/notes/*.hx`、`.pack`、独立 `events.json`：本轮不实现
++  （见 `PROGRAMMING.md` 第 8 节"尚未覆盖"）。
++- Android / Windows：本测试与构建都只在 macOS 上跑过。
+--- /dev/null
++++ b/tools/cne_mod_compat_test/EVIDENCE.md
+@@ -0,0 +1,60 @@
++# CNE 模组兼容 · 本轮交付证据（macOS，2026-09-18）
++
++> 工作副本：`/Users/raidbounce/Documents/FNF-MeteoricEngine-1.0.4`，`master@70c358a2`，版本 1.1.3 / 校验码 4。
++> 本轮用户约束：**只构建，不启动**（UI 与实机由用户第二轮测试）；没有 CNE 样本 mod。
++
++## 1. 类型检查（release 配置）
++
++```
++$ ./compile-mac.sh typecheck
++[typecheck] ✔ 类型检查通过（app 未被改动）        exit 0
++```
++完整日志：`out/typecheck.log`
++
++## 2. 算法级实跑测试（执行仓库真实源码）
++
++```
++$ tools/cne_mod_compat_test/run.sh
++chart_convert: PASS=34 FAIL=0 ; mod_compat: PASS=47 FAIL=0
++RESULT: ALL PASS                                  exit 0
++```
++- `out/chart_convert.log`：CNE 谱面 → psych_v1。含 CNE 官方 base 谱面 `songs/bopeebo/charts/normal.json`
++  的**真实数据**断言（118 音符守恒、玩家线 59 全落列 <4、对手线 59 全落列 >=4、bpm=100 取自 meta.json），
++  以及覆盖 `Camera Movement`/`BPM Change`/`Time Signature Change`/`Alt Animation Toggle`/GF 线/
++  长按/事件映射的合成谱面断言。
++- `out/mod_compat.log`：CNE mod 兼容层。人物 XML→Psych JSON（全字段 + `indices="2..4,0"` 展开）、
++  周目 XML→WeekFile、谱面定位（缺难度返回 null，不静默回退）、音频回退（含 `Voices-Player` 不接管）、
++  zip 识别/暂存/指纹重解/`Paths.mods()` 入口重映射/同名文件夹优先。
++- 运行方式与替身边界见 `README.md`（含**未覆盖项**：deflate 压缩 zip 未走通、实机接线未跑）。
++
++## 3. 发布构建与产物
++
++```
++$ ./compile-mac.sh                                exit 0
++export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric
++  size = 20,447,616 bytes    mtime = 2026-09-18 12:09:13
++  find source Project.xml -newer <bin>  → 空（产物新于全部源码）
++```
++构建尾部日志：`out/build_tail.log`（含 `[post-build] restored user mods from tools/user_mods_prev/`）。
++
++## 4. 新代码确实进入产物（二进制内字符串）
++
++Haxe 字面量在本构建中是 **UTF-16LE**（已用已知串 `设置` ×33 校准），因此按两种编码分别统计：
++
++| 串 | UTF-8 命中 | UTF-16LE 命中 | 含义 |
++|---|---|---|---|
++| `CNE 模组兼容` | 0 | **3** | 设置→编程 的新选项已编译（标签 + 说明） |
++| `CNE 式 HScript 编程层` | 0 | 1 | 校准用（上一轮已存在的标签） |
++| `codenameChart` | **3** | 0 | CNE 谱面格式探测在产物内 |
++| `data/weeks/weeks` | **3** | 1 | CNE 周目扫描路径在产物内 |
++| `mods/_cnestage` | 0 | 1 | zip 暂存目录在产物内 |
++| `cneModCompat` / `[CNE-MOD]` / `_cnestage` | `strings` 命中 3 / 1 / 2 | — | 存档字段、日志前缀、暂存目录 |
++
++## 5. 本轮**没有**做的验证（不要当成已验）
++
++- **实机运行**：不启动游戏（用户明确要求），所以 `Mods.updateModList`/`ModsMenuState`/`Character.hx`/
++  `Song.hx`/`WeekData.hx` 的接线只有类型检查级证据。
++- **真实 CNE mod**：本轮没有样本 mod；第二轮由用户实机测试。
++- **deflate（压缩）zip**：算法测试只用 `zip -0`（stored）；真实引擎的压缩分支走 lime 原生 zlib。
++- **CNE 未覆盖面**：舞台 `data/stages/*`、人物 `.hx`、`data/notes/*.hx`、`.pack`、独立 `events.json`。
++- Android / Windows 未验（本轮只在 macOS 上构建与测试）。
+--- /dev/null
++++ b/tools/cne_mod_compat_test/run.sh
+@@ -0,0 +1,44 @@
++#!/bin/sh
++# CNE 模组兼容层 · 算法级实跑测试
++#
++# 用法：tools/cne_mod_compat_test/run.sh
++# 输出：tools/cne_mod_compat_test/out/{chart_convert.log,mod_compat.log}
++# 退出码：两个测试都全过 = 0
++#
++# 做法：把**仓库真实源码**逐字节复制进 /tmp 的临时工程，只把 flixel / lime / backend
++# 依赖替换为字段与语义一致的测试替身，再 `haxe --interp` 直接执行真实代码。
++# 这样在「没有 CNE 样本 mod、且不启动游戏」的前提下，仍能对转换规则与 zip 暂存做可复核断言。
++set -e
++ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
++OUT="$ROOT/tools/cne_mod_compat_test/out"
++STUBS="$ROOT/tools/cne_mod_compat_test/stubs"
++STAGE="/tmp/cne_mod_compat_test"
++# CNE 源码快照（含官方 base 谱面，用于真实数据断言）；可用环境变量覆盖
++CNE_SRC="${CNE_SRC:-$HOME/Documents/CodenameEngine-main}"
++
++rm -rf "$STAGE"
++mkdir -p "$STAGE/chart/states/editors/content" "$STAGE/mod/cne" "$OUT"
++
++# ---------- A) CNE 谱面 → psych_v1（真实 CneExport.cneToPsych） ----------
++cp -R "$STUBS/chart/." "$STAGE/chart/"
++cp "$ROOT/source/states/editors/content/CneExport.hx" "$STAGE/chart/states/editors/content/CneExport.hx"
++echo "[A] CNE chart → psych_v1 ..."
++(cd "$STAGE/chart" && CNE_SRC_ROOT="$CNE_SRC" haxe -cp . -main Test --interp) > "$OUT/chart_convert.log" 2>&1 || true
++tail -3 "$OUT/chart_convert.log"
++
++# ---------- B) CNE mod 兼容层（真实 CneModCompat + CneZipStore + ZipReader） ----------
++cp -R "$STUBS/mod/." "$STAGE/mod/"
++cp "$ROOT/source/cne/CneModCompat.hx" "$ROOT/source/cne/CneZipStore.hx" "$STAGE/mod/cne/"
++cp "$ROOT/source/backend/ZipReader.hx" "$STAGE/mod/backend/ZipReader.hx"
++echo "[B] CNE mod compat (character/week/chart/audio/zip) ..."
++(cd "$STAGE/mod" && CNE_TEST_WORK="$STAGE/mod/" haxe -cp . -main Test2 --interp -D MODS_ALLOWED) > "$OUT/mod_compat.log" 2>&1 || true
++tail -3 "$OUT/mod_compat.log"
++
++[ -n "$CNE_SRC" ] && [ -d "$CNE_SRC" ] || { echo "RESULT: FAILED (CNE_SRC not found: $CNE_SRC)"; exit 1; }
++FAILA=$(grep -c '^FAIL' "$OUT/chart_convert.log" || true)
++FAILB=$(grep -c '^FAIL' "$OUT/mod_compat.log" || true)
++PASSA=$(grep -c '^PASS' "$OUT/chart_convert.log" || true)
++PASSB=$(grep -c '^PASS' "$OUT/mod_compat.log" || true)
++echo "chart_convert: PASS=$PASSA FAIL=$FAILA ; mod_compat: PASS=$PASSB FAIL=$FAILB"
++[ "$FAILA" = "0" ] && [ "$FAILB" = "0" ] && [ "$PASSA" -gt 20 ] && [ "$PASSB" -gt 20 ] \
++  && echo "RESULT: ALL PASS" || { echo "RESULT: FAILED"; exit 1; }
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/chart/Test.hx
+@@ -0,0 +1,216 @@
++/**
++ * CNE 谱面导入（states/editors/content/CneExport.cneToPsych）算法级实跑测试。
++ *
++ * 目的：在没有 CNE 样本 mod、且用户要求"只构建不启动"的前提下，**直接执行仓库真实源码**
++ * （本目录的 CneExport.hx 是从仓库逐字节复制的副本，只把 flixel/backend 依赖替换为
++ * 逐字段一致的测试替身），用 CNE 官方 base 谱面 + 一份覆盖全部规则分支的合成谱面做断言。
++ *
++ * 运行：haxe -cp /tmp/cne_oracle -main Test --interp
++ */
++class Test
++{
++	static var failures:Int = 0;
++
++	static function check(label:String, ok:Bool, detail:String = ''):Void
++	{
++		Sys.println((ok ? 'PASS  ' : 'FAIL  ') + label + (detail.length > 0 ? '   [' + detail + ']' : ''));
++		if (!ok) failures++;
++	}
++
++	static function main():Void
++	{
++		// CNE 源码根目录：由 run.sh 传入（默认取本机 Documents 下的快照），用于读官方 base 谱面
++		var cneRoot:String = Sys.getEnv('CNE_SRC_ROOT');
++		if (cneRoot == null || cneRoot.length == 0) cneRoot = '/Users/raidbounce/Documents/CodenameEngine-main';
++
++		// ---------------- A) CNE 官方 base 谱面（真实数据） ----------------
++		var chartPath:String = cneRoot + '/assets/songs/bopeebo/charts/normal.json';
++		var metaPath:String = cneRoot + '/assets/songs/bopeebo/meta.json';
++		var raw:String = sys.io.File.getContent(chartPath);
++		var meta:String = sys.io.File.getContent(metaPath);
++
++		check('A1 isCneFormat(官方谱面)', states.editors.content.CneExport.isCneFormat(raw));
++
++		var cne:Dynamic = haxe.Json.parse(raw);
++		var rawCount:Int = 0;
++		var expPlayer:Int = 0;
++		var expOpp:Int = 0;
++		var expGf:Int = 0;
++		for (line in cast(cne.strumLines, Array<Dynamic>))
++		{
++			var notes:Array<Dynamic> = cast line.notes;
++			var cnt:Int = (notes == null) ? 0 : notes.length;
++			rawCount += cnt;
++			switch (Std.int(line.type))
++			{
++				case 1: expPlayer += cnt;
++				case 0: expOpp += cnt;
++				default: expGf += cnt;
++			}
++		}
++
++		var song:backend.Song.SwagSong = states.editors.content.CneExport.cneToPsych(raw, meta);
++		check('A2 转换返回非空', song != null);
++		if (song == null)
++		{
++			Sys.println('FAILURES=' + failures);
++			Sys.exit(1);
++			return;
++		}
++
++		var total:Int = 0, player:Int = 0, opponent:Int = 0, holds:Int = 0, typed:Int = 0;
++		var lastTime:Float = 0;
++		var gfSections:Int = 0;
++		for (sec in song.notes)
++		{
++			if (sec.gfSection) gfSections++;
++			for (n in sec.sectionNotes)
++			{
++				total++;
++				if (Std.int(n[1]) < 4) player++ else opponent++;
++				if (Std.parseFloat(Std.string(n[2])) > 0) holds++;
++				if (n[3] != null && Std.string(n[3]).length > 0) typed++;
++				var t:Float = Std.parseFloat(Std.string(n[0]));
++				if (t > lastTime) lastTime = t;
++			}
++		}
++
++		Sys.println('  [A] raw notes=' + rawCount + ' (player=' + expPlayer + ' opponent=' + expOpp + ' gf=' + expGf + ')'
++			+ ' → psych notes=' + total + ' (player=' + player + ' opponent=' + opponent + ')'
++			+ ' holds=' + holds + ' typed=' + typed + ' sections=' + song.notes.length);
++
++		check('A3 音符总数守恒', total == rawCount, 'raw=' + rawCount + ' psych=' + total);
++		check('A4 玩家线音符全部落列 <4', player == expPlayer, 'expect=' + expPlayer + ' got=' + player);
++		check('A5 对手线音符全部落列 >=4', opponent == expOpp, 'expect=' + expOpp + ' got=' + opponent);
++		check('A6 bpm 来自 meta.json（100）', song.bpm == 100, 'bpm=' + song.bpm);
++		check('A7 输出 format 为 psych_v1', song.format == 'psych_v1', 'format=' + song.format);
++		check('A8 角色槽来自 strumLines', song.player1 == 'bf' && song.player2 == 'dad' && song.gfVersion == 'gf',
++			song.player1 + '/' + song.player2 + '/' + song.gfVersion);
++		check('A9 stage 透传', song.stage == 'stage', 'stage=' + song.stage);
++		check('A10 谱面自带类型名被别名（No Anim Note → No Animation）', typed > 0, 'typed=' + typed);
++		check('A11 段落覆盖到最后一颗音符',
++			song.notes.length > 0 && lastTime > 0 && lastTime <= 999999, 'lastTime=' + lastTime);
++
++		// ---------------- B) 合成谱面：覆盖全部规则分支 ----------------
++		var synth:String = haxe.Json.stringify({
++			codenameChart: true,
++			chartVersion: "1.6.0",
++			scrollSpeed: 1.7,
++			stage: "philly",
++			noteTypes: ["No Anim Note"],
++			strumLines: [
++				{characters: ["dad"], type: 0, position: "dad", visible: true, notes: [
++					{time: 500, id: 2, type: 1, sLen: 300},
++					{time: 7200, id: 1, type: 0, sLen: 0}
++				]},
++				{characters: ["bf"], type: 1, position: "boyfriend", visible: true, notes: [
++					{time: 1200, id: 0, type: 0, sLen: 0},
++					{time: 7500, id: 3, type: 0, sLen: 0}
++				]},
++				{characters: ["gf"], type: 2, position: "girlfriend", visible: true, notes: [
++					{time: 1300, id: 1, type: 0, sLen: 0}
++				]}
++			],
++			events: [
++				{name: "Camera Movement", time: 0, params: ([1] : Array<Dynamic>)},
++				{name: "BPM Change", time: 2500, params: ([120] : Array<Dynamic>)},
++				{name: "Scroll Speed Change", time: 3000, params: ([false, 1.5, 0] : Array<Dynamic>)},
++				{name: "Custom Thing", time: 3000, params: (["a", "b"] : Array<Dynamic>)},
++				{name: "Time Signature Change", time: 4900, params: ([3] : Array<Dynamic>)},
++				{name: "Alt Animation Toggle", time: 5000, params: ([true] : Array<Dynamic>)},
++				{name: "Camera Movement", time: 7000, params: ([0] : Array<Dynamic>)}
++			]
++		});
++
++		var s2:backend.Song.SwagSong = states.editors.content.CneExport.cneToPsych(synth, meta);
++		check('B1 合成谱面转换非空', s2 != null);
++		if (s2 == null)
++		{
++			Sys.println('FAILURES=' + failures);
++			Sys.exit(1);
++			return;
++		}
++
++		Sys.println('  [B] sections=' + s2.notes.length + ' bpm=' + s2.bpm + ' speed=' + s2.speed
++			+ ' stage=' + s2.stage + ' events=' + haxe.Json.stringify(s2.events));
++		for (i in 0...s2.notes.length)
++		{
++			var sec = s2.notes[i];
++			Sys.println('  [B] sec' + i + ' mustHit=' + sec.mustHitSection + ' gf=' + sec.gfSection
++				+ ' bpm=' + sec.bpm + ' changeBPM=' + sec.changeBPM + ' beats=' + sec.sectionBeats
++				+ ' altAnim=' + sec.altAnim + ' notes=' + haxe.Json.stringify(sec.sectionNotes));
++		}
++
++		check('B2 段数 = 4', s2.notes.length == 4, 'sections=' + s2.notes.length);
++		if (s2.notes.length == 4)
++		{
++			var s0 = s2.notes[0];
++			var s1 = s2.notes[1];
++			var s2sec = s2.notes[2];
++			var s3 = s2.notes[3];
++
++			// 段 0：镜头在玩家（Camera Movement [1] @0）；对手/玩家/GF 各一颗
++			check('B3 段0 mustHit=true（Camera Movement[1]）', s0.mustHitSection == true);
++			check('B4 段0 gfSection=true（含 GF 线音符）', s0.gfSection == true);
++			check('B5 段0 对手音符列=6（id2+4）', colOf(s0, 500) == 6, 'col=' + colOf(s0, 500));
++			check('B6 段0 对手音符类型=No Animation（别名）', typeOf(s0, 500) == 'No Animation', 'type=' + typeOf(s0, 500));
++			check('B7 段0 玩家音符列=0', colOf(s0, 1200) == 0, 'col=' + colOf(s0, 1200));
++			check('B8 段0 GF 音符取 mustHit 同向列=1', colOf(s0, 1300) == 1, 'col=' + colOf(s0, 1300));
++			check('B9 段0 长按长度透传=300', holdOf(s0, 500) == 300, 'sLen=' + holdOf(s0, 500));
++
++			// 段 1：BPM Change @2500 落在本段窗口内 → 本段 bpm=120 且 changeBPM=true
++			check('B10 段1 bpm=120（BPM Change 归属本段）', s1.bpm == 120, 'bpm=' + s1.bpm);
++			check('B11 段1 changeBPM=true', s1.changeBPM == true);
++
++			// 段 2：Time Signature Change @4900 → beats=3；Alt Animation Toggle @5000 → altAnim=true
++			check('B12 段2 sectionBeats=3（Time Signature Change）', s2sec.sectionBeats == 3, 'beats=' + s2sec.sectionBeats);
++			check('B13 段2 altAnim=true（Alt Animation Toggle）', s2sec.altAnim == true);
++
++			// 段 3：Camera Movement [0] @7000 → mustHit=false；对手列=5（id1+4）
++			check('B14 段3 mustHit=false（Camera Movement[0]）', s3.mustHitSection == false);
++			check('B15 段3 对手音符列=5', colOf(s3, 7200) == 5, 'col=' + colOf(s3, 7200));
++			check('B16 段3 玩家音符列=3', colOf(s3, 7500) == 3, 'col=' + colOf(s3, 7500));
++		}
++
++		check('B17 bpm/speed/stage 透传', s2.bpm == 100 && s2.speed == 1.7 && s2.stage == 'philly',
++			s2.bpm + '/' + s2.speed + '/' + s2.stage);
++
++		// 事件：镜头/变速/拍号/交替动画被烘焙进 section，不再出现在 events；其余透传
++		var evJson:String = haxe.Json.stringify(s2.events);
++		check('B18 事件不含 Camera Movement', evJson.indexOf('Camera Movement') == -1);
++		check('B19 事件不含 BPM Change', evJson.indexOf('BPM Change') == -1);
++		check('B20 事件不含 Time Signature Change', evJson.indexOf('Time Signature Change') == -1);
++		check('B21 事件不含 Alt Animation Toggle', evJson.indexOf('Alt Animation Toggle') == -1);
++		check('B22 Scroll Speed Change → Change Scroll Speed', evJson.indexOf('Change Scroll Speed') != -1, evJson);
++		check('B23 自定义事件透传', evJson.indexOf('Custom Thing') != -1, evJson);
++
++		Sys.println(failures == 0 ? 'RESULT: ALL PASS' : 'RESULT: FAILURES=' + failures);
++		Sys.exit(failures == 0 ? 0 : 1);
++	}
++
++	// -------- 小工具：按时间取段内音符字段 --------
++	static function noteAt(sec:backend.Section.SwagSection, time:Float):Dynamic
++	{
++		for (n in sec.sectionNotes)
++			if (Std.parseFloat(Std.string(n[0])) == time) return n;
++		return null;
++	}
++
++	static function colOf(sec:backend.Section.SwagSection, time:Float):Int
++	{
++		var n:Dynamic = noteAt(sec, time);
++		return (n == null) ? -1 : Std.int(n[1]);
++	}
++
++	static function typeOf(sec:backend.Section.SwagSection, time:Float):String
++	{
++		var n:Dynamic = noteAt(sec, time);
++		return (n == null || n[3] == null) ? '' : Std.string(n[3]);
++	}
++
++	static function holdOf(sec:backend.Section.SwagSection, time:Float):Float
++	{
++		var n:Dynamic = noteAt(sec, time);
++		return (n == null) ? -1 : Std.parseFloat(Std.string(n[2]));
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/chart/import.hx
+@@ -0,0 +1 @@
++using StringTools;
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/chart/backend/Song.hx
+@@ -0,0 +1,30 @@
++package backend;
++
++import backend.Section;
++
++/**
++ * 测试替身：typedef 与仓库 `source/backend/Song.hx:14-38` 逐字段一致。
++ * 保留同名空类 `Song`，因为没有顶层类的纯 typedef 文件不会成为模块
++ * （仓库里正是 `class Song` + `typedef SwagSong` 同文件）。
++ */
++typedef SwagSong =
++{
++	var song:String;
++	var notes:Array<SwagSection>;
++	var events:Array<Dynamic>;
++	var bpm:Float;
++	var needsVoices:Bool;
++	var speed:Float;
++
++	var player1:String;
++	var player2:String;
++	var gfVersion:String;
++	var stage:String;
++
++	@:optional var format:String;
++}
++
++class Song
++{
++	public function new() {}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/chart/backend/Section.hx
+@@ -0,0 +1,22 @@
++package backend;
++
++/**
++ * 测试替身：typedef 与仓库 `source/backend/Section.hx:3-13` 逐字段一致。
++ * 保留同名空类 `Section`（仓库同文件里也有 class Section）。
++ */
++typedef SwagSection =
++{
++	var sectionNotes:Array<Dynamic>;
++	var sectionBeats:Float;
++	var typeOfSection:Int;
++	var mustHitSection:Bool;
++	var gfSection:Bool;
++	var bpm:Float;
++	var changeBPM:Bool;
++	var altAnim:Bool;
++}
++
++class Section
++{
++	public function new() {}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/chart/flixel/util/FlxSort.hx
+@@ -0,0 +1,27 @@
++package flixel.util;
++
++/**
++ * 测试替身：与 flixel 6.2.0 `flixel/util/FlxSort.hx` 的 `byValues` 逐行一致
++ * （只实现本测试用到的常量与函数）。
++ */
++class FlxSort
++{
++	public static inline var ASCENDING:Int = -1;
++	public static inline var DESCENDING:Int = 1;
++
++	public static inline function byValues(Order:Int, Value1:Float, Value2:Float):Int
++	{
++		var result:Int = 0;
++
++		if (Value1 < Value2)
++		{
++			result = Order;
++		}
++		else if (Value1 > Value2)
++		{
++			result = -Order;
++		}
++
++		return result;
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/Test2.hx
+@@ -0,0 +1,196 @@
++/**
++ * CNE 模组兼容层算法级实跑测试（人物 XML / 周目 XML / 谱面定位 / 音频回退 / zip 暂存）。
++ *
++ * 说明：`cne/CneModCompat.hx`、`cne/CneZipStore.hx`、`backend/ZipReader.hx` 都是从仓库
++ * **逐字节复制**的副本；`backend/Paths.hx` 等替身只保留被调用的入口，其中
++ * `formatToSongPath` 与 `modFolders` 的搜索顺序均按仓库原文复制。
++ *
++ * 运行：haxe -cp . -main Test2 --interp
++ */
++class Test2
++{
++	static var failures:Int = 0;
++
++	static function check(label:String, ok:Bool, detail:String = ''):Void
++	{
++		Sys.println((ok ? 'PASS  ' : 'FAIL  ') + label + (detail.length > 0 ? '   [' + detail + ']' : ''));
++		if (!ok) failures++;
++	}
++
++	static function write(path:String, content:String):Void
++	{
++		var dir:String = haxe.io.Path.directory(path);
++		if (dir.length > 0 && !sys.FileSystem.exists(dir)) sys.FileSystem.createDirectory(dir);
++		sys.io.File.saveContent(path, content);
++	}
++
++	static function main():Void
++	{
++		// 工作根目录由 run.sh 传入（默认 /tmp/cne_mod_compat_test/），假 mod 与 zip 都建在这里
++		var base:String = Sys.getEnv('CNE_TEST_WORK');
++		if (base == null || base.length == 0) base = '/tmp/cne_mod_compat_test/';
++		if (base.length > 0 && !base.endsWith('/')) base += '/';
++		var root:String = base + 'fakemods/';
++		// 清空上一次运行残留
++		if (sys.FileSystem.exists(root)) deleteRecursive(root);
++		sys.FileSystem.createDirectory(root);
++
++		backend.Paths.MODS_ROOT = root;
++		backend.Mods.currentModDirectory = 'MyCneMod';
++		var mod:String = root + 'MyCneMod/';
++
++		// ---------- 准备假 CNE mod ----------
++		write(mod + 'data/characters/testy.xml',
++			'<!DOCTYPE codename-engine-character>\n'
++			+ '<character sprite="testy" icon="testy-icon" color="#AF66CE" holdTime="6.1" scale="0.9" x="12" y="-34" camx="-8" camy="4" flipX="true" antialiasing="false">\n'
++			+ '\t<anim name="idle" anim="Testy idle" x="0" y="0" fps="24" loop="false" indices="2..4,0"/>\n'
++			+ '\t<anim name="singLEFT" anim="Testy LEFT" x="-10" y="50" fps="30" loop="true"/>\n'
++			+ '</character>');
++		write(mod + 'data/weeks/weeks/week1.xml',
++			'<!DOCTYPE codename-engine-week>\n'
++			+ '<week name="TEST WEEK" chars="dad,bf,gf" sprite="testweek" bgColor="#112233">\n'
++			+ '\t<song>Bopeebo</song>\n'
++			+ '\t<song displayName="Fresh 2">Fresh</song>\n'
++			+ '\t<difficulty name="hard"/>\n'
++			+ '\t<difficulty name="normal"/>\n'
++			+ '</week>');
++		write(mod + 'data/weeks/weeks.txt', '# order file\nweek1\n');
++		write(mod + 'songs/bopeebo/charts/normal.json', '{"codenameChart":true,"strumLines":[]}');
++		write(mod + 'songs/bopeebo/meta.json', '{"displayName":"Bopeebo","bpm":100.0}');
++		write(mod + 'songs/bopeebo/song/Inst.ogg', 'x');
++		write(mod + 'songs/bopeebo/song/Voices.ogg', 'x');
++
++		// ---------- 1) mod 类型识别 ----------
++		check('1 isCneMod(有 data/weeks/weeks 的 mod)=true', cne.CneModCompat.isCneMod('MyCneMod'));
++		check('1b isCneMod(不存在)=false', !cne.CneModCompat.isCneMod('NotAMod'));
++
++		// ---------- 2) 人物 XML → Psych JSON ----------
++		var charJson:String = cne.CneModCompat.characterJson('testy');
++		check('2 characterJson 非空', charJson != null);
++		if (charJson != null)
++		{
++			var c:Dynamic = haxe.Json.parse(charJson);
++			Sys.println('  [char] ' + charJson);
++			check('2a image=characters/testy', c.image == 'characters/testy', Std.string(c.image));
++			check('2b healthicon=testy-icon', c.healthicon == 'testy-icon', Std.string(c.healthicon));
++			check('2c color=#AF66CE→[175,102,206]',
++				Std.string(c.healthbar_colors) == '[175,102,206]', Std.string(c.healthbar_colors));
++			check('2d holdTime→sing_duration=6.1', c.sing_duration == 6.1, Std.string(c.sing_duration));
++			check('2e scale=0.9', c.scale == 0.9, Std.string(c.scale));
++			check('2f x/y→position=[12,-34]', Std.string(c.position) == '[12,-34]', Std.string(c.position));
++			check('2g camx/camy→camera_position=[-8,4]', Std.string(c.camera_position) == '[-8,4]', Std.string(c.camera_position));
++			check('2h flipX→flip_x=true', c.flip_x == true);
++			check('2i antialiasing=false→no_antialiasing=true', c.no_antialiasing == true);
++			check('2j anim 数量=2', c.animations.length == 2, 'n=' + c.animations.length);
++			if (c.animations.length == 2)
++			{
++				var a0:Dynamic = c.animations[0];
++				var a1:Dynamic = c.animations[1];
++				check('2k anim0 名/前缀/fps/loop', a0.anim == 'idle' && a0.name == 'Testy idle' && a0.fps == 24 && a0.loop == false);
++				check('2l anim0 indices="2..4,0"→[2,3,4,0]', Std.string(a0.indices) == '[2,3,4,0]', Std.string(a0.indices));
++				check('2m anim0 offsets=[0,0]', Std.string(a0.offsets) == '[0,0]', Std.string(a0.offsets));
++				check('2n anim1 offsets=[-10,50]', Std.string(a1.offsets) == '[-10,50]', Std.string(a1.offsets));
++				check('2o anim1 fps=30 loop=true', a1.fps == 30 && a1.loop == true);
++			}
++		}
++		check('2p 缺人物返回 null', cne.CneModCompat.characterJson('nobody') == null);
++
++		// ---------- 3) 谱面定位 ----------
++		var p1:String = cne.CneModCompat.resolveChartPath('bopeebo', 'bopeebo');
++		check('3 默认难度 → charts/normal.json', p1 != null && p1.endsWith('songs/bopeebo/charts/normal.json'), Std.string(p1));
++		check('3b 未提供的难度 → null', cne.CneModCompat.resolveChartPath('bopeebo-hard', 'bopeebo') == null);
++		write(mod + 'songs/bopeebo/charts/hard.json', '{"codenameChart":true,"strumLines":[]}');
++		var p2:String = cne.CneModCompat.resolveChartPath('bopeebo-hard', 'bopeebo');
++		check('3c 补上 hard.json → 命中', p2 != null && p2.endsWith('charts/hard.json'), Std.string(p2));
++		check('3d metaJsonForChart 回溯 meta.json',
++			(cne.CneModCompat.metaJsonForChart(p1) != null && cne.CneModCompat.metaJsonForChart(p1).indexOf('"bpm"') != -1));
++
++		// ---------- 4) 音频回退 ----------
++		var s1:String = cne.CneModCompat.resolveCneSound('songs', 'bopeebo/Inst');
++		check('4 Inst → songs/bopeebo/song/Inst.ogg', s1 != null && s1.endsWith('songs/bopeebo/song/Inst.ogg'), Std.string(s1));
++		var s2:String = cne.CneModCompat.resolveCneSound('songs', 'bopeebo/Voices');
++		check('4b Voices → songs/bopeebo/song/Voices.ogg', s2 != null && s2.endsWith('song/Voices.ogg'), Std.string(s2));
++		check('4c 不接管 Voices-Player（拆分人声由调用方回退）', cne.CneModCompat.resolveCneSound('songs', 'bopeebo/Voices-Player') == null);
++		check('4d 不接管非 songs 目录', cne.CneModCompat.resolveCneSound('music', 'bopeebo/Inst') == null);
++		check('4e 音频回退尊重 switch（开关关掉即 null）', switchOffTest());
++
++		// ---------- 5) 周目 XML → Psych WeekFile ----------
++		var weeks:Array<Dynamic> = cne.CneModCompat.cneWeekFiles('MyCneMod');
++		check('5 周目数量=1', weeks.length == 1, 'n=' + weeks.length);
++		if (weeks.length == 1)
++		{
++			var w:Dynamic = weeks[0].week;
++			Sys.println('  [week] ' + haxe.Json.stringify(w));
++			check('5a name=week1', weeks[0].name == 'week1', Std.string(weeks[0].name));
++			check('5b weekName=TEST WEEK', w.weekName == 'TEST WEEK', Std.string(w.weekName));
++			check('5c weekCharacters=[dad,bf,gf]', Std.string(w.weekCharacters) == '[dad,bf,gf]', Std.string(w.weekCharacters));
++			check('5d songs 数量=2', w.songs.length == 2, 'n=' + w.songs.length);
++			if (w.songs.length == 2)
++			{
++				check('5e song0=[Bopeebo,bf,[17,34,51]]',
++					w.songs[0][0] == 'Bopeebo' && w.songs[0][1] == 'bf' && Std.string(w.songs[0][2]) == '[17,34,51]',
++					haxe.Json.stringify(w.songs[0]));
++				check('5f song1=Fresh', w.songs[1][0] == 'Fresh', Std.string(w.songs[1][0]));
++			}
++			check('5g difficulties=hard,normal', w.difficulties == 'hard,normal', Std.string(w.difficulties));
++			check('5h freeplayColor=[17,34,51]', Std.string(w.freeplayColor) == '[17,34,51]', Std.string(w.freeplayColor));
++			check('5i 无 menubackgrounds 图 → weekBackground 置空（避免加载不存在的贴图）',
++				w.weekBackground == '', Std.string(w.weekBackground));
++			check('5j startUnlocked=true / hideFreeplay=false', w.startUnlocked == true && w.hideFreeplay == false);
++		}
++
++		// ---------- 6) zip mod 暂存 ----------
++		var zipWork:String = base + 'zipwork/';
++		if (sys.FileSystem.exists(zipWork)) deleteRecursive(zipWork);
++		write(zipWork + 'MyZip/data/characters/zipchar.xml', '<character sprite="z" icon="z"/>');
++		write(zipWork + 'MyZip/songs/zipsong/charts/normal.json', '{"codenameChart":true,"strumLines":[]}');
++		var zipCmd:String = 'cd "' + zipWork + 'MyZip" && zip -0 -q -r "' + root + 'MyZip.zip" .';
++		var code:Int = Sys.command(zipCmd);
++		check('6 测试 zip 生成成功', code == 0 && sys.FileSystem.exists(root + 'MyZip.zip'), 'exit=' + code);
++
++		check('6b zipNames 列出 MyZip', cne.CneZipStore.zipNames().indexOf('MyZip') != -1,
++			Std.string(cne.CneZipStore.zipNames()));
++		var mapped:String = cne.CneZipStore.remapKey('MyZip/data/characters/zipchar.xml');
++		check('6c remapKey 指向 _cnestage 且文件已解包',
++			mapped != null && mapped.indexOf('_cnestage/MyZip/') != -1 && sys.FileSystem.exists(mapped), Std.string(mapped));
++		var mappedChart:String = cne.CneZipStore.remapKey('MyZip/songs/zipsong/charts/normal.json');
++		check('6d zip 内 CNE 谱面可定位', mappedChart != null && sys.FileSystem.exists(mappedChart), Std.string(mappedChart));
++		check('6e 同名真实文件夹优先（不劫持 MyCneMod）', cne.CneZipStore.remapKey('MyCneMod/data/weeks/weeks.txt') == null);
++		check('6f _cnestage 自身不被重映射', cne.CneZipStore.remapKey('_cnestage/MyZip/data/x') == null);
++		// 指纹失效 → 重解（改 zip 后 mtime 变化）
++		Sys.sleep(1.1);
++		write(zipWork + 'MyZip/data/characters/zipchar2.xml', '<character sprite="z2" icon="z2"/>');
++		Sys.command('cd "' + zipWork + 'MyZip" && zip -0 -q -r "' + root + 'MyZip.zip" .');
++		// 引擎在 Mod 列表刷新时走 clearCaches → CneZipStore.invalidate()，这里模拟同一动作
++		cne.CneModCompat.clearCaches();
++		var mapped2:String = cne.CneZipStore.remapKey('MyZip/data/characters/zipchar2.xml');
++		check('6g zip 更新后指纹失效并重解（新文件可见）',
++			mapped2 != null && sys.FileSystem.exists(mapped2), Std.string(mapped2));
++		// 6h：走引擎真实入口 Paths.mods（remap → 暂存）而不是直接调 CneZipStore
++		var viaPaths:String = backend.Paths.mods('MyZip/songs/zipsong/charts/normal.json');
++		check('6h Paths.mods 入口同样命中 zip 内文件',
++			viaPaths.indexOf('_cnestage/MyZip/') != -1 && sys.FileSystem.exists(viaPaths), Std.string(viaPaths));
++
++		Sys.println(failures == 0 ? 'RESULT: ALL PASS' : 'RESULT: FAILURES=' + failures);
++		Sys.exit(failures == 0 ? 0 : 1);
++	}
++
++	static function switchOffTest():Bool
++	{
++		backend.ClientPrefs.data.cneModCompat = false;
++		var r:String = cne.CneModCompat.resolveCneSound('songs', 'bopeebo/Inst');
++		backend.ClientPrefs.data.cneModCompat = true;
++		return r == null;
++	}
++
++	static function deleteRecursive(path:String):Void
++	{
++		if (!sys.FileSystem.exists(path)) return;
++		if (sys.FileSystem.isDirectory(path))
++		{
++			for (f in sys.FileSystem.readDirectory(path)) deleteRecursive(path + '/' + f);
++			sys.FileSystem.deleteDirectory(path);
++		}
++		else sys.FileSystem.deleteFile(path);
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/import.hx
+@@ -0,0 +1 @@
++using StringTools;
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/backend/ClientPrefs.hx
+@@ -0,0 +1,17 @@
++package backend;
++
++/**
++ * 测试替身：只保留 CneModCompat 读取的字段（默认值/语义与仓库 ClientPrefs 一致）。
++ */
++class SaveVariables
++{
++	public var cneModCompat:Bool = true;
++	public var cneScriptLogs:Bool = false;
++
++	public function new() {}
++}
++
++class ClientPrefs
++{
++	public static var data:SaveVariables = new SaveVariables();
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/backend/Paths.hx
+@@ -0,0 +1,63 @@
++package backend;
++
++import sys.FileSystem;
++
++/**
++ * 测试替身：`formatToSongPath` 与仓库 `source/backend/Paths.hx:890-896` 逐行一致；
++ * `mods` / `modFolders` / `getPreloadPath` 按仓库语义（当前 mod → 全局 mod → mods 根）实现，
++ * 只是把根目录指向测试用假 mods 目录。`SOUND_EXT` 取桌面值。
++ */
++class Paths
++{
++	public static var MODS_ROOT:String = 'mods/';
++
++	inline public static var SOUND_EXT:String = 'ogg';
++
++	inline static public function formatToSongPath(path:String)
++	{
++		var invalidChars = ~/[~&\\;:<>#]/;
++		var hideChars = ~/[.,'"%?!]/;
++
++		var path = invalidChars.split(path.replace(' ', '-')).join("-");
++		return hideChars.split(path).join("").toLowerCase();
++	}
++
++	/** 与仓库同款：先走 CNE zip 重映射，再退回原始 mods 路径。 */
++	static public function mods(key:String = ''):String
++	{
++		var remapped:String = cne.CneZipStore.remapKey(key);
++		if (remapped != null) return remapped;
++		return modsRaw(key);
++	}
++
++	static public function modsRaw(key:String = ''):String
++	{
++		var p:String = MODS_ROOT + key;
++		if (!FileSystem.exists(p))
++		{
++			var lower:String = MODS_ROOT + key.toLowerCase();
++			if (FileSystem.exists(lower)) return lower;
++		}
++		return p;
++	}
++
++	static public function modFolders(key:String):String
++	{
++		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
++		{
++			var fileToCheck:String = mods(Mods.currentModDirectory + '/' + key);
++			if (FileSystem.exists(fileToCheck)) return fileToCheck;
++		}
++		for (mod in Mods.getGlobalMods())
++		{
++			var fileToCheck:String = mods(mod + '/' + key);
++			if (FileSystem.exists(fileToCheck)) return fileToCheck;
++		}
++		return mods(key);
++	}
++
++	inline public static function getPreloadPath(file:String = ''):String
++	{
++		return 'assets/' + file;
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/backend/Mods.hx
+@@ -0,0 +1,10 @@
++package backend;
++
++/** 测试替身：只提供 CneModCompat 用到的两个入口。 */
++class Mods
++{
++	public static var currentModDirectory:String = '';
++	static var globalMods:Array<String> = [];
++	public static function getGlobalMods():Array<String> return globalMods;
++	public static function setGlobalMods(m:Array<String>):Void globalMods = m;
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/backend/Difficulty.hx
+@@ -0,0 +1,8 @@
++package backend;
++
++/** 测试替身：固定返回 Normal（对齐仓库默认难度语义）。 */
++class Difficulty
++{
++	public static var name:String = 'Normal';
++	public static function getString(?num:Null<Int> = null):String return name;
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/backend/CoolUtil.hx
+@@ -0,0 +1,15 @@
++package backend;
++
++import sys.io.File;
++
++/** 测试替身：与仓库 CoolUtil.coolTextFile 同语义（按行读、去掉行尾 \r）。 */
++class CoolUtil
++{
++	public static function coolTextFile(path:String):Array<String>
++	{
++		var lines:Array<String> = [];
++		if (!sys.FileSystem.exists(path)) return lines;
++		for (line in File.getContent(path).split('\n')) lines.push(StringTools.replace(line, '\r', ''));
++		return lines;
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/lime/utils/Bytes.hx
+@@ -0,0 +1,26 @@
++package lime.utils;
++
++/**
++ * 测试替身：仅为让仓库 `backend/ZipReader.hx` 的 deflate 分支通过类型检查。
++ * 本测试的 zip 用 `zip -0`（stored）生成，**不会**走到 deflate 分支；
++ * 真实引擎构建使用 lime 的原生 zlib 实现（非本替身）。
++ */
++class Bytes
++{
++	var b:haxe.io.Bytes;
++
++	public function new(b:haxe.io.Bytes)
++	{
++		this.b = b;
++	}
++
++	public static function fromBytes(b:haxe.io.Bytes):Bytes
++	{
++		return new Bytes(b);
++	}
++
++	public function decompress(algorithm:Dynamic):haxe.io.Bytes
++	{
++		throw 'test stub: deflate branch not exercised';
++	}
++}
+--- /dev/null
++++ b/tools/cne_mod_compat_test/stubs/mod/lime/utils/CompressionAlgorithm.hx
+@@ -0,0 +1,7 @@
++package lime.utils;
++
++/** 测试替身：只提供 ZipReader 引用的常量。 */
++abstract CompressionAlgorithm(String)
++{
++	public static inline var DEFLATE:CompressionAlgorithm = cast "DEFLATE";
++}

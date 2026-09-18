@@ -9,6 +9,22 @@ class MusicBeatSubstate extends FlxSubState
 	public var uiScripts:Array<psychlua.MenuScript> = [];
 	#end
 
+	#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+	/** CNE 式子状态脚本组（编程层；总开关关闭时恒为 null） */
+	public var cneScripts:cne.ScriptPack = null;
+	/** ModSubState 指定的脚本名；null = 用类名 */
+	public var cneScriptName:String = null;
+	#end
+
+	override function create()
+	{
+		super.create();
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onSubStateCreate(this);
+		#end
+	}
+
 	public function new()
 	{
 		super();
@@ -90,6 +106,10 @@ class MusicBeatSubstate extends FlxSubState
 		for(script in uiScripts)
 			script.update(elapsed);
 		#end
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onSubStateUpdate(this, elapsed);
+		#end
 	}
 
 	/**
@@ -130,6 +150,11 @@ class MusicBeatSubstate extends FlxSubState
 			script.destroy();
 		uiScripts = [];
 		#end
+
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onSubStateDestroy(this);
+		#end
+
 		super.destroy();
 	}
 
@@ -183,12 +208,19 @@ class MusicBeatSubstate extends FlxSubState
 
 	public function stepHit():Void
 	{
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onSubStateStep(this, curStep);
+		#end
+
 		if (curStep % 4 == 0)
 			beatHit();
 	}
 
 	public function beatHit():Void
 	{
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		cne.ProgrammingManager.onSubStateBeat(this, curBeat);
+		#end
 		//do literally nothing dumbass
 	}
 	

@@ -106,23 +106,35 @@ class Character extends FlxSprite
 				var characterPath:String = 'characters/' + curCharacter + '.json';
 
 				#if MODS_ALLOWED
-				var path:String = Paths.modFolders(characterPath);
-				if (!FileSystem.exists(path)) {
-					path = Paths.getPreloadPath(characterPath);
-				}
+				var rawJson:String = null;
 
-				if (!FileSystem.exists(path))
+				// ① mod 自带的 Psych 人物 JSON（mods/<mod>/characters/<名>.json）
+				var modJsonPath:String = Paths.modFolders(characterPath);
+				if (FileSystem.exists(modJsonPath))
+					rawJson = File.getContent(modJsonPath);
+
+				#if sys
+				// ② CNE 模组兼容：mod 自带的 CNE 人物定义（mods/<mod>/data/characters/<名>.xml）
+				//    —— 必须排在**引擎内置 JSON 之前**。CNE 的资源语义是 mod 覆盖引擎，
+				//    而 Psych 的 preload 里有 gf/bf/dad 等同名人物；按「先查 preload」的旧顺序，
+				//    mod 的人物 XML 永远不会被读到（实测：saturday_morning_alive 的 GF 一直显示
+				//    引擎内置 gf 而不是 mod 的 `images/characters/gf/` 图集）。
+				if (rawJson == null && cne.CneModCompat.isEnabled())
+					rawJson = cne.CneModCompat.characterJson(curCharacter);
+				#end
+
+				// ③ 引擎内置人物 JSON；④ 兜底 DEFAULT_CHARACTER（防崩）
+				if (rawJson == null)
+				{
+					var path:String = Paths.getPreloadPath(characterPath);
+					if (!FileSystem.exists(path))
+						path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json');
+					rawJson = File.getContent(path);
+				}
 				#else
 				var path:String = Paths.getPreloadPath(characterPath);
 				if (!Assets.exists(path))
-				#end
-				{
-					path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
-				}
-
-				#if MODS_ALLOWED
-				var rawJson = File.getContent(path);
-				#else
+					path = Paths.getPreloadPath('characters/' + DEFAULT_CHARACTER + '.json');
 				var rawJson = Assets.getText(path);
 				#end
 
@@ -475,6 +487,15 @@ class Character extends FlxSprite
 	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
 	{
 		specialAnim = false;
+		#if (meteoric_debug && sys)
+		#if flxanimate
+		if (!isAnimateAtlas && animation.getByName(AnimName) == null)
+			trace('[DBG-ANIM] ' + curCharacter + ' missing anim: ' + AnimName + ' (force=' + Force + ')');
+		#else
+		if (animation.getByName(AnimName) == null)
+			trace('[DBG-ANIM] ' + curCharacter + ' missing anim: ' + AnimName + ' (force=' + Force + ')');
+		#end
+		#end
 		#if flxanimate
 		if (isAnimateAtlas)
 		{

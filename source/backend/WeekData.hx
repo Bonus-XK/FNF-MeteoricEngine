@@ -146,6 +146,49 @@ class WeekData {
 			}
 		}
 		#end
+
+		#if (MODS_ALLOWED && sys)
+		// CNE 模组兼容：把已启用 CNE mod 的周目（`data/weeks/weeks/*.xml`，顺序取
+		// `data/weeks/weeks.txt`）翻译成 Psych 周目 —— 否则 CNE mod 的歌不会出现在
+		// Story/Freeplay（Meteoric 的选曲列表完全由周目驱动，见 FreeplayState.create）。
+		if (cne.CneModCompat.isEnabled())
+		{
+			for (mod in Mods.parseList().enabled)
+			{
+				for (entry in cne.CneModCompat.cneWeekFiles(mod))
+				{
+					var weekId:String = entry.name;
+					if (weekId == null || weekId.length == 0 || weeksLoaded.exists(weekId)) continue;
+
+					var cneWeek:WeekData = new WeekData(cast entry.week, weekId);
+					cneWeek.folder = mod;
+					if (isStoryMode == null || (isStoryMode && !cneWeek.hideStoryMode) || (!isStoryMode && !cneWeek.hideFreeplay))
+					{
+						weeksLoaded.set(weekId, cneWeek);
+						weeksList.push(weekId);
+					}
+				}
+
+				// 没有周目 XML 的 CNE mod：用 `data/config/freeplaySonglist.txt`（或扫 songs/）
+				// 合成一个**仅 Freeplay 可见**的周目，否则这些 mod 的歌永远不会出现在选曲列表里。
+				var freeplayId:String = 'cne_' + Paths.formatToSongPath(mod);
+				if (!weeksLoaded.exists(freeplayId))
+				{
+					var freeplayWeek:Dynamic = cne.CneModCompat.cneFreeplayWeek(mod);
+					if (freeplayWeek != null)
+					{
+						var fpWeek:WeekData = new WeekData(cast freeplayWeek, freeplayId);
+						fpWeek.folder = mod;
+						if (isStoryMode == null || (isStoryMode && !fpWeek.hideStoryMode) || (!isStoryMode && !fpWeek.hideFreeplay))
+						{
+							weeksLoaded.set(freeplayId, fpWeek);
+							weeksList.push(freeplayId);
+						}
+					}
+				}
+			}
+		}
+		#end
 	}
 
 	private static function addWeek(weekToCheck:String, path:String, directory:String, i:Int, originalLength:Int)

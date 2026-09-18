@@ -1,0 +1,13 @@
+打击特效预览（PE 0.7.3 排版 / 原行数 6 行）+ 皮肤解析修复 —— 交付证据（2026-09-16）
+
+[1] 代码：
+    source/objects/NoteSplash.hx            defaultNoteSplash → 'noteSplashes/noteSplashes'（PE 0.7.3 约定）+ SONG 空守卫
+    assets/shared/images/noteSplashes/list.txt  新增 063（选中即 raw，不挂着色器）
+    source/options/NoteSettingsSubState.hx  打击特效预览（PE NoteSplashDebugState 排版；预览带 0.33×；整段动画包络量测）
+    source/options/OptionsPane.hx           预览带跟随行窗口；setSection 置 paneHosted
+    source/options/BaseOptionsMenu.hx       新增 paneHosted 常驻标志（修预览走错分支）
+[2] 构建：./compile-mac.sh → EXIT=0；产物时间 Sep 16 23:37:27 2026
+[3] 行数：previewRows = 6（原行数，用户要求恢复）→ 预览带 464..572 = 108px
+[4] 几何：四态打击特效预览落位全部在预览带/面板内（geometry.txt：063 上下余 4.0px、Vanilla ≈2px、Psych 16.7px）
+[5] 皮肤解析：Psych/063/Diamond/Electric/Sparkles/Vanilla 全部命中真实贴图，回退数 = 0
+[6] 预览图：shot-audit.png（四态整页，溅射按动画峰值帧渲染），已 read_image 复核

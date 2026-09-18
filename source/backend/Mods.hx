@@ -36,7 +36,10 @@ class Mods
 		// 多版本容器仓库（backend.ContainerStore.CONTAINERS_DIR）。
 		// 必须显式登记：getModDirectories 只按本白名单过滤，**没有**「下划线前缀自动跳过」这条规则，
 		// 不写进来 mods/_containers 会被扫成一个名为 "_containers" 的假模组。
-		'_containers'
+		'_containers',
+		// CNE zip mod 暂存目录（cne/CneZipStore.STAGE_DIR）：同样必须显式登记，
+		// 否则 mods/_cnestage 会被扫成假模组，里面的每个子目录也会被当成 mod。
+		'_cnestage'
 	];
 
 	private static var globalMods:Array<String> = [];
@@ -74,6 +77,16 @@ class Mods
 				var path = haxe.io.Path.join([modsFolder, folder]);
 				if (sys.FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
 					list.push(folder);
+				#if sys
+				// CNE 模组兼容：mods/<名>.zip（或 .cnz）也算一个 mod（内容是 CNE 布局）。
+				// 只在开关打开时登记；关闭时 zip 不进列表，但 modsList.txt 里的启用状态仍会保留。
+				else if (cne.CneModCompat.isEnabled() && !sys.FileSystem.isDirectory(path))
+				{
+					var zipName:String = haxe.io.Path.withoutExtension(folder);
+					if (cne.CneZipStore.zipPath(zipName) != null && !ignoreModFolders.contains(zipName.toLowerCase()) && !list.contains(zipName))
+						list.push(zipName);
+				}
+				#end
 			}
 		}
 		#end
@@ -210,7 +223,14 @@ class Mods
 			{
 				var dat:Array<String> = mod.split("|");
 				var folder:String = dat[0];
-				if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) && !added.contains(folder))
+				var knownMod:Bool = FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder));
+				#if sys
+				// zip mod：即使「CNE 模组兼容」当前关闭，也要保留它在 modsList.txt 里的启用状态，
+				// 否则关一下开关就把玩家的启用选择抹掉（下次打开全变默认关闭）。
+				if(!knownMod && folder.trim().length > 0 && cne.CneZipStore.zipPath(folder) != null)
+					knownMod = true;
+				#end
+				if(folder.trim().length > 0 && knownMod && !added.contains(folder))
 				{
 					added.push(folder);
 					list.push([folder, (dat[1] == "1")]);

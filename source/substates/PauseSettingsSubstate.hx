@@ -40,7 +40,7 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	static final ROWS_VISIBLE:Int = 8;    // 可见行窗口
 
 	var rowsDef:Array<String> = [
-		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '性能', '按键设置', '自定义界面', '调整延迟与Combo'
+		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '性能', '编程', '按键设置', '自定义界面', '调整延迟与Combo'
 		#if mobile
 		, '移动触控'
 		#end
@@ -125,6 +125,8 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 				openCamSubState(new options.JudgmentSettingsSubState());
 			case '性能':
 				openCamSubState(new options.PerformanceSubState());
+			case '编程':
+				openCamSubState(new options.ProgrammingSettingsSubState());
 			case '按键设置':
 				openCamSubState(new options.ControlsSubState());
 			case '自定义界面':

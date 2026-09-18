@@ -176,7 +176,8 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 
 	function openScoreFormatPrompt()
 	{
-		openSubState(new TextInputPrompt(
+		// openPrompt：分页路径自己 openSubState；headless（单界面宿主）路由到宿主状态
+		openPrompt(new TextInputPrompt(
 			'自定义 Score 栏格式',
 			'可用变量：\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\n{nps} 每秒音符 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比',
 			ClientPrefs.data.scoreTxtFormat,

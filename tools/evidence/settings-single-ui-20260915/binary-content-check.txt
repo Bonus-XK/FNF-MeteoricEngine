@@ -1,0 +1,11 @@
+Meteoric Engine — 源码→产物一致性核验（hxcpp 字符串为 UTF-16LE）
+产物: export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric
+构建时间: Sep 16 06:39:51 2026
+
+  设置菜单(旧有)                                       命中=10（期望 10）  OK
+  Tab 切换分区/选项(新·OptionsState 底部提示)               命中=1（期望 1）  OK
+  箭头配色(分区标题)                                     命中=3（期望 3）  OK
+  正在绑定(新·ControlsPane 绑定弹层)                      命中=1  OK
+  颜色编辑(NotesPane 右栏标题)                           命中=1  OK
+  恢复默认按键(ControlsPane 列表项)                       命中=1  OK
+  点击查看(InterfaceSettings valueHint)              命中=2  OK

@@ -84,6 +84,8 @@ class TitleState extends MusicBeatState
 
 	override public function create():Void
 	{
+		// 维护/CI 直达入口：设 ME_LUAGRAPH_SELFTEST=1 时直接进入 Lua 图形化编辑器并跑一遍自检
+		// （不设置该环境变量时完全不触发，正常启动流程与玩家侧行为不受影响）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 		
@@ -105,6 +107,16 @@ class TitleState extends MusicBeatState
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 
 		ClientPrefs.loadPrefs();
+
+		// 编程层启动：注册全局脚本/热重载信号，并为 TitleState 本体装一次状态脚本。
+		// 必须放在 ClientPrefs.loadPrefs() 之后：总开关与子开关都从存档读取。
+		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
+		#if meteoric_debug
+		Sys.println('[CNE] TitleState integration reached; force=' + Sys.getEnv('METEORIC_CNE_FORCE'));
+		#end
+		cne.ProgrammingManager.init();
+		cne.ProgrammingManager.onStateCreate(this);
+		#end
 
 		// 【帧率档位启动诊断】仅调试构建启用（编译脚本加 -debug / METEORIC_DEBUG=1 时定义
 		// `meteoric_debug`；正式发布构建不编译这段，零开销、也不刷屏）。
@@ -176,7 +188,7 @@ class TitleState extends MusicBeatState
 
 		FlxG.mouse.visible = false;
 		#if FREEPLAY
-		MusicBeatState.switchState(new FreeplayState());
+		MusicBeatState.switchState(new states.FreeplayState());
 		#elseif CHARTING
 		MusicBeatState.switchState(new ChartingState());
 		#else
@@ -209,6 +221,30 @@ class TitleState extends MusicBeatState
 					startIntro();
 				});
 			}
+		}
+		#end
+
+		// 【自动化冒烟：直达指定曲目】仅调试构建编译。用途：没有 UI/键盘自动化权限时，
+		// 用环境变量把游戏直接送进某首歌，验证「模组装入 → 谱面/音频/人物加载」整条链路。
+		//   METEORIC_TEST_SONG="happy|happy-hard|happy|2"   曲名|谱面名|目录名|难度索引
+		// 必须放在 create() **末尾**：跳过 Highscore.load() 等既有初始化会让 PlayState
+		// 在记分/周目状态缺失下崩溃（实测 2026-09-18 12:24 的 SEGV 就是提前 return 造成）。
+		#if (meteoric_debug && sys)
+		var testSong:String = Sys.getEnv('METEORIC_TEST_SONG');
+		if (testSong != null && testSong.length > 0)
+		{
+			var parts:Array<String> = testSong.split('|');
+			var tName:String = parts[0];
+			var tJson:String = (parts.length > 1 && parts[1].length > 0) ? parts[1] : parts[0];
+			var tFolder:String = (parts.length > 2 && parts[2].length > 0) ? parts[2] : parts[0];
+			var tDiff:Null<Int> = (parts.length > 3) ? Std.parseInt(parts[3]) : 2;
+			if (tDiff == null) tDiff = 2;
+			Difficulty.resetList();
+			PlayState.isStoryMode = false;
+			PlayState.storyDifficulty = tDiff;
+			Sys.println('[TEST] jump to song: ' + tName + ' | json=' + tJson + ' | folder=' + tFolder + ' | diff=' + tDiff
+				+ ' | chart=' + Std.string(backend.Song.resolveChartPath(tJson, tFolder)));
+			LoadingState.loadSongAndSwitchState(new PlayState(), Paths.formatToSongPath(tName), tJson, tFolder, true, new states.FreeplayState());
 		}
 		#end
 	}
@@ -429,8 +465,23 @@ class TitleState extends MusicBeatState
 	var newTitle:Bool = false;
 	var titleTimer:Float = 0;
 
+	var selfTestChecked:Bool = false;
+
 	override function update(elapsed:Float)
 	{
+		// 维护/CI 直达入口：第一个 update 帧才切状态
+		// （flixel 在某个 State 的 create() 期间切换状态不安全 —— 实测 SIGSEGV，栈里 create 从未进入）
+		// 不设置 ME_LUAGRAPH_SELFTEST 时完全不触发，玩家侧行为不受影响
+		if (!selfTestChecked)
+		{
+			selfTestChecked = true;
+			if (states.editors.LuaGraphEditorState.selfTestRequested())
+			{
+				MusicBeatState.switchState(new states.editors.LuaGraphEditorState());
+				return;
+			}
+		}
+
 		if (FlxG.sound.music != null)
 			Conductor.songPosition = FlxG.sound.music.time;
 		// FlxG.watch.addQuick('amp', FlxG.sound.music.amplitude);

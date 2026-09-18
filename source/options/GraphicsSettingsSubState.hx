@@ -11,12 +11,16 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		title = '图像设置';
 		rpcTitle = '图像设置菜单'; //for Discord Rich Presence
 
-		boyfriend = new Character(840, 170, 'bf', true);
-		boyfriend.setGraphicSize(Std.int(boyfriend.width * 0.75));
-		boyfriend.updateHitbox();
-		boyfriend.dance();
-		boyfriend.animation.finishCallback = function (name:String) boyfriend.dance();
-		boyfriend.visible = false;
+		// headless（单界面宿主）不创建预览角色：融合宿主内容区本轮没有预览承载位（见 NoteSettingsSubState 同款说明）
+		if (!BaseOptionsMenu.headless)
+		{
+			boyfriend = new Character(840, 170, 'bf', true);
+			boyfriend.setGraphicSize(Std.int(boyfriend.width * 0.75));
+			boyfriend.updateHitbox();
+			boyfriend.dance();
+			boyfriend.animation.finishCallback = function (name:String) boyfriend.dance();
+			boyfriend.visible = false;
+		}
 
 		//I'd suggest using "Low Quality" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('低画质', //Name
@@ -146,7 +150,8 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		#end
 
 		super();
-		insert(1, boyfriend);
+		// 分页路径：插到 bg 之后（层级：背景 → BF 预览 → 面板 → 行文字），与原实现一致
+		addVisual(boyfriend, 1);
 	}
 
 	function onChangeAntiAliasing()
@@ -163,6 +168,13 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 	override function changeSelection(change:Int = 0)
 	{
 		super.changeSelection(change);
-		boyfriend.visible = (antialiasingOption == curSelected);
+		onPaneSelectionChange(curSelected);
+	}
+
+	/** 预览联动（抗锯齿行选中时才显示 BF）：分页与单界面两条路径共用 */
+	override function onPaneSelectionChange(index:Int)
+	{
+		if (boyfriend == null) return;
+		boyfriend.visible = (antialiasingOption == index);
 	}
 }

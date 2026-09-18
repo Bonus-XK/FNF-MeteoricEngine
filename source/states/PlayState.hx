@@ -820,6 +820,13 @@ class PlayState extends MusicBeatState
 			case 'tank': new states.stages.Tank(); //Week 7 - Ugh, Guns, Stress
 			case 'phillyStreets': new states.stages.PhillyStreets(); //Weekend 1 - Darnell, Lit Up, 2Hot
 			case 'phillyBlazin': new states.stages.PhillyBlazin(); //Weekend 1 - Blazin
+			default:
+				#if (MODS_ALLOWED && sys)
+				// CNE 模组兼容：CNE 舞台没有 Psych 舞台类，图层写在 data/stages/<名>.xml 的
+				// <sprite> 元素里（站位/缩放已由 StageData 的 CNE 分支喂给 StageFile）。
+				if (cne.CneModCompat.hasStageXml(curStage))
+					new states.stages.CneXmlStage(curStage);
+				#end
 		}
 
 		if(isPixelStage) {
@@ -909,6 +916,14 @@ class PlayState extends MusicBeatState
 		setOnScripts('boyfriend', boyfriend);
 		setOnScripts('gf', gf);
 		setOnScripts('camGame', camGame);
+
+		// CNE 模组兼容：歌曲脚本（`mods/<mod>/songs/<song>/scripts/*.hx`）在角色/舞台就绪后加载。
+		// CNE 脚本用 `stage.stageSprites[...]`、`FunkinSprite`、`insert` 等名字，globals/回调别名的
+		// 注入在 `CneScriptCompat`；`create` 会在 initHScript 内部立即执行。
+		#if (MODS_ALLOWED && sys && HSCRIPT_ALLOWED)
+		if (cne.CneModCompat.isEnabled())
+			cne.CneScriptCompat.loadSongScripts(this, songName);
+		#end
 
 		// STAGE SCRIPTS（在角色创建后加载，使 onCreate 可访问 dad/boyfriend/gf）
 		// JS Engine 移植：只显示 HUD 时跳过舞台脚本（舞台已不渲染，脚本多为视觉/相机效果）
@@ -4173,6 +4188,11 @@ class PlayState extends MusicBeatState
 
 				if (char != null)
 				{
+					#if (meteoric_debug && sys)
+					trace('[DBG-PLAYANIM] t=' + Std.int(strumTime) + ' v1=' + value1 + ' v2=' + value2
+						+ ' char=' + char.curCharacter + ' hasAnim=' + (char.animation.getByName(value1) != null)
+						+ ' special=' + char.specialAnim);
+					#end
 					char.playAnim(value1, true);
 					char.specialAnim = true;
 				}
@@ -6477,7 +6497,7 @@ class PlayState extends MusicBeatState
 		return false;
 	}
 
-	public function initHScript(file:String)
+	public function initHScript(file:String, ?cneGlobals:Map<String, Dynamic> = null, ?cneCallbacks:Bool = false)
 	{
 		// 回放模式不加载 HScript（与 Lua 同理：避免脚本修改箭头显示影响回放）
 		if (replayMode) return;
@@ -6493,7 +6513,11 @@ class PlayState extends MusicBeatState
 			}
 			catch (e:Dynamic) {}
 			#end
-			var newScript:HScript = new HScript(null, scriptCode);
+			// executeNow=false：先把 globals（含 CNE 的 FunkinSprite/stage/insert）注入，再执行脚本。
+			// CNE 歌曲脚本顶层就有 `var pluh:FlxSprite = new FlxSprite();` /
+			// `var fadeThing:FunkinSprite = new FunkinSprite()...`，若先 execute 会报
+			// "Unknown variable: FunkinSprite"（2026-09-18 实测）。
+			var newScript:HScript = new HScript(null, scriptCode, false);
 			// 66mod 等 Psych 0.7 模组对话脚本需要 songName / startDialogue
 			newScript.set('songName', songName);
 			newScript.set('startDialogue', function(dialogue:Dynamic) startDialogue(dialogue));
@@ -6505,6 +6529,16 @@ class PlayState extends MusicBeatState
 			// 兼容 66mod 舞台脚本（home.hx 等直接访问 camFollow/camHUD）
 			newScript.set('camFollow', camFollow);
 			newScript.set('camHUD', camHUD);
+			// CNE 歌曲脚本：注入 CNE 专用 globals（stage/FunkinSprite/insert…），必须在 execute 之前。
+			if (cneGlobals != null)
+			{
+				for (k => v in cneGlobals) newScript.set(k, v);
+			}
+			try newScript.execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
+			// CNE 回调别名（create→onCreate、stepHit→onStepHit…）必须在 execute 之后：
+			// 脚本函数已解析，`exists('create')` 才为真；同时要早于下面的 onCreate 调用。
+			if (cneCallbacks)
+				cne.CneScriptCompat.applyCallbacks(newScript);
 			@:privateAccess
 			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
 			{

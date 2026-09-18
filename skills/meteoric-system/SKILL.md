@@ -35,12 +35,37 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 
 | 组件 | 现有实现 | 规范 |
 | --- | --- | --- |
-| 复选框 | `checkBgs` / `checkFills`（`CHECK_SIZE` 26，背景 `0x66161622`/描边 `0x8CFFFFFF`，勾选白色圆角块） | 现状为白色勾选；MD3 升级目标：选中 = `primary` 填充、未选中 = `outline` 描边；切换 ≤100ms |
-| 选项行 | `rows:Array<FlxText>` + `selectorBar` | 选中行 α=1 + `selectorBar` 跟随；未选中 0.55；`selectorTween` 先 `cancel()`（`kill()` 同义）再启动 |
-| 滑块/数值 | 键盘 hold + 移动端 `◀▶` 长按 | `PAD_HOLD_DELAY = 0.5` 秒延迟、`PAD_STRING_STEP = 0.2` 秒步进；改为 `primary` 进度条时保留长按计时 |
+| **开关（胶囊 toggle）** | `objects/ToggleSwitch.hx`（**系统域布尔项的唯一形态**） | 轨道胶囊 **96×32**（圆角 = 高的一半）+ **22px 纯白圆钮**；开 = `DesignTokens.primary` 填充 **+ primary 描边**，关 = `0x66161622` 填充 + `panelOutline` 描边（1.5px）；切换动画在**圆心空间** `FlxMath.lerp(..., elapsed * 18)`，首次落位**直接吸附**（否则会从错误初值滑进来）；命中区外扩 12px → 高 **56**（触控红线） |
+| 选项行 | `rows:Array<FlxText>` + `selectorBar` | 选中行 α=1 + `selectorBar` 跟随；未选中 0.55–0.78；tween 先 `cancel()` 再启动 |
+| 滑块/数值 | 键盘 hold + 移动端 `◀▶` 长按 | `PAD_HOLD_DELAY = 0.5` 秒延迟、`PAD_STRING_STEP = 0.2` 秒步进 |
 | 下拉/字符串档 | `Option.hx` 档位 | 弹出子面板（非全屏 State）；圆角 14；选项表用 `MenuText` |
-| 按钮 | `BackButton`、文本链接 | filled / tonal / text 三种语义；按下 0.97 缩放 100ms；触控目标 ≥56×56 逻辑 px |
+| 按钮 | `BackButton`、文本按钮 | filled / tonal / text 三种语义；按下 0.97 缩放 100ms；触控目标 ≥56×56 逻辑 px |
 | 对话框 | `Prompt`、`TextInputPrompt`、`CrashTestPrompt` | 圆角 14 + `scrim` 遮罩；确认/取消按钮 `error`（危险操作）/`primary`（主操作） |
+
+#### 开关（胶囊）落地细节 —— 踩过的坑，改前必读
+
+1. **轨道必须"原地重绘"**：`makeGraphic(..., unique: true)` 建一次，之后每次切换
+   `track.pixels.fillRect(track.pixels.rect, TRANSPARENT)` 清底再画。**禁止**用 `makeGraphic` "重建"——
+   尺寸不变时命中的是缓存里同一张 BitmapData，旧像素不会被清 → 「开」态的 primary 填充会残留在「关」态上
+   （同尺寸精灵还会互相串图）。
+2. **夹取的是圆心、不是精灵左边框**；精灵 x 由圆心换算 `x = track.x + center − 半径`。
+   从前把"轨道内相对量"（16/80）直接写进 `knob.x`，圆钮被画到屏幕左侧、距轨道 409px —— 即「圆点飞出」事故。
+3. **行位动态的列表**（如模组列表）用 `ToggleSwitch.setPosition(x, y)` 整组移动（轨道 + 圆钮一起），
+   不要只改 `track.y`，否则圆钮会留在旧行高。
+4. **主题色**：开态填充/描边是 `DesignTokens.primary`（运行时令牌）→ 宿主在刷新行时调 `refreshTheme()` 重绘。
+5. 组合方式：组件**两个精灵由宿主自己 `add()`**（与 `ColorSwatchPicker` 同款），宿主负责命中、音效与存档；
+   组件**不碰** `ClientPrefs` / `Option`。
+
+**开关统一清单（2026-09-16 完成，新代码禁止再写方框复选框）**：
+
+| 界面 | 实现 |
+| --- | --- |
+| 单界面设置内容区 `OptionsPane` | `switchCols:Array<ToggleSwitch>`（原 `checkBgs/checkFills` 已删） |
+| 分页设置页 `BaseOptionsMenu`（暂停内嵌 7 页） | 同上；`LIST_X` 108 → **164**（胶囊 96 宽后让位），`CHECK_X` 56 |
+| 模组列表 `ModsMenuState` | 同上；行位动态 → `setPosition()`；`LIST_X` 88 → **164** |
+| 更新界面 `OutdatedState` | 私有胶囊实现**已收敛**为共用组件（圆钮坐标模型随之固化） |
+| 4 个编辑器页（对话/角色/周目编辑器） | **不动**：`FlxUICheckBox` 属非主题域工具界面（见 meteoric-design 例外表） |
+
 
 - 状态层：hover `0x18` 白、pressed `0x30` 白叠加，非实体色块。
 - 新组件必须提供**键盘/鼠标/触控三套**操作路径；触控长按与键盘 hold 分别独立计时（现有 `padHoldTime` 模式）。
@@ -69,6 +94,38 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 4. 系统返回键（Android）：返回上一级界面（Options → 主菜单；Pause → 游戏；不带 * 的页面 → 上一页），**禁止**直接退出游戏。
 
 ## 各界面细则
+
+### 单界面设置（OptionsState = 侧栏 + 内容区，2026-09-16 落地）
+
+**结构**（一个界面代替原来的"两级跳转"）：
+
+```
+┌ 侧栏 SettingsRail 230×570 ┐┌ 内容区 OptionsPane 956×570 ─────────────┐
+│ 40,70 起；行距 50、可见 9 ││ 284,70 起；标题 y100；行首 y152、行距 52 │
+│ 「设置」标题 + 13 个分区  ││ 可见 8 行（带预览带的分区 6 行）        │
+└───────────────────────────┘└ 说明行 / 色板条 / 预览带 y464..632 ─────┘
+              底部提示条 40,662,1200,48（Tab 切换焦点 · ↑↓ 选择 · ←→ 调整 · Enter 切换 · R 重置）
+```
+
+- **分区三类**（`OptionsState.buildRoster()`）：
+  ① **选项分区**（7 个）：`BaseOptionsMenu` 子类在 **headless** 模式下构造 —— 子类照旧 `addOption()` 并挂 `onChange`，
+  只是不建 UI；选项表与回调由 `OptionsPane` 渲染/驱动（**选项定义只有一份，禁止在新宿主里重抄选项表**）；
+  ② **画布分区**（箭头配色 `NotesPane` / 按键设置 `ControlsPane`）：自带绝对布局，接受内容区矩形（`hosted` 分支），
+  整屏路径（暂停内嵌）用 `new XXXPane(null)` 跑同一份代码；宿主焦点离开内容区时置 `inputEnabled = false`（只绘制不吃键）；
+  ③ **整屏页出口**（调整延迟/自定义界面/容器/移动触控）：**点侧栏即一步直达**（不进内容区），容器因"启动即整机重启"不做就地化。
+- **焦点模型**：默认焦点在内容区；`Tab` 在两区间迁移；侧栏 ↑↓=逐项、**滚轮 = 页面滚动**（一格翻一整页 = `ROWS_VISIBLE` 项，
+  间隔 ≥110ms，位移走时间插值 `elapsed * SCROLL_LERP(14)`，因此观感是"整栏滑过去"而不是逐项闪）；点侧栏行 = 选分区并接管焦点。
+- **预览带**：分区声明 `BaseOptionsMenu.previewRows = 6` 即可把选项行窗口缩短、腾出 y 464..572 的预览带；
+  预览容器经 `BaseOptionsMenu.headlessVisualHost`（静态口，因为子类在**构造期**就 `addVisual()`）交给宿主，
+  宿主按**叶子精灵包围盒**在带内居中（普通 `FlxGroup` 没有 x/y，且分区常再套一层 `FlxTypedGroup` → 递归收集叶子；
+  同一容器只摆一次，重复平移会累加）。例：音符皮肤预览（5 个真尺寸箭头）。
+- **落盘点**：单界面没有"关子页"这一步 → 必须在 `goBack()` / 整屏页出口 / `destroy()` 三处 `saveSettings()`，
+  否则 `destroy()` 里的 `loadPrefs()` 会把本次改动读没。
+- **兼容契约（勿破）**：`OptionsState.onPlayState`（曲目内进设置后返回要重载曲目）、`pendingSelectLabel`
+  （整屏页返回按标签恢复分区 —— 旧实现靠 `static curSelected`，融合后必须显式记标签）、`enterContainersMenu()`
+  （容器入口"不挂转场"，黑屏回归风险点）。
+- **行窗口是变量**：`OptionsPane.rowsVisible`（默认 8，预览带分区 6）。`refreshRows()` 末尾**必须显式隐藏尾部未用行**
+  （`for (r in rowsVisible...rows.length)`）—— 漏了就会在预览带上留下"没有文字的空开关"（2026-09-16 实测）。
 
 ### Options（BaseOptionsMenu + 子页）
 
@@ -171,6 +228,81 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 - `ModsMenuState`、`OnlineMenuState`、`ModInstallUI` 一律沿用本 skill 的面板/文本/输入规范；不使用手绘域元素。
 - 列表行高 ≥ 40；启用/停用状态用 `primary`/`onSurfaceVariant` 区分，**禁止**只用文字颜色表达状态（需 + 图标/勾选）。
 - 安装/下载进度：进度条用 `primary` 填充 + `surfaceVariant` 底；更新/取消按钮按语义色。
+
+### Lua 图形化编程编辑器（LuaGraphEditorState）
+
+- 入口：`MasterEditorMenu` → 「Lua 图形化编程」；**Android 上该条目直接隐藏**（`#if mobile` 裁剪 `optionShit`），
+  因为本界面依赖鼠标拖拽与键盘，触屏上没有可用的完整操作路径（见 meteoric-mobile 的"不暴露用不了的界面"原则）。
+- 域归属：**系统域**。三个圆角磨砂面板（分类 156 / 积木 300 / 画布 720，y 70 起高 570）+ 底部条
+  （40,**652**,1200,**58**；2026-09-15 由 662/48 加高：完整键位提示一行装不下）；配色一律走令牌，
+  判定/成功失败语义色用局部常量 `COLOR_OK/COLOR_ERROR`
+  （`DesignTokens` **没有** `error` 字段，别写 `DesignTokens.error`）。
+- **层级契约同样适用**：分类高亮条与积木列表高亮条必须在**行文字之前** `add()`。本界面两处都已按此写。
+- 绘制纪律：积木底图在 `LuaBlockSprite` 构造时一次画好（`makeGraphic` + `drawRoundRect`），
+  `update()` 里零绘制；画布只在**编辑事件**（落块/改参数/撤销/滚动）时 `rebuildCanvas()`，禁止逐帧重建。
+- 三套输入：鼠标（拖拽/点击参数/滚轮滚动）、键盘（`[ ]` 分类、`,`/`.` 与 PgUp/PgDn 选积木、`Insert` 插入、
+  `←/→` 选参数并微调枚举/数字、`Enter` 编辑参数、`Del` 删除、`Ctrl+Z/Y/C/X/V/S/O`、`Tab` 预览、`Esc` 返回）、
+  触控（**未提供**，见上文 Android 隐藏）。
+- 参数槽三态：枚举 = 弹出清单选择；数字/文本/表达式/变量 = `UIInputBox` **就地编辑**（Enter 提交、点外部提交、
+  Esc 取消）；槽底属"面板内次级元素"，保留半透明深色（同复选框规则）。
+- **界面不变量（2026-09-15 修完第一版截图缺陷后新增，改动时勿回归）**：
+  - 画布顶部固定**两行**：第 1 行面板标题、第 2 行「模组/脚本」（`nameText` 右对齐 + `wordWrap=false` +
+    超长 `fitText()` 省略）。内容从 `CAN_CONTENT_Y = CAN_Y + 78` 起，`cullOne()` 上界跟着它走。
+  - 空画布判定必须用 `hasDrawableStack()`（有无**可绘制事件栈**），**禁止**用 `GDoc.isEmpty()`：
+    后者语义是"没有任何真实积木"，归 `LuaCodeGen.validate` 保存前校验用；用它控提示会在"只拖了事件帽块"
+    时提示常显并压住第一条事件栈（叠字缺陷根因）。
+  - 底栏 96×32 按钮的标签字号必须显式传 `BAR_BTN_LABEL = 18`：`FlxText.set_fieldWidth()` 在
+    `fieldWidth > 0` 时**强制 `wordWrap = true`**，26px 下 96px 只放得下 3 个汉字（"保存生成"折行、
+    "预览 Lua" 被截）。
+  - 空凹槽（`LuaBlockSprite`）：`EMPTY_BODY_H = 44` + 底色 `0x59000000` + 槽内底部对齐的占位文案；
+    帽块凹槽的"空"必须由 `stack.blocks.length == 0` 传入（模型里栈内积木与帽块同级，`block.body` 恒空）。
+  - **插入点必须可见**：`addGap()` 的命中带本身不可见，拖拽时必须由 `showDropHints()` 画出插入线、
+    由 `updateDropHints()` 高亮最近插入点；画布外松手**禁止静默丢弃**，必须给状态条红色反馈 + 取消音。
+  - **浮层永远在积木之上**：`rebuildCanvas()` 会把积木 `add()` 到 `members` 末尾，所以每次重建后必须调
+    `raiseOverlay()` 把打开中的弹层/预览层摘除再追加回末尾（`FlxGroup.remove(o,true)` 只摘除不销毁）。
+    漏了这一步就是"积木压在弹窗上"的堆叠缺陷（2026-09-15 实测）。
+  - **事件栈必须可删除**：帽块的 `blockPath` 是奇数长度 `[栈下标]`（不是任何序列的元素），
+    `GDoc.detach()` 对奇数路径直接返回 null。因此 `deleteSelected()` 必须显式处理"奇数路径 = 删整条事件栈"，
+    否则「点一下事件积木就新增一条栈、却永远删不掉」——2026-09-15 用户实测缺陷。
+    **任何"可新增"的对象都必须同时存在删除路径**（本轮之前事件栈只能加不能减）。
+  - **底栏文本必须先量宽再定行**：左侧可用宽度只有 `BAR_TEXT_W = 636`（右侧 512px 是 5 个按钮），
+    所以快捷键提示拆成 `HINT_ROW1/HINT_ROW2` 两行，每行 ≤ 636px，并走 `fitText()` 兜底
+    （超宽给可见省略号而不是静默裁切）；自检打印 `hint fit: row1=…/636 row2=…/636 truncated=… barBottom=…`。
+    改提示文案后必须看这行日志 —— 历史上"提示显示不全"就是这样漏掉的。
+    完整键位表不在底栏（放不下），走 **`F1` 操作说明弹层**（`openHelp()` → 通用弹层，10 行 ≤ 556px，
+    自检断言 `help fit: max=…/556`）。
+  - **释放纪律（本轮新增，务必照做）**：`FlxGroup.remove(o, true)` **只摘除、不销毁**（flixel 5.2.2
+    `FlxGroup.hx:396-420`）。所以摘除对象一律走 `disposeSprite()` / `disposeAll()`：
+    它们做 `remove` + `destroy()`，并对**纯 FlxSprite** 补 `FlxG.bitmap.removeIfNoUse(graphic)`
+    （`FlxSprite.destroy()` 只 `graphic = null` + useCount--，**不摘 `FlxG.bitmap` 缓存**；
+    Meteoric 版 `FlxText.set_graphic` 自带摘除，故文本不重复摘）。
+    `rebuildCanvas()` 的销毁顺序是契约：**先摘除全部成员 → 销毁 `canvasBits`（= 各 sprite 的 texts+chips）
+    → 清空 `spr.texts/chips` → 销毁底图**，颠倒会二次 destroy。`UIInputBox` 必须 `destroy()`
+    （其 destroy 才把原生输入框从 stage 摘掉并解绑监听）。
+  - 画布没有真正的裁剪遮罩：拖拽的幽灵块与插入指示必须在 `rebuildCanvas()` **之后**创建，否则会被重建出的积木盖住。
+- **生成物契约**（与 Lua 层的关系，改动时勿破）：
+  - 事件帽块 = 真实 Psych 回调（`onCreate` / `onCreatePost` / `onUpdatePost(elapsed)` / `onBeatHit` / `onStepHit` /
+    `onKeyPress(key)` / `goodNoteHit(id,noteData,noteType,isSustain)` / `onSongStart` / `onDestroy`）；
+  - 「等待 N 秒后继续」= `runTimer` + 续接闭包，靠**本编辑器生成的 `onTimerCompleted` 调度器**驱动
+    （仅当图中真的用了等待积木才生成）；自定义代码区若也定义 `onTimerCompleted`，校验会告警"等待将失效"；
+  - 生成文件分「受管区」与「自定义代码区」：重新生成整体重写受管区、**永不覆盖**自定义区；
+    目标 `.lua` 已存在且**不含**自定义区标记时，必须先经确认，把原内容整体搬进自定义区（不丢手写代码）；
+  - 落点：`mods/<当前模组>/scripts/<名字>.lua` + `<名字>.luagraph.json`。`.json` 不会被当脚本加载
+    （`PlayState.create` 的 `scripts/` 扫描只认 `.lua` / `.hx`）；
+  - 兜底能力：`调用任意 Lua 函数` 与 `直接写一行 Lua` 两块覆盖全部 203 个注册 API，复杂逻辑建议写进自定义区。
+
+### 编辑器菜单（MasterEditorMenu）
+
+- 入口：主菜单按 `7`（debug_1）；界面标题「编辑器菜单」；8 个条目（Android 上裁掉 `luagraph`，见下文）。
+- 背景 = **主题色**：`menuDesat` 染 `DesignTokens.menuTint`（= 当前主题 primary，见 `MENU_TINTS`）。
+  2026-09-15 由"跟随当前选中条目的强调色（`optionShit[r][4]`）+ 0.4s `FlxTween.color` 过渡"改为跟随主题色，
+  与 Options / Pause / Lua 图形化编辑器统一；条目自带的强调色仍保留在表里，但**不再驱动背景**
+  （若日后想恢复"每项一色"的辨识度，请改挂在选项名/高亮条上，不要再让整屏背景变色）。
+- 令牌在 `create()` 读取 → 切换主题色后**下次进入本界面**生效；不做 `update()` 轮询、不注册主题监听
+  （与其它系统域界面同规则）。
+- 边界（勿越）：**菜单本体**属系统域（圆角磨砂面板 + 令牌化）；**它打开的编辑器页本体**仍是非主题域
+  工具界面（深灰底 `0xFF101010` / `0xFF222222`、`ChartWidgets` 自有 hover 档，见 meteoric-design 例外表），
+  本轮没有、后续也不要顺手把它们染成主题色。
 
 ## 动效底线（系统域）
 

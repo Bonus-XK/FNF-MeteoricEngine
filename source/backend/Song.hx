@@ -298,6 +298,13 @@ class Song
 		// 必须用 FileSystem 检查，否则外部谱面永远判为缺失
 		if(FileSystem.exists(baseFile)) return baseFile;
 		if(Assets.exists(baseFile, TEXT)) return baseFile;
+
+		#if (MODS_ALLOWED && sys)
+		// CNE 模组兼容：Psych 布局（data/<song>/<song>-<难度>.json）找不到时，
+		// 退回 CNE 布局 songs/<song>/charts/<难度>.json（由 cne.CneModCompat 负责定位 + 布局换算）。
+		var cnePath:String = cne.CneModCompat.resolveChartPath(jsonInput, folder);
+		if(cnePath != null) return cnePath;
+		#end
 		return null;
 	}
 
@@ -350,6 +357,31 @@ class Song
 			rawJson = rawJson.substr(0, rawJson.length - 1);
 			// LOL GOING THROUGH THE BULLSHIT TO CLEAN IDK WHATS STRANGE
 		}
+
+		#if (MODS_ALLOWED && sys)
+		// CNE 模组兼容：codenameChart 谱面先转成 psych_v1（列号绝对方向），再走下面既有管线。
+		// 转换失败保持原样，由通用解析路径决定行为（不会把错误数据静默当成功）。
+		if (rawJson.indexOf('"codenameChart"') != -1 && cne.CneModCompat.isEnabled()
+			&& states.editors.content.CneExport.isCneFormat(rawJson))
+		{
+			var converted:SwagSong = states.editors.content.CneExport.cneToPsych(
+				rawJson, cne.CneModCompat.metaJsonForChart(filePath), cne.CneModCompat.songNameFromChartPath(filePath));
+			if (converted != null)
+			{
+				// CNE mod 的箭头贴图（images/game/notes/NOTE_assets*）→ Psych 的 SONG.arrowSkin
+				var cneSkin:String = cne.CneModCompat.noteSkin();
+				if (cneSkin != null) converted.arrowSkin = cneSkin;
+				cne.CneModCompat.log('converted CNE chart → psych_v1: ' + filePath
+					+ ' (' + converted.notes.length + ' sections, bpm ' + converted.bpm + ')');
+				rawJson = haxe.Json.stringify(converted);
+			}
+			else
+			{
+				trace('[CNE] CNE chart conversion failed, reading raw: ' + filePath);
+			}
+		}
+		#end
+
 		var songJson:Dynamic = parseJSONshit(rawJson);
 		onLoadJson(songJson);
 

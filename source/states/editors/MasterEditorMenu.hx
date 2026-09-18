@@ -54,7 +54,8 @@ class MasterEditorMenu extends MusicBeatState
 		['menuChar', '菜单角色编辑器', 'Menu Character Editor', '编辑主菜单与自由游玩界面展示的角色。', 0xFFFFD166],
 		['dialogue', '对话编辑器', 'Dialogue Editor', '编辑游戏内对话脚本、演出与表情切换。', 0xFFFF8A8A],
 		['dialogueChar', '对话立绘编辑器', 'Dialogue Portrait Editor', '编辑对话角色的立绘资源与动画。', 0xFFFF9E5E],
-		['noteSplash', '音符溅射调试', 'Note Splash Debug', '调试音符打击特效的贴图与帧动画。', 0xFFB0B6FF]
+		['noteSplash', '音符溅射调试', 'Note Splash Debug', '调试音符打击特效的贴图与帧动画。', 0xFFB0B6FF],
+		['luagraph', 'Lua 图形化编程', 'Lua Visual Script', '用积木块拼出 Lua 脚本：多事件栈、参数槽直接编辑、生成 .lua 与 .luagraph.json（桌面端）。', 0xFF9CE8FF]
 	];
 
 	var rows:Array<MenuText> = [];
@@ -68,7 +69,6 @@ class MasterEditorMenu extends MusicBeatState
 	var lastAction:String = '';
 
 	var bg:FlxSprite;
-	var colorTween:FlxTween;
 	var backBtn:BackButton;
 	var selectedSomethin:Bool = false;
 
@@ -94,11 +94,22 @@ class MasterEditorMenu extends MusicBeatState
 		DiscordClient.changePresence("Editors Main Menu", null);
 		#end
 
+		// Lua 图形化编辑器为桌面端功能（拖拽 + 键盘）：Android 上直接隐藏该条目，
+		// 避免暴露一个用不了的界面（其它 7 项行为不变）。
+		#if mobile
+		optionShit = optionShit.filter(function(row) return row[0] != 'luagraph');
+		#end
+
 		// ---- 背景 ----
+		// 背景 = **主题色**（menuDesat 染 `DesignTokens.menuTint`）。
+		// 2026-09-15 由"跟随当前选中条目的强调色"（`optionShit[r][4]` + 0.4s 颜色过渡）改为跟随主题色：
+		// 与 Options / Pause / Lua 图形化编辑器等系统域界面统一；令牌在 create() 读取，
+		// 因此切换主题色后**下次进入本界面**生效（与其它系统域界面同规则，不做逐帧轮询）。
+		// 注意：条目自带的强调色仍留在 optionShit 表里（可作后续用途），但不再驱动背景。
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.scrollFactor.set();
 		add(bg);
-		bg.color = optionShit[curSelected][4];
+		bg.color = DesignTokens.menuTint;
 
 		// ---- 圆角磨砂面板 ----
 		add(makePanel(PANEL_L_X, PANEL_L_Y, PANEL_L_W, PANEL_L_H, 22));
@@ -313,13 +324,8 @@ class MasterEditorMenu extends MusicBeatState
 		if (selectorBar.y != barY)
 			selectorTween = FlxTween.tween(selectorBar, {y: barY}, 0.12, {ease: FlxEase.cubeOut});
 
-		// 背景色过渡
-		var newColor:Int = leItem[4];
-		if (bg.color != newColor)
-		{
-			if (colorTween != null) { colorTween.cancel(); colorTween = null; }
-			colorTween = FlxTween.color(bg, 0.4, bg.color, newColor, {ease: FlxEase.quadOut});
-		}
+		// 背景不再随选项变色：底色固定为当前主题色（见 create() 的背景注释），
+		// 因此这里不再做颜色过渡 —— 否则会留下一个 "newColor 恒等于 bg.color" 的空转 tween。
 	}
 
 	#if MODS_ALLOWED
@@ -366,6 +372,9 @@ class MasterEditorMenu extends MusicBeatState
 				LoadingState.loadAndSwitchState(new DialogueCharacterEditorState(), false);
 			case 'noteSplash':
 				LoadingState.loadAndSwitchState(new NoteSplashDebugState());
+			case 'luagraph':
+				// 与 Chart/Character/Dialogue 编辑器一致：走 LoadingState（先加载资源再切状态）
+				LoadingState.loadAndSwitchState(new LuaGraphEditorState(), false);
 		}
 
 		FlxG.sound.music.volume = 0;

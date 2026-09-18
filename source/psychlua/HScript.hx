@@ -58,7 +58,7 @@ class HScript extends SScript
 	}
 
 	public var origin:String;
-	override public function new(?parent:FunkinLua, ?file:String)
+	override public function new(?parent:FunkinLua, ?file:String, ?executeNow:Bool = true)
 	{
 		if (file == null)
 			file = '';
@@ -71,7 +71,11 @@ class HScript extends SScript
 			origin = scriptFile;
 		preset();
 		// SScript 4.0.1 的 execute() 解析失败会抛异常（runHaxeCode 首段代码语法错时避免 lua panic）
-		try execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
+		// executeNow=false 供 CNE 编程层使用：先构造并注入 state 变量，再由调用方 execute()。
+		if (executeNow)
+		{
+			try execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
+		}
 	}
 
 	override function preset()

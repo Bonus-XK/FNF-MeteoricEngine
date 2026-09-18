@@ -92,9 +92,15 @@ class EffectsSubState extends BaseOptionsMenu
 		changedMusic = true;
 	}
 
-	override function destroy()
+	/** 离开设置界面的收尾（恢复主菜单音乐）：分页路径（destroy）与单界面宿主释放路径共用 */
+	override function onHostDisposed():Void
 	{
 		if(changedMusic && !OptionsState.onPlayState) FlxG.sound.playMusic(Paths.music('freakyMenu'), 1, true);
+	}
+
+	override function destroy()
+	{
+		onHostDisposed();
 		super.destroy();
 	}
 }

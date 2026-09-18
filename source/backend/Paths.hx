@@ -807,6 +807,19 @@ class Paths
 		return getPackerAtlas(key, library);
 	}
 
+	/**
+	 * CNE 兼容别名：`Paths.getFrames(key)` ≡ `getAtlas(key)`（`.png` + `.xml` Sparrow）。
+	 * CNE 歌曲脚本用这个名字（SMA `REALLYFUCKINGJOYOUS.hx` 的 `Paths.getFrames("pluh")`）。
+	 * 注意：**不能 inline**，且必须 `@:keep` —— HScript 通过反射调用静态函数，release 的
+	 * `--dce full` 会把「只被反射调用」的函数删掉；inline 函数在 hxcpp 里也没有运行时函数指针。
+	 * 实测（2026-09-18）不加 `@:keep` 会报 "Null Function Pointer"。
+	 */
+	@:keep
+	static public function getFrames(key:String, ?library:String = null):FlxAtlasFrames
+	{
+		return getAtlas(key, library);
+	}
+
 	// Aseprite .JSON 图集（显式调用，供角色编辑器等使用）
 	inline static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
@@ -986,7 +999,20 @@ class Paths
 	}
 
 	#if MODS_ALLOWED
+	/**
+	 * `mods/...` 路径入口（全引擎唯一入口）。
+	 * CNE 模组兼容开启时，`mods/<zip mod 名>/...` 会被重映射到暂存目录
+	 * `mods/_cnestage/<mod 名>/...`（见 `cne/CneZipStore.hx`）；其余情况与改动前完全一致。
+	 */
 	static public function mods(key:String = '') {
+		#if sys
+		var remapped:String = cne.CneZipStore.remapKey(key);
+		if(remapped != null) return remapped;
+		#end
+		return modsRaw(key);
+	}
+
+	static public function modsRaw(key:String = '') {
 		var p:String = #if android backend.AndroidStorage.root() + '/mods/' + key #else 'mods/' + key #end;
 		// 兼容模组大小写命名（icon-Oswald.png 等）：原样找不到时尝试全小写
 		if(!FileSystem.exists(p)) {
@@ -1015,6 +1041,11 @@ class Paths
 			var p2:String = modFolders(path + '/' + key.toLowerCase() + '.' + SOUND_EXT);
 			if(FileSystem.exists(p2)) return p2;
 		}
+		#if sys
+		// CNE 模组兼容：songs/<song>/song/Inst|Voices[-难度后缀][-难度].<ext>
+		var cneFound:String = cne.CneModCompat.resolveCneSound(path, key);
+		if(cneFound != null) return cneFound;
+		#end
 		return p;
 	}
 

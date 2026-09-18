@@ -32,6 +32,8 @@ class ColorSwatchPicker
 
 	/** 色块数量与颜色（按色板顺序；由宿主用 DesignTokens 的表填充） */
 	public var colors:Array<FlxColor> = [];
+	/** 整行可见性（setVisible 的读回接口：宿主据此判断"是否该吃这一帧的点击"） */
+	public var isVisible(default, null):Bool = false;
 
 	/** 当前选中索引（高亮圆环 / 键盘焦点圆环的位置） */
 	public var selectedIndex(default, set):Int = 0;
@@ -138,6 +140,7 @@ class ColorSwatchPicker
 	public function setVisible(v:Bool):Void
 	{
 		if (destroyed) return;
+		isVisible = v;
 		for (spr in sprites) spr.visible = v;
 		if (!v)
 		{
@@ -221,18 +224,16 @@ class ColorSwatchPicker
 	 */
 	function setSelectedVisual(index:Int):Void
 	{
+		// ⚠ 整行隐藏时**不得点亮任何环**：本方法会被 `keyboardFocus`（宿主切焦点）与
+		// DesignTokens 主题监听（脚本/设置改主题色）回调触发，那些时机与"整行是否显示"无关，
+		// 若不看 isVisible，就会在别的分区/别的选项行上留下一个孤零零的白圈（2026-09-16 用户实测截图）。
+		var rowVisible:Bool = isVisible;
 		for (i in 0...rings.length)
 		{
 			var ring:FlxSprite = rings[i];
-			if (i == index)
-			{
-				ring.visible = true;
-				ring.color = keyboardFocus ? DesignTokens.primary : FlxColor.WHITE;
-			}
-			else
-			{
-				ring.visible = false;
-			}
+			var on:Bool = rowVisible && (i == index);
+			ring.visible = on;
+			if (on) ring.color = keyboardFocus ? DesignTokens.primary : FlxColor.WHITE;
 		}
 	}
 

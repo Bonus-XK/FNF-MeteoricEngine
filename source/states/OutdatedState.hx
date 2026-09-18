@@ -47,15 +47,9 @@ class OutdatedState extends MusicBeatState
 	static final BTN_H:Float = 56;               // 触控目标 ≥56
 	static final BTN_GAP:Float = 24;
 
-	static final TOGGLE_W:Float = 96;            // 开关（pill）
+	static final TOGGLE_W:Float = 96;            // 开关胶囊 96×32（实现见 objects.ToggleSwitch，圆钮/夹取参数都在那边）
 	static final TOGGLE_H:Float = 32;
 	static final TOGGLE_HIT_W:Float = 260;       // 开关的触控热区（含文字，≥56 高由行高保证）
-	/** 圆钮直径（= 22；圆钮比胶囊小 10px，所以半径 11 **不等于**胶囊半径 16） */
-	static final KNOB_D:Float = TOGGLE_H - 10;
-	static final KNOB_R:Float = KNOB_D * 0.5;
-	/** 圆钮**圆心**在轨道内的活动范围（轨道内坐标）：[16, 80] —— 夹取必须夹圆心，不是夹精灵左边框 */
-	static final KNOB_C_MIN:Float = TOGGLE_H * 0.5;
-	static final KNOB_C_MAX:Float = TOGGLE_W - TOGGLE_H * 0.5;
 
 	var content:FlxSpriteGroup;
 	var panel:FlxSprite;
@@ -64,17 +58,10 @@ class OutdatedState extends MusicBeatState
 	var btnDownload:UIButton;
 	var btnIgnore:UIButton;
 
-	var toggleTrack:FlxSprite;    // 开关底（pill）
-	var toggleKnob:FlxSprite;     // 开关圆钮
+	/** 开关本体：与设置界面共用 objects.ToggleSwitch（圆钮坐标模型 + 原地重绘都封在组件里） */
+	var toggleSw:objects.ToggleSwitch;
 	var toggleLabel:FlxText;      // 「稍后提醒 / 不再提示」
 	var toggleHint:FlxText;       // 说明：当前这个开关的含义
-	var toggleKnobX:Float = 0;    // 圆钮**圆心**目标（轨道内坐标：开 = 80 / 关 = 16）
-	var knobCenter:Float = 0;     // 圆钮圆心当前值（插值在**圆心空间**做，再换算成精灵 x）
-	var knobPlaced:Bool = false;  // 圆钮是否已落位（首帧直接落位，避免从错误初值滑入）
-	#if meteoric_debug
-	var _dbgFrames:Int = 0;       // 【临时探针】帧计数
-	#end
-	var toggleTween:FlxTween;
 
 	var focusIdx:Int = 0;         // 键盘焦点：0=下载 1=忽略 2=开关
 	var interactable:Bool = false;
@@ -156,13 +143,8 @@ class OutdatedState extends MusicBeatState
 		var tglY:Float = btnY + BTN_H + 40;
 		var tglX:Float = px + (PANEL_W - (TOGGLE_W + 16 + 190)) * 0.5; // 开关 + 间距 + 文字，整组居中
 
-		toggleTrack = new FlxSprite(tglX, tglY);
-		toggleTrack.scrollFactor.set();
-		content.add(toggleTrack);
-
-		toggleKnob = new FlxSprite(0, 0);
-		toggleKnob.scrollFactor.set();
-		content.add(toggleKnob);
+		toggleSw = new objects.ToggleSwitch(tglX, tglY);
+		for (spr in toggleSw.sprites) content.add(spr);
 
 		toggleLabel = new FlxText(tglX + TOGGLE_W + 16, tglY + 4, 190, '', 22);
 		toggleLabel.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, LEFT);
@@ -260,40 +242,8 @@ class OutdatedState extends MusicBeatState
 			else if (controls.BACK) goNext();
 		}
 
-		// 开关圆钮（坐标模型，2026-09-12 修正）：
-		//   · `toggleKnobX` / `knobCenter` 一律是**圆心在轨道内的坐标**（关 16 / 开 80）；
-		//   · 精灵 x 由 knobXFromCenter() 换算：x = toggleTrack.x + 圆心 − 圆钮半径。
-		//   轨道与圆钮是 content 的**同级子精灵**（x 同基准），必须显式加上 toggleTrack.x。
-		//   从前把"轨道内相对量"直接写进 `toggleKnob.x`（16/80），圆钮就被画到屏幕左侧、
-		//   距轨道 409px（实测探针 knob.x=80 / track.x=489）—— 这就是「圆点飞出」。
-		#if meteoric_debug
-		// 【临时探针】每 60 帧打一次；验收判据：dx 关态 = 5 / 开态 = 69（验证后连同本段删除）
-		if (toggleKnob != null)
-		{
-			_dbgFrames++;
-			if (_dbgFrames % 60 == 0)
-				Sys.println('[TOGGLE] dx=' + Std.int(toggleKnob.x - toggleTrack.x)
-					+ ' knob.x=' + Std.int(toggleKnob.x) + ' track.x=' + Std.int(toggleTrack.x)
-					+ ' center=' + Std.int(knobCenter) + ' target=' + Std.int(toggleKnobX)
-					+ ' knob.y=' + Std.int(toggleKnob.y) + ' track.y=' + Std.int(toggleTrack.y)
-					+ ' on=' + ClientPrefs.data.updateNotify
-					+ ' placed=' + knobPlaced);
-		}
-		#end
-		if (toggleKnob != null)
-		{
-			if (!knobPlaced)
-			{
-				knobPlaced = true;
-				knobCenter = clampCenter(toggleKnobX);
-			}
-			else
-			{
-				knobCenter = clampCenter(FlxMath.lerp(knobCenter, toggleKnobX, Math.min(1, elapsed * 18)));
-			}
-			toggleKnob.x = knobXFromCenter(knobCenter);
-		}
-		if (toggleKnob != null) syncKnobColor();
+		// 开关滑块：坐标模型与插值都封在 objects.ToggleSwitch 里（"圆点飞出"的修复随之固化）
+		if (toggleSw != null) toggleSw.animate(elapsed);
 
 		super.update(elapsed);
 	}
@@ -302,8 +252,9 @@ class OutdatedState extends MusicBeatState
 
 	function overToggle(mx:Float, my:Float):Bool
 	{
-		return mx >= toggleTrack.x - 12 && mx <= toggleTrack.x + TOGGLE_HIT_W
-			&& my >= toggleTrack.y - 12 && my <= toggleTrack.y + TOGGLE_H + 12;
+		return toggleSw != null
+			&& mx >= toggleSw.track.x - 12 && mx <= toggleSw.track.x + TOGGLE_HIT_W
+			&& my >= toggleSw.track.y - 12 && my <= toggleSw.track.y + TOGGLE_H + 12;
 	}
 
 	/** 翻转「稍后提醒 / 不再提示」并落盘。 */
@@ -315,18 +266,6 @@ class OutdatedState extends MusicBeatState
 		refreshToggle();
 	}
 
-	/** 圆心（轨道内坐标）→ 子精灵 x。轨道与圆钮是 content 的**同级子精灵**，x 同基准。 */
-	inline function knobXFromCenter(center:Float):Float
-	{
-		return toggleTrack.x + center - KNOB_R;
-	}
-
-	/** 把圆心夹进轨道有效区间（夹的是**圆心**，不是精灵左边框）。 */
-	inline function clampCenter(c:Float):Float
-	{
-		return c < KNOB_C_MIN ? KNOB_C_MIN : (c > KNOB_C_MAX ? KNOB_C_MAX : c);
-	}
-
 	/** 刷新开关外观（文案 / 胶囊底 / 圆钮圆心目标），颜色全部走令牌。 */
 	function refreshToggle():Void
 	{
@@ -335,49 +274,12 @@ class OutdatedState extends MusicBeatState
 		toggleLabel.text = on ? '稍后提醒' : '不再提示';
 		toggleLabel.color = on ? FlxColor.WHITE : DesignTokens.secondary;
 
-		// 胶囊底：原地重绘（先清后画）。
-		// ⚠ 不能用 makeGraphic "重建"：尺寸不变时命中的是缓存里同一张 BitmapData，
-		// 旧像素不会被清 → "开"态的 primary 填充会残留在"关"态胶囊上（同尺寸精灵还会互相串图）。
-		if (toggleTrack.graphic == null)
-			toggleTrack.makeGraphic(Std.int(TOGGLE_W), Std.int(TOGGLE_H), FlxColor.TRANSPARENT, true);
-		else
-			toggleTrack.pixels.fillRect(toggleTrack.pixels.rect, FlxColor.TRANSPARENT);
-		FlxSpriteUtil.drawRoundRect(toggleTrack, 0, 0, TOGGLE_W, TOGGLE_H, TOGGLE_H * 0.5, TOGGLE_H * 0.5,
-			on ? DesignTokens.primary : 0x66161622);
-		FlxSpriteUtil.drawRoundRect(toggleTrack, 1, 1, TOGGLE_W - 2, TOGGLE_H - 2, TOGGLE_H * 0.5, TOGGLE_H * 0.5,
-			FlxColor.TRANSPARENT, {color: on ? DesignTokens.primary : DesignTokens.panelOutline, thickness: 1.5});
-		toggleTrack.dirty = true;
+		// 轨道重绘 / 圆钮目标 / 首次落位全在组件内，这里只喂状态
+		if (toggleSw != null) toggleSw.setOn(on);
 
-		// 圆钮：圆心目标（开 80 / 关 16）；首次**直接落位**，之后由 update 在圆心空间插值。
-		toggleKnobX = on ? KNOB_C_MAX : KNOB_C_MIN;
-		if (toggleKnob.graphic == null)
-		{
-			knobCenter = clampCenter(toggleKnobX);
-			toggleKnob.x = knobXFromCenter(knobCenter);
-		}
-		syncKnobColor();
+		// 轨道重绘（开 = primary 填充、关 = 深底+描边）与圆钮落位已移入 objects.ToggleSwitch.setOn()
 	}
 
-	/**
-	 * 圆钮：白圆 + 与轨道**垂直居中**（水平位置由 update 在圆心空间插值后换算）。
-	 *
-	 * x/y 都是 content 组内的**同基准坐标**（轨道与圆钮是同级子精灵），所以：
-	 *  · x 必须写 `toggleTrack.x + 圆心 − 圆钮半径` —— 直接把"轨道内相对量"写进来会让圆钮
-	 *    被画到面板左边（实测：knob.x=80 而 track.x=489），即「圆点飞出」；
-	 *  · y 用 `toggleTrack.y + (胶囊高 − 圆钮高)/2` 即可（两者同为组内坐标，不要额外加绝对偏移）。
-	 * 圆钮位图同样 unique=true：否则可能命中别的 22×22 缓存位图、白圆会带着别人的残留。
-	 */
-	function syncKnobColor():Void
-	{
-		var kn:Float = KNOB_D;
-		if (toggleKnob.graphic == null || toggleKnob.width != kn)
-		{
-			toggleKnob.makeGraphic(Std.int(kn), Std.int(kn), FlxColor.TRANSPARENT, true);
-			FlxSpriteUtil.drawCircle(toggleKnob, kn * 0.5, kn * 0.5, KNOB_R, 0xFFFFFFFF);
-			toggleKnob.updateHitbox();
-		}
-		toggleKnob.y = toggleTrack.y + (TOGGLE_H - toggleKnob.height) * 0.5;
-	}
 
 	// ───────────────────────── 焦点 ─────────────────────────
 
@@ -459,6 +361,8 @@ class OutdatedState extends MusicBeatState
 
 	override function destroy()
 	{
+		if (toggleSw != null) toggleSw.destroy();
+		toggleSw = null;
 		FlxG.mouse.visible = false;
 		super.destroy();
 	}

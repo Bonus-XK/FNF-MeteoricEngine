@@ -214,6 +214,30 @@ class SaveVariables {
 	@:keep public var containerExitKeys:Array<FlxKey> = [CONTROL, C];
 	#end
 
+	// ===== 编程分区：CNE 式 HScript 编程层（默认保守开关）=====
+	// 总开关：关闭时引擎行为与改动前完全一致（不加载 CNE 风格脚本、不注册状态改写钩子）。
+	@:keep public var cneScripting:Bool = false;
+	// 状态脚本：data/states/<界面类名>/LIB_<mod>.hx
+	@:keep public var cneStateScripts:Bool = true;
+	// 全局脚本：data/global/LIB_<mod>.hx
+	@:keep public var cneGlobalScripts:Bool = true;
+	// ModState / ModSubState：允许 HScript 写完整界面
+	@:keep public var cneModStates:Bool = true;
+	// 界面重定向：flags.ini [StateRedirects] 改写引擎界面（默认关）
+	@:keep public var cneStateRedirects:Bool = false;
+	// 脚本热重载：F5 重载当前界面脚本；Shift+F5 重建全局脚本
+	@:keep public var cneHotReload:Bool = true;
+	// 脚本定义/继承类：SScript EX 模式
+	@:keep public var cneScriptClasses:Bool = true;
+	// 脚本加载日志
+	@:keep public var cneScriptLogs:Bool = false;
+	// CNE 模组兼容：让 Codename Engine 格式的 mod（data/characters/*.xml、songs/<song>/charts/*.json、
+	// songs/<song>/song/Inst|Voices-*、data/weeks/weeks/*.xml，文件夹或 .zip 包）能在 Meteoric 里加载。
+	// 默认关：关闭时 mod 加载路径与改动前完全一致（不扫 CNE 布局、不挂 zip 暂存、不翻译谱面/人物/周目）。
+	@:keep public var cneModCompat:Bool = false;
+	// 热重载键位：放在编程专属字段而不是 keyBinds，避免改动 ControlsSubState 的 keyBinds 表结构
+	@:keep public var cneHotReloadKeys:Array<FlxKey> = [F5];
+
 	public function new()
 	{
 		//Why does haxe needs this again?

@@ -1,0 +1,15 @@
+== 第二轮：四个整屏页出口改为一步直达（本轮补充）==
+产物构建时间: Sep 16 06:53:01 2026（BUILD_EXIT=0，0 error）
+
+代码路径（source/options/OptionsState.hx）：
+  208:		pane.onOpenExternal = function() openCurrentExternal();
+  347:	function openCurrentExternal():Void
+  354:		pendingSelectLabel = e.label;
+  361:	function currentIsExternal():Bool
+  459:				if (currentIsExternal()) openCurrentExternal();
+  517:				if (currentIsExternal()) openCurrentExternal();
+
+产物内字符串核验（hxcpp = UTF-16LE 字节）：
+  点左侧分区栏即直接打开            命中=2 OK
+  容器自带引擎界面               命中=1 OK
+  Tab 切换分区/选项            命中=1 OK

@@ -1,0 +1,32 @@
+== 第六轮：全库开关统一为胶囊 toggle（+ Skill 写入）==
+构建: BUILD_EXIT=0 / 0 error；产物 Sep 16 21:38:52 2026
+
+-- 1) 各界面开关实现现状（source/ 下的相对路径）--
+  source/options/OptionsPane.hx          ToggleSwitch引用=5   旧方框引用=0
+  source/options/BaseOptionsMenu.hx      ToggleSwitch引用=5   旧方框引用=0
+  source/states/ModsMenuState.hx         ToggleSwitch引用=5   旧方框引用=0
+  source/states/OutdatedState.hx         ToggleSwitch引用=6   旧方框引用=0
+  source/objects/ToggleSwitch.hx         ToggleSwitch引用=2   旧方框引用=6
+
+-- 2) 组件 API --
+  52:	public function new(x:Float, y:Float, ?w:Float = 96, ?h:Float = 32)
+  76:	public function setOn(v:Bool, instant:Bool = false):Void
+  90:	public function refreshTheme():Void
+  96:	public function animate(elapsed:Float):Void
+  110:	public function setPosition(x:Float, y:Float):Void
+  119:	public function hits(mx:Float, my:Float, pad:Float = 12):Bool
+  125:	public function setVisible(v:Bool):Void
+  130:	public function setAlpha(a:Float):Void
+  135:	public function destroy():Void
+
+-- 3) Skill 写入点 --
+  meteoric-system: 38:| **开关（胶囊 toggle）** | `objects/ToggleSwitch.hx`（**系统域布尔项的唯一形态**） | 轨道胶囊 **96×32**（圆角 = 高的一半）+ **22px 纯白圆钮**；开 = `DesignTokens.primary` 填充 **+ primary 描边**，关 = `0x66161622` 填充 + `panelOutline` 描边（1.5px）；切换动画在**圆心空间** `FlxMath.lerp(..., elapsed * 18)`，首次落位**直接吸附**（否则会从错误初值滑进来）；命中区外扩 12px → 高 **56**（触控红线） |
+  meteoric-system: 59:**开关统一清单（2026-09-16 完成，新代码禁止再写方框复选框）**：
+  meteoric-system: 98:### 单界面设置（OptionsState = 侧栏 + 内容区，2026-09-16 落地）
+  meteoric-design: 80:| **开关（布尔项）** | 全圆胶囊（圆角 = 高的一半） | `objects/ToggleSwitch`：96×32 胶囊 + 22px 白圆钮；开 = `primary`、关 = `0x66161622` + `panelOutline`。**系统域布尔项一律用它，禁止方框复选框** |
+
+-- 4) 列几何 --
+  融合设置内容区: 开关 306..402，名字起点 414（VALUE_X 914）→ 名字可用宽 486px
+  分页设置页(暂停): 开关 56..152，LIST_X 108→164（值列 420..660 不动）
+  模组列表:        开关 56..152，LIST_X 88→164（clipText 宽 352px）
+  命中高一律 32+12×2 = 56（触控红线）

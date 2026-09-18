@@ -104,6 +104,15 @@ class StageData {
 		#end
 		else
 		{
+			#if (MODS_ALLOWED && sys)
+			// CNE 模组兼容：Psych 没有这个舞台的 JSON 时，用 CNE 舞台 XML
+			// （`mods/<mod>/data/stages/<名>.xml`）合成 StageFile —— 角色站位、相机偏移与
+			// defaultZoom 全部来自该 XML（否则 PlayState 会按默认站位把角色堆在一起、
+			// 且因为舞台 switch 无匹配分支导致「背景一个图都不显示」）。
+			// 图层由 states.stages.CneXmlStage 负责（StageFile 没有数据驱动图层字段）。
+			var cneStage:Dynamic = cne.CneModCompat.stageFile(stage);
+			if (cneStage != null) return cast cneStage;
+			#end
 			return null;
 		}
 		return cast Json.parse(rawJson);

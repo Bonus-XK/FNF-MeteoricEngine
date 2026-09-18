@@ -45,8 +45,9 @@ class UIInputBox extends FlxSpriteGroup
 	public var text(get, set):String;
 	public var hasFocus(get, set):Bool;
 
-	public function new(x:Float, y:Float, w:Int, h:Int, ?startText:String = '', fontSize:Int = 22)
+	public function new(x:Float, y:Float, w:Int, h:Int, ?startText:String = '', fontSize:Int = 22, ?maxLength:Int = 24)
 	{
+		if (maxLength < 1) maxLength = 1;
 		super(x, y);
 		boxW = w;
 		boxH = h;
@@ -61,7 +62,7 @@ class UIInputBox extends FlxSpriteGroup
 		input = new FlxInputText(PANEL_PAD, Std.int((h - fontSize - 8) / 2), w - Std.int(PANEL_PAD * 2), startText, fontSize, FlxColor.WHITE, FlxColor.TRANSPARENT);
 		input.setFormat(Paths.font('future.ttf'), fontSize, FlxColor.WHITE, LEFT);
 		input.active = false;
-		input.maxLength = 24;
+		input.maxLength = maxLength;
 		add(input);
 
 		// 自绘光标（聚焦时显示/闪烁；FlxInputText 的 caret 因 active=false 不更新，原生层又隐形）
@@ -78,7 +79,7 @@ class UIInputBox extends FlxSpriteGroup
 		nativeField.background = false;
 		nativeField.border = false;
 		nativeField.text = startText;
-		nativeField.maxChars = 24;
+		nativeField.maxChars = maxLength;
 		nativeField.alpha = 0;
 		nativeField.addEventListener(Event.CHANGE, onNativeChange);
 		nativeField.addEventListener(KeyboardEvent.KEY_DOWN, onNativeKeyDown);

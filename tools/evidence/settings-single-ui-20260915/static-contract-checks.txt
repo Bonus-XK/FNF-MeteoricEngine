@@ -1,0 +1,92 @@
+====================================================================
+Meteoric Engine — 设置界面重写（多界面融合 + 侧边栏切分区）静态契约自查
+生成时间: 2026-09-16 06:38:05
+====================================================================
+
+== 1) 新增/改动文件 ==
+ M source/objects/ColorSwatchPicker.hx
+ M source/options/BaseOptionsMenu.hx
+ M source/options/ControlsSubState.hx
+ M source/options/EffectsSubState.hx
+ M source/options/GraphicsSettingsSubState.hx
+ M source/options/InterfaceSettingsSubState.hx
+ M source/options/NoteSettingsSubState.hx
+ M source/options/NotesSubState.hx
+ M source/options/OptionsState.hx
+?? source/options/ControlsPane.hx
+?? source/options/NotesPane.hx
+?? source/options/OptionValue.hx
+?? source/options/OptionsPane.hx
+?? source/options/OptionsUi.hx
+?? source/options/SettingsCanvas.hx
+?? source/options/SettingsRail.hx
+
+== 2) 面板/高亮令牌：新代码禁止字面量（排除注释行）==
+  OptionsState.hx                            字面量面板色=0
+  OptionsPane.hx                             字面量面板色=0
+  SettingsRail.hx                            字面量面板色=0
+  OptionsUi.hx                               字面量面板色=0
+  SettingsCanvas.hx                          字面量面板色=0
+  NotesPane.hx                               字面量面板色=0
+  ControlsPane.hx                            字面量面板色=0
+
+== 3) 层级契约：高亮条必须在行文字之前 add ==
+  OptionsPane:
+154:		add(selectorBar);
+164:			add(row);
+414:		add(swatchBar);
+  SettingsRail:
+79:		add(bar);
+89:			add(row);
+
+== 4) 画布分区：不得残留子状态专属 API ==
+  OK：无 close()/openSubState/子状态状态位
+
+== 5) 画布布局常量必须为实例字段（可被内容区矩形重算）==
+source/options/NotesPane.hx:0
+source/options/ControlsPane.hx:0
+
+== 6) 内容区几何核算（1280×720 基准）==
+  侧栏面板      x 40..270   (宽 230)
+  内容面板      x 284..1240 (宽 956)  右缘 ≤1240 OK
+  选项行        y 152..560（8 行 × 52）        底栏 578 不重叠 OK
+  说明行/色板条 y 578..632                                       底缘 ≤648 OK
+  值列右对齐    x 914..1214                           右缘 ≤1220 OK
+  底部提示条    y 662..710（高 48 ≤56）
+  —— 画布分区（按键设置/箭头配色）——
+  左面板        x 284..844；右面板 x 858..1240
+  模式列跨度 305 ≤ 左面板 560 OK
+  箭头列跨度 507 ≤ 左面板 560 OK
+  色轮 x 924..1174；渐变条 x 1176..1222（右缘 ≤1240 OK，互不重叠 OK)
+  键位列        x 740..1200          右缘 ≤1240 OK
+
+== 7) headless 契约（BaseOptionsMenu 的 UI 方法必须早退）==
+114:		if (headless) return;
+268:		if (headless)
+290:		if (headless)
+304:		if (headless) return; // 单界面宿主：渲染由 options.OptionsPane 负责
+382:		if (headless) return; // 令牌/存档已生效；本页 UI 由宿主 OptionsPane 刷新（见 OptionsPane.onValueChanged）
+417:		if (headless) return; // 单界面宿主自带色板区（OptionsPane.ensureSwatches）
+485:		if (headless) return; // 由 OptionsPane 的色板区负责
+986:		if (headless) { onPaneSelectionChange(); return; } // 单界面宿主自己维护选中（OptionsPane.changeSelection）
+
+== 8) 分区表（侧栏 13 项 / 就地 9 项 / 独立页出口 4 项）==
+  86:		var e:SectionEntry = new SectionEntry('音符', '音符');
+  90:		e = new SectionEntry('箭头配色', '箭头配色');
+  101:		e = new SectionEntry('界面', '界面');
+  105:		e = new SectionEntry('画面', '图像设置');
+  109:		e = new SectionEntry('效果', '效果');
+  113:		e = new SectionEntry('玩法', '玩法');
+  117:		e = new SectionEntry('判定', '判定');
+  121:		e = new SectionEntry('性能', '性能');
+  125:		e = new SectionEntry('按键设置', '按键设置');
+  136:		e = new SectionEntry('调整延迟', '调整延迟与Combo');
+  143:		e = new SectionEntry('自定义界面', '自定义界面');
+  151:		e = new SectionEntry('容器', '容器');
+  160:		e = new SectionEntry('移动触控', '移动触控');
+  就地(选项分区):
+7
+  就地(画布分区):
+2
+  独立页出口    :
+4

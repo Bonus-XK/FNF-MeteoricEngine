@@ -1,0 +1,44 @@
+== 第五轮：空开关根因 + 开关样式统一为「更新界面」的 toggle ==
+构建: BUILD_EXIT=0 / 0 error；产物 Sep 16 12:46:17 2026
+
+-- 1) 空开关根因（预览带分区只用到 6 行，尾部 2 行未被隐藏）--
+  453:		// ★ 尾部未使用的行（带预览带的分区只用 6 行）必须**显式隐藏**：
+  454-		//   setRowsVisible(true) 会把全部 8 行的行文字/开关/值文字都显示出来，而上面只遍历 rowsVisible 行；
+  455-		//   不补这一段，预览带上就会留下"两个没有文字的空开关"（2026-09-16 用户实测截图定位到的问题）。
+  456-		for (r in rowsVisible...rows.length)
+  457-		{
+  458-			rows[r].visible = false;
+  459-			switchCols[r].setVisible(false);
+  460-			valueTexts[r].visible = false;
+  461-			lastRowText[r] = '';      // 复位缓存：下次真用到这一行时会重新填文本
+  462-			lastValueText[r] = '';
+
+-- 2) 开关组件（照抄更新界面规格）--
+  15: *  - 轨道 96×32 胶囊（圆角 = 高的一半）；开 = `DesignTokens.primary` 填充 + primary 描边，
+  16: *    关 = `0x66161622` 填充 + `DesignTokens.panelOutline` 描边（1.5px）；
+  18: *  - 切换动画：**圆心空间**插值 `FlxMath.lerp(..., elapsed * 18)`；首次落位**直接吸附**
+  24: *     所以这里 `makeGraphic(..., unique: true)` + 每次 `pixels.fillRect` 清底再画。
+  52:	public function new(x:Float, y:Float, ?w:Float = 96, ?h:Float = 32)
+  104:			knobCenter = FlxMath.lerp(knobCenter, knobTarget, Math.min(1, elapsed * 18));
+  109:	/** 命中判定：轨道外扩 pad（默认 12 → 高 32+24 = 56 满足触控目标红线） */
+  148:			on ? DesignTokens.primary : 0x66161622);
+  150:			flixel.util.FlxColor.TRANSPARENT, {color: on ? DesignTokens.primary : DesignTokens.panelOutline, thickness: 1.5});
+
+-- 3) 设置内容区改用开关（方框已移除）--
+  84:	var switchCols:Array<objects.ToggleSwitch> = [];
+  177:			var sw:objects.ToggleSwitch = new objects.ToggleSwitch(CHECK_X, ROW_Y + SWITCH_ROW_OFF + (r * ROW_GAP));
+  393:			switchCols[r].setVisible(v);
+  409:				switchCols[r].setVisible(false);
+  428:			switchCols[r].setVisible(isBool);
+  429:			switchCols[r].setAlpha(idx == curSelected ? 1 : 0.85);
+  432:				switchCols[r].setOn(option.getValue() == true); // 目标态（滑块由 update 的 animate 滑过去）
+  433:				switchCols[r].refreshTheme();                   // primary 是运行时令牌：主题切换后重绘
+  459:			switchCols[r].setVisible(false);
+  914:			var sw:objects.ToggleSwitch = switchCols[r];
+  残留旧方框引用:
+0
+
+-- 4) 列几何核算（开关 96 宽 → 名字列右移，不重叠）--
+  开关 306..402；选项名起点 414（间距 12px）；值列右对齐起点 914
+  名字可用宽 = 486px  OK
+  开关命中高 = 32 + 12×2 = 56（触控红线 ≥56）OK

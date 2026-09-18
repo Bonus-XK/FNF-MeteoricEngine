@@ -1,0 +1,155 @@
+--- a/source/cne/CneModCompat.hx
++++ b/source/cne/CneModCompat.hx
+@@ -610,6 +610,20 @@
+ 				? Std.string(meta.displayName) : dir;
+ 			var icon:String = (meta != null && meta.icon != null && Std.string(meta.icon).length > 0)
+ 				? Std.string(meta.icon) : 'face';
++			// CNE 的 meta.json `icon` 经常是占位：SMA 全部 5 首曲都写 "face"，而 mod 里
++			// 根本没有 face 图标 → 走 Psych 的 `icons/icon-face` 通用兜底，Freeplay 显示小灰人。
++			// CNE 的真实图标是目录形态 `images/icons/<角色>/icon.png`，所以这里在 meta.icon
++			// 解析不到真图标时，用该曲谱面**玩家 strumLine（type 1）**的角色名兜底 ——
++			// 正好复用 `objects/HealthIcon.changeIcon` 里已加的 CNE 目录图标兜底。
++			if (!iconUsable(mod, icon))
++			{
++				var fallbackChar:String = playerCharacterForSong(mod, dir, meta);
++				if (fallbackChar != null && fallbackChar.length > 0 && iconUsable(mod, fallbackChar))
++				{
++					log('CNE freeplay icon fallback: ' + icon + ' → ' + fallbackChar + ' (' + dir + ')');
++					icon = fallbackChar;
++				}
++			}
+ 			var color:Array<Int> = (meta != null) ? parseHexColor(meta.color != null ? Std.string(meta.color) : null) : null;
+ 			if (color == null) color = [255, 255, 255];
+ 			if (firstColor == null) firstColor = color;
+@@ -643,8 +657,131 @@
+ 		};
+ 		log('CNE freeplay list: ' + mod + ' → ' + songs.length + ' songs, difficulties="' + difficulties.join(',') + '"');
+ 		return weekFile;
++	}
++
++	/**
++	 * `meta.icon` 是否真能解析到一张图标。
++	 *
++	 * 与 `objects/HealthIcon.changeIcon` 的**实际查找顺序**一致：
++	 *   ① `images/icons/<名>.png`
++	 *   ② 不存在时 `images/icons/icon-<名>.png`（旧版 Psych）
++	 *   ③ ② 也不存在时才轮到 CNE 目录图标 `images/icons/<名>/icon.png`
++	 * 但**不把引擎通用兜底 `icons/icon-face.png` 当成 `face` 的有效图标** —— 它的存在会
++	 * 挡住 ③（HealthIcon 的条件是 `!exists(icon-<名>.png)`），于是 `face` 永远显示灰脸。
++	 * 所以 `face` 只认 ①，让调用方改用谱面里的真实角色名。
++	 */
++	static function iconUsable(mod:String, name:String):Bool
++	{
++		if (name == null || name.length == 0) return false;
++
++		var prev:String = Mods.currentModDirectory;
++		Mods.currentModDirectory = (mod != null) ? mod : '';
++		var ok:Bool = false;
++		try
++		{
++			if (Paths.fileExists('images/icons/' + name + '.png', openfl.utils.AssetType.IMAGE))
++			{
++				ok = true;
++			}
++			else
++			{
++				var legacyExists:Bool = Paths.fileExists('images/icons/icon-' + name + '.png', openfl.utils.AssetType.IMAGE);
++				if (legacyExists && name.toLowerCase() != 'face')
++					ok = true;
++				else if (!legacyExists
++					&& Paths.fileExists('images/icons/' + name + '/icon.png', openfl.utils.AssetType.IMAGE))
++					ok = true;
++			}
++		}
++		catch (e:Dynamic) { ok = false; }
++		Mods.currentModDirectory = prev;
++		return ok;
+ 	}
+ 
++	/**
++	 * 从该曲谱面取「玩家 strumLine（type 1）」里**第一个图标可解析**的角色名，供 Freeplay 图标兜底。
++	 *
++	 * 只取 type 1 的第一个是不够的：SMA `smile` 的玩家线是 `["boyfunkle","bfsma"]`，
++	 * `boyfunkle` 在 mod/引擎里都没有图标（会掉灰脸），`bfsma` 才有
++	 * `images/icons/bfsma/icon.png`。所以按顺序取第一个 `iconUsable` 的角色；
++	 * 都没有则返回第一个 type 1 角色名（调用方会再校验一次，不满足就保留原 icon）。
++	 * 谱面优先用 `meta.difficulties` 的第一项，缺失/不存在时取 `charts/` 下第一个 `.json`。
++	 * 只解析 `strumLines`，不建整张谱（Freeplay 列表每首歌都会调用一次）。
++	 */
++	static function playerCharacterForSong(mod:String, songDir:String, meta:Dynamic):String
++	{
++		var chartsDir:String = Paths.mods(mod + '/songs/' + songDir + '/charts');
++		if (!FileSystem.exists(chartsDir) || !FileSystem.isDirectory(chartsDir)) return null;
++
++		var chartPath:String = null;
++		if (meta != null && meta.difficulties != null)
++		{
++			for (d in cast(meta.difficulties, Array<Dynamic>))
++			{
++				if (d == null) continue;
++				var dn:String = Std.string(d);
++				if (dn.length == 0) continue;
++				for (cand in [dn, dn.toLowerCase()])
++				{
++					var p:String = chartsDir + '/' + cand + '.json';
++					if (FileSystem.exists(p) && !FileSystem.isDirectory(p)) { chartPath = p; break; }
++				}
++				if (chartPath != null) break;
++			}
++		}
++		if (chartPath == null)
++		{
++			var files:Array<String> = null;
++			try files = FileSystem.readDirectory(chartsDir) catch (e:Dynamic) { files = []; }
++			files.sort(function(a:String, b:String):Int { return Reflect.compare(a.toLowerCase(), b.toLowerCase()); });
++			for (f in files)
++			{
++				if (f == null || !f.toLowerCase().endsWith('.json')) continue;
++				var p:String = chartsDir + '/' + f;
++				if (FileSystem.exists(p) && !FileSystem.isDirectory(p)) { chartPath = p; break; }
++			}
++		}
++		if (chartPath == null) return null;
++
++		var raw:String = null;
++		try raw = File.getContent(chartPath) catch (e:Dynamic) { raw = null; }
++		if (raw == null) return null;
++		var data:Dynamic = null;
++		try data = haxe.Json.parse(raw) catch (e:Dynamic) { data = null; }
++		if (data == null) return null;
++
++		var lines:Array<Dynamic> = cast data.strumLines;
++		if (lines == null) return null;
++		var first:String = null;
++		for (line in lines)
++		{
++			if (line == null) continue;
++			if (intOf(line.type, -1) != 1) continue;
++			var chars:Array<Dynamic> = cast line.characters;
++			if (chars == null) continue;
++			for (ch in chars)
++			{
++				if (ch == null) continue;
++				var c:String = Std.string(ch);
++				if (c.length == 0) continue;
++				if (first == null) first = c;
++				if (iconUsable(mod, c)) return c;
++			}
++		}
++		return first;
++	}
++
++	/** `Dynamic` → Int（CNE JSON 里 type 可能是 Int/Float/Bool/String）。 */
++	static function intOf(v:Dynamic, def:Int):Int
++	{
++		if (v == null) return def;
++		if (Std.isOfType(v, Bool)) return (cast v) ? 1 : 0;
++		if (Std.isOfType(v, Int)) return cast v;
++		if (Std.isOfType(v, Float)) return Std.int(cast v);
++		var parsed:Null<Int> = Std.parseInt(Std.string(v));
++		return (parsed == null) ? def : cast parsed;
++	}
++
+ 	// ==================== 记谱皮肤（CNE NOTE 贴图） ====================
+ 
+ 	/**

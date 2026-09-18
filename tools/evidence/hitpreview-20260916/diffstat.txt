@@ -1,0 +1,4 @@
+ assets/shared/images/noteSplashes/list.txt |   3 +-
+ source/objects/NoteSplash.hx               |  12 +-
+ source/options/NoteSettingsSubState.hx     | 275 ++++++++++++++++++++++++++++-
+ 3 files changed, 278 insertions(+), 12 deletions(-)
