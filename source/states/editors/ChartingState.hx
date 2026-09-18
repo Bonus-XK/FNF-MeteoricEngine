@@ -267,7 +267,7 @@ class ChartingState extends MusicBeatState
 				stage: 'stage'
 			};
 			addSection();
-			PlayState.SONG = _song;
+			PlayState.setSong(_song);
 		}
 
 		// Paths.clearMemory();
@@ -590,7 +590,7 @@ class ChartingState extends MusicBeatState
 		y += 44;
 		var loadAutosaveBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '加载自动保存', function()
 		{
-			PlayState.SONG = Song.parseJSONshit(FlxG.save.data.autosave);
+			PlayState.setSong(Song.parseJSONshit(FlxG.save.data.autosave));
 			MusicBeatState.resetState();
 		}, 13);
 		panel.register(TAB, loadAutosaveBtn);
@@ -1580,7 +1580,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 			{
 				autosaveSong();
 				FlxG.mouse.visible = false;
-				PlayState.SONG = _song;
+				PlayState.setSong(_song);
 				FlxG.sound.music.stop();
 				if(vocals != null) vocals.stop();
 
@@ -2902,12 +2902,12 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		try {
 			if (Difficulty.getString() != Difficulty.getDefault()) {
 				if(Difficulty.getString() == null){
-					PlayState.SONG = Song.loadFromJson(song.toLowerCase(), song.toLowerCase());
+					PlayState.setSong(Song.loadFromJson(song.toLowerCase(), song.toLowerCase()));
 				}else{
-					PlayState.SONG = Song.loadFromJson(song.toLowerCase() + "-" + Difficulty.getString(), song.toLowerCase());
+					PlayState.setSong(Song.loadFromJson(song.toLowerCase() + "-" + Difficulty.getString(), song.toLowerCase()));
 				}
 			}
-			else PlayState.SONG = Song.loadFromJson(song.toLowerCase(), song.toLowerCase());
+			else PlayState.setSong(Song.loadFromJson(song.toLowerCase(), song.toLowerCase()));
 			MusicBeatState.resetState();
 		}
 		catch(e)

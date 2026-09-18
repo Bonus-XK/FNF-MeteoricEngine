@@ -576,7 +576,7 @@ class PauseSubState extends MusicBeatSubstate
 
 						var name:String = PlayState.SONG.song;
 						var poop = Highscore.formatSong(name, curSelected);
-						PlayState.SONG = Song.loadFromJson(poop, name);
+						PlayState.setSong(Song.loadFromJson(poop, name));
 						// 登记新难度谱面身份：游玩期剥离 SONG.notes 后仍可恢复
 						PlayState.registerChartSource(poop, name, name);
 						PlayState.storyDifficulty = curSelected;

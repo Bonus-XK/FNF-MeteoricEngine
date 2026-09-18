@@ -644,7 +644,7 @@ class LoadingState extends MusicBeatState
 
 	function onChartLoaded()
 	{
-		PlayState.SONG = chartMessage;
+		PlayState.setSong(chartMessage);
 		// 登记谱面身份：PlayState 游玩期会剥离 SONG.notes（省内存），重开/编谱靠此从缓存恢复
 		PlayState.registerChartSource(pendingChartJson, pendingChartFolder, chartMessage.song);
 		chartLoaded = true;
@@ -871,7 +871,7 @@ class LoadingState extends MusicBeatState
 			var cached:SwagSong = Song.tryLoadFromCache(pendingChartJson, pendingChartFolder);
 			if (cached != null)
 			{
-				PlayState.SONG = cached;
+				PlayState.setSong(cached);
 				// 登记谱面身份（同上：供 PlayState 剥离后恢复）
 				PlayState.registerChartSource(pendingChartJson, pendingChartFolder, cached.song);
 				clearPendingChart();

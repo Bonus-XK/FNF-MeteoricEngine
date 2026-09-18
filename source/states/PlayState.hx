@@ -204,7 +204,31 @@ class PlayState extends MusicBeatState
 	static function get_isPixelStage():Bool
 		return stageUI == "pixel";
 
+	/** 当前歌曲谱面（= 全局歌曲数据总线）。
+	 *  ⚠ **所有权契约（引擎源码内）**：唯一写入入口是下面的 `setSong()`；除本类方法体外，
+	 *  任何引擎文件都不得再对 `SONG` 直接赋值。
+	 *  收敛前：4 个文件、11 处直接赋值横跨「加载器 / 谱面编辑器 / 暂停重开换难度 / 本类缓存恢复」，
+	 *  任何一次改动都无法推理"此刻的 SONG 是谁装的"。
+	 *
+	 *  ⚠ **契约范围 = 引擎源码**：字段保持 `public`。脚本侧可写路径确实存在 ——
+	 *  HScript 侧 `HScript.hx` 的 `set('PlayState', PlayState)` 让 `PlayState.SONG = x` 在脚本里语法有效；
+	 *  Lua 侧走 `setPropertyFromClass('PlayState','SONG',…)` 反射。
+	 *  **但本仓库语料内未见任何写 SONG 的脚本实例**（这一点与 `Conductor.songPosition` 不同，后者有 2 处实例）——
+	 *  故"脚本会写 SONG"属**结构性成立、未被实例佐证**。无论是否被使用，**不得**为让"唯一写点"好看而私有化
+	 *  （会破坏 mod 兼容）。脚本侧写入不受本契约约束，也不被本契约覆盖。 */
 	public static var SONG:SwagSong = null;
+
+	/** 装载/替换当前歌曲谱面（引擎内唯一写点）。
+	 *  调用者角色：加载器（装载谱面）、谱面编辑器（开关歌曲/自动存档恢复/换曲）、
+	 *  暂停重开（换难度重新解析）、本类自身（缓存命中后恢复完整 DOM）。
+	 *  **不加 `inline`**：本方法不在热路径（11 处调用全发生在装载/换曲/重开/缓存恢复），
+	 *  保持普通静态方法可确保 hxcpp 方法表与脚本侧 `callMethodFromClass('PlayState','setSong')` 都真实存在
+	 *  （`inline` 目标不保证生成物理方法体，属未验证风险）。
+	 *  `@:keep` 保证 `-dce full` 下不被裁剪。引擎内调用点仅多一次静态调用，无实质开销。 */
+	@:keep public static function setSong(song:SwagSong):Void
+	{
+		SONG = song;
+	}
 	public static var isStoryMode:Bool = false;
 	public static var storyWeek:Int = 0;
 	public static var storyPlaylist:Array<String> = [];
@@ -270,7 +294,7 @@ class PlayState extends MusicBeatState
 					fresh.stage = SONG.stage;
 				if (fresh.gfVersion == null || fresh.gfVersion.length < 1)
 					fresh.gfVersion = SONG.gfVersion;
-				SONG = fresh; // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
+				setSong(fresh); // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
 			}
 			else
 			{
@@ -722,7 +746,7 @@ class PlayState extends MusicBeatState
 		persistentDraw = true;
 
 		if (SONG == null)
-			SONG = Song.loadFromJson('tutorial');
+			setSong(Song.loadFromJson('tutorial'));
 
 		// 游玩期会剥离 SONG.notes 逐音符数组（省内存）；回放指纹必须在剥离前记录，
 		// 结算写档（endSong）直接复用此值，不再重扫 sectionNotes
