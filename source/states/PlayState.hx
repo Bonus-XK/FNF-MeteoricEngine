@@ -51,6 +51,7 @@ import states.editors.ChartingState;
 import states.editors.CharacterEditorState;
 
 import substates.PauseSubState;
+import substates.GameOverTheme;
 import substates.ResultsSubState;
 import substates.GameOverSubstate;
 import backend.Multiplayer;
@@ -4100,17 +4101,43 @@ class PlayState extends MusicBeatState
 				}
 				#end
 
+				// 结算主题：由 stage 显式提供（BaseStage.getGameOverTheme），随调用点一次性传入
+				// —— stage 不再直接写 GameOverSubstate 的全局字段。
+				// 求值时点：旧实现在 stage create() 期间写全局，现在改为**进入结算时**求值；
+				// 引擎内两者之间无可观察读取者（四字段只在本类构造/更新期被读），
+				// 唯一可观察差异是脚本侧若在死亡前读这些字段会看到谱面/默认值。
+				// 多 stage 场景按创建序合并（后者覆盖非 null 字段）= 旧实现「后写者胜」；
+				// 注意拷贝而非直接引用返回值，避免污染 stage 自己持有的主题对象。
+				var goTheme:GameOverTheme = null;
+				stagesFunc(function(stage:BaseStage) {
+					var t = stage.getGameOverTheme();
+					if (t == null) return;
+					if (goTheme == null) {
+						goTheme = {
+							characterName: t.characterName,
+							deathSoundName: t.deathSoundName,
+							loopSoundName: t.loopSoundName,
+							endSoundName: t.endSoundName
+						};
+						return;
+					}
+					if (t.characterName != null) goTheme.characterName = t.characterName;
+					if (t.deathSoundName != null) goTheme.deathSoundName = t.deathSoundName;
+					if (t.loopSoundName != null) goTheme.loopSoundName = t.loopSoundName;
+					if (t.endSoundName != null) goTheme.endSoundName = t.endSoundName;
+				});
+
 				// Psych 1.0.4：deathDelay > 0 时延迟打开 Game Over（Weekend 1 Blazin 用 0.15s）
 				if (GameOverSubstate.deathDelay > 0)
 				{
 					gameOverTimer = new FlxTimer().start(GameOverSubstate.deathDelay, function(_)
 					{
-						openSubState(new GameOverSubstate(boyfriend.getScreenPosition().x - boyfriend.positionArray[0], boyfriend.getScreenPosition().y - boyfriend.positionArray[1], camFollow.x, camFollow.y));
+						openSubState(new GameOverSubstate(boyfriend.getScreenPosition().x - boyfriend.positionArray[0], boyfriend.getScreenPosition().y - boyfriend.positionArray[1], camFollow.x, camFollow.y, goTheme));
 						gameOverTimer = null;
 					});
 				}
 				else
-					openSubState(new GameOverSubstate(boyfriend.getScreenPosition().x - boyfriend.positionArray[0], boyfriend.getScreenPosition().y - boyfriend.positionArray[1], camFollow.x, camFollow.y));
+					openSubState(new GameOverSubstate(boyfriend.getScreenPosition().x - boyfriend.positionArray[0], boyfriend.getScreenPosition().y - boyfriend.positionArray[1], camFollow.x, camFollow.y, goTheme));
 
 				// MusicBeatState.switchState(new GameOverState(boyfriend.getScreenPosition().x, boyfriend.getScreenPosition().y));
 

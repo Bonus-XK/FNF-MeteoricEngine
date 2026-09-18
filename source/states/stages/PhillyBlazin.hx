@@ -7,6 +7,7 @@ import flixel.addons.transition.FlxTransitionableState;
 import flixel.addons.display.FlxTiledSprite;
 
 import substates.GameOverSubstate;
+import substates.GameOverTheme;
 import states.stages.objects.*;
 import objects.Note;
 
@@ -82,10 +83,6 @@ class PhillyBlazin extends BaseStage
 			setupRainShader();
 
 		var _song = PlayState.SONG;
-		if(_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) GameOverSubstate.deathSoundName = 'fnf_loss_sfx-pico-gutpunch';
-		if(_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) GameOverSubstate.loopSoundName = 'gameOver-pico';
-		if(_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) GameOverSubstate.endSoundName = 'gameOverEnd-pico';
-		if(_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) GameOverSubstate.characterName = 'pico-blazin';
 		GameOverSubstate.deathDelay = 0.15;
 
 		setDefaultGF('nene');
@@ -269,5 +266,19 @@ class PhillyBlazin extends BaseStage
 		//trace('opponent hit!');
 		picoFight.noteMiss(note);
 		darnellFight.noteMiss(note);
+	}
+
+	// 结算主题：**恒返回非 null map**（null 字段 = 不干预）——PlayState 用返回 null 判定「本 stage 不参与」，
+	//   若未来要改为返回 null，需同步调整 PlayState 的合并逻辑。
+	// 原说明：谱面字段为空时提供本 stage 的主题资源（等价于旧实现里 create() 期间的直接写入）
+	override function getGameOverTheme():GameOverTheme
+	{
+		var _song = PlayState.SONG;
+		return {
+			deathSoundName: (_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) ? 'fnf_loss_sfx-pico-gutpunch' : null,
+			loopSoundName: (_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) ? 'gameOver-pico' : null,
+			endSoundName: (_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) ? 'gameOverEnd-pico' : null,
+			characterName: (_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) ? 'pico-blazin' : null,
+		};
 	}
 }

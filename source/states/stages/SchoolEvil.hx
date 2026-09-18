@@ -3,6 +3,7 @@ package states.stages;
 import flixel.addons.effects.FlxTrail;
 import states.stages.objects.*;
 import substates.GameOverSubstate;
+import substates.GameOverTheme;
 import cutscenes.DialogueBox;
 
 #if MODS_ALLOWED
@@ -16,10 +17,6 @@ class SchoolEvil extends BaseStage
 	override function create()
 	{
 		var _song = PlayState.SONG;
-		if(_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) GameOverSubstate.deathSoundName = 'fnf_loss_sfx-pixel';
-		if(_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) GameOverSubstate.loopSoundName = 'gameOver-pixel';
-		if(_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) GameOverSubstate.endSoundName = 'gameOverEnd-pixel';
-		if(_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) GameOverSubstate.characterName = 'bf-pixel-dead';
 		
 		var posX = 400;
 		var posY = 200;
@@ -161,5 +158,19 @@ class SchoolEvil extends BaseStage
 				});
 			}
 		});
+	}
+
+	// 结算主题：**恒返回非 null map**（null 字段 = 不干预）——PlayState 用返回 null 判定「本 stage 不参与」，
+	//   若未来要改为返回 null，需同步调整 PlayState 的合并逻辑。
+	// 原说明：谱面字段为空时提供本 stage 的主题资源（等价于旧实现里 create() 期间的直接写入）
+	override function getGameOverTheme():GameOverTheme
+	{
+		var _song = PlayState.SONG;
+		return {
+			deathSoundName: (_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) ? 'fnf_loss_sfx-pixel' : null,
+			loopSoundName: (_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) ? 'gameOver-pixel' : null,
+			endSoundName: (_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) ? 'gameOverEnd-pixel' : null,
+			characterName: (_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) ? 'bf-pixel-dead' : null,
+		};
 	}
 }

@@ -8,6 +8,7 @@ import backend.MusicBeatState;
 import objects.Note.EventNote;
 import objects.Character;
 import objects.Note;
+import substates.GameOverTheme;
 
 enum Countdown
 {
@@ -22,6 +23,10 @@ class BaseStage extends FlxBasic
 {
 	private var game(default, set):Dynamic = PlayState.instance;
 	public var onPlayState:Bool = false;
+
+	/** 本 stage 想给 Game Over 用的主题资源（角色/音效），null 字段 = 不干预。
+	 *  由 PlayState 在进入结算时读取并**显式传给** GameOverSubstate 构造函数 —— stage 不再直接写全局字段。 */
+	public function getGameOverTheme():Null<GameOverTheme> return null;
 
 	// some variables for convenience
 	public var paused(get, never):Bool;

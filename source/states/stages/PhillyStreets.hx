@@ -9,6 +9,7 @@ import flixel.addons.display.FlxTiledSprite;
 import flixel.graphics.frames.FlxAtlasFrames;
 
 import substates.GameOverSubstate;
+import substates.GameOverTheme;
 import states.stages.objects.*;
 
 import objects.Note;
@@ -141,10 +142,6 @@ class PhillyStreets extends BaseStage
 			setupRainShader();
 
 		var _song = PlayState.SONG;
-		if(_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) GameOverSubstate.deathSoundName = 'fnf_loss_sfx-pico';
-		if(_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) GameOverSubstate.loopSoundName = 'gameOver-pico';
-		if(_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) GameOverSubstate.endSoundName = 'gameOverEnd-pico';
-		if(_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) GameOverSubstate.characterName = 'pico-dead';
 		setDefaultGF('nene');
 		
 		if (isStoryMode)
@@ -982,9 +979,13 @@ class PhillyStreets extends BaseStage
 				game.health -= 0.4;
 				if(game.health <= 0.0 && !game.practiceMode)
 				{
-					GameOverSubstate.deathSoundName = 'fnf_loss_sfx-pico-explode';
-					GameOverSubstate.loopSoundName = 'gameOverStart-pico-explode';
-					GameOverSubstate.characterName = 'pico-explosion-dead';
+					// 死亡瞬间的硬覆盖：记录为本 stage 主题，由进入结算的调用点显式传参
+					// （等价于原实现里在此处直接写 GameOverSubstate 的三个字段）
+					_gameOverOverride = {
+						deathSoundName: 'fnf_loss_sfx-pico-explode',
+						loopSoundName: 'gameOverStart-pico-explode',
+						characterName: 'pico-explosion-dead'
+					};
 				}
 		}
 	}
@@ -1020,5 +1021,22 @@ class PhillyStreets extends BaseStage
 				FlxTween.color(sprite, 1.4, 0xFF222222, 0xFFFFFFFF);
 			});
 		}
+	}
+
+	var _gameOverOverride:GameOverTheme = null;
+
+	// 结算主题：**恒返回非 null map**（null 字段 = 不干预）——PlayState 用返回 null 判定「本 stage 不参与」，
+	//   若未来要改为返回 null，需同步调整 PlayState 的合并逻辑。
+	// 原说明：谱面字段为空时提供本 stage 主题；死亡爆炸时由 _gameOverOverride 硬覆盖
+	override function getGameOverTheme():GameOverTheme
+	{
+		if (_gameOverOverride != null) return _gameOverOverride;
+		var _song = PlayState.SONG;
+		return {
+			deathSoundName: (_song.gameOverSound == null || _song.gameOverSound.trim().length < 1) ? 'fnf_loss_sfx-pico' : null,
+			loopSoundName: (_song.gameOverLoop == null || _song.gameOverLoop.trim().length < 1) ? 'gameOver-pico' : null,
+			endSoundName: (_song.gameOverEnd == null || _song.gameOverEnd.trim().length < 1) ? 'gameOverEnd-pico' : null,
+			characterName: (_song.gameOverChar == null || _song.gameOverChar.trim().length < 1) ? 'pico-dead' : null
+		};
 	}
 }

@@ -22,6 +22,12 @@ class GameOverSubstate extends MusicBeatSubstate
 
 	var stageSuffix:String = "";
 
+	/** Game Over 主题：由 stage 通过 `BaseStage.getGameOverTheme()` 提供、在进入结算时
+	 *  **显式传给本类构造函数**。字段为 null 表示"不干预"，回退到谱面字段 / 引擎默认值。
+	 *  这样 stage 不再直接写全局；字段优先级与取值等价：硬默认 → 谱面字段 → 主题覆盖。
+	 *  ⚠ 求值时点：这四个字段此前由 stage 在 create() 期间写；现在由进入结算的调用点显式传参，
+	 *  在**本类构造函数**里应用。引擎内无可观察差异（字段只在本类构造/更新期被读），
+	 *  但脚本侧若在死亡**之前**读它们，看到的仍是谱面/默认值（不是该 stage 的主题值）。 */
 	public static var characterName:String = 'bf-dead';
 	public static var deathSoundName:String = 'fnf_loss_sfx';
 	public static var loopSoundName:String = 'gameOver';
@@ -65,8 +71,17 @@ class GameOverSubstate extends MusicBeatSubstate
 		loadUIscripts('gameover');
 	}
 
-	public function new(x:Float, y:Float, camX:Float, camY:Float)
+	public function new(x:Float, y:Float, camX:Float, camY:Float, ?theme:GameOverTheme)
 	{
+		// 入口显式传入的 stage 主题：非 null 的字段覆盖（等价于旧实现里 stage 在 create() 期间的写入）
+		if (theme != null)
+		{
+			if (theme.characterName != null) characterName = theme.characterName;
+			if (theme.deathSoundName != null) deathSoundName = theme.deathSoundName;
+			if (theme.loopSoundName != null) loopSoundName = theme.loopSoundName;
+			if (theme.endSoundName != null) endSoundName = theme.endSoundName;
+		}
+
 		super();
 
 		PlayState.instance.setOnScripts('inGameOver', true);
