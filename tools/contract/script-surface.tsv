@@ -2,13 +2,14 @@
 # generator: tools/contract/gen_script_surface.py
 # schema: 1
 # columns: kind<TAB>name<TAB>source_location
-# counts: lua_unique=222 hscript_unique=183 pairs_unique=405 bare_name_unique=379 registrations=406 dynamic_sites=4
+# counts: lua_unique=222 hscript_unique=183 lua_ui_unique=73 pairs_unique=478 bare_name_unique=429 registrations=479 dynamic_sites=4
 # 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（Lua 与 HScript 有 26 个同名，属两份独立契约）
 # dynamic_sites: source/psychlua/FunkinLua.hx:112, source/psychlua/FunkinLua.hx:392, source/psychlua/HScript.hx:501, source/psychlua/MenuScript.hx:203
 # 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。
 # multi_site: lua.noteTweenAngle
 # kind=lua    : source/psychlua/** 下 Lua_helper.add_callback 的字符串字面量
 # kind=hscript: source/psychlua/HScript.hx 的 set('…') 预设变量
+# kind=lua-ui : interface 脚本专属回调 MenuScript.addLocalCallback('…') 的字面量名
 # 不变量：本文件中的名字只增不减；删除或改名 = 破坏 mod 兼容，必须人工评审。
 hscript	Achievements	source/psychlua/HScript.hx:189
 hscript	Adler32	source/psychlua/HScript.hx:272
@@ -416,3 +417,76 @@ lua	stringTrim	source/psychlua/ExtraFunctions.hx:260
 lua	triggerEvent	source/psychlua/functions/PlayCommands.hx:42
 lua	updateHitbox	source/psychlua/functions/ObjectCommands.hx:281
 lua	updateHitboxFromGroup	source/psychlua/functions/ObjectCommands.hx:296
+lua-ui	addBox	source/psychlua/functions/MenuCommands.hx:170
+lua-ui	addHaxeLibrary	source/psychlua/HScript.hx:646
+lua-ui	addSprite	source/psychlua/functions/MenuCommands.hx:162
+lua-ui	addText	source/psychlua/functions/MenuCommands.hx:53
+lua-ui	addTimer	source/psychlua/functions/MenuCommands.hx:209
+lua-ui	callOnHScript	source/psychlua/functions/ScriptCommands.hx:56
+lua-ui	callOnLuas	source/psychlua/functions/ScriptCommands.hx:49
+lua-ui	callOnScripts	source/psychlua/functions/ScriptCommands.hx:42
+lua-ui	callStateFunction	source/psychlua/functions/MenuCommands.hx:359
+lua-ui	cancelTimer	source/psychlua/functions/MenuCommands.hx:222
+lua-ui	cancelTween	source/psychlua/functions/MenuCommands.hx:206
+lua-ui	close	source/psychlua/functions/MiscCommands.hx:84
+lua-ui	getDataFromSave	source/psychlua/functions/MenuCommands.hx:271
+lua-ui	getImportedScripts	source/psychlua/functions/MenuCommands.hx:369
+lua-ui	getObjectAlpha	source/psychlua/functions/MenuCommands.hx:97
+lua-ui	getObjectAngle	source/psychlua/functions/MenuCommands.hx:143
+lua-ui	getObjectColor	source/psychlua/functions/MenuCommands.hx:132
+lua-ui	getObjectPosition	source/psychlua/functions/MenuCommands.hx:109
+lua-ui	getObjectScale	source/psychlua/functions/MenuCommands.hx:121
+lua-ui	getObjectType	source/psychlua/functions/MenuCommands.hx:155
+lua-ui	getObjectVisible	source/psychlua/functions/MenuCommands.hx:86
+lua-ui	getStateProperty	source/psychlua/functions/MenuCommands.hx:347
+lua-ui	getStateVar	source/psychlua/functions/MenuCommands.hx:356
+lua-ui	getText	source/psychlua/functions/MenuCommands.hx:48
+lua-ui	getThemeColor	source/psychlua/functions/MenuCommands.hx:307
+lua-ui	getThemeColorCount	source/psychlua/functions/MenuCommands.hx:316
+lua-ui	getThemeColorKey	source/psychlua/functions/MenuCommands.hx:313
+lua-ui	getThemeColorName	source/psychlua/functions/MenuCommands.hx:310
+lua-ui	getThemeColors	source/psychlua/functions/MenuCommands.hx:319
+lua-ui	getThemePanelFill	source/psychlua/functions/MenuCommands.hx:333
+lua-ui	getThemePrimary	source/psychlua/functions/MenuCommands.hx:322
+lua-ui	getThemeRowHighlight	source/psychlua/functions/MenuCommands.hx:336
+lua-ui	getThemeSecondary	source/psychlua/functions/MenuCommands.hx:325
+lua-ui	getThemeTertiary	source/psychlua/functions/MenuCommands.hx:328
+lua-ui	import	source/psychlua/functions/MiscCommands.hx:90
+lua-ui	initLuaShader	source/psychlua/ShaderFunctions.hx:15
+lua-ui	keyJustPressed	source/psychlua/functions/MenuCommands.hx:233
+lua-ui	keyJustReleased	source/psychlua/functions/MenuCommands.hx:235
+lua-ui	keyPressed	source/psychlua/functions/MenuCommands.hx:234
+lua-ui	luaTrace	source/psychlua/functions/MenuCommands.hx:365
+lua-ui	mouseJustPressed	source/psychlua/functions/MenuCommands.hx:236
+lua-ui	mouseJustReleased	source/psychlua/functions/MenuCommands.hx:238
+lua-ui	mousePressed	source/psychlua/functions/MenuCommands.hx:237
+lua-ui	objectExists	source/psychlua/functions/MenuCommands.hx:75
+lua-ui	openURL	source/psychlua/functions/MenuCommands.hx:294
+lua-ui	playMusic	source/psychlua/functions/MenuCommands.hx:261
+lua-ui	playSound	source/psychlua/functions/MenuCommands.hx:241
+lua-ui	removeObject	source/psychlua/functions/MenuCommands.hx:63
+lua-ui	resetState	source/psychlua/functions/MenuCommands.hx:284
+lua-ui	runHaxeCode	source/psychlua/HScript.hx:594
+lua-ui	runHaxeFunction	source/psychlua/HScript.hx:629
+lua-ui	setDataFromSave	source/psychlua/functions/MenuCommands.hx:275
+lua-ui	setDropShadow	source/psychlua/ShaderFunctions.hx:13
+lua-ui	setObjectAlpha	source/psychlua/functions/MenuCommands.hx:91
+lua-ui	setObjectAngle	source/psychlua/functions/MenuCommands.hx:137
+lua-ui	setObjectColor	source/psychlua/functions/MenuCommands.hx:126
+lua-ui	setObjectFlip	source/psychlua/functions/MenuCommands.hx:148
+lua-ui	setObjectPosition	source/psychlua/functions/MenuCommands.hx:102
+lua-ui	setObjectScale	source/psychlua/functions/MenuCommands.hx:114
+lua-ui	setObjectVisible	source/psychlua/functions/MenuCommands.hx:80
+lua-ui	setOnHScript	source/psychlua/functions/ScriptCommands.hx:30
+lua-ui	setOnLuas	source/psychlua/functions/ScriptCommands.hx:36
+lua-ui	setOnScripts	source/psychlua/functions/ScriptCommands.hx:24
+lua-ui	setSpriteShader	source/psychlua/ShaderFunctions.hx:26
+lua-ui	setStateProperty	source/psychlua/functions/MenuCommands.hx:341
+lua-ui	setStateVar	source/psychlua/functions/MenuCommands.hx:352
+lua-ui	setText	source/psychlua/functions/MenuCommands.hx:41
+lua-ui	setThemeColor	source/psychlua/functions/MenuCommands.hx:303
+lua-ui	stopMusic	source/psychlua/functions/MenuCommands.hx:265
+lua-ui	stopSound	source/psychlua/functions/MenuCommands.hx:246
+lua-ui	switchState	source/psychlua/functions/MenuCommands.hx:288
+lua-ui	tweenObject	source/psychlua/functions/MenuCommands.hx:183
+lua-ui	tweenObjectColor	source/psychlua/functions/MenuCommands.hx:194

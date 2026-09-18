@@ -27,7 +27,9 @@ OUT_MD = os.path.join(ROOT, "tools", "contract", "BASELINE.md")
 
 RE_LUA = re.compile(r"""Lua_helper\s*\.\s*add_callback\s*\(\s*[^,]+,\s*[\"']([A-Za-z0-9_]+)[\"']""")
 RE_LUA_ANY = re.compile(r'Lua_helper\s*\.\s*add_callback\s*\(')
-RE_HSX = re.compile(r"set\('([A-Za-z0-9_]+)'")
+RE_HSX = re.compile(r"(?<![A-Za-z0-9_])set\('([A-Za-z0-9_]+)'")
+# 界面脚本专属回调（红队 #4：addLocalCallback 字面量此前不在冻结面，实测 73 个站点）
+RE_UI = re.compile(r"""addLocalCallback\s*\(\s*["']([A-Za-z0-9_]+)["']""")
 
 
 def scan_lua():
@@ -60,13 +62,31 @@ def scan_hscript():
     return rows
 
 
+def scan_ui():
+    """界面脚本专属回调（MenuScript.addLocalCallback 的字符串字面量）。"""
+    rows = []
+    for dirpath, _dn, filenames in os.walk(LUA_ROOT):
+        for fn in sorted(filenames):
+            if not fn.endswith(".hx"):
+                continue
+            path = os.path.join(dirpath, fn)
+            rel = os.path.relpath(path, ROOT)
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                for i, line in enumerate(fh, 1):
+                    for m in RE_UI.finditer(line):
+                        rows.append(("lua-ui", m.group(1), "%s:%d" % (rel, i)))
+    return rows
+
+
 def collect():
     lua, dynamic, dyn_sites = scan_lua()
     hsx = scan_hscript()
-    rows = sorted(lua + hsx, key=lambda r: (r[0], r[1], r[2]))
+    ui = scan_ui()
+    rows = sorted(lua + hsx + ui, key=lambda r: (r[0], r[1], r[2]))
     stats = {
         "lua_unique": len({n for k, n, _ in rows if k == "lua"}),
         "hscript_unique": len({n for k, n, _ in rows if k == "hscript"}),
+        "ui_unique": len({n for k, n, _ in rows if k == "lua-ui"}),
         "total_unique": len({n for _, n, _ in rows}),
         "registrations": len(rows),
         "dynamic_or_unparsed": dynamic,
@@ -83,15 +103,16 @@ def render(rows, stats):
         "# generator: tools/contract/gen_script_surface.py",
         "# schema: 1",
         "# columns: kind<TAB>name<TAB>source_location",
-        "# counts: lua_unique=%d hscript_unique=%d pairs_unique=%d bare_name_unique=%d registrations=%d dynamic_sites=%d"
-        % (stats["lua_unique"], stats["hscript_unique"], stats["pairs_unique"], stats["total_unique"],
-           stats["registrations"], stats["dynamic_or_unparsed"]),
+        "# counts: lua_unique=%d hscript_unique=%d lua_ui_unique=%d pairs_unique=%d bare_name_unique=%d registrations=%d dynamic_sites=%d"
+        % (stats["lua_unique"], stats["hscript_unique"], stats["ui_unique"], stats["pairs_unique"],
+           stats["total_unique"], stats["registrations"], stats["dynamic_or_unparsed"]),
         "# 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（Lua 与 HScript 有 26 个同名，属两份独立契约）",
         "# dynamic_sites: %s" % (", ".join(stats["dynamic_sites"]) or "(none)"),
         "# 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。",
         "# multi_site: %s" % (", ".join("%s.%s" % (k, n) for k, n in stats["multi_site"]) or "(none)"),
         "# kind=lua    : source/psychlua/** 下 Lua_helper.add_callback 的字符串字面量",
         "# kind=hscript: source/psychlua/HScript.hx 的 set('…') 预设变量",
+        "# kind=lua-ui : interface 脚本专属回调 MenuScript.addLocalCallback('…') 的字面量名",
         "# 不变量：本文件中的名字只增不减；删除或改名 = 破坏 mod 兼容，必须人工评审。",
     ]
     for kind, name, loc in rows:

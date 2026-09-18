@@ -40,7 +40,7 @@ def diff_keys(base_rows, cur_rows, keyfn):
     def index(rows):
         d = {}
         for r in rows:
-            d.setdefault(keyfn(r), []).append(r[-1] if False else r)
+            d.setdefault(keyfn(r), []).append(r)
         return d
     b, c = index(base_rows), index(cur_rows)
     bk, ck = set(b), set(c)
@@ -114,6 +114,8 @@ def run_check(verbose=True):
         ok = False; reasons.append("路径/格式契约缺失 %d 行（路径字符串变化或站点消失，破坏 mod/存档/容器兼容）" % len(pm))
     if stats_p["unclassified"]:
         ok = False; reasons.append("路径候选存在未归类 %d 个" % stats_p["unclassified"])
+        for raw, loc in unclassified[:MAX_DETAIL]:
+            print("    未归类候选（必须显式归入 contract 或 exclude）: %s @ %s" % (raw, loc))
     if stats_p["missing"]:
         ok = False; reasons.append("§5 清单缺项: %s" % ", ".join(l for l, _ in stats_p["missing"]))
     print("RESULT: %s%s" % ("PASS" if ok else "FAIL",
@@ -134,7 +136,10 @@ def selftest():
     try:
         shutil.copytree(os.path.join(ROOT, "source"), os.path.join(tmp, "source"))
         shutil.copytree(HERE, os.path.join(tmp, "tools", "contract"))
-        cases = []
+        # 用例 0（红队 #8）：未突变副本必须先 PASS —— 否则后续用例的"FAIL"可能来自别处
+        r0 = _run(tmp)
+        cases = [("未突变副本→PASS", r0.returncode == 0 and "RESULT: PASS" in r0.stdout,
+                  next((l for l in r0.stdout.splitlines() if l.startswith("RESULT")), ""))]
         # ① 删 1 个名 → 期望 FAIL
         hsx = os.path.join(tmp, "source", "psychlua", "HScript.hx")
         s = open(hsx, encoding="utf-8").read()
@@ -142,13 +147,17 @@ def selftest():
         mut = s.replace("set('", "setDisabled('", 1)
         assert mut != s, "对照用例① 突变未生效"
         open(hsx, "w", encoding="utf-8").write(mut)
-        r = _run(tmp); cases.append(("删1个名→FAIL", r.returncode == 1 and "缺失 1" in r.stdout, r.stdout.splitlines()[-1] if r.stdout else ""))
-        shutil.copy2(os.path.join(HERE and ROOT, "source", "psychlua", "HScript.hx"), hsx)
+        r = _run(tmp)
+        cases.append(("删1个名→FAIL", r.returncode == 1 and "脚本入口缺失 1 个" in r.stdout and "RESULT: FAIL" in r.stdout,
+                      next((l for l in r.stdout.splitlines() if l.startswith("RESULT")), "")))
+        shutil.copy2(os.path.join(ROOT, "source", "psychlua", "HScript.hx"), hsx)
         # ② 增 1 个名 → 期望 PASS 且列出新增
         misc = os.path.join(tmp, "source", "psychlua", "functions", "MiscCommands.hx")
         with open(misc, "a", encoding="utf-8") as fh:
             fh.write('\n// selftest\nfunction _ctSelfTest(lua) { Lua_helper.add_callback(lua, "zzSelfTestApi999", null); }\n')
-        r = _run(tmp); cases.append(("增1个名→PASS+列出新增", r.returncode == 0 and "新增 1" in r.stdout, r.stdout.splitlines()[-1] if r.stdout else ""))
+        r = _run(tmp)
+        cases.append(("增1个名→PASS+列出新增", r.returncode == 0 and "新增 1" in r.stdout and "RESULT: PASS" in r.stdout,
+                      next((l for l in r.stdout.splitlines() if l.startswith("RESULT:") or l.startswith("提示")), "")))
         shutil.copy2(os.path.join(ROOT, "source", "psychlua", "functions", "MiscCommands.hx"), misc)
         # ③ 改 1 条路径串 → 期望 FAIL
         mods = os.path.join(tmp, "source", "backend", "Mods.hx")
@@ -158,7 +167,20 @@ def selftest():
         mutated = s.replace("'/modsList.txt'", "'/mods_list.txt'", 1)
         assert mutated != s, "对照用例③ 突变未生效"
         open(mods, "w", encoding="utf-8").write(mutated)
-        r = _run(tmp); cases.append(("改1条路径串(2站点中改1)→FAIL", r.returncode == 1 and "行级缺失 1" in r.stdout, r.stdout.splitlines()[-1] if r.stdout else ""))
+        r = _run(tmp)
+        cases.append(("改1条路径串(2站点中改1)→FAIL", r.returncode == 1 and "行级缺失 1" in r.stdout and "RESULT: FAIL" in r.stdout,
+                      next((l for l in r.stdout.splitlines() if l.startswith("RESULT")), "")))
+        shutil.copy2(os.path.join(ROOT, "source", "backend", "Mods.hx"), mods)
+        # ④ 真改名（删+增）→ 期望两侧同时点亮：缺失 1 + 新增 1（红队 #3：原用例只覆盖"纯删除"）
+        s2 = open(hsx, encoding="utf-8").read()
+        assert "set('FlxG'" in s2, "对照用例④ 前置不符：找不到 set('FlxG'"
+        mut2 = s2.replace("set('FlxG'", "set('FlxGProbe999'", 1)
+        assert mut2 != s2, "对照用例④ 突变未生效"
+        open(hsx, "w", encoding="utf-8").write(mut2)
+        r = _run(tmp)
+        cases.append(("真改名(删+增)→FAIL且两侧点亮", r.returncode == 1 and "缺失 1" in r.stdout and "新增 1" in r.stdout,
+                      next((l for l in r.stdout.splitlines() if l.startswith("[1/3")), "")))
+        shutil.copy2(os.path.join(ROOT, "source", "psychlua", "HScript.hx"), hsx)
         print("=== 对照用例 ===")
         allok = True
         for name, passed, last in cases:
