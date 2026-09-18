@@ -5,9 +5,9 @@
 | 项 | 值 |
 |---|---|
 | 生成脚本 | `tools/contract/gen_path_format.py` |
-| 生成时 commit | `600148b09191e2a896de4b6936a5140a236500fc` |
-| 契约行数 | 70 |
-| 排除行数 | 86 |
+| 生成时 commit | `a73fd6a9923318b1a6c10b23898199b1c6c8d0fc` |
+| 契约行数 | 76 |
+| 排除行数 | 88 |
 | 未归类 | 0 |
 | §5 清单覆盖 | 17/17 |
 
@@ -17,15 +17,20 @@
 |---|---|---|---|
 | format | `.cnz` | CNE mod 打包扩展名（CneZipStore.hx:32） | 1 |
 | format | `.zip` | mod 打包扩展名（ModInstaller.hx:243 / CneZipStore.hx:32） | 2 |
+| format | `Meteoric.exe` | 容器包装器引用的宿主可执行名（ContainerLauncher.hx:229,241） | 2 |
+| format | `activate.sh` | 容器前台化激活脚本名（ContainerStore.hx:39） | 1 |
 | format | `cmd.txt` | 容器命令通道（ContainerStore.hx:42） | 1 |
 | format | `container.json` | 容器清单文件名（ContainerManifestParser.hx:17） | 1 |
 | format | `container.log` | 容器运行日志（ContainerStore.hx:32） | 1 |
 | format | `dialogue.json` | 对话数据（DialogueEditorState.hx:533） | 1 |
 | format | `events.json` | 事件数据（ChartingState.hx:2997） | 1 |
 | format | `exit.txt` | 容器退出码（ContainerStore.hx:34） | 1 |
+| format | `flags.ini` | CNE 状态重定向配置（mod 侧格式，StateRedirects.hx:47） | 1 |
 | format | `meteoric_dpi_mode.txt` | 高清渲染档位落盘：单字符 '1'/'0'（ClientPrefs.hx:748-749） | 1 |
 | format | `pack.json` | mod 包描述（Mods.hx:161 / ModZipPlanner.hx:19） | 2 |
 | format | `phase.txt` | 容器会话相位（ContainerStore.hx:43） | 1 |
+| format | `wrapper.bat` | 容器包装器脚本名·Windows（ContainerStore.hx:37） | 1 |
+| format | `wrapper.sh` | 容器包装器脚本名·POSIX（ContainerStore.hx:35） | 1 |
 | hook | `Main.hx` | 容器每帧钩子/会话驱动（§5 容器行） | 5 |
 | module | `ContainerInfo` | 容器模块（§5 容器行） | 1 |
 | module | `ContainerLauncher` | 容器模块（§5 容器行） | 1 |
@@ -57,6 +62,7 @@
 | `Animation.json` | 角色图集元数据路径 | 4 |
 | `characterList.txt` | 编辑器素材清单 | 1 |
 | `credits.txt` | 引擎内置内容清单 | 2 |
+| `desktop.ini` | 压缩包内需忽略的系统垃圾文件（ZipReader.hx:187） | 1 |
 | `dev_diag.txt` | 开发诊断落盘（CrashHandler:894） | 1 |
 | `freeplaySonglist.txt` | 引擎内置曲单 | 2 |
 | `gfDanceTitle.json` | 标题画面素材路径 | 1 |
@@ -72,6 +78,7 @@
 | `spritemap.json` | 示例资源路径 | 1 |
 | `spritemap1.json` | 角色图集元数据路径 | 3 |
 | `stageList.txt` | 编辑器素材清单 | 1 |
+| `thumbs.db` | 压缩包内需忽略的系统垃圾文件（ZipReader.hx:187） | 1 |
 | `weeks.txt` | 内置周目素材清单 | 1 |
 
 ## 三、一条命令校验

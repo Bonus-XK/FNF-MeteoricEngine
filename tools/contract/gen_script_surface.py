@@ -20,7 +20,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "source")
-LUA_ROOT = os.path.join(SRC, "psychlua")
+LUA_ROOT = SRC  # 全 source/：Lua 回调不止在 psychlua（如 backend/Discord.hx）
 HSX_FILE = os.path.join(SRC, "psychlua", "HScript.hx")
 OUT_TSV = os.path.join(ROOT, "tools", "contract", "script-surface.tsv")
 OUT_MD = os.path.join(ROOT, "tools", "contract", "BASELINE.md")
@@ -106,13 +106,13 @@ def render(rows, stats):
         "# counts: lua_unique=%d hscript_unique=%d lua_ui_unique=%d pairs_unique=%d bare_name_unique=%d registrations=%d dynamic_sites=%d"
         % (stats["lua_unique"], stats["hscript_unique"], stats["ui_unique"], stats["pairs_unique"],
            stats["total_unique"], stats["registrations"], stats["dynamic_or_unparsed"]),
-        "# 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（Lua 与 HScript 有 26 个同名，属两份独立契约）",
+        "# 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（同一裸名可同时属于多个 kind，属独立契约）",
         "# dynamic_sites: %s" % (", ".join(stats["dynamic_sites"]) or "(none)"),
         "# 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。",
         "# multi_site: %s" % (", ".join("%s.%s" % (k, n) for k, n in stats["multi_site"]) or "(none)"),
-        "# kind=lua    : source/psychlua/** 下 Lua_helper.add_callback 的字符串字面量",
+        "# kind=lua    : source/** 下 Lua_helper.add_callback 的字符串字面量",
         "# kind=hscript: source/psychlua/HScript.hx 的 set('…') 预设变量",
-        "# kind=lua-ui : interface 脚本专属回调 MenuScript.addLocalCallback('…') 的字面量名",
+# kind=lua-ui : source/psychlua/** 下 addLocalCallback 的字符串字面量名（含界面/脚本桥，非仅 MenuScript）
         "# 不变量：本文件中的名字只增不减；删除或改名 = 破坏 mod 兼容，必须人工评审。",
     ]
     for kind, name, loc in rows:

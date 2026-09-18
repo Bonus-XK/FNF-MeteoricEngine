@@ -24,6 +24,15 @@ OUT_TSV = os.path.join(ROOT, "tools", "contract", "path-format-surface.tsv")
 OUT_MD = os.path.join(ROOT, "tools", "contract", "PATHS-BASELINE.md")
 EXTS = ("json", "txt", "zip", "cnz", "log", "dat")
 KNOWN_BARE = ("meoptions", "mods", "_containers", "_cnestage")
+# 资源/二进制类扩展名：这些不是 mod/存档/容器契约，按扩展名集合豁免（文档口径，非逐个登记）
+ASSET_EXT = {"png", "jpg", "jpeg", "gif", "webp", "bmp", "ogg", "mp3", "wav", "flac",
+             "xml", "hx", "lua", "frag", "vert", "ttf", "otf", "woff", "woff2",
+             "mp4", "webm", "avi", "dll", "so", "dylib", "ndll", "js", "css", "html", "swf"}
+# 未知扩展名的文件形态 token：必须被显式归类，否则 FAIL（红队二轮 mid#2：.bin/.db/.cfg 此前不可见）
+RE_UNKNOWN_EXT = re.compile(r"^/?[A-Za-z0-9_][A-Za-z0-9_.\-]{1,58}\.([A-Za-z][A-Za-z0-9]{0,7})$")
+# 只有"含路径分隔符"或"扩展名属于可疑文件类"的未知扩展名 token 才进候选 —— 剔除 OptionsState.update / scale.x 这类点号标识符误报
+SUSPICIOUS_EXT = {"bin", "db", "sqlite", "cfg", "ini", "save", "sav", "bak", "tmp", "dat",
+                  "yaml", "yml", "toml", "csv", "json5", "exe", "bat", "sh", "cmd", "log"}
 RE_QUOTED = re.compile(r"""['"](/?[A-Za-z0-9_./\-]{1,60})['"]""")
 RE_EXT_ONLY = re.compile(r"^\.(?:%s)$" % "|".join(EXTS))
 
@@ -47,6 +56,11 @@ INCLUDE = {
     "Offsets.txt": ("save", "角色偏移存档（CharacterEditorState.hx:1292）"),
     "dialogue.json": ("format", "对话数据（DialogueEditorState.hx:533）"),
     "events.json": ("format", "事件数据（ChartingState.hx:2997）"),
+    "flags.ini": ("format", "CNE 状态重定向配置（mod 侧格式，StateRedirects.hx:47）"),
+    "Meteoric.exe": ("format", "容器包装器引用的宿主可执行名（ContainerLauncher.hx:229,241）"),
+    "wrapper.sh": ("format", "容器包装器脚本名·POSIX（ContainerStore.hx:35）"),
+    "wrapper.bat": ("format", "容器包装器脚本名·Windows（ContainerStore.hx:37）"),
+    "activate.sh": ("format", "容器前台化激活脚本名（ContainerStore.hx:39）"),
 }
 # 显式排除：base/pattern -> 理由
 EXCLUDE = {
@@ -69,6 +83,8 @@ EXCLUDE = {
     "Animation.json": "角色图集元数据路径", "spritemap.json": "图集元数据路径",
     "assets/TEST/Animation.json": "示例资源路径", "assets/TEST/spritemap.json": "示例资源路径",
     "images/gfDanceTitle.json": "标题画面素材路径", "/library.json": "图集运行时元数据",
+    "thumbs.db": "压缩包内需忽略的系统垃圾文件（ZipReader.hx:187）",
+    "desktop.ini": "压缩包内需忽略的系统垃圾文件（ZipReader.hx:187）",
 }
 # 审计报告 §5 清单（正向覆盖检查）
 CHECKLIST = [
@@ -106,9 +122,13 @@ def candidates():
                     for m in RE_QUOTED.finditer(line):
                         raw = m.group(1)
                         base = raw.rstrip("/").split("/")[-1]
+                        m_ue = RE_UNKNOWN_EXT.match(raw)
+                        _e = m_ue.group(1).lower() if m_ue else ""
+                        ue_unknown = bool(m_ue) and _e not in ASSET_EXT and _e not in EXTS \
+                            and ("/" in raw or _e in SUSPICIOUS_EXT)
                         keep = (base in KNOWN_BARE or base in INCLUDE or base in EXCLUDE
                                 or raw in EXCLUDE or RE_EXT_ONLY.match(raw) is not None
-                                or base.endswith(tuple("." + e for e in EXTS)))
+                                or base.endswith(tuple("." + e for e in EXTS)) or ue_unknown)
                         if keep:
                             out.append((raw, base, "%s:%d" % (rel, i)))
     return out
@@ -188,6 +208,9 @@ def render(rows, stats):
         "保留目录名、以及 /meoptions 这类无扩展名文件）；每个候选必须归入 contract 或 exclude，"
         "出现 unclassified 即判 FAIL。",
         "# 不变量：contract 行的 base 名与所属路径/格式语义只增不减；删除或改名 = 破坏 mod/存档/容器兼容。",
+        "# 已知边界：① 未知扩展名的文件形态 token 会被判 unclassified（必须显式归类）；",
+        "#           ② **无扩展名**的裸名（如 meoptions）在语法上与动画/资源名不可区分 → 必须人工登记（KNOWN_BARE），检测不到新增；",
+        "#           ③ 资源/二进制扩展名按 ASSET_EXT 集合豁免（非逐个登记）。",
     ]
     for r in rows:
         out.append("\t".join(r))

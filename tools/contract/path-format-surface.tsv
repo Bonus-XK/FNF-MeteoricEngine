@@ -2,10 +2,13 @@
 # generator: tools/contract/gen_path_format.py
 # schema: 1
 # columns: verdict<TAB>kind<TAB>base<TAB>raw_token<TAB>source_location<TAB>purpose_or_reason
-# counts: rows=156 contract=70 excluded=86 structural=16 unclassified=0 checklist_covered=17/17
+# counts: rows=164 contract=76 excluded=88 structural=16 unclassified=0 checklist_covered=17/17
 # checklist_missing: (none)
 # 口径: 扫描 source/**/*.hx 中带引号的候选 token（含扩展名/json|txt|zip|cnz|log|dat、保留目录名、以及 /meoptions 这类无扩展名文件）；每个候选必须归入 contract 或 exclude，出现 unclassified 即判 FAIL。
 # 不变量：contract 行的 base 名与所属路径/格式语义只增不减；删除或改名 = 破坏 mod/存档/容器兼容。
+# 已知边界：① 未知扩展名的文件形态 token 会被判 unclassified（必须显式归类）；
+#           ② **无扩展名**的裸名（如 meoptions）在语法上与动画/资源名不可区分 → 必须人工登记（KNOWN_BARE），检测不到新增；
+#           ③ 资源/二进制扩展名按 ASSET_EXT 集合豁免（非逐个登记）。
 contract	format	.cnz	.cnz	source/cne/CneZipStore.hx:32	CNE mod 打包扩展名（CneZipStore.hx:32）
 contract	format	.zip	.zip	source/backend/ModInstaller.hx:243	mod 打包扩展名（ModInstaller.hx:243 / CneZipStore.hx:32）
 contract	format	.zip	.zip	source/cne/CneZipStore.hx:32	mod 打包扩展名（ModInstaller.hx:243 / CneZipStore.hx:32）
@@ -24,6 +27,8 @@ contract	hook	Main.hx	Container	source/Main.hx:62	容器每帧钩子/会话驱�
 contract	hook	Main.hx	Container	source/Main.hx:70	容器每帧钩子/会话驱动（§5 容器行）
 contract	hook	Main.hx	Container	source/Main.hx:72	容器每帧钩子/会话驱动（§5 容器行）
 contract	hook	Main.hx	Container	source/Main.hx:77	容器每帧钩子/会话驱动（§5 容器行）
+contract	format	Meteoric.exe	Meteoric.exe	source/backend/ContainerLauncher.hx:229	容器包装器引用的宿主可执行名（ContainerLauncher.hx:229,241）
+contract	format	Meteoric.exe	Meteoric.exe	source/backend/ContainerLauncher.hx:241	容器包装器引用的宿主可执行名（ContainerLauncher.hx:229,241）
 contract	save	Offsets.txt	Offsets.txt	source/states/editors/CharacterEditorState.hx:1292	角色偏移存档（CharacterEditorState.hx:1292）
 contract	module	Phase	Phase	source/backend/Phase.hx:1	容器模块（§5 容器行）
 contract	path	_cnestage	_cnestage	source/backend/Mods.hx:42	CNE 暂存目录保留名，不得被扫成假 mod（CneZipStore.hx:29 / Mods.hx:42）
@@ -33,12 +38,14 @@ contract	path	_containers	_containers	source/backend/ContainerStore.hx:25	容器
 contract	path	_containers	_containers	source/backend/ContainerStore.hx:30	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
 contract	path	_containers	_containers	source/backend/Mods.hx:38	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
 contract	path	_containers	_containers	source/backend/Mods.hx:39	容器根目录保留名，不得被扫成假 mod（ContainerStore.hx:24,25,30 / Mods.hx:38）
+contract	format	activate.sh	activate.sh	source/backend/ContainerStore.hx:39	容器前台化激活脚本名（ContainerStore.hx:39）
 contract	format	cmd.txt	cmd.txt	source/backend/ContainerStore.hx:42	容器命令通道（ContainerStore.hx:42）
 contract	format	container.json	container.json	source/backend/ContainerManifestParser.hx:17	容器清单文件名（ContainerManifestParser.hx:17）
 contract	format	container.log	container.log	source/backend/ContainerStore.hx:32	容器运行日志（ContainerStore.hx:32）
 contract	format	dialogue.json	dialogue.json	source/states/editors/DialogueEditorState.hx:533	对话数据（DialogueEditorState.hx:533）
 contract	format	events.json	events.json	source/states/editors/ChartingState.hx:2997	事件数据（ChartingState.hx:2997）
 contract	format	exit.txt	exit.txt	source/backend/ContainerStore.hx:34	容器退出码（ContainerStore.hx:34）
+contract	format	flags.ini	flags.ini	source/cne/StateRedirects.hx:47	CNE 状态重定向配置（mod 侧格式，StateRedirects.hx:47）
 contract	save	meoptions	/meoptions	source/backend/ClientPrefs.hx:352	Android 权威设置文件：无扩展名 + JSON（写 ClientPrefs.hx:352 / 读 :585）
 contract	save	meoptions	/meoptions	source/backend/ClientPrefs.hx:585	Android 权威设置文件：无扩展名 + JSON（写 ClientPrefs.hx:352 / 读 :585）
 contract	format	meteoric_dpi_mode.txt	/meteoric_dpi_mode.txt	source/backend/ClientPrefs.hx:749	高清渲染档位落盘：单字符 '1'/'0'（ClientPrefs.hx:748-749）
@@ -76,6 +83,8 @@ contract	format	pack.json	/pack.json	source/backend/Mods.hx:161	mod 包描述（
 contract	format	phase.txt	phase.txt	source/backend/ContainerStore.hx:43	容器会话相位（ContainerStore.hx:43）
 contract	save	weekList.txt	weeks/weekList.txt	source/backend/WeekData.hx:100	周目清单（WeekData.hx:100、:128）
 contract	save	weekList.txt	weekList.txt	source/backend/WeekData.hx:128	周目清单（WeekData.hx:100、:128）
+contract	format	wrapper.bat	wrapper.bat	source/backend/ContainerStore.hx:37	容器包装器脚本名·Windows（ContainerStore.hx:37）
+contract	format	wrapper.sh	wrapper.sh	source/backend/ContainerStore.hx:35	容器包装器脚本名·POSIX（ContainerStore.hx:35）
 exclude	excluded	.json	.json	source/backend/Multiplayer.hx:701	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/backend/Multiplayer.hx:747	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/backend/Multiplayer.hx:772	文件名拼接片段（非完整契约 token）
@@ -138,6 +147,7 @@ exclude	excluded	Animation.json	/Animation.json	source/states/editors/CharacterE
 exclude	excluded	characterList.txt	data/characterList.txt	source/states/editors/ChartingState.hx:469	编辑器素材清单
 exclude	excluded	credits.txt	/data/credits.txt	source/states/CreditsState.hx:752	引擎内置内容清单
 exclude	excluded	credits.txt	data/credits.txt	source/states/CreditsState.hx:753	引擎内置内容清单
+exclude	excluded	desktop.ini	desktop.ini	source/backend/ZipReader.hx:187	压缩包内需忽略的系统垃圾文件（ZipReader.hx:187）
 exclude	excluded	dev_diag.txt	/dev_diag.txt	source/backend/CrashHandler.hx:894	开发诊断落盘（CrashHandler:894）
 exclude	excluded	freeplaySonglist.txt	data/config/freeplaySonglist.txt	source/cne/CneModCompat.hx:548	引擎内置曲单
 exclude	excluded	freeplaySonglist.txt	data/freeplaySonglist.txt	source/cne/CneModCompat.hx:548	引擎内置曲单
@@ -161,4 +171,5 @@ exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:15
 exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:162	角色图集元数据路径
 exclude	excluded	spritemap1.json	/spritemap1.json	source/objects/Character.hx:166	角色图集元数据路径
 exclude	excluded	stageList.txt	data/stageList.txt	source/states/editors/ChartingState.hx:524	编辑器素材清单
+exclude	excluded	thumbs.db	thumbs.db	source/backend/ZipReader.hx:187	压缩包内需忽略的系统垃圾文件（ZipReader.hx:187）
 exclude	excluded	weeks.txt	/data/weeks/weeks.txt	source/cne/CneModCompat.hx:402	内置周目素材清单

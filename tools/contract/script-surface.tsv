@@ -2,14 +2,13 @@
 # generator: tools/contract/gen_script_surface.py
 # schema: 1
 # columns: kind<TAB>name<TAB>source_location
-# counts: lua_unique=222 hscript_unique=183 lua_ui_unique=73 pairs_unique=478 bare_name_unique=429 registrations=479 dynamic_sites=4
-# 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（Lua 与 HScript 有 26 个同名，属两份独立契约）
+# counts: lua_unique=224 hscript_unique=183 lua_ui_unique=73 pairs_unique=480 bare_name_unique=431 registrations=481 dynamic_sites=4
+# 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（同一裸名可同时属于多个 kind，属独立契约）
 # dynamic_sites: source/psychlua/FunkinLua.hx:112, source/psychlua/FunkinLua.hx:392, source/psychlua/HScript.hx:501, source/psychlua/MenuScript.hx:203
 # 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。
 # multi_site: lua.noteTweenAngle
-# kind=lua    : source/psychlua/** 下 Lua_helper.add_callback 的字符串字面量
+# kind=lua    : source/** 下 Lua_helper.add_callback 的字符串字面量
 # kind=hscript: source/psychlua/HScript.hx 的 set('…') 预设变量
-# kind=lua-ui : interface 脚本专属回调 MenuScript.addLocalCallback('…') 的字面量名
 # 不变量：本文件中的名字只增不减；删除或改名 = 破坏 mod 兼容，必须人工评审。
 hscript	Achievements	source/psychlua/HScript.hx:189
 hscript	Adler32	source/psychlua/HScript.hx:272
@@ -224,6 +223,8 @@ lua	cameraSetTarget	source/psychlua/functions/CameraCommands.hx:16
 lua	cameraShake	source/psychlua/functions/CameraCommands.hx:25
 lua	cancelTimer	source/psychlua/functions/MiscCommands.hx:60
 lua	cancelTween	source/psychlua/functions/ScriptTweens.hx:93
+lua	changeDiscordClientID	source/backend/Discord.hx:156
+lua	changeDiscordPresence	source/backend/Discord.hx:152
 lua	characterDance	source/psychlua/functions/CharacterCommands.hx:81
 lua	characterPlayAnim	source/psychlua/DeprecatedFunctions.hx:42
 lua	checkFileExists	source/psychlua/ExtraFunctions.hx:170
