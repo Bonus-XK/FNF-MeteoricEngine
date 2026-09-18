@@ -255,6 +255,7 @@ def render_md(rows, stats, commit, unclassified):
               "```bash", "python3 tools/contract/gen_path_format.py --check", "```", "",
               "## 四、已知边界", "",
               "1. 归类为**人工决策**：每个新出现的候选 token 必须在此文件登记（contract 或 exclude），否则 `--check` 判 FAIL。",
+              "1b. **无扩展名裸名**（如 `meoptions`）在语法上与动画/资源名不可区分 → 只能人工登记在 `KNOWN_BARE`，**新增不会自动 FAIL**（已知边界，非隐藏缺陷）。",
               "2. 本基线冻结的是**路径字符串与格式约定**，不含 Lua/HScript 入口名（见 `script-surface.tsv`）。",
               "3. `生成时 commit` = 生成时的 HEAD（基线自身入库前的父提交），属设计使然。"]
     if unclassified:

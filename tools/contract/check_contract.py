@@ -18,6 +18,8 @@ import subprocess
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # 不在仓库内落 __pycache__（曾被误入库，见 .gitignore）
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE)) if os.path.basename(os.path.dirname(HERE)) == "tools" \
     else os.path.dirname(HERE)
@@ -197,7 +199,7 @@ def selftest():
         allok = True
         for name, passed, last in cases:
             allok &= passed
-            print("  %-28s %s   (%s)" % (name, "PASS" if passed else "FAIL", last[:70]))
+            print("  %-28s %s   (%s)" % (name, "PASS" if passed else "FAIL", last.replace(chr(10), " | ")))
         print("SELFTEST: %s" % ("PASS" if allok else "FAIL"))
         return 0 if allok else 1
     finally:
