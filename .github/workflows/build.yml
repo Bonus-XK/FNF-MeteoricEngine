@@ -13,8 +13,10 @@ name: 构建（Build）
 
 # 同一分支的工作流按序排队（不前后叠加占用 runner；release 手动触发也保留排队语义）
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: false
+  # 新推送自动取消同一分支上**上一个**还在跑/排队的构建（不空耗 runner）。
+  # 手动派发（发布用 workflow_dispatch）走独立 group，不会被普通推送误取消。
+  group: build-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && '-manual' || '' }}
+  cancel-in-progress: true
 
 on:
   push:
