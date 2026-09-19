@@ -15,7 +15,9 @@ import backend.Highscore;
 import backend.StageData;
 import backend.WeekData;
 import backend.CameraHudDomain;
+import backend.EventDomain;
 import backend.NoteChartDomain;
+import backend.OnlineDomain;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
@@ -1839,14 +1841,9 @@ class PlayState extends MusicBeatState
 		Conductor.setPosition(time);
 	}
 
-	public function startNextDialogue() {
-		dialogueCount++;
-		callOnScripts('onNextDialogue', [dialogueCount]);
-	}
+	public function startNextDialogue() EventDomain.startNextDialogue(this);
 
-	public function skipDialogue() {
-		callOnScripts('onSkipDialogue', [dialogueCount]);
-	}
+	public function skipDialogue() EventDomain.skipDialogue(this);
 
 	function startSong():Void
 	{
@@ -2541,15 +2538,7 @@ class PlayState extends MusicBeatState
 	}
 
 	// called only once per different event (Used for precaching)
-	function eventPushed(event:EventNote) {
-		eventPushedUnique(event);
-		if(eventsPushed.contains(event.event)) {
-			return;
-		}
-
-		stagesFunc(function(stage:BaseStage) stage.eventPushed(event));
-		eventsPushed.push(event.event);
-	}
+	function eventPushed(event:EventNote) EventDomain.eventPushed(this, event);
 
 	// called by every event with the same name
 	function eventPushedUnique(event:EventNote) {
@@ -5487,36 +5476,10 @@ class PlayState extends MusicBeatState
 	public var strumsBlocked:Array<Bool> = [];
 	#if mobile
 	/** 后台化时自动暂停：返回键/侧滑返回/Home 键都会先把游戏切到后台 */
-	private function onStageDeactivate(event:Event):Void
-	{
-		trace('[PAUSE] onStageDeactivate started=' + startedCountdown + ' paused=' + paused + ' canPause=' + canPause);
-		if (startedCountdown && !endingSong)
-		{
-			if (!paused && canPause)
-			{
-				trace('[PAUSE] openPauseMenu from deactivate');
-				openPauseMenu();
-			}
-			// Meteoric：退后台=冻结游戏——音频位置一并暂停（仅开暂停菜单音乐仍会继续响）
-			freezeBackgroundAudio();
-		}
-	}
+	private function onStageDeactivate(event:Event):Void EventDomain.onStageDeactivate(this, event);
 
 	/** 回前台：恢复被后台冻结的音频（游戏仍处于暂停菜单，不自动继续游戏） */
-	private function onStageActivate(event:Event):Void
-	{
-		restoreBackgroundAudio();
-		// flixel 在焦点恢复时会自动 resume 失焦前“正在播放”的声音（FlxG.sound.onFocus()），
-		// 而本钩子在 FlxGame 焦点处理之后执行（FlxGame 先注册）——若暂停菜单仍打开，
-		// 歌曲伴奏/人声会被误恢复，立即重新冻结；暂停菜单音乐与场景音效仍由 flixel 正常续播。
-		// 玩家点“返回游戏”后由 closeSubState → resyncVocals 统一恢复歌曲。
-		if (paused)
-		{
-			if (FlxG.sound.music != null) FlxG.sound.music.pause();
-			if (vocals != null) vocals.pause();
-			if (opponentVocals != null) opponentVocals.pause();
-		}
-	}
+	private function onStageActivate(event:Event):Void EventDomain.onStageActivate(this, event);
 
 	private function freezeBackgroundAudio():Void
 	{
@@ -7240,24 +7203,10 @@ class PlayState extends MusicBeatState
 		openSubState(onlineResults);
 	}
 
-	function onlineGoBackToLobby(reason:String):Void
-	{
-		Multiplayer.stop();
-		PlayState.isOnlineMode = false;
-		OnlineMenuState.notifyReason = reason;
-		try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
-		MusicBeatState.switchState(new OnlineMenuState());
-	}
+	function onlineGoBackToLobby(reason:String):Void OnlineDomain.onlineGoBackToLobby(this, reason);
 
 	/** 结算/主动退出对局：保持局域网连接，返回房间大厅（双方可再选曲再来一局），不切断 socket */
-	public function onlineBackToRoomLobby(reason:String):Void
-	{
-		PlayState.isOnlineMode = false;
-		OnlineMenuState.notifyReason = reason;
-		OnlineMenuState.openInLobby = true;
-		try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
-		MusicBeatState.switchState(new OnlineMenuState());
-	}
+	public function onlineBackToRoomLobby(reason:String):Void OnlineDomain.onlineBackToRoomLobby(this, reason);
 
 	/**
 	 * 暂停期间由 PauseSubState 每帧调用：PlayState.update 被冻结时仍处理
