@@ -11,6 +11,7 @@ import states.PlayState;
 import states.PlayState.GameHUD;
 import objects.Note;
 import objects.StrumNote;
+import psychlua.FunkinLua;
 
 /** 相机与 HUD 域（C3 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，全仓 `PlayState.*` 调用点零改动。
@@ -204,5 +205,41 @@ class CameraHudDomain
 			ps.strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
 		}
+	}
+
+	/** 原 PlayState.RecalculateRating（作用域分析：零遮蔽，31 处成员引用已限定）。 */
+	public static function RecalculateRating(ps:PlayState, badHit:Bool = false)
+	{
+		ps.setOnScripts('score', ps.songScore);
+		ps.setOnScripts('misses', ps.songMisses);
+		ps.setOnScripts('hits', ps.songHits);
+		ps.setOnScripts('combo', ps.combo);
+
+		var ret:Dynamic = ps.callOnScripts('onRecalculateRating', null, true);
+		if(ret != FunkinLua.Function_Stop)
+		{
+			ps.ratingName = '?';
+			if(ps.totalPlayed != 0) //Prevent divide by 0
+			{
+				// Rating Percent
+				ps.ratingPercent = Math.min(1, Math.max(0, ps.totalNotesHit / ps.totalPlayed));
+				//trace((totalNotesHit / totalPlayed) + ', Total: ' + totalPlayed + ', notes hit: ' + totalNotesHit);
+
+				// Rating Name
+				ps.ratingName = PlayState.ratingStuff[PlayState.ratingStuff.length-1][0]; //Uses last string
+				if(ps.ratingPercent < 1)
+					for (i in 0...PlayState.ratingStuff.length-1)
+						if(ps.ratingPercent < PlayState.ratingStuff[i][1])
+						{
+							ps.ratingName = PlayState.ratingStuff[i][0];
+							break;
+						}
+			}
+			ps.fullComboFunction();
+		}
+		ps.updateScore(badHit); // score will only update after rating is calculated, if it's a badHit, it shouldn't bounce -Ghost
+		ps.setOnScripts('rating', ps.ratingPercent);
+		ps.setOnScripts('ratingName', ps.ratingName);
+		ps.setOnScripts('ratingFC', ps.ratingFC);
 	}
 }

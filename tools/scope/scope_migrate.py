@@ -89,6 +89,12 @@ def token_classes(masked, members, localsx):
         ls = masked.rfind('\n', 0, pos) + 1
         if masked[ls:pos].strip().startswith('#'):
             continue
+        # 元数据名（@:privateAccess / @:noCompletion …）：前面的 token 以 @ 结尾则跳过
+        k2 = pos - 1
+        while k2 >= 0 and (masked[k2].isalnum() or masked[k2] == '_'):
+            k2 -= 1
+        if k2 >= 0 and masked[k2] == '@':
+            continue
         # 结构体字段名（`{alpha: v}` / `{…, startDelay: v}`）不是成员引用，绝不能加前缀。
         # 实测踩坑：tween 选项对象 `{ease:…, startDelay:…}` 被写成 `{ps.ease:…}` → typecheck `Missing ;`。
         j = mm.end()
@@ -468,19 +474,19 @@ def main():
     for n in names:
         f = by_name.get(n)
         if f is None or not is_candidate(f):
-            print('✘ %s 不在严格安全候选内（verdict=%s，外来裸调用=%d）'
-                  % (n, f['verdict'] if f else '?', len(f['unknown_calls']) if f else -1), file=sys.stderr)
-            return 2
+            print('  ⚠ 跳过 %s（非严格安全候选：verdict=%s，外来裸调用=%d）'
+                  % (n, f['verdict'] if f else '?', len(f['unknown_calls']) if f else -1))
+            continue
         sp = split_function(raw, f['line'] - 1)
         if not sp['ret']:
             guess = infer_ret(sa.mask(sp['body']))
             if guess is None:
-                print('✘ %s 无返回类型标注且返回类型无法推断，拒绝迁出' % n, file=sys.stderr)
-                return 2
+                print('  ⚠ 跳过 %s（无返回类型标注且无法推断）' % n)
+                continue
             sp['ret'] = guess
         if sp['style'] != 'block':
-            print('✘ %s 是表达式体，本版不支持' % n, file=sys.stderr)
-            return 2
+            print('  ⚠ 跳过 %s（表达式体，本版不支持）' % n)
+            continue
         localsx = set(f['locals']) | set(f['params'])
         old_masked = sa.mask(sp['body'])
         old_seq = token_classes(old_masked, members, localsx)
@@ -514,11 +520,11 @@ def main():
         head = sp['params']  # 占位，实际判定见下
         if re.search(r'(?m)^\s*#(?:if|else|elseif|end)\b',
                      '\n'.join(raw[f['line'] - 1:]).split('{', 1)[0]):
-            print('✘ %s 的声明区含预处理指令，拒绝（#end 会落在迁出跨度内被吞）' % n, file=sys.stderr)
-            return 2
+            print('  ⚠ 跳过 %s（声明区含预处理指令：#end 会落在迁出跨度内被吞）' % n)
+            continue
         if len(re.findall(r'(?m)^\s*#if\b', sp['body'])) != len(re.findall(r'(?m)^\s*#end\b', sp['body'])):
-            print('✘ %s 的体预处理指令不配平，拒绝' % n, file=sys.stderr)
-            return 2
+            print('  ⚠ 跳过 %s（体预处理指令不配平）' % n)
+            continue
         pnames = param_names(sp['params'])
         arglist = ', '.join(pnames)
         if f['static']:
@@ -542,6 +548,9 @@ def main():
         forwarders.append((f, sp, '\t%sfunction %s(%s)%s %s%s;' % (
             mods, n, sp['params'].strip(), (':' + sp['ret']) if sp['ret'] else '', ret_kw, call)))
 
+    if not forwarders:
+        print('  本批无可迁函数（全部被跳过）')
+        return 0
     print('== 等价性证明（A 无漏加 / B 无过度加 / C 前缀计数）==')
     for n, span, npre, a, b, c, oi, os_, gp, gs in rows:
         print('  %-28s %3d 行  加前缀 %3d 处  A:%s B:%s C:%s（ps %d/%d，PlayState %d/%d）'

@@ -25,6 +25,7 @@ import states.PlayState.PreGenResult;
 import backend.Section.SwagSection;
 import objects.Character;
 import backend.Multiplayer;
+import backend.Rating;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -782,5 +783,75 @@ class NoteChartDomain
 		ps.botBatchSplashDone = [false, false, false, false];
 		ps.botBatchHitsoundDone = false;
 		ps.botBatchScoreShown = false;
+	}
+
+	/** 原 PlayState.settleCastHit（作用域分析：零遮蔽，27 处成员引用已限定）。 */
+	public static function settleCastHit(ps:PlayState, target:CastNote, hitMult:Int):Void
+	{
+		// 计数权威封顶（与 goodNoteHit 同款）：结算/命中不超过总音符数
+		if (ps.totalNotes > 0)
+		{
+			if (ps.songHits >= ps.totalNotes) hitMult = 0;
+			else if (ps.songHits + hitMult > ps.totalNotes) hitMult = Std.int(ps.totalNotes - ps.songHits);
+		}
+		if (hitMult <= 0) return;
+
+		var daRating:Rating = ps.ratingsData[0]; // botplay diff=0：marvelous 时=marvelous，否则=sick
+		ps.totalNotesHit += daRating.ratingMod * hitMult;
+		ps.totalPlayed += hitMult;
+		ps.songHits += hitMult;
+		daRating.hits += hitMult;
+		ps.songScore += daRating.score * hitMult;
+		ps.combo += hitMult;
+		if (ps.combo > ps.maxCombo) ps.maxCombo = ps.combo;
+		ps._npsCount += hitMult;
+		ps.health += 0.023 * ps.healthGain * hitMult; // Note.hitHealth 默认 0.023
+		// 结算恒为满分（marvelous/sick）→ 不触碰 allSicks（保持全 S 金 Combo）
+		// 评级/分数文本节流（与 popUpScore 同款 250ms）
+		if (haxe.Timer.stamp() - ps._lastRatingRecalc >= 0.25)
+		{
+			ps._lastRatingRecalc = haxe.Timer.stamp();
+			ps.RecalculateRating(false);
+		}
+		// strum confirm 高亮：每帧每轨一次（与批处理 botBatchAnimDone 同款节流）
+		var lane:Int = target.noteData & 255;
+		if (lane >= 0 && lane < 4 && !ps._settleAnimDone[lane])
+		{
+			ps._settleAnimDone[lane] = true;
+			ps.strumPlayAnim(false, lane, Conductor.stepCrochet * 1.25 / 1000 / ps.playbackRate);
+		}
+		target.wasHit = true;
+	}
+
+	/** 原 PlayState.clearNotesBefore（作用域分析：零遮蔽，8 处成员引用已限定）。 */
+	public static function clearNotesBefore(ps:PlayState, time:Float)
+	{
+		// H-Slice 移植：CastNote 数组用生成游标二分跳进（O(log n)），不再逐条 remove/销毁
+		var firstId:Int = ps.currentSpawnId;
+		var lastId:Int = ps.unspawnNotes.length;
+		while (firstId < lastId)
+		{
+			var middleId:Int = (firstId + lastId) >>> 1;
+			if (ps.unspawnNotes[middleId].strumTime - 350 < time)
+				firstId = middleId + 1;
+			else
+				lastId = middleId;
+		}
+		ps.currentSpawnId = firstId;
+		ps.releaseConsumedNotes();
+
+		// 已生成的音符同样静默回收（与旧行为一致：不判 miss、不溅射）
+		var i:Int = ps.notes.length - 1;
+		while (i >= 0) {
+			var daNote:Note = ps.notes.members[i];
+			if(daNote != null && daNote.strumTime - 350 < time)
+			{
+				daNote.active = false;
+				daNote.visible = false;
+				daNote.ignoreNote = true;
+				ps.notes.invalidateNote(daNote);
+			}
+			--i;
+		}
 	}
 }

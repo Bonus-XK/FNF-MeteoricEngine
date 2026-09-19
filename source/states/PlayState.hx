@@ -1228,39 +1228,7 @@ class PlayState extends MusicBeatState
 	}
 
 	// 游玩设置改动后即时同步到当前局（暂停菜单里打开设置时调用）
-	public function syncGameplaySettings():Void
-	{
-		var oldPractice:Bool = practiceMode;
-		var oldBotplay:Bool = cpuControlled;
-
-		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
-		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
-		switch(songSpeedType)
-		{
-			case "multiplicative":
-				songSpeed = SONG.speed * ClientPrefs.getGameplaySetting('scrollspeed');
-			case "constant":
-				songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
-		}
-		healthGain = ClientPrefs.getGameplaySetting('healthgain');
-		healthLoss = ClientPrefs.getGameplaySetting('healthloss');
-		instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
-		practiceMode = ClientPrefs.getGameplaySetting('practice');
-		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
-
-		if (cpuControlled) usedAutoplay = true;
-
-		if (practiceMode != oldPractice || cpuControlled != oldBotplay)
-			changedDifficulty = true;
-
-		if (botplayTxt != null)
-		{
-			botplayTxt.visible = cpuControlled || replayMode;
-			botplayTxt.alpha = 1;
-			botplaySine = 0;
-		}
-
-	}
+	public function syncGameplaySettings():Void HostDomain.syncGameplaySettings(this);
 
 	public function addTextToDebug(text:String, color:FlxColor) {
 		#if LUA_ALLOWED
@@ -1297,40 +1265,7 @@ class PlayState extends MusicBeatState
 
 	public function reloadHealthBarColors() CameraHudDomain.reloadHealthBarColors(this);
 
-	public function addCharacterToList(newCharacter:String, type:Int) {
-		switch(type) {
-			case 0:
-				if(!boyfriendMap.exists(newCharacter)) {
-					var newBoyfriend:Character = new Character(0, 0, newCharacter, true);
-					boyfriendMap.set(newCharacter, newBoyfriend);
-					boyfriendGroup.add(newBoyfriend);
-					startCharacterPos(newBoyfriend);
-					newBoyfriend.alpha = 0.00001;
-					startCharacterScripts(newBoyfriend.curCharacter);
-				}
-
-			case 1:
-				if(!dadMap.exists(newCharacter)) {
-					var newDad:Character = new Character(0, 0, newCharacter);
-					dadMap.set(newCharacter, newDad);
-					dadGroup.add(newDad);
-					startCharacterPos(newDad, true);
-					newDad.alpha = 0.00001;
-					startCharacterScripts(newDad.curCharacter);
-				}
-
-			case 2:
-				if(gf != null && !gfMap.exists(newCharacter)) {
-					var newGf:Character = new Character(0, 0, newCharacter);
-					newGf.scrollFactor.set(0.95, 0.95);
-					gfMap.set(newCharacter, newGf);
-					gfGroup.add(newGf);
-					startCharacterPos(newGf);
-					newGf.alpha = 0.00001;
-					startCharacterScripts(newGf.curCharacter);
-				}
-		}
-	}
+	public function addCharacterToList(newCharacter:String, type:Int) HostDomain.addCharacterToList(this, newCharacter, type);
 
 	function startCharacterScripts(name:String) HostDomain.startCharacterScripts(this, name);
 
@@ -1353,51 +1288,7 @@ class PlayState extends MusicBeatState
 		char.y += char.positionArray[1];
 	}
 
-	public function startVideo(name:String, ?onComplete:Void->Void = null)
-	{
-		#if VIDEOS_ALLOWED
-		inCutscene = true;
-
-		var filepath:String = Paths.video(name);
-		#if sys
-		if(!FileSystem.exists(filepath))
-		#else
-		if(!OpenFlAssets.exists(filepath))
-		#end
-		{
-			FlxG.log.warn('Couldnt find video file: ' + name);
-			if(onComplete != null) onComplete();
-			else startAndEnd();
-			return;
-		}
-
-		var video:VideoHandler = new VideoHandler();
-			#if (hxCodec >= "3.0.0")
-			// Recent versions
-			video.play(filepath);
-			video.onEndReached.add(function()
-			{
-				video.dispose();
-				if(onComplete != null) onComplete();
-				else startAndEnd();
-				return;
-			}, true);
-			#else
-			// Older versions
-			video.playVideo(filepath);
-			video.finishCallback = function()
-			{
-				if(onComplete != null) onComplete();
-				else startAndEnd();
-				return;
-			}
-			#end
-		#else
-		FlxG.log.warn('Platform not supported!');
-		startAndEnd();
-		return;
-		#end
-	}
+	public function startVideo(name:String, ?onComplete:Void->Void = null) HostDomain.startVideo(this, name, onComplete);
 
 	function startAndEnd()
 	{
@@ -1623,36 +1514,7 @@ class PlayState extends MusicBeatState
 		insert(members.indexOf(dadGroup), obj);
 	}
 
-	public function clearNotesBefore(time:Float)
-	{
-		// H-Slice 移植：CastNote 数组用生成游标二分跳进（O(log n)），不再逐条 remove/销毁
-		var firstId:Int = currentSpawnId;
-		var lastId:Int = unspawnNotes.length;
-		while (firstId < lastId)
-		{
-			var middleId:Int = (firstId + lastId) >>> 1;
-			if (unspawnNotes[middleId].strumTime - 350 < time)
-				firstId = middleId + 1;
-			else
-				lastId = middleId;
-		}
-		currentSpawnId = firstId;
-		releaseConsumedNotes();
-
-		// 已生成的音符同样静默回收（与旧行为一致：不判 miss、不溅射）
-		var i:Int = notes.length - 1;
-		while (i >= 0) {
-			var daNote:Note = notes.members[i];
-			if(daNote != null && daNote.strumTime - 350 < time)
-			{
-				daNote.active = false;
-				daNote.visible = false;
-				daNote.ignoreNote = true;
-				notes.invalidateNote(daNote);
-			}
-			--i;
-		}
-	}
+	public function clearNotesBefore(time:Float) NoteChartDomain.clearNotesBefore(this, time);
 
 	public function updateScore(miss:Bool = false)
 	{
@@ -2506,42 +2368,7 @@ class PlayState extends MusicBeatState
 
 	// 【Turbo】数据级结算（不建 Sprite）：口径与 goodNoteHit/popUpScore 的 botplay 路径一致——
 	// 判定恒为 ratingsData[0]（botplay diff=0 → Marvelous/Sick），按密度加权；长条不在此结算。
-	function settleCastHit(target:CastNote, hitMult:Int):Void
-	{
-		// 计数权威封顶（与 goodNoteHit 同款）：结算/命中不超过总音符数
-		if (totalNotes > 0)
-		{
-			if (songHits >= totalNotes) hitMult = 0;
-			else if (songHits + hitMult > totalNotes) hitMult = Std.int(totalNotes - songHits);
-		}
-		if (hitMult <= 0) return;
-
-		var daRating:Rating = ratingsData[0]; // botplay diff=0：marvelous 时=marvelous，否则=sick
-		totalNotesHit += daRating.ratingMod * hitMult;
-		totalPlayed += hitMult;
-		songHits += hitMult;
-		daRating.hits += hitMult;
-		songScore += daRating.score * hitMult;
-		combo += hitMult;
-		if (combo > maxCombo) maxCombo = combo;
-		_npsCount += hitMult;
-		health += 0.023 * healthGain * hitMult; // Note.hitHealth 默认 0.023
-		// 结算恒为满分（marvelous/sick）→ 不触碰 allSicks（保持全 S 金 Combo）
-		// 评级/分数文本节流（与 popUpScore 同款 250ms）
-		if (haxe.Timer.stamp() - _lastRatingRecalc >= 0.25)
-		{
-			_lastRatingRecalc = haxe.Timer.stamp();
-			RecalculateRating(false);
-		}
-		// strum confirm 高亮：每帧每轨一次（与批处理 botBatchAnimDone 同款节流）
-		var lane:Int = target.noteData & 255;
-		if (lane >= 0 && lane < 4 && !_settleAnimDone[lane])
-		{
-			_settleAnimDone[lane] = true;
-			strumPlayAnim(false, lane, Conductor.stepCrochet * 1.25 / 1000 / playbackRate);
-		}
-		target.wasHit = true;
-	}
+	function settleCastHit(target:CastNote, hitMult:Int):Void NoteChartDomain.settleCastHit(this, target, hitMult);
 
 	// 【性能】释放已消费的 CastNote 引用：桌面游标模式下，currentSpawnId 左侧的
 	// 对象已不可能再被读取（二分/顺序读取均从 currentSpawnId 起步），置 null 让
@@ -5202,39 +5029,7 @@ class PlayState extends MusicBeatState
 	public var ratingName:String = '?';
 	public var ratingPercent:Float;
 	public var ratingFC:String;
-	public function RecalculateRating(badHit:Bool = false) {
-		setOnScripts('score', songScore);
-		setOnScripts('misses', songMisses);
-		setOnScripts('hits', songHits);
-		setOnScripts('combo', combo);
-
-		var ret:Dynamic = callOnScripts('onRecalculateRating', null, true);
-		if(ret != FunkinLua.Function_Stop)
-		{
-			ratingName = '?';
-			if(totalPlayed != 0) //Prevent divide by 0
-			{
-				// Rating Percent
-				ratingPercent = Math.min(1, Math.max(0, totalNotesHit / totalPlayed));
-				//trace((totalNotesHit / totalPlayed) + ', Total: ' + totalPlayed + ', notes hit: ' + totalNotesHit);
-
-				// Rating Name
-				ratingName = ratingStuff[ratingStuff.length-1][0]; //Uses last string
-				if(ratingPercent < 1)
-					for (i in 0...ratingStuff.length-1)
-						if(ratingPercent < ratingStuff[i][1])
-						{
-							ratingName = ratingStuff[i][0];
-							break;
-						}
-			}
-			fullComboFunction();
-		}
-		updateScore(badHit); // score will only update after rating is calculated, if it's a badHit, it shouldn't bounce -Ghost
-		setOnScripts('rating', ratingPercent);
-		setOnScripts('ratingName', ratingName);
-		setOnScripts('ratingFC', ratingFC);
-	}
+	public function RecalculateRating(badHit:Bool = false) CameraHudDomain.RecalculateRating(this, badHit);
 
 	function fullComboUpdate() CameraHudDomain.fullComboUpdate(this);
 

@@ -589,4 +589,122 @@ class HostDomain
 		DiscordClient.changePresence(ps.detailsPausedText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
 		#end
 	}
+
+	/** 原 PlayState.startVideo（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function startVideo(ps:PlayState, name:String, ?onComplete:Void->Void = null)
+	{
+		#if VIDEOS_ALLOWED
+		ps.inCutscene = true;
+
+		var filepath:String = Paths.video(name);
+		#if sys
+		if(!FileSystem.exists(filepath))
+		#else
+		if(!OpenFlAssets.exists(filepath))
+		#end
+		{
+			FlxG.log.warn('Couldnt find video file: ' + name);
+			if(onComplete != null) onComplete();
+			else ps.startAndEnd();
+			return;
+		}
+
+		var video:VideoHandler = new VideoHandler();
+			#if (hxCodec >= "3.0.0")
+			// Recent versions
+			video.play(filepath);
+			video.onEndReached.add(function()
+			{
+				video.dispose();
+				if(onComplete != null) onComplete();
+				else ps.startAndEnd();
+				return;
+			}, true);
+			#else
+			// Older versions
+			video.playVideo(filepath);
+			video.finishCallback = function()
+			{
+				if(onComplete != null) onComplete();
+				else ps.startAndEnd();
+				return;
+			}
+			#end
+		#else
+		FlxG.log.warn('Platform not supported!');
+		ps.startAndEnd();
+		return;
+		#end
+	}
+
+	/** 原 PlayState.addCharacterToList（作用域分析：零遮蔽，16 处成员引用已限定）。 */
+	public static function addCharacterToList(ps:PlayState, newCharacter:String, type:Int)
+	{
+		switch(type) {
+			case 0:
+				if(!ps.boyfriendMap.exists(newCharacter)) {
+					var newBoyfriend:Character = new Character(0, 0, newCharacter, true);
+					ps.boyfriendMap.set(newCharacter, newBoyfriend);
+					ps.boyfriendGroup.add(newBoyfriend);
+					ps.startCharacterPos(newBoyfriend);
+					newBoyfriend.alpha = 0.00001;
+					ps.startCharacterScripts(newBoyfriend.curCharacter);
+				}
+
+			case 1:
+				if(!ps.dadMap.exists(newCharacter)) {
+					var newDad:Character = new Character(0, 0, newCharacter);
+					ps.dadMap.set(newCharacter, newDad);
+					ps.dadGroup.add(newDad);
+					ps.startCharacterPos(newDad, true);
+					newDad.alpha = 0.00001;
+					ps.startCharacterScripts(newDad.curCharacter);
+				}
+
+			case 2:
+				if(ps.gf != null && !ps.gfMap.exists(newCharacter)) {
+					var newGf:Character = new Character(0, 0, newCharacter);
+					newGf.scrollFactor.set(0.95, 0.95);
+					ps.gfMap.set(newCharacter, newGf);
+					ps.gfGroup.add(newGf);
+					ps.startCharacterPos(newGf);
+					newGf.alpha = 0.00001;
+					ps.startCharacterScripts(newGf.curCharacter);
+				}
+		}
+	}
+
+	/** 原 PlayState.syncGameplaySettings（作用域分析：零遮蔽，24 处成员引用已限定）。 */
+	public static function syncGameplaySettings(ps:PlayState):Void
+	{
+		var oldPractice:Bool = ps.practiceMode;
+		var oldBotplay:Bool = ps.cpuControlled;
+
+		ps.playbackRate = ClientPrefs.getGameplaySetting('songspeed');
+		ps.songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
+		switch(ps.songSpeedType)
+		{
+			case "multiplicative":
+				ps.songSpeed = PlayState.SONG.speed * ClientPrefs.getGameplaySetting('scrollspeed');
+			case "constant":
+				ps.songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
+		}
+		ps.healthGain = ClientPrefs.getGameplaySetting('healthgain');
+		ps.healthLoss = ClientPrefs.getGameplaySetting('healthloss');
+		ps.instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
+		ps.practiceMode = ClientPrefs.getGameplaySetting('practice');
+		ps.cpuControlled = ClientPrefs.getGameplaySetting('botplay');
+
+		if (ps.cpuControlled) ps.usedAutoplay = true;
+
+		if (ps.practiceMode != oldPractice || ps.cpuControlled != oldBotplay)
+			PlayState.changedDifficulty = true;
+
+		if (ps.botplayTxt != null)
+		{
+			ps.botplayTxt.visible = ps.cpuControlled || ps.replayMode;
+			ps.botplayTxt.alpha = 1;
+			ps.botplaySine = 0;
+		}
+	}
 }
