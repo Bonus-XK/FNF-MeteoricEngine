@@ -27,6 +27,7 @@ import objects.Character;
 import backend.Multiplayer;
 import backend.Rating;
 import objects.NoteSplash;
+import psychlua.FunkinLua;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -1049,5 +1050,242 @@ class NoteChartDomain
 			ps.noteTypeLuaPaths.push(path + '.lua');
 			ps.noteTypeHxPaths.push(path + '.hx');
 		}
+	}
+
+	/** 原 PlayState.goodNoteHit（作用域分析：零遮蔽，74 处成员引用已限定）。 */
+	public static function goodNoteHit(ps:PlayState, note:Note):Void
+	{
+		// 【密集谱自动游玩·命中开销收敛】stagesFunc 每命中创建一个闭包并派发（每次命中都分配），
+		// 密集批（≈每帧数百命中）下是 notes 阶段 300us+ 的来源之一；
+		// 密集自动游玩/回放跳过场景命中回调（Weekend 1 等舞台点亮对自动游玩无意义），手动游玩不受影响。
+		if (!(PlayState.densePerfMode && (ps.cpuControlled || ps.replayMode)))
+			ps.stagesFunc(function(stage:BaseStage) stage.goodNoteHit(note)); //Psych 1.0.4：场景命中回调（Weekend 1）
+		var onlineScoreDelta:Int = 0;
+		var onlineHealthDelta:Float = 0;
+		if (!note.wasGoodHit)
+		{
+			var hitMult:Int = Std.int(note.density); // H-Slice 移植：堆叠合并按 density 计分/加血
+			if (hitMult < 1) hitMult = 1;
+			// 计数权威封顶：命中/连击/评级/分数累计不得超过总音符数（批次去重噪声等超额在此截断），
+			// 结算时 Combo/Marvelous/…/分数恰好等于总音符数（1,130,083 级谱面 = totalNotes）
+			if (ps.totalNotes > 0)
+			{
+				if (ps.songHits >= ps.totalNotes) hitMult = 0;
+				else if (ps.songHits + hitMult > ps.totalNotes) hitMult = Std.int(ps.totalNotes - ps.songHits);
+			}
+			// NPS 统计：每个音符（含长条）只计一次，只计独立音符（堆叠合并按 density 计）
+			if (!note.isSustainNote) ps._npsCount += hitMult;
+			if(ps.cpuControlled && (note.ignoreNote || note.hitCausesMiss)) return;
+
+			note.wasGoodHit = true;
+			// 回放录制：长条子段命中（Psych 判定按住时的子段逐个记录）
+			if (ps.recordingReplay && !ps.cpuControlled && ps.currentReplay != null && note.isSustainNote)
+				ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, 'sus');
+			if (ClientPrefs.data.hitsoundVolume > 0 && !note.hitsoundDisabled && !(ps.botHitBatch && ps.botBatchHitsoundDone))
+			{
+				FlxG.sound.play(Paths.sound(note.hitsound), ClientPrefs.data.hitsoundVolume);
+				if (ps.botHitBatch) ps.botBatchHitsoundDone = true;
+			}
+
+			if(note.hitCausesMiss) {
+				// 回放录制：伤害音符的命中（回放时同样走命中→受伤流程）
+				if (ps.recordingReplay && !ps.cpuControlled && ps.currentReplay != null && !note.isSustainNote)
+					ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, 'hurt');
+				ps.noteMiss(note);
+				if(!note.noteSplashData.disabled && !note.isSustainNote) {
+					ps.spawnNoteSplashOnNote(note);
+				}
+
+				if(!note.noMissAnimation)
+				{
+					switch(note.noteType) {
+						case 'Hurt Note': //Hurt note
+							if(ps.boyfriend.animation.getByName('hurt') != null) {
+								ps.boyfriend.playAnim('hurt', true);
+								ps.boyfriend.specialAnim = true;
+							}
+					}
+				}
+
+				if (!note.isSustainNote)
+				{
+					ps.notes.invalidateNote(note);
+				}
+				return;
+			}
+
+			if (!note.isSustainNote)
+			{
+				ps.combo += hitMult;
+				if (ps.combo > ps.maxCombo) ps.maxCombo = ps.combo; // 最高连击追踪
+				var onlinePrevScore:Int = ps.songScore;
+				ps.popUpScore(note, hitMult); // 传入已封顶的 density：计分/评级/命中同源封顶
+				onlineScoreDelta = ps.songScore - onlinePrevScore;
+				// 回放录制：主音符命中（评分取本局真实判定结果）
+				if (ps.recordingReplay && !ps.cpuControlled && ps.currentReplay != null)
+					ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
+			}
+			onlineHealthDelta = note.hitHealth * ps.healthGain * hitMult;
+			ps.health += onlineHealthDelta;
+			// 血条溢出图标飞出：堆叠命中（density≥2）即上报——小型堆叠也飞，幅度 = 该堆叠提供的血量%
+			// （堆叠越大飞得越远、显示越高，封顶 1000%）；由 GameHUD 在当帧统一结算
+			if (ClientPrefs.data.iconFlyOverflow && hitMult > 1 && !note.isSustainNote)
+			{
+				var stackGainPct:Float = (note.hitHealth * ps.healthGain * hitMult) / 2 * 100;
+				ps.pendingFlySpikePct = Math.max(ps.pendingFlySpikePct, Math.min(100 + stackGainPct, 1000));
+			}
+			// Bad 及以下评分扣一点点血
+			if (!note.isSustainNote && (note.rating == 'bad' || note.rating == 'shit'))
+			{
+				onlineHealthDelta -= 0.02 * ps.healthLoss * hitMult;
+				ps.health -= 0.02 * ps.healthLoss * hitMult;
+			}
+			// 联机：广播己方命中（分数增量/血量增量/密度 + 音符序号），对方据此重建对手面板与血量，
+			// 并按 chartSeq 精确消费对侧音符（真双人：对侧谱面由对方按键打击）
+			if (PlayState.isOnlineMode && !ps.cpuControlled && !note.isSustainNote)
+				Multiplayer.send('HIT|' + note.noteData + '~' + note.rating + '~' + onlineScoreDelta + '~' + onlineHealthDelta + '~' + hitMult + '~' + note.chartSeq);
+
+			if(!ClientPrefs.data.hudOnly && !note.noAnimation && !(ps.botHitBatch && ps.botBatchAnimDone[note.noteData])) {
+				var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, note.noteData)))];
+
+				var char:Character = ps.boyfriend;
+				var animCheck:String = 'hey';
+				if(note.gfNote)
+				{
+					char = ps.gf;
+					animCheck = 'cheer';
+				}
+
+				if(char != null)
+				{
+					char.playAnim(animToPlay + note.animSuffix, true);
+					char.holdTimer = 0;
+
+					if(note.noteType == 'Hey!') {
+						if(char.animOffsets.exists(animCheck)) {
+							char.playAnim(animCheck, true);
+							char.specialAnim = true;
+							char.heyTimer = 0.6;
+						}
+					}
+				}
+				if (ps.botHitBatch) ps.botBatchAnimDone[note.noteData] = true;
+			}
+
+			if(!ps.cpuControlled && !ps.replayMode)
+			{
+				// 手动命中：strum 高亮由松键（keyReleased -> static）熄灭
+				var spr = ps.playerStrums.members[note.noteData];
+				if(spr != null && ClientPrefs.data.playerLightStrum) spr.playAnim('confirm', true);
+			}
+			else if (!(ps.botHitBatch && ps.botBatchAnimDone[note.noteData]) && ClientPrefs.data.botLightStrum)
+				// 自动游玩/回放：confirm 高亮带复位计时，避免判定后常亮
+				ps.strumPlayAnim(false, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / ps.playbackRate);
+			ps.vocals.volume = 1;
+
+			var isSus:Bool = note.isSustainNote; //GET OUT OF MY HEAD, GET OUT OF MY HEAD, GET OUT OF MY HEAD
+			var leData:Int = Math.round(Math.abs(note.noteData));
+			var leType:String = note.noteType;
+
+			// JS Engine 移植：关闭命中回调（noHitFuncs）
+			if (!ClientPrefs.data.noHitFuncs)
+			{
+				var result:Dynamic = ps.callOnLuas('goodNoteHit', [ps.notes.members.indexOf(note), leData, leType, isSus]);
+				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('goodNoteHit', [note]);
+			}
+
+			// 原生长条按压覆盖（模组 goodNoteHit 回调同点触发）
+			if (ps.holdCoverHandler != null && note.isSustainNote)
+				ps.holdCoverHandler.onHit(Std.int(Math.abs(note.noteData)));
+
+			if (!note.isSustainNote)
+			{
+				ps.notes.invalidateNote(note);
+			}
+		}
+	}
+
+	/** 原 PlayState.opponentNoteHit（作用域分析：零遮蔽，31 处成员引用已限定）。 */
+	public static function opponentNoteHit(ps:PlayState, note:Note):Void
+	{
+		ps.stagesFunc(function(stage:BaseStage) stage.opponentNoteHit(note)); //Psych 1.0.4：场景命中回调（Weekend 1）
+		if (Paths.formatToSongPath(PlayState.SONG.song) != 'tutorial')
+			ps.camZooming = true;
+
+		if(note.noteType == 'Hey!' && !ClientPrefs.data.hudOnly && ps.dad.animOffsets.exists('hey')) {
+			ps.dad.playAnim('hey', true);
+			ps.dad.specialAnim = true;
+			ps.dad.heyTimer = 0.6;
+		} else if(!ClientPrefs.data.hudOnly && !note.noAnimation) {
+			var altAnim:String = note.animSuffix;
+
+			if (PlayState.SONG.notes[ps.curSection] != null)
+			{
+				if (PlayState.SONG.notes[ps.curSection].altAnim && !PlayState.SONG.notes[ps.curSection].gfSection) {
+					altAnim = '-alt';
+				}
+			}
+
+			var char:Character = ps.dad;
+			var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, note.noteData)))] + altAnim;
+			if(note.gfNote) {
+				char = ps.gf;
+			}
+
+			if(char != null)
+			{
+				char.playAnim(animToPlay, true);
+				char.holdTimer = 0;
+			}
+		}
+
+		if (PlayState.SONG.needsVoices && ps.opponentVocals.length <= 0)
+			ps.vocals.volume = 1;
+
+		if (ClientPrefs.data.opponentLightStrum)
+			ps.strumPlayAnim(true, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / ps.playbackRate);
+		note.hitByOpponent = true;
+
+		// JS Engine 移植：关闭命中回调（noHitFuncs）
+		if (!ClientPrefs.data.noHitFuncs)
+		{
+			var result:Dynamic = ps.callOnLuas('opponentNoteHit', [ps.notes.members.indexOf(note), Math.abs(note.noteData), note.noteType, note.isSustainNote]);
+			if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('opponentNoteHit', [note]);
+		}
+
+		// 原生长条按压覆盖（模组 opponentNoteHit 回调同点触发，轨偏移 +4）
+		if (ps.holdCoverHandler != null && note.isSustainNote)
+			ps.holdCoverHandler.onHit(4 + Std.int(Math.abs(note.noteData)));
+
+		if (!note.isSustainNote)
+		{
+			// 对方推条：开启后对手命中箭头会像玩家一样加血（推条向对方侧移动），但最低保留一点血量，不会被推死
+			if (ClientPrefs.getGameplaySetting('opponentpush') == true)
+				ps.health -= Math.min(note.hitHealth * ps.healthLoss, Math.max(0, ps.health - 0.01));
+			ps.notes.invalidateNote(note);
+		}
+	}
+
+	/** 原 PlayState.noteMiss（作用域分析：零遮蔽，8 处成员引用已限定）。 */
+	public static function noteMiss(ps:PlayState, daNote:Note):Void
+	{
+		 //You didn't hit the key and let it go offscreen, also used by Hurt Notes
+				ps.stagesFunc(function(stage:BaseStage) stage.noteMiss(daNote)); //Psych 1.0.4：场景 miss 回调（Weekend 1）
+				// NPS 统计：漏掉的音符也计入“收到”（堆叠合并按 density 计）
+				if (!daNote.isSustainNote) ps._npsCount += Std.int(daNote.density);
+				// Dupe note remove：只移除"谱面原始重复"（charter 在同一个时间刻度上放了多颗完全相同音符）。
+				// 展开簇内同时间箭头（同 chartSeq）不在此列——否则整簇被静默杀掉不计数，结算总数对不上。
+				ps.notes.forEachAlive(function(note:Note) {
+					if (daNote != note && daNote.mustPress && daNote.noteData == note.noteData
+						&& daNote.isSustainNote == note.isSustainNote
+						&& Math.abs(daNote.strumTime - note.strumTime) < 1
+						&& note.chartSeq != daNote.chartSeq) {
+						ps.notes.invalidateNote(note);
+					}
+				});
+
+				ps.noteMissCommon(daNote.noteData, daNote);
+				var result:Dynamic = ps.callOnLuas('noteMiss', [ps.notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
+				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('noteMiss', [daNote]);
 	}
 }

@@ -108,6 +108,9 @@ def token_classes(masked, members, localsx):
         if j < len(masked) and masked[j] == ':' and k >= 0 and masked[k] in '{,':
             out.append((pos, n, 'key'))
             continue
+        if n == 'this':
+            out.append((pos, n, 'thisref'))   # 裸 this 一律替换为 ps（域函数是静态的）
+            continue
         if n in localsx:
             cls = 'local'
         elif n in members:
@@ -283,12 +286,19 @@ def rewrite(body_raw, members, localsx):
     body_masked = sa.mask(body_raw)
     edits = []
     for pos, n, cls in token_classes(body_masked, members, localsx):
+        if cls == 'thisref':
+            edits.append((pos, pos + 4, 'ps'))    # `this` → `ps`
+            continue
         if cls == 'member:inst' or cls == 'inst-unknown':
             edits.append((pos, 'ps.'))
         elif cls == 'member:static':
             edits.append((pos, 'PlayState.'))
-    for pos, pre in sorted(edits, key=lambda x: -x[0]):
-        body_raw = body_raw[:pos] + pre + body_raw[pos:]
+    for e in sorted(edits, key=lambda x: -x[0]):
+        if len(e) == 3:
+            a, b, txt = e
+            body_raw = body_raw[:a] + txt + body_raw[b:]
+        else:
+            body_raw = body_raw[:e[0]] + e[1] + body_raw[e[0]:]
     return body_raw, len(edits)
 
 
@@ -422,13 +432,24 @@ def main():
     def is_candidate(f):
         if f['verdict'] not in ('mech', 'accessor'):
             return False
-        if f['unknown_calls'] and not args.allow_foreign:
+        # 外来调用判定改用**合并了继承链的成员表**：
+        # scope_analyze 只看 PlayState 自身声明，会把 MusicBeatState 的继承方法（stagesFunc 等）
+        # 误判成「外来调用」，导致整块函数被拒（实测这是剩余 ~2000 行的最大阻断项）。
+        bm = sa.mask(block(f))
+        lx = set(f['locals']) | set(f['params'])
+        foreign = set()
+        for mm in re.finditer(r'(?<![\w.])([A-Za-z_]\w*)\s*\(', bm):
+            t = mm.group(1)
+            if t in sa.KW or t in members or t in lx:
+                continue
+            foreign.add(t)
+        if foreign and not args.allow_foreign:
             return False
         if f['name'].startswith(('get_', 'set_')):
             return False
         b = block(f)
-        if re.search(r'(?<![\w.])this\s*\.', b) or re.search(r'(?<![\w.])super\s*\.', b):
-            return False
+        if re.search(r'(?<![\w.])super\s*\.', b):
+            return False   # super 需「骨架保留+片段迁出」，本轮仍排除；裸 this 已支持（替换为 ps）
         if 'Domain.' in b:
             return False
         # `#if false / #else / #end` 包裹声明的写法：`#end` 落在「声明行→体右括号」区间内，
@@ -499,16 +520,17 @@ def main():
         new_body, npre = rewrite(sp['body'], members, localsx)
         new_masked = sa.mask(new_body)
         new_seq = [(nm, c) for _, nm, c in token_classes(new_masked, members, localsx)]
+        old_this = sum(1 for _, _, c in old_seq if c == 'thisref')
         old_nonmember = [(nm, c) for _, nm, c in old_seq
-                         if not c.startswith('member') and c != 'inst-unknown']
+                         if not c.startswith('member') and c not in ('inst-unknown', 'thisref')]
         new_member_left = [(nm, c) for nm, c in new_seq
-                           if c.startswith('member') or c == 'inst-unknown']
-        got_ps = len(re.findall(r'(?<![\w])ps\s*\.', new_masked))
+                           if c.startswith('member') or c in ('inst-unknown', 'thisref')]
+        got_ps = len(re.findall(r'(?<![\w.])ps(?!\w)', new_masked))   # 含 `ps.` 与裸 `ps`（this 替换）
         got_stat = len(re.findall(r'(?<![\w])PlayState\s*\.', new_masked))
 
         a = not new_member_left
         b = (new_seq == old_nonmember)
-        c = (got_ps == old_inst and got_stat == old_stat + old_ps)
+        c = (got_ps == old_inst + old_this and got_stat == old_stat + old_ps)
         rows.append((n, f['span_body'], npre, a, b, c, old_inst, old_stat, got_ps, got_stat))
         if not (a and b and c):
             print('✘ 等价性证明失败：%s' % n, file=sys.stderr)

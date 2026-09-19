@@ -34,6 +34,7 @@ import psychlua.HScript;
 import backend.TurboDensity;
 import backend.TurboDensity.TurboZone;
 import flixel.addons.display.FlxRuntimeShader;
+import backend.BaseStage;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -976,5 +977,57 @@ class HostDomain
 			return true;
 		}
 		return false;
+	}
+
+	/** 原 PlayState.startSong（作用域分析：零遮蔽，36 处成员引用已限定）。 */
+	public static function startSong(ps:PlayState):Void
+	{
+		ps.startingSong = false;
+
+		@:privateAccess FlxG.sound.playMusic(ps.inst._sound, 1, false);
+		FlxG.sound.music.pitch = ps.playbackRate;
+		FlxG.sound.music.onComplete = ps.finishSong.bind();
+		ps.vocals.play();
+		ps.opponentVocals.play();
+
+		ps.stagesFunc(function(stage:BaseStage) stage.startSong()); //Psych 1.0.4：场景 startSong 钩子（Weekend 1）
+
+		if(PlayState.startOnTime > 0) ps.setSongTime(PlayState.startOnTime - 500);
+		PlayState.startOnTime = 0;
+		if(ps.paused) {
+			//trace('Oopsie doopsie! Paused sound');
+			FlxG.sound.music.pause();
+			ps.vocals.pause();
+			ps.opponentVocals.pause();
+		}
+
+		// Song duration in a float, useful for the time left feature
+		ps.songLength = FlxG.sound.music.length;
+		// 【0:00 卡结算 修复二】歌曲时长至少不短于谱面末尾：
+		// ① 音频缺失/文件损坏 → 空 Sound，music.length=0 且 onComplete 永不触发；
+		// ② 流式 Vorbis（streamSongAudio）等场景 music.length 也可能为 0/不可靠。
+		// 一律取 max(音频长度, 谱面末尾) —— HUD 时间有依据，update 的"越过时长即收尾"
+		// 也保证任何歌曲都能正常结算，不再依赖 onComplete。
+		if (ps.chartEndTimeMs <= 0 && ps.unspawnNotes != null && ps.unspawnNotes.length > 0)
+		{
+			// 兜底再算一次（覆盖非 generateChartNotes 路径/异常早退）
+			var _lastCast0:CastNote = ps.unspawnNotes[ps.unspawnNotes.length - 1];
+			ps.chartEndTimeMs = _lastCast0.strumTime + _lastCast0.holdLength + Conductor.safeZoneOffset + 1000;
+		}
+		if (ps.chartEndTimeMs > ps.songLength)
+		{
+			ps.songLength = ps.chartEndTimeMs;
+			trace('[Audio] songLength 按谱面末尾兜底：' + Std.int(ps.songLength) + 'ms（music.length=' + Std.int(FlxG.sound.music.length) + 'ms）');
+		}
+		FlxTween.tween(ps.timeBar, {alpha: 1}, 0.5, {ease: FlxEase.circOut});
+		FlxTween.tween(ps.timeTxt, {alpha: 1}, 0.5, {ease: FlxEase.circOut});
+
+		#if desktop
+		// Updating Discord Rich Presence (with Time Left)
+		DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter(), true, ps.songLength);
+		#end
+		ps.setOnScripts('songLength', ps.songLength);
+		ps.callOnScripts('onSongStart');
+		CrashHandler.mark('PlayState.startSong:music-playing');
 	}
 }
