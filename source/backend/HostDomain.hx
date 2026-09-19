@@ -29,7 +29,6 @@ import backend.Discord.DiscordClient;
 import objects.MobileControls;
 import backend.Multiplayer;
 import substates.PauseSubState;
-import cne.CneScriptCompat;
 import psychlua.HScript;
 import backend.TurboDensity;
 import backend.TurboDensity.TurboZone;
@@ -761,7 +760,7 @@ class HostDomain
 			// CNE 回调别名（create→onCreate、stepHit→onStepHit…）必须在 execute 之后：
 			// 脚本函数已解析，`exists('create')` 才为真；同时要早于下面的 onCreate 调用。
 			if (cneCallbacks)
-				cne.CneScriptCompat.applyCallbacks(newScript);
+				bridge.CneBridge.applyCallbacks(newScript);
 			@:privateAccess
 			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
 			{

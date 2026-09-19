@@ -790,7 +790,7 @@ class PlayState extends MusicBeatState
 				#if (MODS_ALLOWED && sys)
 				// CNE 模组兼容：CNE 舞台没有 Psych 舞台类，图层写在 data/stages/<名>.xml 的
 				// <sprite> 元素里（站位/缩放已由 StageData 的 CNE 分支喂给 StageFile）。
-				if (cne.CneModCompat.hasStageXml(curStage))
+				if (bridge.CneBridge.hasStageXml(curStage))
 					new states.stages.CneXmlStage(curStage);
 				#end
 		}
@@ -887,8 +887,8 @@ class PlayState extends MusicBeatState
 		// CNE 脚本用 `stage.stageSprites[...]`、`FunkinSprite`、`insert` 等名字，globals/回调别名的
 		// 注入在 `CneScriptCompat`；`create` 会在 initHScript 内部立即执行。
 		#if (MODS_ALLOWED && sys && HSCRIPT_ALLOWED)
-		if (cne.CneModCompat.isEnabled())
-			cne.CneScriptCompat.loadSongScripts(this, songName);
+		if (bridge.CneBridge.isEnabled())
+			bridge.CneBridge.loadSongScripts(this, songName);
 		#end
 
 		// STAGE SCRIPTS（在角色创建后加载，使 onCreate 可访问 dad/boyfriend/gf）

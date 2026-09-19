@@ -544,7 +544,7 @@ class ModsMenuState extends MusicBeatState
 		mods = [];
 		modsList = [];
 		#if (MODS_ALLOWED && sys)
-		cne.CneModCompat.clearCaches(); // mod 列表变化 → CNE songs/ 目录名缓存作废
+		bridge.CneBridge.clearCaches(); // mod 列表变化 → CNE songs/ 目录名缓存作废
 		#end
 		var list:ModsList = Mods.parseList();
 		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
@@ -799,8 +799,8 @@ class ModsMenuState extends MusicBeatState
 		cardStatus.text = isOn ? '已启用' : '已停用（按 Enter 或点击启用）';
 		#if (MODS_ALLOWED && sys)
 		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
-		if (cne.CneModCompat.isCneMod(mod.folder))
-			cardStatus.text += (cne.CneModCompat.isEnabled() ? '   ·   CNE 格式' : '   ·   CNE 格式（需在设置→编程开启「CNE 模组兼容」）');
+		if (bridge.CneBridge.isCneMod(mod.folder))
+			cardStatus.text += (bridge.CneBridge.isEnabled() ? '   ·   CNE 格式' : '   ·   CNE 格式（需在设置→编程开启「CNE 模组兼容」）');
 		#end
 		cardStatus.updateHitbox();
 
@@ -878,7 +878,7 @@ class ModsMenuState extends MusicBeatState
 		var folderLabel:String = '文件夹：' + mod.folder;
 		#if (MODS_ALLOWED && sys)
 		// 右侧信息：CNE 格式 mod 且兼容开关未开时给出可操作的提示（开关位置写在提示里）
-		if (cne.CneModCompat.isCneMod(mod.folder) && !cne.CneModCompat.isEnabled())
+		if (bridge.CneBridge.isCneMod(mod.folder) && !bridge.CneBridge.isEnabled())
 			folderLabel += '   ·   CNE 格式，需开启「设置 → 编程 → CNE 模组兼容」';
 		#end
 		clipText(folderText, folderLabel, INFO_W - 20);

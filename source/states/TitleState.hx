@@ -114,8 +114,8 @@ class TitleState extends MusicBeatState
 		#if meteoric_debug
 		Sys.println('[CNE] TitleState integration reached; force=' + Sys.getEnv('METEORIC_CNE_FORCE'));
 		#end
-		cne.ProgrammingManager.init();
-		cne.ProgrammingManager.onStateCreate(this);
+		bridge.CneBridge.programmingInit();
+		bridge.CneBridge.programmingOnStateCreate(this);
 		#end
 
 		// 【帧率档位启动诊断】仅调试构建启用（编译脚本加 -debug / METEORIC_DEBUG=1 时定义
@@ -475,9 +475,9 @@ class TitleState extends MusicBeatState
 		if (!selfTestChecked)
 		{
 			selfTestChecked = true;
-			if (states.editors.LuaGraphEditorState.selfTestRequested())
+			if (bridge.LuaGraphBridge.selfTestRequested())
 			{
-				MusicBeatState.switchState(new states.editors.LuaGraphEditorState());
+				bridge.LuaGraphBridge.openEditor();
 				return;
 			}
 		}
