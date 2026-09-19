@@ -1,8 +1,27 @@
 # Meteoric Engine 更新日志
 
-> 版本：1.1.3
+> 版本：1.2.0
 
-## 未发布（打击特效预览 + 皮肤解析修复 + CNE 模组兼容）
+## 1.2.0 主要更新（自 1.1.3 以来）
+
+- **【重构】PlayState 宿主域拆分**：`source/states/PlayState.hx` **7,946 → 3,853 行（−51.5%）**。
+  按「骨架保留 + 片段迁出」把实现迁入 8 个域模块（NoteChartDomain / CameraHudDomain / EventDomain /
+  OnlineDomain / ReplayDomain / InputDomain / HostDomain 等），PlayState 只保留字段契约、生命周期骨架与
+  **同签名单行转发入口** → 全仓调用点零改动。私有成员经 `@:access(states.PlayState)`；
+  `super.X()` 调用经 PlayState 内 `@:noCompletion meteoSuper_X` 跳板（无闭包开销）。
+  迁出前强制三条等价性证明（无漏加前缀 / 无过度加前缀 / 前缀计数对账），不通过即不写盘。
+- **【重构】外围子系统边界外移**：新增 `source/bridge/`（`EditorBridge` / `CneBridge` / `LuaGraphBridge`）。
+  主流程（states 根 / backend / objects）对编辑器类的 import **5 → 0**、对 `cne`/`luagraph` 的 import **→ 0**。
+  `EditorButton` 组件归位到 `objects/`（`ChartWidgets.hx` 保留兼容 typedef，编辑器侧零改动）。
+- **【修复】特殊箭头（Hurt Note）在 `disableNoteRGB` 曲目下整条初始化失败**：
+  `Note.set_noteType` 的 `case 'Hurt Note'` 无条件写 `rgbShader.r/g/b`，而该字段在关闭音符 RGB 时为 `null`
+  → 抛空引用 → 该类型音符不生成/不显示。已按本文件既有约定补判空。
+- **【修复】Weekend1 在 Freeplay 不显示正确小图标**：部分角色图标只有 PE 命名（`icons/icon-<角色>-pe.png`），
+  而图标加载链缺这一档 → 直接掉到 `icon-face` 兜底。已在兜底前补 `-pe` 档。
+- **【工具】新增只读分析/迁移工具链**：`tools/scope/scope_analyze.py`（作用域分析：真遮蔽 + 迁移可行性分级）、
+  `tools/scope/scope_migrate.py`（片段迁出器，内置等价性证明）、`tools/boundary/editor_census.py`（编辑器耦合测绘）、
+  `tools/boundary/overlay_ledger.py`（上游覆盖层台账）。
+## 1.2.0（打击特效预览 + 皮肤解析修复 + CNE 模组兼容）
 
 - **【新增】「CNE 模组兼容」：Codename Engine 格式的 mod 可直接在 Meteoric 里加载**（设置 → 编程 → **CNE 模组兼容**，
   **默认关**；关闭时 mod 加载路径与改动前完全一致）。与上一轮落地的「CNE 式 HScript 编程层」是两条独立的线：
