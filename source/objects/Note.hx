@@ -502,9 +502,15 @@ class Note extends FlxSprite
 					//but i've changed it to something more optimized with the implementation of RGBPalette:
 
 					// note colors
-					rgbShader.r = 0xFF101010;
-					rgbShader.g = 0xFFFF0000;
-					rgbShader.b = 0xFF990022;
+					// RGB 关闭时 rgbShader 为 null（Note.hx:374 useRGBShader = !SONG.disableNoteRGB；
+					// 本文件 733/911/945 行同约定判空）。此前无条件写 → disableNoteRGB 曲目下抛空引用，
+					// set_noteType('Hurt Note') 整体失败 → 该类型箭头不生成/不显示。
+					if (rgbShader != null)
+					{
+						rgbShader.r = 0xFF101010;
+						rgbShader.g = 0xFFFF0000;
+						rgbShader.b = 0xFF990022;
+					}
 
 					// splash data and colors
 					noteSplashData.r = 0xFFFF0000;
