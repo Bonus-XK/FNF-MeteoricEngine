@@ -80,8 +80,17 @@ jobs:
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager || true)"; fi
           echo "sdkmanager: $SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          "$SDKMANAGER" --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          # `yes | sdkmanager --licenses`：sdkmanager 读完授权退出后管道关闭，yes 收 SIGPIPE
+          # 会打印 "yes: standard output: Broken pipe" —— 标准噪音，与本步成败无关（故下面不再
+          # 把 sdkmanager 的输出丢进 /dev/null：授权/安装真出错时日志里必须看得见原因）。
+          yes | "$SDKMANAGER" --licenses > /tmp/sdk-lic.log 2>&1 || true
+          grep -v "Broken pipe" /tmp/sdk-lic.log | tail -5 || true
+          if ! "$SDKMANAGER" --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /tmp/sdk-install.log 2>&1; then
+            echo "✘ sdkmanager 安装 NDK/平台失败，输出如下："
+            tail -40 /tmp/sdk-install.log
+            exit 1
+          fi
+          tail -5 /tmp/sdk-install.log
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
 
       - name: 安装 haxelib 依赖
