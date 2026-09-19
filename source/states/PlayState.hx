@@ -5354,37 +5354,7 @@ class PlayState extends MusicBeatState
 	 * 暂停期间由 PauseSubState 每帧调用：PlayState.update 被冻结时仍处理
 	 * RESUME / QUIT / DISCONNECTED（普通游戏事件在暂停期间忽略，恢复后再消费）。
 	 */
-	public function onlinePauseNetworkTick():Void
-	{
-		if (!isOnlineMode) return;
-		Multiplayer.update();
-		var leftover:Array<String> = [];
-		for (m in Multiplayer.pollMessages())
-		{
-			var parts:Array<String> = m.split('|');
-			switch (parts[0])
-			{
-				case 'RESUME':
-					if (paused && subState != null)
-					{
-						onlineRemoteResume = true;
-						closeSubState();
-						onlineRemoteResume = false;
-					}
-				case 'QUIT':
-					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
-					onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
-					return;
-				case 'DISCONNECTED':
-					onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
-					return;
-				default:
-					// 暂停期间暂存游戏事件；PAUSE 丢弃（恢复后不得重放对方的旧暂停）
-					if (parts[0] != 'PAUSE') leftover.push(m);
-			}
-		}
-		Multiplayer.reinjectMany(leftover);
-	}
+	public function onlinePauseNetworkTick():Void OnlineDomain.onlinePauseNetworkTick(this);
 
 	/**
 	 * 联机结算界面打开后由 ResultsSubState 每帧调用：

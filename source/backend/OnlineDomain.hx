@@ -112,4 +112,37 @@ class OnlineDomain
 			}
 		}
 	}
+
+	/** 原 PlayState.onlinePauseNetworkTick（作用域分析：零遮蔽，8 处成员引用已限定）。 */
+	public static function onlinePauseNetworkTick(ps:PlayState):Void
+	{
+		if (!PlayState.isOnlineMode) return;
+		Multiplayer.update();
+		var leftover:Array<String> = [];
+		for (m in Multiplayer.pollMessages())
+		{
+			var parts:Array<String> = m.split('|');
+			switch (parts[0])
+			{
+				case 'RESUME':
+					if (ps.paused && ps.subState != null)
+					{
+						ps.onlineRemoteResume = true;
+						ps.closeSubState();
+						ps.onlineRemoteResume = false;
+					}
+				case 'QUIT':
+					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
+					ps.onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
+					return;
+				case 'DISCONNECTED':
+					ps.onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
+					return;
+				default:
+					// 暂停期间暂存游戏事件；PAUSE 丢弃（恢复后不得重放对方的旧暂停）
+					if (parts[0] != 'PAUSE') leftover.push(m);
+			}
+		}
+		Multiplayer.reinjectMany(leftover);
+	}
 }
