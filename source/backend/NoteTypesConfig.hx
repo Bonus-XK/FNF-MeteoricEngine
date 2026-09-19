@@ -18,7 +18,14 @@ class NoteTypesConfig
 		if(noteTypesData.exists(name)) return noteTypesData.get(name);
 
 		var str:String = Paths.getTextFromFile('custom_notetypes/$name.txt');
-		if(str == null || !str.contains(':') || !str.contains('=')) noteTypesData.set(name, null);
+		// 文件缺失/内容不含 `:` 或 `=` → 记为「无数据」并**立即返回**。
+		// 缺 return 时会把 null 交给 CoolUtil.listFromString（其内部 string.trim() 非 null 安全）
+		// → 该 noteType 的 set_noteType 抛空引用 → 这类特殊箭头（扣血键/子弹键等）不生成、不显示。
+		if(str == null || !str.contains(':') || !str.contains('='))
+		{
+			noteTypesData.set(name, null);
+			return null;
+		}
 
 		var parsed:Array<NoteTypeProperty> = [];
 		var lines:Array<String> = CoolUtil.listFromString(str);
