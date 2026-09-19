@@ -5,7 +5,7 @@
 | 项 | 值 |
 |---|---|
 | 生成脚本 | `tools/contract/gen_path_format.py` |
-| 生成时 commit | `8905453919a541711e2f344800b3647bf1d4001c` |
+| 生成时 commit | `cfef89dc6bcd5c20a80b50806255a8f88b1ae64e` |
 | 契约行数 | 76 |
 | 排除行数 | 88 |
 | 未归类 | 0 |
