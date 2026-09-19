@@ -14,6 +14,7 @@ import backend.Achievements;
 import backend.Highscore;
 import backend.StageData;
 import backend.WeekData;
+import backend.NoteChartDomain;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
@@ -247,19 +248,7 @@ class PlayState extends MusicBeatState
 
 	// SONG 逐音符 DOM 是否已被剥离（releaseSongChartDom 把每 section 的 sectionNotes 置空数组）。
 	// 按真实数据判定：任一 section 仍有音符数组/内容 → 未剥离；全部为空数组 → 已剥离。
-	static function isSongChartStripped(s:SwagSong):Bool
-	{
-		if (s == null || s.notes == null) return false;
-		var any:Bool = false;
-		for (sec in s.notes)
-		{
-			if (sec == null) continue;
-			if (sec.sectionNotes == null) return false; // 异常态：保守视为未剥离
-			if (sec.sectionNotes.length > 0) return false;
-			any = true;
-		}
-		return any;
-	}
+	static function isSongChartStripped(s:SwagSong):Bool return NoteChartDomain.isSongChartStripped(s);
 
 	// 加载方（LoadingState/PauseSubState）替换 SONG 时必须先登记身份，剥离才有恢复依据
 	public static function registerChartSource(chartJson:String, folder:String, songName:String):Void
@@ -4039,23 +4028,7 @@ class PlayState extends MusicBeatState
 		#end
 	}
 
-	function openChartEditor()
-	{
-		// 编谱需要完整谱面：若游玩期已剥离 SONG.notes，先从缓存恢复
-		reloadChartSourceIfNeeded();
-		FlxG.camera.followLerp = 0;
-		persistentUpdate = false;
-		paused = true;
-		cancelMusicFadeTween();
-		chartingMode = true;
-
-		#if desktop
-		DiscordClient.changePresence("Chart Editor", null, null, true);
-		DiscordClient.resetClientID();
-		#end
-		
-		MusicBeatState.switchState(new ChartingState());
-	}
+	function openChartEditor() NoteChartDomain.openChartEditor(this);
 
 	function openCharacterEditor()
 	{
@@ -5729,15 +5702,7 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-	public static function sortHitNotes(a:Note, b:Note):Int
-	{
-		if (a.lowPriority && !b.lowPriority)
-			return 1;
-		else if (!a.lowPriority && b.lowPriority)
-			return -1;
-
-		return FlxSort.byValues(FlxSort.ASCENDING, a.strumTime, b.strumTime);
-	}
+	public static function sortHitNotes(a:Note, b:Note):Int return NoteChartDomain.sortHitNotes(a, b);
 
 	private function onKeyRelease(event:KeyboardEvent):Void
 	{
@@ -5939,15 +5904,7 @@ class PlayState extends MusicBeatState
 		if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) callOnHScript('noteMiss', [daNote]);
 	}
 
-	function noteMissPress(direction:Int = 1, force:Bool = false):Void //You pressed a key when there was no notes to press for this key
-	{
-		stagesFunc(function(stage:BaseStage) stage.noteMissPress(direction)); //Psych 1.0.4：场景误触回调（Weekend 1）
-		if(ClientPrefs.data.ghostTapping && !force) return; //fuck it
-
-		noteMissCommon(direction);
-		FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
-		callOnScripts('noteMissPress', [direction]);
-	}
+	function noteMissPress(direction:Int = 1, force:Bool = false):Void NoteChartDomain.noteMissPress(this, direction, force);
 
 	function noteMissCommon(direction:Int, note:Note = null)
 	{
@@ -6285,13 +6242,7 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-	public function spawnNoteSplashOnNote(note:Note) {
-		if(note != null) {
-			var strum:StrumNote = playerStrums.members[note.noteData];
-			if(strum != null)
-				spawnNoteSplash(strum.x, strum.y, note.noteData, note);
-		}
-	}
+	public function spawnNoteSplashOnNote(note:Note) NoteChartDomain.spawnNoteSplashOnNote(this, note);
 
 	public function spawnNoteSplash(x:Float, y:Float, data:Int, ?note:Note = null) {
 		// 【视觉/性能】密集谱自动游玩：每轨 250ms 最多 1 次溅射。原实现 botHitBatch 只限
@@ -7231,15 +7182,7 @@ class PlayState extends MusicBeatState
 		if (opponentVocals != null) opponentVocals.volume = 0;
 	}
 
-	function flashOppStrums(data:Int, anim:String, confirm:Bool):Void
-	{
-		if (onlineOppStrums == null) return;
-		var s:StrumNote = onlineOppStrums.members[data];
-		if (s == null) return;
-		s.playAnim(anim, true);
-		if (confirm)
-			s.resetAnim = Conductor.stepCrochet * 1.25 / 1000 / playbackRate;
-	}
+	function flashOppStrums(data:Int, anim:String, confirm:Bool):Void NoteChartDomain.flashOppStrums(this, data, anim, confirm);
 
 	function refreshOppHud():Void
 	{
