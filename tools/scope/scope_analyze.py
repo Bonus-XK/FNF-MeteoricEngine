@@ -279,12 +279,12 @@ def scan(path, cls='PlayState', stop_at='GameHUD'):
     members = {}
     for i in range(s, e):
         m = FIELD_DECL_RE.match(struct[i])
-        if m:
+        if m and m.group(2) not in KW:
             mods = m.group(1)
             members.setdefault(m.group(2), {'kind': 'var', 'static': 'static' in mods,
                                             'private': 'private' in mods, 'line': i + 1})
         m = FN_DECL_RE.match(struct[i])
-        if m:
+        if m and m.group(2) not in KW:   # 构造函数 function new() 不是成员
             mods = m.group(1)
             members.setdefault(m.group(2), {'kind': 'func', 'static': 'static' in mods,
                                             'private': 'private' in mods, 'line': i + 1})

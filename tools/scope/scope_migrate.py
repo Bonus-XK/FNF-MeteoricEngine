@@ -106,7 +106,10 @@ def token_classes(masked, members, localsx):
             cls = 'member:static' if members[n]['static'] else 'member:inst'
         elif n in sa.KW:
             cls = 'kw'
-        elif n[0].islower() and not re.match(r'\s*\(', masked[mm.end():]):
+        elif (n[0].islower() and not re.match(r'\s*\(', masked[mm.end():])
+              and not re.match(r'\s*\.', masked[mm.end():])):
+            # 排除「紧跟 . 的小写裸名」：那是包/模块限定符（sys.FileSystem、cne.FunkinSprite），
+            # 不是继承成员。实测前缀成 ps.sys → `Identifier expected` / `has no field sys`。
             cls = 'inst-unknown'
         else:
             cls = 'foreign'
@@ -129,6 +132,47 @@ def foreign_values(body_masked, members, localsx):
         if re.match(r'\s*\(', body_masked[mm.end():]):
             continue
         out.add(n)
+    return out
+
+
+def base_class_members(cls_name='PlayState'):
+    """沿 extends 链把**仓库内父类**的类级成员并入成员表（静态/私有标记照抄）。
+
+    为什么必须做：`controls`（MusicBeatState 的成员）与包名 `sys` 都是「小写裸名 + .」，
+    不区分就会把包名前缀成 `ps.sys`（语法错）或把继承成员漏加前缀（`Unknown identifier`）。
+    """
+    build_type_index()
+    out = {}
+    cur = cls_name
+    seen = set()
+    while cur and cur not in seen:
+        seen.add(cur)
+        fp = TYPE_FILE.get(cur)
+        if not fp or not os.path.exists(fp):
+            break
+        try:
+            src = open(fp, encoding='utf-8', errors='replace').read()
+        except OSError:
+            break
+        masked = sa.mask(src).split('\n')
+        raw = src.split('\n')
+        s0, e0 = sa.class_bounds(raw, cur, None)
+        for i in range(s0, e0):
+            m = sa.FIELD_DECL_RE.match(masked[i])
+            if m and m.group(2) not in sa.KW:
+                mods = m.group(1)
+                out.setdefault(m.group(2), {'kind': 'var', 'static': 'static' in mods,
+                                            'private': 'private' in mods, 'line': i + 1, 'inh': True})
+            m = sa.FN_DECL_RE.match(masked[i])
+            if m and m.group(2) not in sa.KW:
+                mods = m.group(1)
+                out.setdefault(m.group(2), {'kind': 'func', 'static': 'static' in mods,
+                                            'private': 'private' in mods, 'line': i + 1, 'inh': True})
+        mm = re.search(r'class\s+%s\s+extends\s+([\w.]+)' % re.escape(cur), src)
+        nxt = mm.group(1).split('.')[-1] if mm else None
+        if nxt and nxt == cur:
+            break
+        cur = nxt
     return out
 
 
@@ -241,6 +285,7 @@ def rewrite(body_raw, members, localsx):
 
 
 TYPE_INDEX = None
+TYPE_FILE = {}
 STD_TYPES = {'Int', 'Float', 'Bool', 'String', 'Void', 'Dynamic', 'Array', 'Map', 'Null', 'Any',
              'UInt', 'Date', 'Math', 'Std', 'StringBuf', 'Class', 'EnumValue', 'Iterable'}
 
@@ -272,27 +317,59 @@ def build_type_index():
                 nm = dm.group(1)
                 path = ('%s.%s' % (pkg, nm)) if nm == base else ('%s.%s.%s' % (pkg, base, nm))
                 idx.setdefault(nm, path)
+                TYPE_FILE.setdefault(nm, os.path.join(dirpath, fn))
     TYPE_INDEX = idx
     return idx
+
+
+def infer_ret(body_masked):
+    """无返回类型标注时，从体内 `return <expr>;` 推断类型（写进域签名与转发入口）。
+
+    为什么必须显式：原函数 `public function endSong()` 的返回类型是**推断**的（Bool），
+    迁出后 PlayState 只剩一行转发，调用点（BaseStage.endSong 的表达式体）拿不到原推断链
+    → typecheck 报 `Bool should be Void`。返回 True 表示无法判定（此时拒绝迁出）。
+    """
+    vals = [v.strip() for v in re.findall(r'\breturn\s+([^;\n]+);', body_masked)]
+    if not vals:
+        return ''
+    if all(v in ('true', 'false') for v in vals):
+        return 'Bool'
+    if all(re.fullmatch(r'-?\d+', v) for v in vals):
+        return 'Int'
+    if all(re.fullmatch(r'-?\d*\.\d+', v) for v in vals):
+        return 'Float'
+    if all(v[:1] in ('"', "'") for v in vals):
+        return 'String'
+    return None
 
 
 def needed_imports(dom_src, body_masked, extra_types, dom_pkg):
     """按全仓类型索引，为迁移体用到的类型补具体 import（跳过标准类型/同包/已 import）。"""
     idx = build_type_index()
+    ps_src = open(PS, encoding='utf-8').read()
+    ps_explicit = {}
+    for imp in re.findall(r'import\s+([\w.]+)\s*;', ps_src):
+        ps_explicit.setdefault(imp.split('.')[-1], imp)
     have = set(re.findall(r'import\s+([\w.]+)\s*;', dom_src))
     have_names = set(x.split('.')[-1] for x in have)
     wildcards = set(re.findall(r'import\s+([\w.]+)\.\*;', dom_src))
     used = set(m.group(1) for m in re.finditer(r'\b([A-Z]\w*)\b', body_masked)) | set(extra_types)
     out = []
+    unresolved = []
     for t in sorted(used):
         if t in STD_TYPES or t in have_names:
             continue
         pkg = idx.get(t)
         if pkg is None:
+            pkg = ps_explicit.get(t)   # 回退：PlayState 的显式 import 表（如 sys.FileSystem）
+        if pkg is None:
+            unresolved.append(t)
             continue
         if pkg == dom_pkg or pkg in wildcards:
             continue
         out.append('import %s;' % pkg)
+    if unresolved:
+        print('  ⚠ 未解析 import 的类型（需人工确认）：%s' % ', '.join(sorted(set(unresolved))))
     return out
 
 
@@ -322,7 +399,9 @@ def main():
 
     raw = open(PS, encoding='utf-8').read().split('\n')
     r = sa.scan(PS)
-    members, fns = r['members'], r['fns']
+    members, fns = dict(r['members']), r['fns']
+    for k, v in base_class_members('PlayState').items():
+        members.setdefault(k, v)   # 继承成员：本类声明优先
     by_name = {f['name']: f for f in fns}
     dom_name = os.path.basename(args.domain)[:-3]
 
@@ -390,6 +469,12 @@ def main():
                   % (n, f['verdict'] if f else '?', len(f['unknown_calls']) if f else -1), file=sys.stderr)
             return 2
         sp = split_function(raw, f['line'] - 1)
+        if not sp['ret']:
+            guess = infer_ret(sa.mask(sp['body']))
+            if guess is None:
+                print('✘ %s 无返回类型标注且返回类型无法推断，拒绝迁出' % n, file=sys.stderr)
+                return 2
+            sp['ret'] = guess
         if sp['style'] != 'block':
             print('✘ %s 是表达式体，本版不支持' % n, file=sys.stderr)
             return 2
@@ -443,7 +528,7 @@ def main():
                 n, (', ' + sp['params'].strip()) if sp['params'].strip() else '',
                 (':' + sp['ret']) if sp['ret'] else '')
         body_txt = dedent_reindent(new_body)
-        extra_types = set(re.findall(r'\b([A-Z]\w*)\b', sp['params'] + ' ' + sp['ret'] + ' ' + new_body))
+        extra_types = set(re.findall(r'\b([A-Z]\w*)\b', sp['params'] + ' ' + sp['ret'] + ' ' + sa.mask(new_body)))
         for imp in needed_imports(dom, new_masked, extra_types, dom_pkg):
             if imp not in dom_imports_added:
                 dom_imports_added.append(imp)

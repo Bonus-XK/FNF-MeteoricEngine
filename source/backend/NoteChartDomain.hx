@@ -19,6 +19,10 @@ import objects.Note.SpamNoteData;
 import states.LoadingState;
 import states.stages.School;
 import backend.Song.SwagSong;
+import sys.FileSystem;
+import objects.NoteGroup;
+import states.PlayState.PreGenResult;
+import backend.Section.SwagSection;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -432,5 +436,230 @@ class NoteChartDomain
 			trace('[Memory] 谱面恢复异常：' + e);
 			// 保留剥离标记：下次重开再试（文件丢失属极端异常，不再额外清空）
 		}
+	}
+
+	/** 原 PlayState.generateChartNotes（作用域分析：零遮蔽，93 处成员引用已限定）。 */
+	public static function generateChartNotes(ps:PlayState, loadPhase:Bool):Void
+	{
+		// 重开/回溯路径可能带着被剥离的 SONG：先恢复完整逐音符 DOM 再生成
+		PlayState.reloadChartSourceIfNeeded();
+		// 生成完成后标记 done（原生崩溃时日志簿显示最终到达的阶段）
+		ps.totalNotes = 0;
+		// 新曲/重开：stage 落盘标记复位（每曲各记一次首次生成/首次命中）
+		ps._stageMarkSpawn = false;
+		ps._stageMarkPop = false;
+		ps.botplayPlan = Note.getBotplayPlan();
+		if (ps.botplayPlan != null) ps.botLaneCounts = [0, 0, 0, 0];
+		// 【视觉】生效值：只透传用户设置（重叠隐藏不再对密集谱自动开启——
+		// 用户实测会隐藏真实箭头/长条头，表现"箭头消失但可打"；场上上限同理不自动改。
+		// 500 帧降载改由：quad 合批 + 密集谱 063 原生贴图（关 RGB）+ 视觉采样预算 + 命中批扫承担。
+		ps.perfLimitNotes = ClientPrefs.data.limitNotes;
+		ps.perfHideOverlapped = ClientPrefs.data.hideOverlapped;
+		var songData = PlayState.SONG;
+		ps.noteTypes = [];
+		ps.noteTypeLuaPaths = [];
+		ps.noteTypeHxPaths = [];
+		ps.eventsPushed = [];
+		var chartSeqCounter:Int = 0;
+
+		var noteData:Array<SwagSection> = songData.notes;
+
+		if (loadPhase)
+		{
+			if (ps.cachedEventsData == null)
+			{
+				var file:String = Paths.json(ps.songName + '/events');
+				#if MODS_ALLOWED
+				if (FileSystem.exists(Paths.modsJson(ps.songName + '/events')) || FileSystem.exists(file)) {
+				#else
+				if (OpenFlAssets.exists(file)) {
+				#end
+					ps.cachedEventsData = Song.loadFromJson('events', ps.songName).events;
+				}
+				else {
+					ps.cachedEventsData = [];
+				}
+			}
+			for (event in ps.cachedEventsData) //Event Notes
+				for (i in 0...event[1].length)
+					ps.makeEvent(event, i);
+		}
+		else
+		{
+			for (event in ps.cachedEventNotes)
+				ps.eventNotes.push(event);
+		}
+
+		#if false
+		// ===== 安卓最稳定管线：备份式直建 Note 对象（8月17 实机验证可用）=====
+		// 不使用 CastNote/对象池/回收；音符在生成期直接创建，noteSpawn 按时间插入。
+		for (section in noteData)
+		{
+			for (songNotes in section.sectionNotes)
+			{
+				var daStrumTime:Float = songNotes[0];
+				var daNoteData:Int = Std.int(songNotes[1] % 4);
+				// Psych 1.0.4 格式：列号直接决定方向（<4 玩家、>=4 对手）。
+				// 谱面在加载时已由 convertToPsychV1 转成该格式（mustHitSection 已烘焙进列号），
+				// 与桌面 buildChartNotes 语义一致；旧逻辑再加 mustHitSection 翻转会把
+				// 对手段（mustHitSection=false + 列 4-7）翻成玩家 → 对手箭头全跑到玩家侧。
+				var gottaHitNote:Bool = (songNotes[1] < 4);
+
+				var oldNote:Note;
+				if (ps.unspawnNotes.length > 0)
+					oldNote = ps.unspawnNotes[Std.int(ps.unspawnNotes.length - 1)];
+				else
+					oldNote = null;
+
+				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, false, false, null);
+				swagNote.chartSeq = chartSeqCounter++;
+				swagNote.mustPress = gottaHitNote;
+				swagNote.sustainLength = songNotes[2];
+				swagNote.gfNote = (section.gfSection == true && songNotes[1] < 4);
+				swagNote.noteType = songNotes[3];
+				if (!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]];
+
+				swagNote.scrollFactor.set();
+
+				var susLength:Float = swagNote.sustainLength;
+				susLength = susLength / Conductor.stepCrochet;
+				ps.unspawnNotes.push(swagNote);
+
+				var floorSus:Int = Math.floor(susLength);
+				if (ps.botplayPlan != null && gottaHitNote)
+				{
+					ps.botLaneCounts[daNoteData]++;
+					if (floorSus > 0) ps.botLaneCounts[daNoteData] += floorSus + 1;
+				}
+				if (floorSus > 0)
+				{
+					for (susNote in 0...floorSus + 1)
+					{
+						oldNote = ps.unspawnNotes[Std.int(ps.unspawnNotes.length - 1)];
+						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, false, null);
+						sustainNote.chartSeq = chartSeqCounter++;
+						sustainNote.mustPress = gottaHitNote;
+						sustainNote.gfNote = (section.gfSection == true && songNotes[1] < 4);
+						sustainNote.noteType = swagNote.noteType;
+						sustainNote.scrollFactor.set();
+						swagNote.tail.push(sustainNote);
+						sustainNote.parent = swagNote;
+						ps.unspawnNotes.push(sustainNote);
+
+						sustainNote.correctionOffset = swagNote.height / 2;
+						if (!PlayState.isPixelStage)
+						{
+							if (oldNote.isSustainNote)
+							{
+								oldNote.scale.y *= Note.SUSTAIN_SIZE / oldNote.frameHeight;
+								oldNote.scale.y /= ps.playbackRate;
+								oldNote.updateHitbox();
+							}
+							if (ClientPrefs.data.downScroll && !ps.isPhigrosStyle)
+								sustainNote.correctionOffset = 0;
+						}
+						else if (oldNote.isSustainNote)
+						{
+							oldNote.scale.y /= ps.playbackRate;
+							oldNote.updateHitbox();
+						}
+
+						if (sustainNote.mustPress) sustainNote.x += FlxG.width / 2;
+						else if (ClientPrefs.data.middleScroll)
+						{
+							sustainNote.x += 310;
+							if (daNoteData > 1) sustainNote.x += FlxG.width / 2 + 25;
+						}
+					}
+				}
+
+				if (swagNote.mustPress) swagNote.x += FlxG.width / 2;
+				else if (ClientPrefs.data.middleScroll)
+				{
+					swagNote.x += 310;
+					if (daNoteData > 1) swagNote.x += FlxG.width / 2 + 25;
+				}
+
+				if (!ps.noteTypes.contains(swagNote.noteType)) ps.noteTypes.push(swagNote.noteType);
+				if (gottaHitNote) ps.totalNotes++;
+			}
+		}
+		#else
+		var consumedPreGen:Bool = loadPhase && PlayState.preGenNotes != null && PlayState.preGenSong == Paths.formatToSongPath(PlayState.SONG.song);
+		if (consumedPreGen)
+		{
+			// 消费加载期预生成的音符（已排序、已含 chartSeq 链）
+			ps.unspawnNotes = PlayState.preGenNotes;
+			PlayState.preGenNotes = null;
+			PlayState.preGenSong = null;
+			ps.noteTypes = PlayState.preGenNoteTypes;
+			PlayState.preGenNoteTypes = null;
+			ps.rebuildNoteTypePaths();
+			ps.totalNotes = PlayState.preGenTotalNotes;
+			if (ps.botplayPlan != null) ps.botLaneCounts = PlayState.preGenBotLaneCounts;
+			PlayState.preGenBotLaneCounts = null;
+		}
+		else
+		{
+			// 兜底：预生成不可用（快速重开/预生成失败）时生成轻量 CastNote（与预生成同一路径）。
+			// 直接在共享 SONG 上构建（只读 + clearSections=false）；SONG 的逐音符剥离统一
+			// 由 create 尾 releaseSongChartDom 执行（重开/回溯前 reloadChartSourceIfNeeded 按需重解析）。
+			// 不再深拷贝：11.8M 音符级谱面的 copySong 会让加载峰值翻倍（Obsolescence-spam 闪退主因之一）。
+			var res:PreGenResult = PlayState.buildChartNotes(PlayState.SONG, ps.botplayPlan, ps.isPhigrosStyle,
+				{ songSpeed: ps.songSpeed }, ps.playbackRate, false);
+			if (res.botplayLanes != null)
+				Note.storeBotplayPlan(res.botplayLanes);
+			ps.unspawnNotes = res.notes;
+			ps.noteTypes = res.noteTypes;
+			ps.rebuildNoteTypePaths();
+			ps.totalNotes = res.totalNotes;
+			if (ps.botplayPlan != null) ps.botLaneCounts = res.botLaneCounts;
+		}
+		#end
+		if (loadPhase)
+		{
+			for (event in songData.events) //Event Notes
+				for (i in 0...event[1].length)
+					ps.makeEvent(event, i);
+		}
+		// 【密集对象硬上限】在 densePerfMode 定案后（预生成与创建期兜底的 buildChartNotes
+		// 均已执行、此处为两路径汇合点）再生效：只对超密集谱自动开启（不写存档；非密集谱恒 0=关闭）
+		ps.perfObjCap = PlayState.densePerfMode ? PlayState.DENSE_OBJ_CAP : 0;
+		// 【Turbo】dense 档启用 notePool 复用（非密集谱恒关闭，行为与旧版一致）
+		NoteGroup.poolEnabled = PlayState.densePerfMode;
+		// 【Turbo】聚合区分析（含侧车缓存）：仅 dense 谱；失败/空结果时 turboZones=[]，
+		// 数据级结算对全部 dense 段生效（更保守，视觉略稀）。
+		ps.turboZones = [];
+		ps.turboZoneCursor = 0;
+		if (PlayState.densePerfMode)
+			ps.initTurboZones();
+
+		if (ps.botplayPlan != null)
+		{
+			// 校验预演与正式生成完全一致（同一遍历逻辑下必然一致；不一致时回退实时判定，防止错位）
+			for (lane in 0...4)
+				if (ps.botLaneCounts[lane] != ps.botplayPlan[lane].length)
+				{
+					ps.botplayPlan = null;
+					break;
+				}
+		}
+		#if false
+		ps.unspawnNotes.sort(PlayState.sortByTime);
+		#else
+		if (!consumedPreGen) ps.unspawnNotes.sort(PlayState.sortByTime);
+		#end
+
+		// 谱面末尾时间（ms）：已排序数组的最后一条 strumTime+holdLength 即谱面终点。
+		// 在生成期（DOM/音频均未剥离时）一次性记录，供 startSong 兜底歌曲时长（0:00 卡结算修复）。
+		ps.chartEndTimeMs = 0;
+		if (ps.unspawnNotes != null && ps.unspawnNotes.length > 0)
+		{
+			var _lastCast:CastNote = ps.unspawnNotes[ps.unspawnNotes.length - 1];
+			ps.chartEndTimeMs = _lastCast.strumTime + _lastCast.holdLength + Conductor.safeZoneOffset + 1000;
+		}
+
+		ps.generatedMusic = true;
+		CrashHandler.mark('PlayState.generateChartNotes:done');
 	}
 }
