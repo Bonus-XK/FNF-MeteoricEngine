@@ -16,6 +16,9 @@ import states.editors.ChartingState;
 import objects.Note.CastNote;
 import backend.CrashHandler;
 import objects.Note.SpamNoteData;
+import states.LoadingState;
+import states.stages.School;
+import backend.Song.SwagSong;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -388,6 +391,46 @@ class NoteChartDomain
 				spam.seedNote.strumTime += noteInterval;
 			}
 			if (spam.remaining <= 0) PlayState.spamNotes.remove(spam);
+		}
+	}
+
+	/** 原 PlayState.reloadChartSourceIfNeeded（作用域分析：零遮蔽，15 处成员引用已限定）。 */
+	public static function reloadChartSourceIfNeeded():Void
+	{
+		// 同曲重入（LoadingState 复用静态 SONG 且 registerChartSource 已把标记重置为 false）
+		// 时，SONG 可能仍处于剥离态（sectionNotes 全为空数组）——按真实数据状态判定，
+		// 标记与数据不一致时以数据为准，否则二次加载同一首歌会在空 DOM 上生成 0 音符。
+		if (!PlayState.chartDataStripped && !PlayState.isSongChartStripped(PlayState.SONG)) return;
+		if (PlayState.SONG == null || PlayState.chartJsonInput == null || PlayState.chartSongName != PlayState.SONG.song)
+		{
+			// 无登记身份或对象与身份不一致（如 tutorial 兜底）：放弃剥离，避免误恢复
+			PlayState.chartDataStripped = false;
+			return;
+		}
+		try
+		{
+			var fresh:SwagSong = Song.loadFromJson(PlayState.chartJsonInput, PlayState.chartFolder);
+			if (fresh != null)
+			{
+				// 保留引擎运行期派生的字段：School.setDefaultGF('gf-pixel')/vanillaSongStage 等只在
+				// 首次 create 时写入 SONG（roses.json 等基础谱面本身没有这些字段）。重开从 JSON
+				// 重新解析出的 fresh 会丢失它们 → GF 变普通贴图 + 位置错（快速重开 GF 瞬移 bug）。
+				if (fresh.stage == null || fresh.stage.length < 1)
+					fresh.stage = PlayState.SONG.stage;
+				if (fresh.gfVersion == null || fresh.gfVersion.length < 1)
+					fresh.gfVersion = PlayState.SONG.gfVersion;
+				PlayState.setSong(fresh); // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
+			}
+			else
+			{
+				trace('[Memory] 谱面恢复失败（缓存/文件缺失）：' + PlayState.chartJsonInput);
+				PlayState.chartDataStripped = false;
+			}
+		}
+		catch (e:Dynamic)
+		{
+			trace('[Memory] 谱面恢复异常：' + e);
+			// 保留剥离标记：下次重开再试（文件丢失属极端异常，不再额外清空）
 		}
 	}
 }

@@ -96,6 +96,8 @@ import psychlua.HScript;
 
 #if (SScript >= "3.0.0")
 import tea.SScript;
+import backend.ReplayDomain;
+import backend.InputDomain;
 #end
 
 typedef PreGenResult = {
@@ -263,44 +265,7 @@ class PlayState extends MusicBeatState
 	}
 
 	// SONG 的逐音符数组被剥离后，任何需要完整谱面的入口（重开/回溯/编谱）先从此恢复
-	static function reloadChartSourceIfNeeded():Void
-	{
-		// 同曲重入（LoadingState 复用静态 SONG 且 registerChartSource 已把标记重置为 false）
-		// 时，SONG 可能仍处于剥离态（sectionNotes 全为空数组）——按真实数据状态判定，
-		// 标记与数据不一致时以数据为准，否则二次加载同一首歌会在空 DOM 上生成 0 音符。
-		if (!chartDataStripped && !isSongChartStripped(SONG)) return;
-		if (SONG == null || chartJsonInput == null || chartSongName != SONG.song)
-		{
-			// 无登记身份或对象与身份不一致（如 tutorial 兜底）：放弃剥离，避免误恢复
-			chartDataStripped = false;
-			return;
-		}
-		try
-		{
-			var fresh:SwagSong = Song.loadFromJson(chartJsonInput, chartFolder);
-			if (fresh != null)
-			{
-				// 保留引擎运行期派生的字段：School.setDefaultGF('gf-pixel')/vanillaSongStage 等只在
-				// 首次 create 时写入 SONG（roses.json 等基础谱面本身没有这些字段）。重开从 JSON
-				// 重新解析出的 fresh 会丢失它们 → GF 变普通贴图 + 位置错（快速重开 GF 瞬移 bug）。
-				if (fresh.stage == null || fresh.stage.length < 1)
-					fresh.stage = SONG.stage;
-				if (fresh.gfVersion == null || fresh.gfVersion.length < 1)
-					fresh.gfVersion = SONG.gfVersion;
-				setSong(fresh); // 缓存命中（或重新解析）→ 完整 DOM 回归；后续 generateChartNotes 正常消费
-			}
-			else
-			{
-				trace('[Memory] 谱面恢复失败（缓存/文件缺失）：' + chartJsonInput);
-				chartDataStripped = false;
-			}
-		}
-		catch (e:Dynamic)
-		{
-			trace('[Memory] 谱面恢复异常：' + e);
-			// 保留剥离标记：下次重开再试（文件丢失属极端异常，不再额外清空）
-		}
-	}
+	static function reloadChartSourceIfNeeded():Void NoteChartDomain.reloadChartSourceIfNeeded();
 
 	// create 尾 / 重开收尾共用：剥离 SONG 逐音符 DOM + 淘汰大谱面缓存副本
 	// （Flocc 级：两份 DOM 全释放后，游玩稳态只剩 CastNote + 音频 + 基线，≈400MB）
@@ -5282,136 +5247,10 @@ class PlayState extends MusicBeatState
 	}
 
 	// Hold notes
-	private function keysCheck():Void
-	{
-		// HOLDING
-		var holdArray:Array<Bool> = [];
-		var pressArray:Array<Bool> = [];
-		var releaseArray:Array<Bool> = [];
-		for (key in keysArray)
-		{
-			holdArray.push(controls.pressed(key));
-			pressArray.push(controls.justPressed(key));
-			releaseArray.push(controls.justReleased(key));
-		}
-
-		// TO DO: Find a better way to handle controller inputs, this should work for now
-		if(controls.controllerMode && pressArray.contains(true))
-			for (i in 0...pressArray.length)
-				if(pressArray[i] && strumsBlocked[i] != true)
-					keyPressed(i);
-
-		if (startedCountdown && !boyfriend.stunned && generatedMusic)
-		{
-			// rewritten inputs???
-			if(notes.length > 0)
-			{
-				notes.forEachAlive(function(daNote:Note)
-				{
-					// hold note functions
-					if (strumsBlocked[daNote.noteData] != true && daNote.isSustainNote && holdArray[daNote.noteData] && daNote.canBeHit
-					&& daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit && !daNote.blockHit) {
-						if (ClientPrefs.data.noteJudgment == 'KE 判定')
-						{
-							// KE 判定：长条不参与判定，按住时子段仅做视觉消除
-							daNote.wasGoodHit = true;
-							if (recordingReplay && currentReplay != null)
-								currentReplay.addEvent(daNote.chartSeq, daNote.strumTime, daNote.noteData, 'sus');
-							daNote.active = false;
-							daNote.visible = false;
-							notes.invalidateNote(daNote);
-						}
-						else goodNoteHit(daNote);
-					}
-				});
-			}
-
-			if (holdArray.contains(true) && !endingSong) {
-				#if ACHIEVEMENTS_ALLOWED
-				var achieve:String = checkForAchievement(['oversinging']);
-				if (achieve != null) {
-					startAchievement(achieve);
-				}
-				#end
-			}
-			else if (!endingSong && !finishingSong && !ClientPrefs.data.hudOnly && boyfriend != null
-				&& boyfriend.animation != null && boyfriend.animation.curAnim != null
-				&& boyfriend.getAnimationName().startsWith('sing') && !boyfriend.getAnimationName().endsWith('miss')
-				&& boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration)
-			{
-				boyfriend.dance();
-				//boyfriend.animation.curAnim.finish();
-			}
-		}
-
-		// TO DO: Find a better way to handle controller inputs, this should work for now
-		if((controls.controllerMode || strumsBlocked.contains(true)) && releaseArray.contains(true))
-			for (i in 0...releaseArray.length)
-				if(releaseArray[i] || strumsBlocked[i] == true)
-					keyReleased(i);
-
-		// 联机：转发己方按键事件，驱动对方按键条
-		if (isOnlineMode && startedCountdown && !paused && !endingSong && !cpuControlled && !replayMode)
-		{
-			for (i in 0...4)
-			{
-				if (pressArray[i]) Multiplayer.send('PRESS|' + i);
-				if (releaseArray[i]) Multiplayer.send('RELEASE|' + i);
-			}
-		}
-	}
+	private function keysCheck():Void InputDomain.keysCheck(this);
 
 	/** 回放 v2：按录制时间注入按键按下/抬起（走正常判定路径），并处理长按子段命中 */
-	private function updateReplayInputs():Void
-	{
-		if (!startedCountdown || paused || rewinding || endingSong || inCutscene) return;
-
-		// 注入到点按键事件：按下走 keyPressed（真实判定），抬起走 keyReleased（strum 复位）
-		replayInjecting = true;
-		while (replayInputPtr < replayInputs.length && Conductor.songPosition >= replayInputs[replayInputPtr].t)
-		{
-			var ev:ReplayInput = replayInputs[replayInputPtr++];
-			if (ev.d < 0 || ev.d > 3) continue;
-			if (ev.u)
-			{
-				replayHeld[ev.d] = false;
-				keyReleased(ev.d);
-			}
-			else
-			{
-				replayHeld[ev.d] = true;
-				keyPressed(ev.d);
-			}
-		}
-		replayInjecting = false;
-
-		// 长按：与 keysCheck 的 HOLD 段一致（按住期间长条子段逐个命中/消除）
-		if (generatedMusic && notes.length > 0 && !boyfriend.stunned)
-		{
-			var anyHold:Bool = false;
-			for (i in 0...4)
-				if (replayHeld[i]) { anyHold = true; break; }
-			if (anyHold)
-			{
-				notes.forEachAlive(function(daNote:Note)
-				{
-					if (strumsBlocked[daNote.noteData] != true && daNote.isSustainNote && replayHeld[daNote.noteData]
-						&& daNote.canBeHit && daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit && !daNote.blockHit)
-					{
-						if (ClientPrefs.data.noteJudgment == 'KE 判定')
-						{
-							// KE 判定：长条不参与判定，按住时子段仅做视觉消除
-							daNote.wasGoodHit = true;
-							daNote.active = false;
-							daNote.visible = false;
-							notes.invalidateNote(daNote);
-						}
-						else goodNoteHit(daNote);
-					}
-				});
-			}
-		}
-	}
+	private function updateReplayInputs():Void ReplayDomain.updateReplayInputs(this);
 
 	/** 回放 v2：暂停菜单跳时间后，把按键游标对齐到新时间点 */
 	public function resetReplayToTime(t:Float):Void

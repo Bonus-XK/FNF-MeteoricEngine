@@ -330,7 +330,7 @@ def main():
         return '\n'.join(raw[f['line']:f['line'] + f['span_body'] - 1])
 
     def is_candidate(f):
-        if f['verdict'] != 'mech':
+        if f['verdict'] not in ('mech', 'accessor'):
             return False
         if f['unknown_calls'] and not args.allow_foreign:
             return False
@@ -364,6 +364,14 @@ def main():
         return 2
 
     dom_path = os.path.join(REPO, 'source', args.domain)
+    if not os.path.exists(dom_path):
+        cls = os.path.basename(args.domain)[:-3]
+        os.makedirs(os.path.dirname(dom_path), exist_ok=True)
+        open(dom_path, 'w', encoding='utf-8').write(
+            'package backend;\n\nimport states.PlayState;\n\n'
+            '/** %s（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */\n'
+            '@:access(states.PlayState)\nclass %s\n{\n}\n' % (cls, cls))
+        print('  新建域模块：%s' % args.domain)
     dom = open(dom_path, encoding='utf-8').read()
 
     dom_pkg = ''
@@ -371,6 +379,10 @@ def main():
     if _pm:
         dom_pkg = _pm.group(1)
     dom_fns, forwarders, rows, dom_imports_added = [], [], [], []
+    if any(by_name.get(n) and by_name[n]['priv_uses'] for n in names) and \
+            not re.search(r'@:access\(\s*states\.PlayState\s*\)', dom):
+        dom = re.sub(r'(?m)^(class\s+\w+)', '@:access(states.PlayState)\n\\1', dom, count=1)
+        print('  补 @:access(states.PlayState)')
     for n in names:
         f = by_name.get(n)
         if f is None or not is_candidate(f):
@@ -458,6 +470,13 @@ def main():
 
     for f, sp, fwd in sorted(forwarders, key=lambda x: -x[0]['line']):
         raw[f['line'] - 1:sp['span_end'] + 1] = [fwd]
+    # 转发入口引用新域模块 → PlayState 必须能解析该类名（实测：新建域模块时漏补 → Type not found）
+    dom_cls = os.path.basename(args.domain)[:-3]
+    imp_line = ('import %s.%s;' % (dom_pkg, dom_cls)) if dom_pkg else ('import %s;' % dom_cls)
+    if not any(l.strip() == imp_line for l in raw):
+        last_imp = max(i for i, l in enumerate(raw) if l.startswith('import '))
+        raw.insert(last_imp + 1, imp_line)
+        print('  补 import 到 PlayState：%s' % imp_line)
     open(PS, 'w', encoding='utf-8').write('\n'.join(raw))
 
     dom_out = dom
