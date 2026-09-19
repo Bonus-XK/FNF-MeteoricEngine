@@ -29,6 +29,8 @@ import backend.Discord.DiscordClient;
 import objects.MobileControls;
 import backend.Multiplayer;
 import substates.PauseSubState;
+import cne.CneScriptCompat;
+import psychlua.HScript;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -705,6 +707,93 @@ class HostDomain
 			ps.botplayTxt.visible = ps.cpuControlled || ps.replayMode;
 			ps.botplayTxt.alpha = 1;
 			ps.botplaySine = 0;
+		}
+	}
+
+	/** 原 PlayState.initHScript（作用域分析：零遮蔽，15 处成员引用已限定）。 */
+	public static function initHScript(ps:PlayState, file:String, ?cneGlobals:Map<String, Dynamic> = null, ?cneCallbacks:Bool = false)
+	{
+		// 回放模式不加载 HScript（与 Lua 同理：避免脚本修改箭头显示影响回放）
+		if (ps.replayMode) return;
+		try
+		{
+			// Psych 0.7.3 兼容：读取 .hx 内容并预处理（var x:Map = [] → new Map()），以代码串交给 SScript
+			var scriptCode:String = file;
+			#if sys
+			try
+			{
+				if (sys.FileSystem.exists(file))
+					scriptCode = HScript.preprocessScript(sys.io.File.getContent(file));
+			}
+			catch (e:Dynamic) {}
+			#end
+			// executeNow=false：先把 globals（含 CNE 的 FunkinSprite/stage/insert）注入，再执行脚本。
+			// CNE 歌曲脚本顶层就有 `var pluh:FlxSprite = new FlxSprite();` /
+			// `var fadeThing:FunkinSprite = new FunkinSprite()...`，若先 execute 会报
+			// "Unknown variable: FunkinSprite"（2026-09-18 实测）。
+			var newScript:HScript = new HScript(null, scriptCode, false);
+			// 66mod 等 Psych 0.7 模组对话脚本需要 songName / startDialogue
+			newScript.set('songName', ps.songName);
+			newScript.set('startDialogue', function(dialogue:Dynamic) ps.startDialogue(dialogue));
+			// Psych 0.7.3 setSpecialObject 等价物：onCreate 阶段即可访问角色/摄像机（setOnScripts 只推给已加载脚本，stage 脚本加载时拿不到）
+			newScript.set('dad', ps.dad);
+			newScript.set('boyfriend', ps.boyfriend);
+			newScript.set('gf', ps.gf);
+			newScript.set('camGame', ps.camGame);
+			// 兼容 66mod 舞台脚本（home.hx 等直接访问 camFollow/camHUD）
+			newScript.set('camFollow', ps.camFollow);
+			newScript.set('camHUD', ps.camHUD);
+			// CNE 歌曲脚本：注入 CNE 专用 globals（stage/FunkinSprite/insert…），必须在 execute 之前。
+			if (cneGlobals != null)
+			{
+				for (k => v in cneGlobals) newScript.set(k, v);
+			}
+			try newScript.execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
+			// CNE 回调别名（create→onCreate、stepHit→onStepHit…）必须在 execute 之后：
+			// 脚本函数已解析，`exists('create')` 才为真；同时要早于下面的 onCreate 调用。
+			if (cneCallbacks)
+				cne.CneScriptCompat.applyCallbacks(newScript);
+			@:privateAccess
+			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
+			{
+				@:privateAccess
+				for (e in newScript.parsingExceptions)
+					if(e != null)
+						ps.addTextToDebug('ERROR ON LOADING ($file): ${e.message.substr(0, e.message.indexOf('\n'))}', FlxColor.RED);
+				newScript.destroy();
+				return;
+			}
+
+			ps.hscriptArray.push(newScript);
+			if(newScript.exists('onCreate'))
+			{
+				var callValue = newScript.call('onCreate');
+				if(!callValue.succeeded)
+				{
+					for (e in callValue.exceptions)
+						if (e != null)
+						{
+							var errMsg:String = e.message != null ? e.message : Std.string(e);
+							ps.addTextToDebug('ERROR ($file: onCreate) - ${errMsg.substr(0, errMsg.indexOf('\n'))}', FlxColor.RED);
+						}
+
+					newScript.destroy();
+					ps.hscriptArray.remove(newScript);
+					trace('failed to initialize sscript interp!!! ($file)');
+				}
+				else trace('initialized sscript interp successfully: $file');
+			}
+
+		}
+		catch(e)
+		{
+			ps.addTextToDebug('ERROR ($file) - ' + e.message.substr(0, e.message.indexOf('\n')), FlxColor.RED);
+			var newScript:HScript = cast (SScript.global.get(file), HScript);
+			if(newScript != null)
+			{
+				newScript.destroy();
+				ps.hscriptArray.remove(newScript);
+			}
 		}
 	}
 }

@@ -93,6 +93,8 @@ def token_classes(masked, members, localsx):
         k2 = pos - 1
         while k2 >= 0 and (masked[k2].isalnum() or masked[k2] == '_'):
             k2 -= 1
+        if k2 >= 0 and masked[k2] == ':':   # @:name 形态：先跳过冒号
+            k2 -= 1
         if k2 >= 0 and masked[k2] == '@':
             continue
         # 结构体字段名（`{alpha: v}` / `{…, startDelay: v}`）不是成员引用，绝不能加前缀。
