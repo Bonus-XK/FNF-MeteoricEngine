@@ -318,6 +318,19 @@ def scan(path, cls='PlayState', stop_at='GameHUD'):
             for mm in re.finditer(r'\bcatch\s*\(\s*([A-Za-z_]\w*)', bl):
                 locals_.append(mm.group(1))
                 local_lines.setdefault(mm.group(1), abs_line)
+            # 箭头函数参数：`(a, b) -> …` 与单参 `a -> …`（核实员反例指出的漏报面）
+            for mm in re.finditer(r'\(([^()]*)\)\s*->', bl):
+                for part in mm.group(1).split(','):
+                    pm = re.match(r'\s*\??\s*([A-Za-z_]\w*)', part)
+                    if pm:
+                        locals_.append(pm.group(1))
+                        local_lines.setdefault(pm.group(1), abs_line)
+            for mm in re.finditer(r'(?<![\w.])([A-Za-z_]\w*)\s*->', bl):
+                locals_.append(mm.group(1))
+                local_lines.setdefault(mm.group(1), abs_line)
+            for mm in re.finditer(r'\bfunction\s+([A-Za-z_]\w*)\s*\(', bl):
+                locals_.append(mm.group(1))
+                local_lines.setdefault(mm.group(1), abs_line)
             for mm in re.finditer(r'\bfunction\s*\(([^)]*)\)', bl):
                 for part in mm.group(1).split(','):
                     pm = re.match(r'\s*\??\s*([A-Za-z_]\w*)', part)
