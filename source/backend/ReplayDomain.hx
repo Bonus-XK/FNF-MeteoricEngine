@@ -62,4 +62,13 @@ class ReplayDomain
 			}
 		}
 	}
+
+	/** 原 PlayState.resetReplayToTime（作用域分析：零遮蔽，7 处成员引用已限定）。 */
+	public static function resetReplayToTime(ps:PlayState, t:Float):Void
+	{
+		ps.replayInputPtr = 0;
+		while (ps.replayInputPtr < ps.replayInputs.length && ps.replayInputs[ps.replayInputPtr].t < t)
+			ps.replayInputPtr++;
+		ps.replayHeld = [false, false, false, false];
+	}
 }

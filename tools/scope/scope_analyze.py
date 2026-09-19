@@ -219,7 +219,7 @@ def parse_param_names(sig_text):
             buf += ch
     names = []
     for part in (parts[0].split(',') if parts else []):
-        m = re.match(r'\s*\??\s*([A-Za-z_]\w*)\s*(?::|$)', part.strip())
+        m = re.match(r'\s*\??\s*([A-Za-z_]\w*)\s*(?::|=|$)', part.strip())
         if m:
             names.append(m.group(1))
     return names

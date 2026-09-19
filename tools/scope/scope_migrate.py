@@ -224,6 +224,23 @@ def split_function(raw, i):
         k += 1
     style, open_line, open_col = found
     end_line = sa.body_span(struct, i) if style == 'block' else open_line
+    end_col = None
+    if style == 'block':
+        depth, started = 0, False
+        for k in range(open_line, len(struct)):
+            line = struct[k]
+            for c in range(open_col if k == open_line else 0, len(line)):
+                ch = line[c]
+                if ch == '{':
+                    depth += 1
+                    started = True
+                elif ch == '}':
+                    depth -= 1
+                    if started and depth == 0:
+                        end_line, end_col = k, c
+                        break
+            if end_col is not None:
+                break
 
     sig_all = '\n'.join(masked[i:open_line + 1])
     pq = sig_all[sig_all.find('('):]
@@ -252,6 +269,8 @@ def split_function(raw, i):
         body = raw[open_line][open_col:]
     return {'params': params, 'ret': ret, 'body': body, 'style': style,
             'decl_line': i, 'span_end': end_line,
+            'open_line': open_line, 'open_col': open_col,
+            'end_col': end_col,
             'mods': (sa.FN_DECL_RE.match(masked[i]).group(1) or '').strip()}
 
 
@@ -454,8 +473,7 @@ def main():
             return False
         # `#if false / #else / #end` 包裹声明的写法：`#end` 落在「声明行→体右括号」区间内，
         # 跨度替换会连它一起删掉 → 预处理配平断裂（实测 typecheck 报 Unclosed conditional compilation block）。
-        if re.search(r'(?m)^\s*#(?:if|else|elseif|end)\b', b.split('{', 1)[0]):
-            return False
+        # 声明区含 `#if/#else/#end` 现在可迁：改用「只替换函数体」，声明与其包裹指令原样保留
         # 外来小写裸值不再拒绝：它们是继承成员，改写时会一并加 `ps.`，由 typecheck 复核
         if 'ps' in set(f['locals']) | set(f['params']):
             return False
@@ -569,7 +587,7 @@ def main():
                        % (n, npre, dom_sig, body_txt))
         ret_kw = 'return ' if (sp['ret'] and sp['ret'] != 'Void') else ''
         mods = (sp['mods'] + ' ') if sp['mods'] else ''
-        forwarders.append((f, sp, '\t%sfunction %s(%s)%s %s%s;' % (
+        forwarders.append((f, sp, call, '\t%sfunction %s(%s)%s %s%s;' % (
             mods, n, sp['params'].strip(), (':' + sp['ret']) if sp['ret'] else '', ret_kw, call)))
 
     if not forwarders:
@@ -585,12 +603,25 @@ def main():
         print('\n== DRY-RUN（不写盘）==')
         for txt in dom_fns:
             print('---- 域模块新增 ----\n' + txt[:900])
-        for f, sp, fwd in forwarders:
-            print('---- PlayState L%d 替换为 ----\n%s' % (f['line'], fwd))
+        for f, sp, call, fwd in forwarders:
+            print('---- PlayState L%d 体替换为 ----\n%s' % (f['line'], call))
         return 0
 
-    for f, sp, fwd in sorted(forwarders, key=lambda x: -x[0]['line']):
-        raw[f['line'] - 1:sp['span_end'] + 1] = [fwd]
+    text = '\n'.join(raw)
+    starts = [0]
+    for l in raw:
+        starts.append(starts[-1] + len(l) + 1)
+    for f, sp, call, fwd in sorted(forwarders, key=lambda x: -x[0]['line']):
+        if sp['style'] != 'block' or sp['end_col'] is None:
+            continue
+        open_off = starts[sp['open_line']] + sp['open_col']
+        close_off = starts[sp['span_end']] + sp['end_col']
+        body_indent = '\t' + (re.match(r'\t*', raw[sp['decl_line']]).group(0))
+        close_indent = re.match(r'\t*', raw[sp['span_end']]).group(0)
+        stmt = ('return ' if (sp['ret'] and sp['ret'] != 'Void') else '') + call + ';'
+        text = (text[:open_off + 1] + '\n' + body_indent + stmt + '\n' + close_indent
+                + text[close_off:])
+    raw = text.split('\n')
     # 转发入口引用新域模块 → PlayState 必须能解析该类名（实测：新建域模块时漏补 → Type not found）
     dom_cls = os.path.basename(args.domain)[:-3]
     imp_line = ('import %s.%s;' % (dom_pkg, dom_cls)) if dom_pkg else ('import %s;' % dom_cls)

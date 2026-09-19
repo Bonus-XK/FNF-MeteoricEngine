@@ -7,6 +7,8 @@ import backend.Multiplayer;
 import objects.Note;
 import backend.Paths;
 import objects.StrumNote;
+import flixel.input.keyboard.FlxKey;
+import openfl.events.KeyboardEvent;
 
 /** InputDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -247,5 +249,21 @@ class InputDomain
 			}
 			ps.callOnScripts('onKeyRelease', [key]);
 		}
+	}
+
+	/** 原 PlayState.onKeyRelease（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function onKeyRelease(ps:PlayState, event:KeyboardEvent):Void
+	{
+		var eventKey:FlxKey = event.keyCode;
+		var key:Int = PlayState.getKeyFromEvent(ps.keysArray, eventKey);
+		if(!ps.controls.controllerMode && key > -1) ps.keyReleased(key);
+	}
+
+	/** 原 PlayState.onKeyPress（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function onKeyPress(ps:PlayState, event:KeyboardEvent):Void
+	{
+		var eventKey:FlxKey = event.keyCode;
+		var key:Int = PlayState.getKeyFromEvent(ps.keysArray, eventKey);
+		if (!ps.controls.controllerMode && FlxG.keys.checkStatus(eventKey, JUST_PRESSED)) ps.keyPressed(key);
 	}
 }

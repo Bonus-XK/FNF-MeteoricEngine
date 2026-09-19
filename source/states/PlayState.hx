@@ -495,9 +495,7 @@ class PlayState extends MusicBeatState
 	 */
 	private function cameraSmoothSpeed():Float
 	{
-		var presets:Map<String, Float> = ClientPrefs.camSmoothPresets;
-		var v:Null<Float> = (ClientPrefs.data != null && presets != null) ? presets.get(ClientPrefs.data.camSmooth) : null;
-		return (v == null || v <= 0) ? 2.4 : v; // 兜底 = 原引擎强度（1.22s）
+		return CameraHudDomain.cameraSmoothSpeed(this);
 	}
 
 
@@ -1218,29 +1216,11 @@ class PlayState extends MusicBeatState
 	public function syncGameplaySettings():Void HostDomain.syncGameplaySettings(this);
 
 	public function addTextToDebug(text:String, color:FlxColor) {
-		#if LUA_ALLOWED
-		var newText:DebugLuaText = luaDebugGroup.recycle(DebugLuaText);
-		newText.text = text;
-		newText.color = color;
-		newText.disableTime = 6;
-		newText.alpha = 1;
-		newText.setPosition(10, 8 - newText.height);
-
-		luaDebugGroup.forEachAlive(function(spr:DebugLuaText) {
-			spr.y += newText.height + 2;
-		});
-		luaDebugGroup.add(newText);
-		#end
+		HostDomain.addTextToDebug(this, text, color);
 	}
 	
 	public function updateHUDVisibility() {
-		var hide:Bool = ClientPrefs.data.hideHud;
-		if (healthBar != null) healthBar.visible = !hide;
-		if (healthBarOverlay != null) healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar;
-		if (iconP1 != null) iconP1.visible = !hide;
-		if (iconP2 != null) iconP2.visible = !hide;
-		if (scoreTxt != null) scoreTxt.visible = !hide;
-		if (timeBarOverlay != null) timeBarOverlay.visible = timeBar != null && timeBar.visible && !hide;
+		CameraHudDomain.updateHUDVisibility(this);
 	}
 
 	/**
@@ -1257,32 +1237,18 @@ class PlayState extends MusicBeatState
 	function startCharacterScripts(name:String) HostDomain.startCharacterScripts(this, name);
 
 	public function getLuaObject(tag:String, text:Bool=true):FlxSprite {
-		#if LUA_ALLOWED
-		if(modchartSprites.exists(tag)) return modchartSprites.get(tag);
-		if(text && modchartTexts.exists(tag)) return modchartTexts.get(tag);
-		if(variables.exists(tag)) return variables.get(tag);
-		#end
-		return null;
+		return HostDomain.getLuaObject(this, tag, text);
 	}
 
 	function startCharacterPos(char:Character, ?gfCheck:Bool = false) {
-		if(gfCheck && char.curCharacter.startsWith('gf')) { //IF DAD IS GIRLFRIEND, HE GOES TO HER POSITION
-			char.setPosition(GF_X, GF_Y);
-			char.scrollFactor.set(0.95, 0.95);
-			char.danceEveryNumBeats = 2;
-		}
-		char.x += char.positionArray[0];
-		char.y += char.positionArray[1];
+		HostDomain.startCharacterPos(this, char, gfCheck);
 	}
 
 	public function startVideo(name:String, ?onComplete:Void->Void = null) HostDomain.startVideo(this, name, onComplete);
 
 	function startAndEnd()
 	{
-		if(endingSong)
-			endSong();
-		else
-			startCountdown();
+		HostDomain.startAndEnd(this);
 	}
 
 	var dialogueCount:Int = 0;
@@ -1492,13 +1458,7 @@ class PlayState extends MusicBeatState
 	// 是否含 CJK 汉字（用于 scoreTxt 中文字体自动切换）
 	function containsChinese(s:String):Bool
 	{
-		if (s == null || s == '') return false;
-		for (i in 0...s.length)
-		{
-			var c:Int = s.charCodeAt(i);
-			if (c >= 0x4E00 && c <= 0x9FFF) return true;
-		}
-		return false;
+		return HostDomain.containsChinese(this, s);
 	}
 
 	// Score 栏文本：用 ClientPrefs.scoreTxtFormat 自定义格式 + 变量替换
@@ -2073,12 +2033,7 @@ class PlayState extends MusicBeatState
 	// Updating Discord Rich Presence.
 	function resetRPC(?cond:Bool = false)
 	{
-		#if desktop
-		if (cond)
-			DiscordClient.changePresence(detailsText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter(), true, songLength - Conductor.songPosition - ClientPrefs.data.noteOffset);
-		else
-			DiscordClient.changePresence(detailsText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
-		#end
+		HostDomain.resetRPC(this, cond);
 	}
 
 	function resyncVocals():Void HostDomain.resyncVocals(this);
@@ -2094,12 +2049,7 @@ class PlayState extends MusicBeatState
 
 	inline function spawnWindowFor(target:CastNote):Float
 	{
-		// 【500 帧冲刺】密集谱出生窗口 2000ms→1100ms：同屏成员数（渲染+followStrum 双头）近似减半；
-		// 音符改为约 1.1s 前出现在屏幕（墙略短、贴线更近），判定/计分零影响。
-		var t:Float = (densePerfMode ? 1100 : spawnTime) * playbackRate;
-		if (songSpeed < 1) t /= songSpeed;
-		if (target.multSpeed < 1) t /= target.multSpeed;
-		return t;
+		return HostDomain.spawnWindowFor(this, target);
 	}
 
 	// 【Turbo】聚合区分析（含侧车缓存）：100ms 分箱 ≥4000NPS、无长条、≥500ms 的连续区间。
@@ -2109,14 +2059,7 @@ class PlayState extends MusicBeatState
 	// 【Turbo】当前 unspawn 游标是否处于聚合区（游标单调前进，O(1) 摊销）
 	inline function isTurboAggregateIndex(index:Int):Bool
 	{
-		if (turboZones == null || turboZones.length == 0 || index < 0)
-			return false;
-		while (turboZoneCursor < turboZones.length && turboZones[turboZoneCursor].endIndex <= index)
-			turboZoneCursor++;
-		if (turboZoneCursor >= turboZones.length)
-			return false;
-		var z:TurboZone = turboZones[turboZoneCursor];
-		return index >= z.startIndex && index < z.endIndex;
+		return HostDomain.isTurboAggregateIndex(this, index);
 	}
 
 	// 【Turbo】数据级结算（不建 Sprite）：口径与 goodNoteHit/popUpScore 的 botplay 路径一致——
@@ -2786,8 +2729,7 @@ class PlayState extends MusicBeatState
 	/** 游玩中按返回键 / 左上角 X：暂停游戏而不是退出（菜单里仍是退出到桌面） */
 	override public function onAndroidBack():Bool
 	{
-		androidBackQueued = true;
-		return true;
+		return HostDomain.onAndroidBack(this);
 	}
 	#end
 
@@ -3236,10 +3178,7 @@ class PlayState extends MusicBeatState
 	}
 	function achievementEnd():Void
 	{
-		achievementObj = null;
-		if(endingSong && !inCutscene) {
-			endSong();
-		}
+		HostDomain.achievementEnd(this);
 	}
 	#end
 
@@ -3811,33 +3750,18 @@ class PlayState extends MusicBeatState
 
 	private function freezeBackgroundAudio():Void
 	{
-		if (_bgAudioFrozen) return;
-		_bgAudioFrozen = true;
-		if (FlxG.sound.music != null) FlxG.sound.music.pause();
-		if (vocals != null) vocals.pause();
-		if (opponentVocals != null) opponentVocals.pause();
-		// 暂停菜单音乐等所有在播 FlxSound 一并冻结，避免锁屏/后台期间仍有声音
-		for (sound in FlxG.sound.list.members)
-			if (sound != null) sound.pause();
+		HostDomain.freezeBackgroundAudio(this);
 	}
 
 	private function restoreBackgroundAudio():Void
 	{
-		if (!_bgAudioFrozen) return;
-		_bgAudioFrozen = false;
-		// 若玩家仍处于暂停菜单（未返回游戏），保持静音；真正恢复由 closeSubState/resyncVocals 负责
-		if (paused) return;
-		if (FlxG.sound.music != null) FlxG.sound.music.play();
-		if (vocals != null) vocals.play();
-		if (opponentVocals != null) opponentVocals.play();
+		HostDomain.restoreBackgroundAudio(this);
 	}
 	#end
 
 	private function onKeyPress(event:KeyboardEvent):Void
 	{
-		var eventKey:FlxKey = event.keyCode;
-		var key:Int = getKeyFromEvent(keysArray, eventKey);
-		if (!controls.controllerMode && FlxG.keys.checkStatus(eventKey, JUST_PRESSED)) keyPressed(key);
+		InputDomain.onKeyPress(this, event);
 	}
 
 	private function keyPressed(key:Int) InputDomain.keyPressed(this, key);
@@ -3846,9 +3770,7 @@ class PlayState extends MusicBeatState
 
 	private function onKeyRelease(event:KeyboardEvent):Void
 	{
-		var eventKey:FlxKey = event.keyCode;
-		var key:Int = getKeyFromEvent(keysArray, eventKey);
-		if(!controls.controllerMode && key > -1) keyReleased(key);
+		InputDomain.onKeyRelease(this, event);
 	}
 
 	private function keyReleased(key:Int) InputDomain.keyReleased(this, key);
@@ -3864,10 +3786,7 @@ class PlayState extends MusicBeatState
 	/** 回放 v2：暂停菜单跳时间后，把按键游标对齐到新时间点 */
 	public function resetReplayToTime(t:Float):Void
 	{
-		replayInputPtr = 0;
-		while (replayInputPtr < replayInputs.length && replayInputs[replayInputPtr].t < t)
-			replayInputPtr++;
-		replayHeld = [false, false, false, false];
+		ReplayDomain.resetReplayToTime(this, t);
 	}
 
 	function noteMiss(daNote:Note):Void NoteChartDomain.noteMiss(this, daNote);
@@ -3948,21 +3867,13 @@ class PlayState extends MusicBeatState
 	// 结算权威钳制：命中/进行数不超总音符（池化复用与批处理的帧级噪声不污染结算面板）
 	public function clampGameplayTotals():Void
 	{
-		if (totalNotes > 0 && songHits > totalNotes)
-			songHits = totalNotes;
-		if (totalNotes > 0 && totalPlayed > totalNotes)
-			totalPlayed = totalNotes;
-		if (totalNotes > 0 && totalNotesHit > totalNotes)
-			totalNotesHit = totalNotes;
+		HostDomain.clampGameplayTotals(this);
 	}
 
 	var offRatingProbe:Int = 0; // 非顶格评级采样计数（前 40 条，零持续开销）
 
 	public static function cancelMusicFadeTween() {
-		if(FlxG.sound.music.fadeTween != null) {
-			FlxG.sound.music.fadeTween.cancel();
-		}
-		FlxG.sound.music.fadeTween = null;
+		HostDomain.cancelMusicFadeTween();
 	}
 
 	var lastStepHit:Int = -1;
@@ -4103,125 +4014,27 @@ class PlayState extends MusicBeatState
 	#end
 
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
-		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
-		if(args == null) args = [];
-		if(exclusions == null) exclusions = _noExclusions;
-		if(excludeValues == null) excludeValues = _noExcludeValues;
-
-		var result:Dynamic = callOnLuas(funcToCall, args, ignoreStops, exclusions, excludeValues);
-		if(result == null || excludeValues.contains(result)) result = callOnHScript(funcToCall, args, ignoreStops, exclusions, excludeValues);
-		return result;
+		return HostDomain.callOnScripts(this, funcToCall, args, ignoreStops, exclusions, excludeValues);
 	}
 
 	public function callOnLuas(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
-		var returnVal:Dynamic = FunkinLua.Function_Continue;
-		#if LUA_ALLOWED
-		if(args == null) args = [];
-		if(exclusions == null) exclusions = _noExclusions;
-		if(excludeValues == null) excludeValues = _noExcludeValues;
-
-		var len:Int = luaArray.length;
-		var i:Int = 0;
-		while(i < len)
-		{
-			var script:FunkinLua = luaArray[i];
-			if(exclusions.contains(script.scriptName))
-			{
-				i++;
-				continue;
-			}
-
-			var myValue:Dynamic = script.call(funcToCall, args);
-			if((myValue == FunkinLua.Function_StopLua || myValue == FunkinLua.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
-			{
-				returnVal = myValue;
-				break;
-			}
-			
-			if(myValue != null && !excludeValues.contains(myValue))
-				returnVal = myValue;
-
-			if(!script.closed) i++;
-			else len--;
-		}
-		#end
-		return returnVal;
+		return HostDomain.callOnLuas(this, funcToCall, args, ignoreStops, exclusions, excludeValues);
 	}
 	
 	public function callOnHScript(funcToCall:String, args:Array<Dynamic> = null, ?ignoreStops:Bool = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
-		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
-
-		#if HSCRIPT_ALLOWED
-		if(exclusions == null) exclusions = _noExclusions;
-		if(excludeValues == null) excludeValues = _noExcludeValues;
-		else if (excludeValues != _noExcludeValues) excludeValues.push(psychlua.FunkinLua.Function_Continue);
-
-		var len:Int = hscriptArray.length;
-		if (len < 1)
-			return returnVal;
-		for(i in 0...len)
-		{
-			var script:HScript = hscriptArray[i];
-			if(script == null || !script.exists(funcToCall) || exclusions.contains(script.origin))
-				continue;
-
-			var myValue:Dynamic = null;
-			try
-			{
-				var callValue = script.call(funcToCall, args);
-				if(!callValue.succeeded)
-				{
-					var e = callValue.exceptions[0];
-					if(e != null)
-						FunkinLua.luaTrace('ERROR (${script.origin}: ${callValue.calledFunction}) - ' + e.message.substr(0, e.message.indexOf('\n')), true, false, FlxColor.RED);
-				}
-				else
-				{
-					myValue = callValue.returnValue;
-					if((myValue == FunkinLua.Function_StopHScript || myValue == FunkinLua.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
-					{
-						returnVal = myValue;
-						break;
-					}
-					
-					if(myValue != null && !excludeValues.contains(myValue))
-						returnVal = myValue;
-				}
-			}
-		}
-		#end
-
-		return returnVal;
+		return HostDomain.callOnHScript(this, funcToCall, args, ignoreStops, exclusions, excludeValues);
 	}
 
 	public function setOnScripts(variable:String, arg:Dynamic, exclusions:Array<String> = null) {
-		if(exclusions == null) exclusions = _noExclusions;
-		setOnLuas(variable, arg, exclusions);
-		setOnHScript(variable, arg, exclusions);
+		HostDomain.setOnScripts(this, variable, arg, exclusions);
 	}
 
 	public function setOnLuas(variable:String, arg:Dynamic, exclusions:Array<String> = null) {
-		#if LUA_ALLOWED
-		if(exclusions == null) exclusions = _noExclusions;
-		for (script in luaArray) {
-			if(exclusions.contains(script.scriptName))
-				continue;
-
-			script.set(variable, arg);
-		}
-		#end
+		HostDomain.setOnLuas(this, variable, arg, exclusions);
 	}
 
 	public function setOnHScript(variable:String, arg:Dynamic, exclusions:Array<String> = null) {
-		#if HSCRIPT_ALLOWED
-		if(exclusions == null) exclusions = _noExclusions;
-		for (script in hscriptArray) {
-			if(exclusions.contains(script.origin))
-				continue;
-
-			script.set(variable, arg);
-		}
-		#end
+		HostDomain.setOnHScript(this, variable, arg, exclusions);
 	}
 
 	function strumPlayAnim(isDad:Bool, id:Int, time:Float) NoteChartDomain.strumPlayAnim(this, isDad, id, time);
@@ -4316,38 +4129,19 @@ class PlayState extends MusicBeatState
 	/** 对方 Miss 动画 + 对方人声静音（角色有 miss 动画才播） */
 	function playOnlineOppMiss(data:Int, note:Note):Void
 	{
-		var char:Character = dad;
-		if (note != null && note.gfNote) char = gf;
-		if (char != null && char.hasMissAnimations)
-		{
-			var suffix:String = note != null ? note.animSuffix : '';
-			char.playAnim(singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, data)))] + 'miss' + suffix, true);
-		}
-		if (opponentVocals != null) opponentVocals.volume = 0;
+		NoteChartDomain.playOnlineOppMiss(this, data, note);
 	}
 
 	function flashOppStrums(data:Int, anim:String, confirm:Bool):Void NoteChartDomain.flashOppStrums(this, data, anim, confirm);
 
 	function refreshOppHud():Void
 	{
-		if (onlineOppTexts == null || onlineOppTexts.length < 5) return;
-		onlineOppTexts[0].text = onlineOppNick;
-		onlineOppTexts[1].text = '连击: ' + onlineOppCombo;
-		onlineOppTexts[2].text = '分数: ' + onlineOppScore;
-		var oppAcc:Float = onlineOppTotalPlayed > 0 ? onlineOppTotalNotesHit / onlineOppTotalPlayed : 0;
-		onlineOppTexts[3].text = '准确率: ' + Math.round(oppAcc * 1000) / 10 + '%';
-		onlineOppTexts[4].text = '判定: ' + buildOppCountsLine();
-		refreshOppHealthFill();
+		CameraHudDomain.refreshOppHud(this);
 	}
 
 	function buildOppCountsLine():String
 	{
-		var parts:Array<String> = [];
-		for (r in ratingsData)
-			if (onlineOppRatings.exists(r.name) && onlineOppRatings.get(r.name) > 0)
-				parts.push(r.name + ':' + onlineOppRatings.get(r.name));
-		parts.push('miss:' + onlineOppMisses);
-		return parts.join(' ');
+		return HostDomain.buildOppCountsLine(this);
 	}
 
 	function refreshOppHealthFill():Void CameraHudDomain.refreshOppHealthFill(this);
@@ -4356,11 +4150,7 @@ class PlayState extends MusicBeatState
 
 	function buildRatingCountsCsv():String
 	{
-		var parts:Array<String> = [];
-		for (r in ratingsData)
-			if (r.hits > 0) parts.push(r.name + ':' + r.hits);
-		parts.push('miss:' + songMisses);
-		return parts.join(',');
+		return CameraHudDomain.buildRatingCountsCsv(this);
 	}
 
 	/** 单曲结束（含死亡）：上报本方 FINISH 并打开普通结算界面（联机精简版） */

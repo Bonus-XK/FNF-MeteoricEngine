@@ -35,6 +35,7 @@ import backend.TurboDensity;
 import backend.TurboDensity.TurboZone;
 import flixel.addons.display.FlxRuntimeShader;
 import backend.BaseStage;
+import psychlua.DebugLuaText;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -1029,5 +1030,308 @@ class HostDomain
 		ps.setOnScripts('songLength', ps.songLength);
 		ps.callOnScripts('onSongStart');
 		CrashHandler.mark('PlayState.startSong:music-playing');
+	}
+
+	/** 原 PlayState.callOnHScript（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function callOnHScript(ps:PlayState, funcToCall:String, args:Array<Dynamic> = null, ?ignoreStops:Bool = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic
+	{
+		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
+
+		#if HSCRIPT_ALLOWED
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		if(excludeValues == null) excludeValues = PlayState._noExcludeValues;
+		else if (excludeValues != PlayState._noExcludeValues) excludeValues.push(psychlua.FunkinLua.Function_Continue);
+
+		var len:Int = ps.hscriptArray.length;
+		if (len < 1)
+			return returnVal;
+		for(i in 0...len)
+		{
+			var script:HScript = ps.hscriptArray[i];
+			if(script == null || !script.exists(funcToCall) || exclusions.contains(script.origin))
+				continue;
+
+			var myValue:Dynamic = null;
+			try
+			{
+				var callValue = script.call(funcToCall, args);
+				if(!callValue.succeeded)
+				{
+					var e = callValue.exceptions[0];
+					if(e != null)
+						FunkinLua.luaTrace('ERROR (${script.origin}: ${callValue.calledFunction}) - ' + e.message.substr(0, e.message.indexOf('\n')), true, false, FlxColor.RED);
+				}
+				else
+				{
+					myValue = callValue.returnValue;
+					if((myValue == FunkinLua.Function_StopHScript || myValue == FunkinLua.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
+					{
+						returnVal = myValue;
+						break;
+					}
+
+					if(myValue != null && !excludeValues.contains(myValue))
+						returnVal = myValue;
+				}
+			}
+		}
+		#end
+
+		return returnVal;
+	}
+
+	/** 原 PlayState.callOnLuas（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function callOnLuas(ps:PlayState, funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic
+	{
+		var returnVal:Dynamic = FunkinLua.Function_Continue;
+		#if LUA_ALLOWED
+		if(args == null) args = [];
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		if(excludeValues == null) excludeValues = PlayState._noExcludeValues;
+
+		var len:Int = ps.luaArray.length;
+		var i:Int = 0;
+		while(i < len)
+		{
+			var script:FunkinLua = ps.luaArray[i];
+			if(exclusions.contains(script.scriptName))
+			{
+				i++;
+				continue;
+			}
+
+			var myValue:Dynamic = script.call(funcToCall, args);
+			if((myValue == FunkinLua.Function_StopLua || myValue == FunkinLua.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
+			{
+				returnVal = myValue;
+				break;
+			}
+
+			if(myValue != null && !excludeValues.contains(myValue))
+				returnVal = myValue;
+
+			if(!script.closed) i++;
+			else len--;
+		}
+		#end
+		return returnVal;
+	}
+
+	/** 原 PlayState.addTextToDebug（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function addTextToDebug(ps:PlayState, text:String, color:FlxColor)
+	{
+		#if LUA_ALLOWED
+		var newText:DebugLuaText = ps.luaDebugGroup.recycle(DebugLuaText);
+		newText.text = text;
+		newText.color = color;
+		newText.disableTime = 6;
+		newText.alpha = 1;
+		newText.setPosition(10, 8 - newText.height);
+
+		ps.luaDebugGroup.forEachAlive(function(spr:DebugLuaText) {
+			spr.y += newText.height + 2;
+		});
+		ps.luaDebugGroup.add(newText);
+		#end
+	}
+
+	/** 原 PlayState.setOnLuas（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function setOnLuas(ps:PlayState, variable:String, arg:Dynamic, exclusions:Array<String> = null)
+	{
+		#if LUA_ALLOWED
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		for (script in ps.luaArray) {
+			if(exclusions.contains(script.scriptName))
+				continue;
+
+			script.set(variable, arg);
+		}
+		#end
+	}
+
+	/** 原 PlayState.setOnHScript（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function setOnHScript(ps:PlayState, variable:String, arg:Dynamic, exclusions:Array<String> = null)
+	{
+		#if HSCRIPT_ALLOWED
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		for (script in ps.hscriptArray) {
+			if(exclusions.contains(script.origin))
+				continue;
+
+			script.set(variable, arg);
+		}
+		#end
+	}
+
+	/** 原 PlayState.isTurboAggregateIndex（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function isTurboAggregateIndex(ps:PlayState, index:Int):Bool
+	{
+		if (ps.turboZones == null || ps.turboZones.length == 0 || index < 0)
+			return false;
+		while (ps.turboZoneCursor < ps.turboZones.length && ps.turboZones[ps.turboZoneCursor].endIndex <= index)
+			ps.turboZoneCursor++;
+		if (ps.turboZoneCursor >= ps.turboZones.length)
+			return false;
+		var z:TurboZone = ps.turboZones[ps.turboZoneCursor];
+		return index >= z.startIndex && index < z.endIndex;
+	}
+
+	/** 原 PlayState.freezeBackgroundAudio（作用域分析：零遮蔽，6 处成员引用已限定）。 */
+	public static function freezeBackgroundAudio(ps:PlayState):Void
+	{
+		if (ps._bgAudioFrozen) return;
+		ps._bgAudioFrozen = true;
+		if (FlxG.sound.music != null) FlxG.sound.music.pause();
+		if (ps.vocals != null) ps.vocals.pause();
+		if (ps.opponentVocals != null) ps.opponentVocals.pause();
+		// 暂停菜单音乐等所有在播 FlxSound 一并冻结，避免锁屏/后台期间仍有声音
+		for (sound in FlxG.sound.list.members)
+			if (sound != null) sound.pause();
+	}
+
+	/** 原 PlayState.restoreBackgroundAudio（作用域分析：零遮蔽，7 处成员引用已限定）。 */
+	public static function restoreBackgroundAudio(ps:PlayState):Void
+	{
+		if (!ps._bgAudioFrozen) return;
+		ps._bgAudioFrozen = false;
+		// 若玩家仍处于暂停菜单（未返回游戏），保持静音；真正恢复由 closeSubState/resyncVocals 负责
+		if (ps.paused) return;
+		if (FlxG.sound.music != null) FlxG.sound.music.play();
+		if (ps.vocals != null) ps.vocals.play();
+		if (ps.opponentVocals != null) ps.opponentVocals.play();
+	}
+
+	/** 原 PlayState.containsChinese（作用域分析：零遮蔽，0 处成员引用已限定）。 */
+	public static function containsChinese(ps:PlayState, s:String):Bool
+	{
+		if (s == null || s == '') return false;
+		for (i in 0...s.length)
+		{
+			var c:Int = s.charCodeAt(i);
+			if (c >= 0x4E00 && c <= 0x9FFF) return true;
+		}
+		return false;
+	}
+
+	/** 原 PlayState.callOnScripts（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function callOnScripts(ps:PlayState, funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic
+	{
+		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
+		if(args == null) args = [];
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		if(excludeValues == null) excludeValues = PlayState._noExcludeValues;
+
+		var result:Dynamic = ps.callOnLuas(funcToCall, args, ignoreStops, exclusions, excludeValues);
+		if(result == null || excludeValues.contains(result)) result = ps.callOnHScript(funcToCall, args, ignoreStops, exclusions, excludeValues);
+		return result;
+	}
+
+	/** 原 PlayState.startCharacterPos（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function startCharacterPos(ps:PlayState, char:Character, ?gfCheck:Bool = false)
+	{
+		if(gfCheck && char.curCharacter.startsWith('gf')) { //IF DAD IS GIRLFRIEND, HE GOES TO HER POSITION
+			char.setPosition(ps.GF_X, ps.GF_Y);
+			char.scrollFactor.set(0.95, 0.95);
+			char.danceEveryNumBeats = 2;
+		}
+		char.x += char.positionArray[0];
+		char.y += char.positionArray[1];
+	}
+
+	/** 原 PlayState.spawnWindowFor（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function spawnWindowFor(ps:PlayState, target:CastNote):Float
+	{
+		// 【500 帧冲刺】密集谱出生窗口 2000ms→1100ms：同屏成员数（渲染+followStrum 双头）近似减半；
+		// 音符改为约 1.1s 前出现在屏幕（墙略短、贴线更近），判定/计分零影响。
+		var t:Float = (PlayState.densePerfMode ? 1100 : ps.spawnTime) * ps.playbackRate;
+		if (ps.songSpeed < 1) t /= ps.songSpeed;
+		if (target.multSpeed < 1) t /= target.multSpeed;
+		return t;
+	}
+
+	/** 原 PlayState.resetRPC（作用域分析：零遮蔽，9 处成员引用已限定）。 */
+	public static function resetRPC(ps:PlayState, ?cond:Bool = false)
+	{
+		#if desktop
+		if (cond)
+			DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter(), true, ps.songLength - Conductor.songPosition - ClientPrefs.data.noteOffset);
+		else
+			DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
+		#end
+	}
+
+	/** 原 PlayState.clampGameplayTotals（作用域分析：零遮蔽，15 处成员引用已限定）。 */
+	public static function clampGameplayTotals(ps:PlayState):Void
+	{
+		if (ps.totalNotes > 0 && ps.songHits > ps.totalNotes)
+			ps.songHits = ps.totalNotes;
+		if (ps.totalNotes > 0 && ps.totalPlayed > ps.totalNotes)
+			ps.totalPlayed = ps.totalNotes;
+		if (ps.totalNotes > 0 && ps.totalNotesHit > ps.totalNotes)
+			ps.totalNotesHit = ps.totalNotes;
+	}
+
+	/** 原 PlayState.buildOppCountsLine（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function buildOppCountsLine(ps:PlayState):String
+	{
+		var parts:Array<String> = [];
+		for (r in ps.ratingsData)
+			if (ps.onlineOppRatings.exists(r.name) && ps.onlineOppRatings.get(r.name) > 0)
+				parts.push(r.name + ':' + ps.onlineOppRatings.get(r.name));
+		parts.push('miss:' + ps.onlineOppMisses);
+		return parts.join(' ');
+	}
+
+	/** 原 PlayState.getLuaObject（作用域分析：零遮蔽，6 处成员引用已限定）。 */
+	public static function getLuaObject(ps:PlayState, tag:String, text:Bool=true):FlxSprite
+	{
+		#if LUA_ALLOWED
+		if(ps.modchartSprites.exists(tag)) return ps.modchartSprites.get(tag);
+		if(text && ps.modchartTexts.exists(tag)) return ps.modchartTexts.get(tag);
+		if(ps.variables.exists(tag)) return ps.variables.get(tag);
+		#end
+		return null;
+	}
+
+	/** 原 PlayState.startAndEnd（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function startAndEnd(ps:PlayState)
+	{
+		if(ps.endingSong)
+			ps.endSong();
+		else
+			ps.startCountdown();
+	}
+
+	/** 原 PlayState.achievementEnd（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function achievementEnd(ps:PlayState):Void
+	{
+		ps.achievementObj = null;
+		if(ps.endingSong && !ps.inCutscene) {
+			ps.endSong();
+		}
+	}
+
+	/** 原 PlayState.cancelMusicFadeTween（作用域分析：零遮蔽，0 处成员引用已限定）。 */
+	public static function cancelMusicFadeTween()
+	{
+		if(FlxG.sound.music.fadeTween != null) {
+			FlxG.sound.music.fadeTween.cancel();
+		}
+		FlxG.sound.music.fadeTween = null;
+	}
+
+	/** 原 PlayState.setOnScripts（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function setOnScripts(ps:PlayState, variable:String, arg:Dynamic, exclusions:Array<String> = null)
+	{
+		if(exclusions == null) exclusions = PlayState._noExclusions;
+		ps.setOnLuas(variable, arg, exclusions);
+		ps.setOnHScript(variable, arg, exclusions);
+	}
+
+	/** 原 PlayState.onAndroidBack（作用域分析：零遮蔽，1 处成员引用已限定）。 */
+	public static function onAndroidBack(ps:PlayState):Bool
+	{
+		ps.androidBackQueued = true;
+		return true;
 	}
 }

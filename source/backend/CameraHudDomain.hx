@@ -426,4 +426,47 @@ class CameraHudDomain
 		ps.onlineOppHealthFill.visible = true;
 		ps.onlineOppHealthFill.makeGraphic(newW, Std.int(ps.onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
 	}
+
+	/** 原 PlayState.refreshOppHud（作用域分析：零遮蔽，15 处成员引用已限定）。 */
+	public static function refreshOppHud(ps:PlayState):Void
+	{
+		if (ps.onlineOppTexts == null || ps.onlineOppTexts.length < 5) return;
+		ps.onlineOppTexts[0].text = PlayState.onlineOppNick;
+		ps.onlineOppTexts[1].text = '连击: ' + ps.onlineOppCombo;
+		ps.onlineOppTexts[2].text = '分数: ' + ps.onlineOppScore;
+		var oppAcc:Float = ps.onlineOppTotalPlayed > 0 ? ps.onlineOppTotalNotesHit / ps.onlineOppTotalPlayed : 0;
+		ps.onlineOppTexts[3].text = '准确率: ' + Math.round(oppAcc * 1000) / 10 + '%';
+		ps.onlineOppTexts[4].text = '判定: ' + ps.buildOppCountsLine();
+		ps.refreshOppHealthFill();
+	}
+
+	/** 原 PlayState.updateHUDVisibility（作用域分析：零遮蔽，14 处成员引用已限定）。 */
+	public static function updateHUDVisibility(ps:PlayState)
+	{
+		var hide:Bool = ClientPrefs.data.hideHud;
+		if (ps.healthBar != null) ps.healthBar.visible = !hide;
+		if (ps.healthBarOverlay != null) ps.healthBarOverlay.visible = !hide && ClientPrefs.data.healthBarOverlay && !ClientPrefs.data.oldHealthBar;
+		if (ps.iconP1 != null) ps.iconP1.visible = !hide;
+		if (ps.iconP2 != null) ps.iconP2.visible = !hide;
+		if (ps.scoreTxt != null) ps.scoreTxt.visible = !hide;
+		if (ps.timeBarOverlay != null) ps.timeBarOverlay.visible = ps.timeBar != null && ps.timeBar.visible && !hide;
+	}
+
+	/** 原 PlayState.buildRatingCountsCsv（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function buildRatingCountsCsv(ps:PlayState):String
+	{
+		var parts:Array<String> = [];
+		for (r in ps.ratingsData)
+			if (r.hits > 0) parts.push(r.name + ':' + r.hits);
+		parts.push('miss:' + ps.songMisses);
+		return parts.join(',');
+	}
+
+	/** 原 PlayState.cameraSmoothSpeed（作用域分析：零遮蔽，0 处成员引用已限定）。 */
+	public static function cameraSmoothSpeed(ps:PlayState):Float
+	{
+		var presets:Map<String, Float> = ClientPrefs.camSmoothPresets;
+		var v:Null<Float> = (ClientPrefs.data != null && presets != null) ? presets.get(ClientPrefs.data.camSmooth) : null;
+		return (v == null || v <= 0) ? 2.4 : v; // 兜底 = 原引擎强度（1.22s）
+	}
 }

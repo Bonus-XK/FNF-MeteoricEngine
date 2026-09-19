@@ -1288,4 +1288,17 @@ class NoteChartDomain
 				var result:Dynamic = ps.callOnLuas('noteMiss', [ps.notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
 				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('noteMiss', [daNote]);
 	}
+
+	/** 原 PlayState.playOnlineOppMiss（作用域分析：零遮蔽，6 处成员引用已限定）。 */
+	public static function playOnlineOppMiss(ps:PlayState, data:Int, note:Note):Void
+	{
+		var char:Character = ps.dad;
+		if (note != null && note.gfNote) char = ps.gf;
+		if (char != null && char.hasMissAnimations)
+		{
+			var suffix:String = note != null ? note.animSuffix : '';
+			char.playAnim(ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length - 1, data)))] + 'miss' + suffix, true);
+		}
+		if (ps.opponentVocals != null) ps.opponentVocals.volume = 0;
+	}
 }
