@@ -53,6 +53,9 @@ class HealthIcon extends FlxSprite
 				&& Paths.fileExists('images/icons/' + char + '/icon.png', IMAGE))
 				name = 'icons/' + char + '/icon';
 			#end
+			// PE 命名兜底：部分角色的图标只有 `icon-<角色>-pe.png`（Psych Engine 命名），
+			// 缺这一档时 Weekend1 等周的小图标会直接掉到 icon-face（表现为「图标缺失」）。
+			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char + '-pe';
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-face'; //Prevents crash from missing icon
 			
 			var graphic = Paths.image(name, allowGPU);
