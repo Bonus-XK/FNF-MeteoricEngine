@@ -175,7 +175,10 @@ fi
 if [ "$1" = "test" ]; then
   haxelib run lime test macos -release $PROFILE_DEFINE $DEBUG_FLAGS
 else
-  haxelib run lime build macos -release $PROFILE_DEFINE $DEBUG_FLAGS
+  # 可选注入额外 define（默认空 → 与既有行为完全一致）：
+  #   METEORIC_EXTRA_DEFINES="-D METEORIC_NOTE_DIAG" bash ./compile-mac.sh
+  EXTRA_DEFINES="${METEORIC_EXTRA_DEFINES:-}"
+  haxelib run lime build macos -release $PROFILE_DEFINE $DEBUG_FLAGS $EXTRA_DEFINES
 fi
 
 # ---- 构建后处理：恢复墙钟版 lime.ndll ----

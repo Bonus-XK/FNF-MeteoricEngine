@@ -84,6 +84,21 @@ class TitleState extends MusicBeatState
 
 	override public function create():Void
 	{
+		#if METEORIC_NOTE_DIAG
+		new flixel.util.FlxTimer().start(3, function(_)
+		{
+			var __auto:String = Sys.getEnv('METEORIC_AUTO_SONG');
+			if (__auto == null || __auto.length < 1) return;
+			var __lc:String = backend.Paths.formatToSongPath(__auto);
+			var __diff:Int = 1;
+			var __d:String = Sys.getEnv('METEORIC_AUTO_DIFF');
+			if (__d == 'easy') __diff = 0; else if (__d == 'hard') __diff = 2;
+			var __poop:String = backend.Highscore.formatSong(__lc, __diff);
+			states.PlayState.isStoryMode = false;
+			states.PlayState.storyDifficulty = __diff;
+			states.LoadingState.loadSongAndSwitchState(new states.PlayState(), __lc, __poop, __lc, true, new TitleState());
+		});
+		#end
 		// 维护/CI 直达入口：设 ME_LUAGRAPH_SELFTEST=1 时直接进入 Lua 图形化编辑器并跑一遍自检
 		// （不设置该环境变量时完全不触发，正常启动流程与玩家侧行为不受影响）
 		Paths.clearStoredMemory();

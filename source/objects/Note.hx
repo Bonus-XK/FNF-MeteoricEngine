@@ -501,16 +501,13 @@ class Note extends FlxSprite
 					//this used to change the note texture to HURTNOTE_assets.png,
 					//but i've changed it to something more optimized with the implementation of RGBPalette:
 
-					// note colors
-					// RGB 关闭时 rgbShader 为 null（Note.hx:374 useRGBShader = !SONG.disableNoteRGB；
-					// 本文件 733/911/945 行同约定判空）。此前无条件写 → disableNoteRGB 曲目下抛空引用，
-					// set_noteType('Hurt Note') 整体失败 → 该类型箭头不生成/不显示。
-					if (rgbShader != null)
-					{
-						rgbShader.r = 0xFF101010;
-						rgbShader.g = 0xFFFF0000;
-						rgbShader.b = 0xFF990022;
-					}
+					// 【独立贴图】Hurt Note 改用专属图集，不再依赖暗色 RGB 调色板：
+					// 原方案（0xFF101010/0xFFFF0000/0xFF990022 乘色）在深色舞台上等于不可见
+					// （实测：alpha=1、frames=ok、visible=true，但视觉消失）。上游注释掉的
+					// reloadNote('HURTNOTE_assets') 即此意图，此处正式恢复。
+					texture = 'HURTNOTE_assets';
+					reloadNote('HURTNOTE_assets');
+					if (rgbShader != null) rgbShader.enabled = false; // 专属贴图自带颜色，不叠加染色
 
 					// splash data and colors
 					noteSplashData.r = 0xFFFF0000;
