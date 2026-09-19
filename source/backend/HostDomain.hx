@@ -1907,4 +1907,14 @@ class HostDomain
 		#end
 		ps.meteoSuper_onFocus();
 	}
+
+	/** 原 PlayState.spawnOneWithTail（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function spawnOneWithTail(ps:PlayState, target:CastNote):Note
+	{
+		var hadOffs:Bool = target.offs != null; // 合并簇：尾巴已在上方 offs 分支挂到 base
+		var n:Note = ps.spawnOne(target);
+		if (!hadOffs && target.holdLength > 0 && target.chartSeq >= 0)
+			ps.spawnHoldTail(n, target);
+		return n;
+	}
 }

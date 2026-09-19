@@ -11,6 +11,8 @@ import backend.Controls;
 import flixel.input.keyboard.FlxKey;
 import backend.ClientPrefs;
 import psychlua.FunkinLua;
+import objects.Character;
+import psychlua.LuaUtils;
 
 /** 事件调度域（C4 首批迁出，7 个零遮蔽函数中的 5 个）。
  *  PlayState 保留同签名转发入口，全仓调用点零改动。
@@ -171,5 +173,254 @@ class EventDomain
 	{
 		if (ps.recordingReplay && ps.currentReplay != null && !ps.cpuControlled && !ps.replayMode)
 			ps.currentReplay.addEvent(seq, t, d, r);
+	}
+
+	/** 原 PlayState.triggerEvent（作用域分析：零遮蔽，92 处成员引用已限定）。 */
+	public static function triggerEvent(ps:PlayState, eventName:String, value1:String, value2:String, strumTime:Float)
+	{
+		var flValue1:Null<Float> = Std.parseFloat(value1);
+		var flValue2:Null<Float> = Std.parseFloat(value2);
+		if(Math.isNaN(flValue1)) flValue1 = null;
+		if(Math.isNaN(flValue2)) flValue2 = null;
+
+		switch(eventName) {
+			case 'Hey!':
+				var value:Int = 2;
+				switch(value1.toLowerCase().trim()) {
+					case 'bf' | 'boyfriend' | '0':
+						value = 0;
+					case 'gf' | 'girlfriend' | '1':
+						value = 1;
+				}
+
+				if(flValue2 == null || flValue2 <= 0) flValue2 = 0.6;
+
+				if(value != 0) {
+					if(ps.dad.curCharacter.startsWith('gf')) { //Tutorial GF is actually Dad! The GF is an imposter!! ding ding ding ding ding ding ding, dindinding, end my suffering
+						ps.dad.playAnim('cheer', true);
+						ps.dad.specialAnim = true;
+						ps.dad.heyTimer = flValue2;
+					} else if (ps.gf != null) {
+						ps.gf.playAnim('cheer', true);
+						ps.gf.specialAnim = true;
+						ps.gf.heyTimer = flValue2;
+					}
+				}
+				if(value != 1) {
+					ps.boyfriend.playAnim('hey', true);
+					ps.boyfriend.specialAnim = true;
+					ps.boyfriend.heyTimer = flValue2;
+				}
+
+			case 'Set GF Speed':
+				if(flValue1 == null || flValue1 < 1) flValue1 = 1;
+				ps.gfSpeed = Math.round(flValue1);
+
+			case 'Add Camera Zoom':
+				if(ClientPrefs.data.camZooms && FlxG.camera.zoom < 1.35) {
+					if(flValue1 == null) flValue1 = 0.015;
+					if(flValue2 == null) flValue2 = 0.03;
+
+					FlxG.camera.zoom += flValue1;
+					ps.camHUD.zoom += flValue2;
+				}
+
+			case 'Play Animation':
+				//trace('Anim to play: ' + value1);
+				var char:Character = ps.dad;
+				switch(value2.toLowerCase().trim()) {
+					case 'bf' | 'boyfriend':
+						char = ps.boyfriend;
+					case 'gf' | 'girlfriend':
+						char = ps.gf;
+					default:
+						if(flValue2 == null) flValue2 = 0;
+						switch(Math.round(flValue2)) {
+							case 1: char = ps.boyfriend;
+							case 2: char = ps.gf;
+						}
+				}
+
+				if (char != null)
+				{
+					#if (meteoric_debug && sys)
+					trace('[DBG-PLAYANIM] t=' + Std.int(strumTime) + ' v1=' + value1 + ' v2=' + value2
+						+ ' char=' + char.curCharacter + ' hasAnim=' + (char.animation.getByName(value1) != null)
+						+ ' special=' + char.specialAnim);
+					#end
+					char.playAnim(value1, true);
+					char.specialAnim = true;
+				}
+
+			case 'Camera Follow Pos':
+				if(ps.camFollow != null)
+				{
+					ps.isCameraOnForcedPos = false;
+					if(flValue1 != null || flValue2 != null)
+					{
+						ps.isCameraOnForcedPos = true;
+						if(flValue1 == null) flValue1 = 0;
+						if(flValue2 == null) flValue2 = 0;
+						ps.camFollow.x = flValue1;
+						ps.camFollow.y = flValue2;
+					}
+				}
+
+			case 'Alt Idle Animation':
+				var char:Character = ps.dad;
+				switch(value1.toLowerCase().trim()) {
+					case 'gf' | 'girlfriend':
+						char = ps.gf;
+					case 'boyfriend' | 'bf':
+						char = ps.boyfriend;
+					default:
+						var val:Int = Std.parseInt(value1);
+						if(Math.isNaN(val)) val = 0;
+
+						switch(val) {
+							case 1: char = ps.boyfriend;
+							case 2: char = ps.gf;
+						}
+				}
+
+				if (char != null)
+				{
+					char.idleSuffix = value2;
+					char.recalculateDanceIdle();
+				}
+
+			case 'Screen Shake':
+				var valuesArray:Array<String> = [value1, value2];
+				var targetsArray:Array<FlxCamera> = [ps.camGame, ps.camHUD];
+				for (i in 0...targetsArray.length) {
+					var split:Array<String> = valuesArray[i].split(',');
+					var duration:Float = 0;
+					var intensity:Float = 0;
+					if(split[0] != null) duration = Std.parseFloat(split[0].trim());
+					if(split[1] != null) intensity = Std.parseFloat(split[1].trim());
+					if(Math.isNaN(duration)) duration = 0;
+					if(Math.isNaN(intensity)) intensity = 0;
+
+					if(duration > 0 && intensity != 0) {
+						targetsArray[i].shake(intensity, duration);
+					}
+				}
+
+
+			case 'Change Character':
+				var charType:Int = 0;
+				switch(value1.toLowerCase().trim()) {
+					case 'gf' | 'girlfriend':
+						charType = 2;
+					case 'dad' | 'opponent':
+						charType = 1;
+					default:
+						charType = Std.parseInt(value1);
+						if(Math.isNaN(charType)) charType = 0;
+				}
+
+				switch(charType) {
+					case 0:
+						if(ps.boyfriend != null && ps.boyfriend.curCharacter != value2) {
+							if(!ps.boyfriendMap.exists(value2)) {
+								ps.addCharacterToList(value2, charType);
+							}
+
+							var lastAlpha:Float = ps.boyfriend.alpha;
+							ps.boyfriend.alpha = 0.00001;
+							// 防御：角色添加失败（图集缺失等）时保持现角色，绝不把 boyfriend 置 null
+							var newB:Character = ps.boyfriendMap.get(value2);
+							if (newB == null) newB = ps.boyfriend;
+							ps.boyfriend = newB;
+							ps.boyfriend.alpha = lastAlpha;
+							ps.iconP1.changeIcon(ps.boyfriend.healthIcon);
+						}
+						if (ps.boyfriend != null) ps.setOnScripts('boyfriendName', ps.boyfriend.curCharacter);
+
+					case 1:
+						if(ps.dad != null && ps.dad.curCharacter != value2) {
+							if(!ps.dadMap.exists(value2)) {
+								ps.addCharacterToList(value2, charType);
+							}
+
+							var wasGf:Bool = ps.dad.curCharacter.startsWith('gf-') || ps.dad.curCharacter == 'gf';
+							var lastAlpha:Float = ps.dad.alpha;
+							ps.dad.alpha = 0.00001;
+							var newD:Character = ps.dadMap.get(value2);
+							if (newD == null) newD = ps.dad; // 防御同上
+							ps.dad = newD;
+							if(!ps.dad.curCharacter.startsWith('gf-') && ps.dad.curCharacter != 'gf') {
+								if(wasGf && ps.gf != null) {
+									ps.gf.visible = true;
+								}
+							} else if(ps.gf != null) {
+								ps.gf.visible = false;
+							}
+							ps.dad.alpha = lastAlpha;
+							ps.iconP2.changeIcon(ps.dad.healthIcon);
+						}
+						if (ps.dad != null) ps.setOnScripts('dadName', ps.dad.curCharacter);
+
+					case 2:
+						if(ps.gf != null)
+						{
+							if(ps.gf.curCharacter != value2)
+							{
+								if(!ps.gfMap.exists(value2)) {
+									ps.addCharacterToList(value2, charType);
+								}
+
+								var lastAlpha:Float = ps.gf.alpha;
+								ps.gf.alpha = 0.00001;
+								var newG:Character = ps.gfMap.get(value2);
+								if (newG == null) newG = ps.gf; // 防御同上
+								ps.gf = newG;
+								ps.gf.alpha = lastAlpha;
+							}
+							ps.setOnScripts('gfName', ps.gf.curCharacter);
+						}
+				}
+				ps.reloadHealthBarColors();
+
+			case 'Change Scroll Speed':
+				if (ps.songSpeedType != "constant")
+				{
+					if(flValue1 == null) flValue1 = 1;
+					if(flValue2 == null) flValue2 = 0;
+
+					var newValue:Float = PlayState.SONG.speed * ClientPrefs.getGameplaySetting('scrollspeed') * flValue1;
+					if(flValue2 <= 0)
+						ps.songSpeed = newValue;
+					else
+						ps.songSpeedTween = FlxTween.tween(ps, {songSpeed: newValue}, flValue2 / ps.playbackRate, {ease: FlxEase.linear, onComplete:
+							function (twn:FlxTween)
+							{
+								ps.songSpeedTween = null;
+							}
+						});
+				}
+
+			case 'Set Property':
+				try
+				{
+					var split:Array<String> = value1.split('.');
+					if(split.length > 1) {
+						LuaUtils.setVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1], value2);
+					} else {
+						LuaUtils.setVarInArray(ps, value1, value2);
+					}
+				}
+				catch(e:Dynamic)
+				{
+					ps.addTextToDebug('ERROR ("Set Property" Event) - ' + e.message.substr(0, e.message.indexOf('\n')), FlxColor.RED);
+				}
+
+			case 'Play Sound':
+				if(flValue2 == null) flValue2 = 1;
+				FlxG.sound.play(Paths.sound(value1), flValue2);
+		}
+
+		ps.stagesFunc(function(stage:BaseStage) stage.eventCalled(eventName, value1, value2, flValue1, flValue2, strumTime));
+		ps.callOnScripts('onEvent', [eventName, value1, value2, strumTime]);
 	}
 }

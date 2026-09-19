@@ -548,7 +548,9 @@ def main():
 
         new_body, npre, supers = rewrite(sp['body'], members, localsx)
         new_masked = sa.mask(new_body)
-        new_seq = [(nm, c) for _, nm, c in token_classes(new_masked, members, localsx)]
+        # `this` → `ps` 的替换产物是**裸 ps**（后面不是 `.`），比对时必须剔除，否则序列错位
+        new_seq = [(nm, c) for _, nm, c in token_classes(new_masked, members, localsx)
+                   if not (nm == 'ps' and c == 'inst-unknown')]
         old_this = sum(1 for _, _, c in old_seq if c == 'thisref')
         old_super = sum(1 for _, _, c in old_seq if c == 'superref')
         old_nonmember = [(nm, c) for _, nm, c in old_seq
@@ -572,10 +574,7 @@ def main():
 
         head = '\n'.join(raw[f['line'] - 1:sp['decl_line'] + 1])
         head = sp['params']  # 占位，实际判定见下
-        if re.search(r'(?m)^\s*#(?:if|else|elseif|end)\b',
-                     '\n'.join(raw[f['line'] - 1:]).split('{', 1)[0]):
-            print('  ⚠ 跳过 %s（声明区含预处理指令：#end 会落在迁出跨度内被吞）' % n)
-            continue
+        # 声明区预处理指令不再阻断：现在只替换函数体（声明与其 #if 包裹原样保留）
         if len(re.findall(r'(?m)^\s*#if\b', sp['body'])) != len(re.findall(r'(?m)^\s*#end\b', sp['body'])):
             print('  ⚠ 跳过 %s（体预处理指令不配平）' % n)
             continue
