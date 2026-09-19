@@ -254,6 +254,17 @@ class MusicBeatState extends FlxUIState
 		curStep = lastChange.stepTime + Math.floor(shit);
 	}
 
+	/** 是否处于 FlxState.resetSubState() 调用栈内（子状态关闭/替换的重入窗口）。
+	 *  供 startTransition 判断是否需要延后开转场层，避免转场层被下一次 resetSubState 销毁。 */
+	public static var inSubStateReset:Bool = false;
+
+	override public function resetSubState():Void
+	{
+		inSubStateReset = true;
+		super.resetSubState();
+		inSubStateReset = false;
+	}
+
 	public static function switchState(nextState:FlxState = null) {
 		if(nextState == null) nextState = FlxG.state;
 		if(nextState == FlxG.state)
@@ -278,6 +289,19 @@ class MusicBeatState extends FlxUIState
 	{
 		if(nextState == null)
 			nextState = FlxG.state;
+
+		// 重入保护（P0 修复）：**仅当处于 FlxState.resetSubState() 调用栈内**（即正由某个子状态的关闭/替换流程
+		// 驱动、典型是子状态 closeCallback 里发起转场，例如结算界面「继续」→ 回自由选歌）时延后。
+		// 此时直接 openSubState 会落进 flixel 的重入窗口：嵌套请求让**下一次** resetSubState 把刚建好的转场层
+		// 当作「旧子状态」销毁（destroySubStates 默认 true）→ 转场层 update 永不执行 → finishCallback 永不触发 → 永久卡住。
+		// 注意：**不能**用「当前有子状态」作判据 —— 暂停菜单「返回主菜单」等路径正是在子状态仍开着时切换，
+		// 原逻辑靠 openSubState 替换掉该子状态，延后会永不执行（早期版本曾因此卡死，已修正）。
+		if (inSubStateReset)
+		{
+			var deferredState:FlxState = nextState;
+			FlxG.signals.postUpdate.addOnce(function() startTransition(deferredState));
+			return;
+		}
 
 		FlxG.state.openSubState(new CustomFadeTransition(0.6, false));
 		if(nextState == FlxG.state)
