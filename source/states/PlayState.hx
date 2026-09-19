@@ -14,6 +14,7 @@ import backend.Achievements;
 import backend.Highscore;
 import backend.StageData;
 import backend.WeekData;
+import backend.CameraHudDomain;
 import backend.NoteChartDomain;
 import backend.Song;
 import backend.Section;
@@ -1324,14 +1325,9 @@ class PlayState extends MusicBeatState
 	 * 无论谁（Lua/Hscript/Mod/遗留代码）把 healthBar/图标/分数直接改成不可见，
 	 * 下一帧都会被拉回 —— 彻底解决“游玩中 UI 突然消失”（只剩箭头和时间条）问题。
 	 */
-	public function enforceHUD() {
-		// 已收敛到 GameHUD.enforce()（每帧可见性权威）
-		if (hud != null) hud.enforce();
-	}
+	public function enforceHUD() CameraHudDomain.enforceHUD(this);
 
-	public function reloadHealthBarColors() {
-		if (hud != null) hud.reloadHealthBarColors();
-	}
+	public function reloadHealthBarColors() CameraHudDomain.reloadHealthBarColors(this);
 
 	public function addCharacterToList(newCharacter:String, type:Int) {
 		switch(type) {
@@ -2636,11 +2632,7 @@ class PlayState extends MusicBeatState
 	}
 
 	// 重置某个 HUD 元素到默认位置（偏移清零并立即重排）
-	public function hudResetElement(id:String)
-	{
-		try { ClientPrefs.data.hudLayout.set(id, [0, 0]); } catch (e:Dynamic) {}
-		repositionHUD();
-	}
+	public function hudResetElement(id:String) CameraHudDomain.hudResetElement(this, id);
 
 	// 按保存的偏移重算所有 HUD 元素位置（默认位置 + 偏移），自定义界面拖动/重置时使用
 	public function repositionHUD()
@@ -4444,15 +4436,7 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-	public function tweenCamIn() {
-		if (Paths.formatToSongPath(SONG.song) == 'tutorial' && cameraTwn == null && FlxG.camera.zoom != 1.3) {
-			cameraTwn = FlxTween.tween(FlxG.camera, {zoom: 1.3}, (Conductor.stepCrochet * 4 / 1000), {ease: FlxEase.elasticInOut, onComplete:
-				function (twn:FlxTween) {
-					cameraTwn = null;
-				}
-			});
-		}
-	}
+	public function tweenCamIn() CameraHudDomain.tweenCamIn(this);
 
 	public function finishSong(?ignoreNoteOffset:Bool = false):Void
 	{
@@ -6759,17 +6743,7 @@ class PlayState extends MusicBeatState
 		setOnScripts('ratingFC', ratingFC);
 	}
 
-	function fullComboUpdate()
-	{
-		if(songMisses < 1)
-		{
-			ratingFC = 'FC';
-		}else if (songMisses < 10){
-			ratingFC = 'SDCB';
-		}else{
-			ratingFC = 'Clear';
-		}
-	}
+	function fullComboUpdate() CameraHudDomain.fullComboUpdate(this);
 
 	#if ACHIEVEMENTS_ALLOWED
 	private function checkForAchievement(achievesToCheck:Array<String> = null):String
@@ -7220,12 +7194,7 @@ class PlayState extends MusicBeatState
 		onlineOppHealthFill.makeGraphic(newW, Std.int(onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
 	}
 
-	function getRatingModByName(name:String):Float
-	{
-		for (r in ratingsData)
-			if (r.name == name) return r.ratingMod;
-		return 1;
-	}
+	function getRatingModByName(name:String):Float return CameraHudDomain.getRatingModByName(this, name);
 
 	function buildRatingCountsCsv():String
 	{
