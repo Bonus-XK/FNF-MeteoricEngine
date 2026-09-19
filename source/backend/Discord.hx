@@ -1,7 +1,11 @@
 package backend;
 
 import Sys.sleep;
+#if desktop
 import discord_rpc.DiscordRpc;
+#else
+import backend.DiscordRpcStub as DiscordRpc; // 移动端等非桌面平台：no-op 替身（见该文件注释）
+#end
 import lime.app.Application;
 
 class DiscordClient
