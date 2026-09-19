@@ -54,7 +54,24 @@ jobs:
           java-version: 17
 
       - name: 安装 Android SDK
-        uses: android-actions/setup-android@v3
+        # 不再依赖 android-actions/setup-android：v3 仍跑 Node.js 20，被 GitHub 强制迁移到
+        # Node.js 24 后会直接崩溃（实测该步骤 12 秒失败，后续 NDK/构建/上传全部 skipped）。
+        # 改用 runner 预装 SDK；仅在缺 cmdline-tools 时才下载官方包（带重试）。
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          export ANDROID_SDK_ROOT="$SDK"
+          export ANDROID_HOME="$SDK"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          ls "$SDK" 2>/dev/null || echo "（无预装 SDK）"
+          if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
+            echo "预装 SDK 缺 cmdline-tools → 下载官方 commandlinetools"
+            curl -fL --retry 5 --retry-delay 5 -o /tmp/clt.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            mkdir -p /tmp/clt && unzip -q /tmp/clt.zip -d /tmp/clt
+            mkdir -p "$SDK/cmdline-tools" && rm -rf "$SDK/cmdline-tools/latest"
+            mv /tmp/clt/cmdline-tools "$SDK/cmdline-tools/latest"
+          fi
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --version
 
       - name: 安装 NDK 21.4 与平台
         run: |
