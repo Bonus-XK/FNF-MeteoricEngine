@@ -12,6 +12,9 @@ import states.PlayState.GameHUD;
 import objects.Note;
 import objects.StrumNote;
 import psychlua.FunkinLua;
+import backend.CoolUtil;
+import flixel.text.FlxText.FlxTextBorderStyle;
+import backend.Rating;
 
 /** 相机与 HUD 域（C3 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，全仓 `PlayState.*` 调用点零改动。
@@ -241,5 +244,186 @@ class CameraHudDomain
 		ps.setOnScripts('rating', ps.ratingPercent);
 		ps.setOnScripts('ratingName', ps.ratingName);
 		ps.setOnScripts('ratingFC', ps.ratingFC);
+	}
+
+	/** 原 PlayState.updateScore（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function updateScore(ps:PlayState, miss:Bool = false)
+	{
+		if(ps.totalPlayed != 0)
+		{
+			var percent:Float = CoolUtil.floorDecimal(ps.ratingPercent * 100, 2);
+		}
+
+		ps.scoreTxt.text = ps.buildScoreText();
+
+		// 字体：文本含中文 → 自动用 future（含中文字形）；否则用设置里的字体
+		var fontPath:String;
+		if (ps.containsChinese(ps.scoreTxt.text))
+			fontPath = Paths.font('future.ttf');
+		else if (ClientPrefs.data.scoreTxtFont == 'Bahnschrift')
+			fontPath = Paths.font('bahnschrift.ttf');
+		else
+			fontPath = Paths.font('vcr.ttf');
+
+		var txtColor:FlxColor = FlxColor.WHITE;
+		if (ps.health <= 0.4) txtColor = FlxColor.RED;
+		else if (ps.health >= 1.55) txtColor = FlxColor.LIME;
+
+		ps.scoreTxt.setFormat(fontPath, 15, txtColor, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		ps.scoreTxt.borderSize = 1.25;
+		ps.callOnScripts('onUpdateScore', [miss]);
+	}
+
+	/** 原 PlayState.moveCamera（作用域分析：零遮蔽，23 处成员引用已限定）。 */
+	public static function moveCamera(ps:PlayState, isDad:Bool)
+	{
+		if(isDad)
+		{
+			ps.camFollow.setPosition(ps.dad.getMidpoint().x + 150, ps.dad.getMidpoint().y - 100);
+			ps.camFollow.x += ps.dad.cameraPosition[0] + ps.opponentCameraOffset[0];
+			ps.camFollow.y += ps.dad.cameraPosition[1] + ps.opponentCameraOffset[1];
+			ps.tweenCamIn();
+		}
+		else
+		{
+			ps.camFollow.setPosition(ps.boyfriend.getMidpoint().x - 100, ps.boyfriend.getMidpoint().y - 100);
+			ps.camFollow.x -= ps.boyfriend.cameraPosition[0] - ps.boyfriendCameraOffset[0];
+			ps.camFollow.y += ps.boyfriend.cameraPosition[1] + ps.boyfriendCameraOffset[1];
+
+			if (Paths.formatToSongPath(PlayState.SONG.song) == 'tutorial' && ps.cameraTwn == null && FlxG.camera.zoom != 1)
+			{
+				ps.cameraTwn = FlxTween.tween(FlxG.camera, {zoom: 1}, (Conductor.stepCrochet * 4 / 1000), {ease: FlxEase.elasticInOut, onComplete:
+					function (twn:FlxTween)
+					{
+						ps.cameraTwn = null;
+					}
+				});
+			}
+		}
+	}
+
+	/** 原 PlayState.moveCameraSection（作用域分析：零遮蔽，19 处成员引用已限定）。 */
+	public static function moveCameraSection(ps:PlayState, ?sec:Null<Int>):Void
+	{
+		if(sec == null) sec = ps.curSection;
+		if(sec < 0) sec = 0;
+
+		if(PlayState.SONG.notes[sec] == null) return;
+
+		if (ps.gf != null && PlayState.SONG.notes[sec].gfSection)
+		{
+			ps.camFollow.setPosition(ps.gf.getMidpoint().x, ps.gf.getMidpoint().y);
+			ps.camFollow.x += ps.gf.cameraPosition[0] + ps.girlfriendCameraOffset[0];
+			ps.camFollow.y += ps.gf.cameraPosition[1] + ps.girlfriendCameraOffset[1];
+			ps.tweenCamIn();
+			ps.callOnScripts('onMoveCamera', ['gf']);
+			return;
+		}
+
+		// 联机真双人-客户端镜像：本端演唱半边与谱面 mustHitSection 相反（客户端唱 Dad 半边），
+		// 反转 isDad，保证相机跟随「本屏当前演唱的角色」（房主端不变）。
+		var isDad:Bool = (PlayState.SONG.notes[sec].mustHitSection != true) != ps.onlineMirror;
+		ps.moveCamera(isDad);
+		ps.callOnScripts('onMoveCamera', [isDad ? 'dad' : 'boyfriend']);
+	}
+
+	/** 原 PlayState.buildScoreText（作用域分析：零遮蔽，9 处成员引用已限定）。 */
+	public static function buildScoreText(ps:PlayState):String
+	{
+		var fmt:String = ClientPrefs.data.scoreTxtFormat;
+		// 兼容旧“显示NPS”开关：开启且格式里没写 {nps} 时，自动在 {fc} 后追加
+		if (ClientPrefs.data.showNPS && fmt.indexOf('{nps}') == -1)
+			fmt = StringTools.replace(fmt, '{fc}', '{fc} | NPS: {nps}');
+
+		var acc:String = Std.string(CoolUtil.floorDecimal(ps.ratingPercent * 100, 2));
+		// health 范围 0~2（默认 1 = 50%），换算成 0%~100%；
+		// 开启「血条溢出图标飞出」时改用显示级 healthDisplayPct（音符爆发可冲到 1000%，随后回落到真实血量）
+		var healthVal:Float = ClientPrefs.data.iconFlyOverflow ? ps.healthDisplayPct : (ps.health / 2 * 100);
+		var healthPct:String = Std.string(Math.round(healthVal)) + '%';
+		return fmt
+			.replace('{score}', Std.string(ps.songScore))
+			.replace('{misses}', Std.string(ps.songMisses))
+			.replace('{rank}', ps.ratingName)
+			.replace('{accuracy}', acc)
+			.replace('{nps}', Std.string(ps.npsDisplay))
+			.replace('{fc}', ps.ratingFC)
+			.replace('{combo}', Std.string(ps.combo))
+			.replace('{health}', healthPct);
+	}
+
+	/** 原 PlayState.hudGetOffset（作用域分析：零遮蔽，0 处成员引用已限定）。 */
+	public static function hudGetOffset(ps:PlayState, id:String):Array<Float>
+	{
+		// 防御：旧存档/异常数据下 hudLayout 可能是 null 或 haxe.Json 还原的匿名对象
+		// （Map 经 JSON 往返后 .exists()/.get() 会抛 Null Object Reference）——
+		// 任何异常都回退默认 [0,0]，绝不因布局数据拖垮整局
+		var layout:Dynamic = ClientPrefs.data.hudLayout;
+		if (layout != null)
+		{
+			try
+			{
+				if (layout.exists(id)) return cast layout.get(id);
+			}
+			catch (e:Dynamic) {}
+		}
+		var arr:Array<Float> = [0, 0];
+		if (layout != null)
+		{
+			try { layout.set(id, arr); } catch (e:Dynamic) {}
+		}
+		return arr;
+	}
+
+	/** 原 PlayState.judgeRatingKE（作用域分析：零遮蔽，10 处成员引用已限定）。 */
+	public static function judgeRatingKE(ps:PlayState, note:Note):Rating
+	{
+		// botplay 命中时刻由其排期时刻定义（=音符自身 strumTime），帧延迟/批量弹出不影响评级
+		var signedDiff:Float = ps.cpuControlled ? 0 : (note.strumTime - Conductor.songPosition);
+		var timeScale:Float = Conductor.safeZoneOffset / 166;
+		var off:Int = ClientPrefs.data.marvelousJudgement ? 1 : 0;
+
+		// Marvelous：比 Sick 更严（窗口 = Sick 的一半）
+		if (off == 1 && Math.abs(signedDiff) <= ps.ratingsData[0].hitWindow * timeScale)
+			return ps.ratingsData[0];
+
+		if (signedDiff > 135 * timeScale) return ps.ratingsData[off + 3]; // way early
+		if (signedDiff > 90 * timeScale) return ps.ratingsData[off + 2]; // early
+		if (signedDiff > 45 * timeScale) return ps.ratingsData[off + 1]; // kinda there
+		if (signedDiff < -45 * timeScale) return ps.ratingsData[off + 1]; // little late
+		if (signedDiff < -90 * timeScale) return ps.ratingsData[off + 2]; // late
+		if (signedDiff < -135 * timeScale) return ps.ratingsData[off + 3]; // late as fuck
+		return ps.ratingsData[off]; // sick（marvelous 窗口外）
+	}
+
+	/** 原 PlayState.cachePopUpScore（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function cachePopUpScore(ps:PlayState)
+	{
+		var uiPrefix:String = '';
+		var uiSuffix:String = '';
+		if (PlayState.stageUI != "normal")
+		{
+			uiPrefix = '${PlayState.stageUI}UI/';
+			if (PlayState.isPixelStage) uiSuffix = '-pixel';
+		}
+
+		for (rating in ps.ratingsData)
+			Paths.image(uiPrefix + rating.image + uiSuffix);
+		for (i in 0...10)
+			Paths.image(uiPrefix + 'num' + i + uiSuffix);
+	}
+
+	/** 原 PlayState.refreshOppHealthFill（作用域分析：零遮蔽，7 处成员引用已限定）。 */
+	public static function refreshOppHealthFill(ps:PlayState):Void
+	{
+		if (ps.onlineOppHealthFill == null) return;
+		var pct:Float = FlxMath.bound(ps.onlineOppHealth, 0, 2) / 2;
+		var newW:Int = Std.int(ps.onlineOppBarW * pct);
+		if (newW <= 0)
+		{
+			ps.onlineOppHealthFill.visible = false;
+			return;
+		}
+		ps.onlineOppHealthFill.visible = true;
+		ps.onlineOppHealthFill.makeGraphic(newW, Std.int(ps.onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
 	}
 }

@@ -26,6 +26,7 @@ import backend.Section.SwagSection;
 import objects.Character;
 import backend.Multiplayer;
 import backend.Rating;
+import objects.NoteSplash;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -852,6 +853,201 @@ class NoteChartDomain
 				ps.notes.invalidateNote(daNote);
 			}
 			--i;
+		}
+	}
+
+	/** 原 PlayState.onlineOppHitVisual（作用域分析：零遮蔽，8 处成员引用已限定）。 */
+	public static function onlineOppHitVisual(ps:PlayState, data:Int, seq:Int):Void
+	{
+		var note:Note = ps.findOnlineOppNoteBySeq(seq);
+		if (note != null)
+		{
+			note.wasGoodHit = true;
+			note.active = false;
+			note.visible = false;
+			ps.notes.invalidateNote(note);
+			// 同簇视觉副本一并销毁（与玩家侧 processBotHits 一致，避免副本飞过判定线滞留）
+			if (note.chartSeq >= 0)
+			{
+				var i:Int = ps.notes.members.length - 1;
+				while (i >= 0)
+				{
+					var sib:Note = ps.notes.members[i];
+					if (sib != null && sib != note && sib.blockHit && sib.ignoreNote && sib.chartSeq == note.chartSeq)
+						ps.notes.invalidateNote(sib);
+					i--;
+				}
+			}
+		}
+		ps.playOnlineOppSing(data, note);
+		if (ps.opponentVocals != null) ps.opponentVocals.volume = 1;
+	}
+
+	/** 原 PlayState.checkEventNote（作用域分析：零遮蔽，10 处成员引用已限定）。 */
+	public static function checkEventNote(ps:PlayState)
+	{
+		if (ps.rewinding) return; // 回溯中不触发谱面事件
+		while(ps.eventNotes.length > 0) {
+			var leStrumTime:Float = ps.eventNotes[0].strumTime;
+			if(Conductor.songPosition < leStrumTime) {
+				return;
+			}
+
+			var value1:String = '';
+			if(ps.eventNotes[0].value1 != null)
+				value1 = ps.eventNotes[0].value1;
+
+			var value2:String = '';
+			if(ps.eventNotes[0].value2 != null)
+				value2 = ps.eventNotes[0].value2;
+
+			ps.triggerEvent(ps.eventNotes[0].event, value1, value2, leStrumTime);
+			ps.eventNotes.shift();
+		}
+	}
+
+	/** 原 PlayState.releaseConsumedNotes（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function releaseConsumedNotes(ps:PlayState):Void
+	{
+		#if !android
+		if (ps.currentSpawnId < ps.lastSpawnGc) ps.lastSpawnGc = ps.currentSpawnId;
+		if (ps.currentSpawnId - ps.lastSpawnGc >= 2048)
+		{
+			var gi:Int = ps.lastSpawnGc;
+			while (gi < ps.currentSpawnId)
+			{
+				ps.unspawnNotes[gi] = null;
+				gi++;
+			}
+			ps.lastSpawnGc = ps.currentSpawnId;
+		}
+		#end
+	}
+
+	/** 原 PlayState.applyOppMiss（作用域分析：零遮蔽，12 处成员引用已限定）。 */
+	public static function applyOppMiss(ps:PlayState, data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
+	{
+		ps.onlineOppScore += scoreDelta;
+		ps.onlineOppMisses += mult;
+		ps.onlineOppTotalPlayed += mult;
+		ps.onlineOppCombo = 0;
+		ps.onlineOppHealth = FlxMath.bound(ps.onlineOppHealth + healthDelta, 0, 2);
+		// 攻防式：对方 Miss → 我方按比例回血
+		if (healthDelta < 0)
+			ps.health = FlxMath.bound(ps.health + (-healthDelta) * PlayState.ONLINE_OPP_MISS_GAIN, 0, 2);
+		ps.flashOppStrums(data, 'static', false);
+		// 真双人：对方 Miss —— 对侧音符不消费（自然飞过判定线，由回收窗清理），
+		// 仅播放对方角色 Miss 动画 + 对方人声静音
+		ps.playOnlineOppMiss(data, ps.findOnlineOppNoteBySeq(seq));
+	}
+
+	/** 原 PlayState.spawnNoteSplash（作用域分析：零遮蔽，7 处成员引用已限定）。 */
+	public static function spawnNoteSplash(ps:PlayState, x:Float, y:Float, data:Int, ?note:Note = null)
+	{
+		// 【视觉/性能】密集谱自动游玩：每轨 250ms 最多 1 次溅射。原实现 botHitBatch 只限
+		// "每帧每轨 1 个"——700fps 下每秒最多 2800 个、同屏上千个溅射精灵：既是"五颜六色"
+		// 乱象，也是密集段渲染/更新的大头。节流后每轨约 2~4 个/秒，观感恢复正常。
+		if (PlayState.densePerfMode && (ps.cpuControlled || ps.replayMode) && data >= 0 && data < 4)
+		{
+			var nowSplash:Float = Conductor.songPosition;
+			if (nowSplash - ps.lastSplashLane[data] < 250) return;
+			ps.lastSplashLane[data] = nowSplash;
+		}
+		var splash:NoteSplash = ps.grpNoteSplashes.recycle(NoteSplash);
+		splash.setupNoteSplash(x, y, data, note);
+		ps.grpNoteSplashes.add(splash);
+	}
+
+	/** 原 PlayState.releaseSongChartDom（作用域分析：零遮蔽，9 处成员引用已限定）。 */
+	public static function releaseSongChartDom():Void
+	{
+		#if desktop
+		if (PlayState.SONG != null && PlayState.chartJsonInput != null && PlayState.chartSongName == PlayState.SONG.song)
+		{
+			if (!PlayState.chartDataStripped)
+			{
+				Song.stripSectionNotes(PlayState.SONG);
+				PlayState.chartDataStripped = true;
+			}
+			Song.evictLargeChartFromCache(PlayState.chartJsonInput, PlayState.chartFolder);
+		}
+		#end
+	}
+
+	/** 原 PlayState.applyOppHit（作用域分析：零遮蔽，17 处成员引用已限定）。 */
+	public static function applyOppHit(ps:PlayState, data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
+	{
+		ps.onlineOppScore += scoreDelta;
+		ps.onlineOppCombo += mult;
+		if (ps.onlineOppCombo > ps.onlineOppMaxCombo) ps.onlineOppMaxCombo = ps.onlineOppCombo;
+		ps.onlineOppHits += mult;
+		ps.onlineOppTotalPlayed += mult;
+		ps.onlineOppTotalNotesHit += ps.getRatingModByName(rating) * mult;
+		ps.onlineOppRatings.set(rating, (ps.onlineOppRatings.exists(rating) ? ps.onlineOppRatings.get(rating) : 0) + mult);
+		ps.onlineOppHealth = FlxMath.bound(ps.onlineOppHealth + healthDelta, 0, 2);
+		ps.flashOppStrums(data, 'confirm', true);
+		// 真双人：对侧谱面由对方按键打击——按 chartSeq 消费对侧音符 + 对方角色唱歌 + 对方人声响起
+		ps.onlineOppHitVisual(data, seq);
+	}
+
+	/** 原 PlayState.strumPlayAnim（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function strumPlayAnim(ps:PlayState, isDad:Bool, id:Int, time:Float)
+	{
+		var spr:StrumNote = null;
+		if(isDad) {
+			spr = ps.opponentStrums.members[id];
+		} else {
+			spr = ps.playerStrums.members[id];
+		}
+
+		if(spr != null) {
+			spr.playAnim('confirm', true);
+			spr.resetAnim = time;
+		}
+	}
+
+	/** 原 PlayState.findOnlineOppNoteBySeq（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function findOnlineOppNoteBySeq(ps:PlayState, seq:Int):Note
+	{
+		if (seq < 0 || seq >= Note.seqNote.length) return null;
+		var n:Note = Note.seqNote[seq];
+		if (n != null && n.alive && n.exists && !n.blockHit) return n;
+		// seqNote 可能被同 chartSeq 的视觉副本（blockHit）覆盖：回退扫描基准音符
+		var found:Note = null;
+		if (ps.notes != null)
+			ps.notes.forEachAlive(function(c:Note) {
+				if (found == null && c.chartSeq == seq && !c.blockHit) found = c;
+			});
+		return found;
+	}
+
+	/** 原 PlayState.KillNotes（作用域分析：零遮蔽，8 处成员引用已限定）。 */
+	public static function KillNotes(ps:PlayState)
+	{
+		ps.botHitQueue.resize(0); // 丢弃待批处理的命中，避免引用已销毁音符
+		while(ps.notes.length > 0) {
+			var daNote:Note = ps.notes.members[0];
+			ps.notes.invalidateNote(daNote); // 池化回收（替代直接 destroy）
+		}
+		ps.unspawnNotes = [];
+		ps.currentSpawnId = 0;
+		PlayState.spamNotes = [];
+		Note.seqNote = [];
+		Note.seqHit = [];
+		ps.eventNotes = [];
+	}
+
+	/** 原 PlayState.rebuildNoteTypePaths（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function rebuildNoteTypePaths(ps:PlayState):Void
+	{
+		ps.noteTypeLuaPaths = [];
+		ps.noteTypeHxPaths = [];
+		for (nt in ps.noteTypes)
+		{
+			if (nt == null || nt.length < 1) continue;
+			var path:String = 'custom_notetypes/' + nt;
+			ps.noteTypeLuaPaths.push(path + '.lua');
+			ps.noteTypeHxPaths.push(path + '.hx');
 		}
 	}
 }

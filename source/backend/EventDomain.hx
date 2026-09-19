@@ -6,6 +6,11 @@ import backend.BaseStage;
 import backend.MusicBeatState;
 import objects.Note.EventNote;
 import states.PlayState;
+import backend.Paths;
+import backend.Controls;
+import flixel.input.keyboard.FlxKey;
+import backend.ClientPrefs;
+import psychlua.FunkinLua;
 
 /** 事件调度域（C4 首批迁出，7 个零遮蔽函数中的 5 个）。
  *  PlayState 保留同签名转发入口，全仓调用点零改动。
@@ -70,4 +75,67 @@ class EventDomain
 	}
 	#end
 
+	/** 原 PlayState.cacheCountdown（作用域分析：零遮蔽，13 处成员引用已限定）。 */
+	public static function cacheCountdown(ps:PlayState)
+	{
+		var introAssets:Map<String, Array<String>> = new Map<String, Array<String>>();
+		var introImagesArray:Array<String> = switch(PlayState.stageUI) {
+			case "pixel": ['${PlayState.stageUI}UI/ready-pixel', '${PlayState.stageUI}UI/set-pixel', '${PlayState.stageUI}UI/date-pixel'];
+			case "normal": ["ready", "set" ,"go"];
+			default: ['${PlayState.stageUI}UI/ready', '${PlayState.stageUI}UI/set', '${PlayState.stageUI}UI/go'];
+		}
+		introAssets.set(PlayState.stageUI, introImagesArray);
+		var introAlts:Array<String> = introAssets.get(PlayState.stageUI);
+		for (asset in introAlts) Paths.image(asset);
+
+		Paths.sound('intro3' + ps.introSoundsSuffix);
+		Paths.sound('intro2' + ps.introSoundsSuffix);
+		Paths.sound('intro1' + ps.introSoundsSuffix);
+		Paths.sound('introGo' + ps.introSoundsSuffix);
+	}
+
+	/** 原 PlayState.getKeyFromEvent（作用域分析：零遮蔽，0 处成员引用已限定）。 */
+	public static function getKeyFromEvent(arr:Array<String>, key:FlxKey):Int
+	{
+		if(key != NONE)
+		{
+			for (i in 0...arr.length)
+			{
+				var note:Array<FlxKey> = Controls.instance.keyboardBinds[arr[i]];
+				for (noteKey in note)
+					if(key == noteKey)
+						return i;
+			}
+		}
+		return -1;
+	}
+
+	/** 原 PlayState.makeEvent（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function makeEvent(ps:PlayState, event:Array<Dynamic>, i:Int)
+	{
+		var subEvent:EventNote = {
+			strumTime: event[0] + ClientPrefs.data.noteOffset,
+			event: event[1][i][0],
+			value1: event[1][i][1],
+			value2: event[1][i][2]
+		};
+		ps.eventNotes.push(subEvent);
+		ps.eventPushed(subEvent);
+		ps.callOnScripts('onEventPushed', [subEvent.event, subEvent.value1 != null ? subEvent.value1 : '', subEvent.value2 != null ? subEvent.value2 : '', subEvent.strumTime]);
+	}
+
+	/** 原 PlayState.eventEarlyTrigger（作用域分析：零遮蔽，1 处成员引用已限定）。 */
+	public static function eventEarlyTrigger(ps:PlayState, event:EventNote):Float
+	{
+		var returnedValue:Null<Float> = ps.callOnScripts('eventEarlyTrigger', [event.event, event.value1, event.value2, event.strumTime], true, [], [0]);
+		if(returnedValue != null && returnedValue != 0 && returnedValue != FunkinLua.Function_Continue) {
+			return returnedValue;
+		}
+
+		switch(event.event) {
+			case 'Kill Henchmen': //Better timing so that the kill sound matches the beat intended
+				return 280; //Plays 280ms before the actual position
+		}
+		return 0;
+	}
 }

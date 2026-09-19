@@ -31,6 +31,9 @@ import backend.Multiplayer;
 import substates.PauseSubState;
 import cne.CneScriptCompat;
 import psychlua.HScript;
+import backend.TurboDensity;
+import backend.TurboDensity.TurboZone;
+import flixel.addons.display.FlxRuntimeShader;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -795,5 +798,183 @@ class HostDomain
 				ps.hscriptArray.remove(newScript);
 			}
 		}
+	}
+
+	/** 原 PlayState.resyncVocals（作用域分析：零遮蔽，13 处成员引用已限定）。 */
+	public static function resyncVocals(ps:PlayState):Void
+	{
+		if(ps.finishTimer != null) return;
+		// 【Obsolescence-spam 0:00 卡死根因修复】空/流式不可用音频（music.length<=0）时，
+		// music.time 恒为 0：若仍用 music.time 回写 songPosition，每次 stepHit 的漂移检测
+		// （|0 - songPos| > 20ms）都会把歌曲时钟拉回 0 → 音符永不生成、HUD 恒 0:00。
+		// 无音频可同步时只做音量/人声恢复，绝不动歌曲时钟（结算由 update 时间轴兜底）。
+		if (FlxG.sound.music == null || FlxG.sound.music.length <= 0) return;
+
+		ps.vocals.pause();
+		ps.opponentVocals.pause();
+
+		FlxG.sound.music.play();
+		FlxG.sound.music.pitch = ps.playbackRate;
+		Conductor.syncToMusic();
+		if (Conductor.songPosition <= ps.vocals.length)
+		{
+			ps.vocals.time = Conductor.songPosition;
+			ps.opponentVocals.time = Conductor.songPosition;
+			ps.vocals.pitch = ps.playbackRate;
+			ps.opponentVocals.pitch = ps.playbackRate;
+		}
+		ps.vocals.play();
+		ps.opponentVocals.play();
+	}
+
+	/** 原 PlayState.initTurboZones（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function initTurboZones(ps:PlayState):Void
+	{
+		try
+		{
+			var meta:Dynamic = {
+				song: PlayState.SONG != null ? PlayState.SONG.song : '',
+				mod: (backend.Mods.currentModDirectory != null ? backend.Mods.currentModDirectory : ''),
+				notes: ps.unspawnNotes != null ? ps.unspawnNotes.length : 0,
+				fingerprint: TurboDensity.chartFingerprint(ps.unspawnNotes)
+			};
+			var path:String = TurboDensity.cachePath(meta.song, meta.mod, ps.unspawnNotes);
+			var cached:Array<TurboZone> = TurboDensity.loadCache(path, meta);
+			if (cached != null)
+			{
+				ps.turboZones = cached;
+				return;
+			}
+			ps.turboZones = TurboDensity.buildZones(ps.unspawnNotes);
+			TurboDensity.saveCache(path, ps.turboZones, meta);
+		}
+		catch (e:Dynamic)
+		{
+			ps.turboZones = [];
+		}
+	}
+
+	/** 原 PlayState.setSongTime（作用域分析：零遮蔽，12 处成员引用已限定）。 */
+	public static function setSongTime(ps:PlayState, time:Float)
+	{
+		if(time < 0) time = 0;
+
+		FlxG.sound.music.pause();
+		ps.vocals.pause();
+		ps.opponentVocals.pause();
+
+		FlxG.sound.music.time = time;
+		FlxG.sound.music.pitch = ps.playbackRate;
+		FlxG.sound.music.play();
+
+		if (Conductor.songPosition <= ps.vocals.length)
+		{
+			ps.vocals.time = time;
+			ps.opponentVocals.time = time;
+			ps.vocals.pitch = ps.playbackRate;
+			ps.opponentVocals.pitch = ps.playbackRate;
+		}
+		ps.vocals.play();
+		ps.opponentVocals.play();
+		Conductor.setPosition(time);
+	}
+
+	/** 原 PlayState.startLuasNamed（作用域分析：零遮蔽，1 处成员引用已限定）。 */
+	public static function startLuasNamed(ps:PlayState, luaFile:String):Bool
+	{
+		#if MODS_ALLOWED
+		var luaToLoad:String = Paths.modFolders(luaFile);
+		if(!FileSystem.exists(luaToLoad))
+			luaToLoad = Paths.getPreloadPath(luaFile);
+
+		if(FileSystem.exists(luaToLoad))
+		#elseif sys
+		var luaToLoad:String = Paths.getPreloadPath(luaFile);
+		if(OpenFlAssets.exists(luaToLoad))
+		#end
+		{
+			for (script in ps.luaArray)
+				if(script.scriptName == luaToLoad) return false;
+
+			new FunkinLua(luaToLoad);
+			return true;
+		}
+		return false;
+	}
+
+	/** 原 PlayState.createRuntimeShader（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function createRuntimeShader(ps:PlayState, name:String):FlxRuntimeShader
+	{
+		if(!ClientPrefs.data.shaders) return new FlxRuntimeShader();
+
+		#if (!flash && MODS_ALLOWED && sys)
+		if(!ps.runtimeShaders.exists(name) && !ps.initLuaShader(name))
+		{
+			FlxG.log.warn('Shader $name is missing!');
+			return new FlxRuntimeShader();
+		}
+
+		backend.CrashHandler.logEvent('createRuntimeShader: ' + name);
+		var arr:Array<String> = ps.runtimeShaders.get(name);
+		return new FlxRuntimeShader(arr[0], arr[1]);
+		#else
+		FlxG.log.warn("Platform unsupported for Runtime Shaders!");
+		return null;
+		#end
+	}
+
+	/** 原 PlayState.finishSong（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function finishSong(ps:PlayState, ?ignoreNoteOffset:Bool = false):Void
+	{
+		if (ps.endingSong || ps.finishingSong) return; // 防重入：哑谱自动结算与空音频 onComplete / 延迟窗口内的重复触发
+		ps.finishingSong = true;
+		ps.updateTime = false;
+		FlxG.sound.music.volume = 0;
+		ps.vocals.volume = 0;
+		ps.vocals.pause();
+		ps.opponentVocals.volume = 0;
+		ps.opponentVocals.pause();
+		if(ClientPrefs.data.noteOffset <= 0 || ignoreNoteOffset) {
+			ps.endCallback();
+		} else {
+			ps.finishTimer = new FlxTimer().start(ClientPrefs.data.noteOffset / 1000, function(tmr:FlxTimer) {
+				ps.endCallback();
+			});
+		}
+	}
+
+	/** 原 PlayState.destroyAllCharacters（作用域分析：零遮蔽，6 处成员引用已限定）。 */
+	public static function destroyAllCharacters(ps:PlayState):Void
+	{
+		for (group in [ps.boyfriendGroup, ps.dadGroup, ps.gfGroup])
+		{
+			if (group == null) continue;
+			for (member in group.members.copy())
+			{
+				if (member == null || !Std.isOfType(member, Character)) continue;
+				group.remove(member, true);
+				cast(member, Character).destroy();
+			}
+		}
+		ps.boyfriendMap.clear();
+		ps.dadMap.clear();
+		ps.gfMap.clear();
+	}
+
+	/** 原 PlayState.startHScriptsNamed（作用域分析：零遮蔽，1 处成员引用已限定）。 */
+	public static function startHScriptsNamed(ps:PlayState, scriptFile:String):Bool
+	{
+		var scriptToLoad:String = Paths.modFolders(scriptFile);
+		if(!FileSystem.exists(scriptToLoad))
+			scriptToLoad = Paths.getPreloadPath(scriptFile);
+
+		if(FileSystem.exists(scriptToLoad))
+		{
+			if (SScript.global.exists(scriptToLoad)) return false;
+
+			ps.initHScript(scriptToLoad);
+			return true;
+		}
+		return false;
 	}
 }

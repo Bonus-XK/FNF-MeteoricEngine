@@ -270,20 +270,7 @@ class PlayState extends MusicBeatState
 
 	// create 尾 / 重开收尾共用：剥离 SONG 逐音符 DOM + 淘汰大谱面缓存副本
 	// （Flocc 级：两份 DOM 全释放后，游玩稳态只剩 CastNote + 音频 + 基线，≈400MB）
-	static function releaseSongChartDom():Void
-	{
-		#if desktop
-		if (SONG != null && chartJsonInput != null && chartSongName == SONG.song)
-		{
-			if (!chartDataStripped)
-			{
-				Song.stripSectionNotes(SONG);
-				chartDataStripped = true;
-			}
-			Song.evictLargeChartFromCache(chartJsonInput, chartFolder);
-		}
-		#end
-	}
+	static function releaseSongChartDom():Void NoteChartDomain.releaseSongChartDom();
 
 	public var spawnTime:Float = 2000;
 
@@ -1343,23 +1330,7 @@ class PlayState extends MusicBeatState
 	public var countdownGo:FlxSprite;
 	public static var startOnTime:Float = 0;
 
-	function cacheCountdown()
-	{
-		var introAssets:Map<String, Array<String>> = new Map<String, Array<String>>();
-		var introImagesArray:Array<String> = switch(stageUI) {
-			case "pixel": ['${stageUI}UI/ready-pixel', '${stageUI}UI/set-pixel', '${stageUI}UI/date-pixel'];
-			case "normal": ["ready", "set" ,"go"];
-			default: ['${stageUI}UI/ready', '${stageUI}UI/set', '${stageUI}UI/go'];
-		}
-		introAssets.set(stageUI, introImagesArray);
-		var introAlts:Array<String> = introAssets.get(stageUI);
-		for (asset in introAlts) Paths.image(asset);
-		
-		Paths.sound('intro3' + introSoundsSuffix);
-		Paths.sound('intro2' + introSoundsSuffix);
-		Paths.sound('intro1' + introSoundsSuffix);
-		Paths.sound('introGo' + introSoundsSuffix);
-	}
+	function cacheCountdown() EventDomain.cacheCountdown(this);
 
 	public function startCountdown()
 	{
@@ -1516,32 +1487,7 @@ class PlayState extends MusicBeatState
 
 	public function clearNotesBefore(time:Float) NoteChartDomain.clearNotesBefore(this, time);
 
-	public function updateScore(miss:Bool = false)
-	{
-		if(totalPlayed != 0)
-		{
-			var percent:Float = CoolUtil.floorDecimal(ratingPercent * 100, 2);
-		}
-
-		scoreTxt.text = buildScoreText();
-
-		// 字体：文本含中文 → 自动用 future（含中文字形）；否则用设置里的字体
-		var fontPath:String;
-		if (containsChinese(scoreTxt.text))
-			fontPath = Paths.font('future.ttf');
-		else if (ClientPrefs.data.scoreTxtFont == 'Bahnschrift')
-			fontPath = Paths.font('bahnschrift.ttf');
-		else
-			fontPath = Paths.font('vcr.ttf');
-
-		var txtColor:FlxColor = FlxColor.WHITE;
-		if (health <= 0.4) txtColor = FlxColor.RED;
-		else if (health >= 1.55) txtColor = FlxColor.LIME;
-
-		scoreTxt.setFormat(fontPath, 15, txtColor, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		scoreTxt.borderSize = 1.25;
-		callOnScripts('onUpdateScore', [miss]);
-	}
+	public function updateScore(miss:Bool = false) CameraHudDomain.updateScore(this, miss);
 
 	// 是否含 CJK 汉字（用于 scoreTxt 中文字体自动切换）
 	function containsChinese(s:String):Bool
@@ -1559,52 +1505,9 @@ class PlayState extends MusicBeatState
 	// 可用变量：
 	//   {score} 分数 | {misses} Miss数 | {rank} 评级 | {accuracy} 准度(纯数字，%自己加)
 	//   {nps} 每秒音符数 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比
-	function buildScoreText():String
-	{
-		var fmt:String = ClientPrefs.data.scoreTxtFormat;
-		// 兼容旧“显示NPS”开关：开启且格式里没写 {nps} 时，自动在 {fc} 后追加
-		if (ClientPrefs.data.showNPS && fmt.indexOf('{nps}') == -1)
-			fmt = StringTools.replace(fmt, '{fc}', '{fc} | NPS: {nps}');
+	function buildScoreText():String return CameraHudDomain.buildScoreText(this);
 
-		var acc:String = Std.string(CoolUtil.floorDecimal(ratingPercent * 100, 2));
-		// health 范围 0~2（默认 1 = 50%），换算成 0%~100%；
-		// 开启「血条溢出图标飞出」时改用显示级 healthDisplayPct（音符爆发可冲到 1000%，随后回落到真实血量）
-		var healthVal:Float = ClientPrefs.data.iconFlyOverflow ? healthDisplayPct : (health / 2 * 100);
-		var healthPct:String = Std.string(Math.round(healthVal)) + '%';
-		return fmt
-			.replace('{score}', Std.string(songScore))
-			.replace('{misses}', Std.string(songMisses))
-			.replace('{rank}', ratingName)
-			.replace('{accuracy}', acc)
-			.replace('{nps}', Std.string(npsDisplay))
-			.replace('{fc}', ratingFC)
-			.replace('{combo}', Std.string(combo))
-			.replace('{health}', healthPct);
-	}
-
-	public function setSongTime(time:Float)
-	{
-		if(time < 0) time = 0;
-
-		FlxG.sound.music.pause();
-		vocals.pause();
-		opponentVocals.pause();
-
-		FlxG.sound.music.time = time;
-		FlxG.sound.music.pitch = playbackRate;
-		FlxG.sound.music.play();
-
-		if (Conductor.songPosition <= vocals.length)
-		{
-			vocals.time = time;
-			opponentVocals.time = time;
-			vocals.pitch = playbackRate;
-			opponentVocals.pitch = playbackRate;
-		}
-		vocals.play();
-		opponentVocals.play();
-		Conductor.setPosition(time);
-	}
+	public function setSongTime(time:Float) HostDomain.setSongTime(this, time);
 
 	public function startNextDialogue() EventDomain.startNextDialogue(this);
 
@@ -2065,18 +1968,7 @@ class PlayState extends MusicBeatState
 	}
 
 	// 谱面生成期即拼接完整脚本路径（create 后期才拼接会读到 GC 后悬垂的字符串）
-	inline function rebuildNoteTypePaths():Void
-	{
-		noteTypeLuaPaths = [];
-		noteTypeHxPaths = [];
-		for (nt in noteTypes)
-		{
-			if (nt == null || nt.length < 1) continue;
-			var path:String = 'custom_notetypes/' + nt;
-			noteTypeLuaPaths.push(path + '.lua');
-			noteTypeHxPaths.push(path + '.hx');
-		}
-	}
+	inline function rebuildNoteTypePaths():Void NoteChartDomain.rebuildNoteTypePaths(this);
 
 	private function generateChartNotes(loadPhase:Bool):Void NoteChartDomain.generateChartNotes(this, loadPhase);
 
@@ -2109,59 +2001,17 @@ class PlayState extends MusicBeatState
 		stagesFunc(function(stage:BaseStage) stage.eventPushedUnique(event));
 	}
 
-	function eventEarlyTrigger(event:EventNote):Float {
-		var returnedValue:Null<Float> = callOnScripts('eventEarlyTrigger', [event.event, event.value1, event.value2, event.strumTime], true, [], [0]);
-		if(returnedValue != null && returnedValue != 0 && returnedValue != FunkinLua.Function_Continue) {
-			return returnedValue;
-		}
-
-		switch(event.event) {
-			case 'Kill Henchmen': //Better timing so that the kill sound matches the beat intended
-				return 280; //Plays 280ms before the actual position
-		}
-		return 0;
-	}
+	function eventEarlyTrigger(event:EventNote):Float return EventDomain.eventEarlyTrigger(this, event);
 
 	public static function sortByTime(Obj1:Dynamic, Obj2:Dynamic):Int
 		return FlxSort.byValues(FlxSort.ASCENDING, Obj1.strumTime, Obj2.strumTime);
 
-	function makeEvent(event:Array<Dynamic>, i:Int)
-	{
-		var subEvent:EventNote = {
-			strumTime: event[0] + ClientPrefs.data.noteOffset,
-			event: event[1][i][0],
-			value1: event[1][i][1],
-			value2: event[1][i][2]
-		};
-		eventNotes.push(subEvent);
-		eventPushed(subEvent);
-		callOnScripts('onEventPushed', [subEvent.event, subEvent.value1 != null ? subEvent.value1 : '', subEvent.value2 != null ? subEvent.value2 : '', subEvent.strumTime]);
-	}
+	function makeEvent(event:Array<Dynamic>, i:Int) EventDomain.makeEvent(this, event, i);
 
 	public var skipArrowStartTween:Bool = false; //for lua
 
 	// ---- 自定义界面：HUD 布局偏移 ----
-	public function hudGetOffset(id:String):Array<Float>
-	{
-		// 防御：旧存档/异常数据下 hudLayout 可能是 null 或 haxe.Json 还原的匿名对象
-		// （Map 经 JSON 往返后 .exists()/.get() 会抛 Null Object Reference）——
-		// 任何异常都回退默认 [0,0]，绝不因布局数据拖垮整局
-		var layout:Dynamic = ClientPrefs.data.hudLayout;
-		if (layout != null)
-		{
-			try
-			{
-				if (layout.exists(id)) return cast layout.get(id);
-			}
-			catch (e:Dynamic) {}
-		}
-		var arr:Array<Float> = [0, 0];
-		if (layout != null)
-		{
-			try { layout.set(id, arr); } catch (e:Dynamic) {}
-		}
-		return arr;
-	}
+	public function hudGetOffset(id:String):Array<Float> return CameraHudDomain.hudGetOffset(this, id);
 
 	// 重置某个 HUD 元素到默认位置（偏移清零并立即重排）
 	public function hudResetElement(id:String) CameraHudDomain.hudResetElement(this, id);
@@ -2280,31 +2130,7 @@ class PlayState extends MusicBeatState
 		#end
 	}
 
-	function resyncVocals():Void
-	{
-		if(finishTimer != null) return;
-		// 【Obsolescence-spam 0:00 卡死根因修复】空/流式不可用音频（music.length<=0）时，
-		// music.time 恒为 0：若仍用 music.time 回写 songPosition，每次 stepHit 的漂移检测
-		// （|0 - songPos| > 20ms）都会把歌曲时钟拉回 0 → 音符永不生成、HUD 恒 0:00。
-		// 无音频可同步时只做音量/人声恢复，绝不动歌曲时钟（结算由 update 时间轴兜底）。
-		if (FlxG.sound.music == null || FlxG.sound.music.length <= 0) return;
-
-		vocals.pause();
-		opponentVocals.pause();
-
-		FlxG.sound.music.play();
-		FlxG.sound.music.pitch = playbackRate;
-		Conductor.syncToMusic();
-		if (Conductor.songPosition <= vocals.length)
-		{
-			vocals.time = Conductor.songPosition;
-			opponentVocals.time = Conductor.songPosition;
-			vocals.pitch = playbackRate;
-			opponentVocals.pitch = playbackRate;
-		}
-		vocals.play();
-		opponentVocals.play();
-	}
+	function resyncVocals():Void HostDomain.resyncVocals(this);
 
 	public var paused:Bool = false;
 	// Meteoric：后台音频冻结标记（退后台时暂停 music/vocals/opponentVocals，回前台恢复）
@@ -2327,31 +2153,7 @@ class PlayState extends MusicBeatState
 
 	// 【Turbo】聚合区分析（含侧车缓存）：100ms 分箱 ≥4000NPS、无长条、≥500ms 的连续区间。
 	// 缓存指纹 = song|mod|数量|chartFingerprint，落盘 crash/turbo_cache/<md5>.bin。
-	function initTurboZones():Void
-	{
-		try
-		{
-			var meta:Dynamic = {
-				song: SONG != null ? SONG.song : '',
-				mod: (backend.Mods.currentModDirectory != null ? backend.Mods.currentModDirectory : ''),
-				notes: unspawnNotes != null ? unspawnNotes.length : 0,
-				fingerprint: TurboDensity.chartFingerprint(unspawnNotes)
-			};
-			var path:String = TurboDensity.cachePath(meta.song, meta.mod, unspawnNotes);
-			var cached:Array<TurboZone> = TurboDensity.loadCache(path, meta);
-			if (cached != null)
-			{
-				turboZones = cached;
-				return;
-			}
-			turboZones = TurboDensity.buildZones(unspawnNotes);
-			TurboDensity.saveCache(path, turboZones, meta);
-		}
-		catch (e:Dynamic)
-		{
-			turboZones = [];
-		}
-	}
+	function initTurboZones():Void HostDomain.initTurboZones(this);
 
 	// 【Turbo】当前 unspawn 游标是否处于聚合区（游标单调前进，O(1) 摊销）
 	inline function isTurboAggregateIndex(index:Int):Bool
@@ -2374,22 +2176,7 @@ class PlayState extends MusicBeatState
 	// 对象已不可能再被读取（二分/顺序读取均从 currentSpawnId 起步），置 null 让
 	// GC 逐段回收，避免 22 万级谱面全程持有已消费对象（GC 尖峰/内存大头之一）。
 	// 每累计 2048 条清扫一次，摊还 O(1)/音符；游标回退（重开）时自动对齐。
-	function releaseConsumedNotes():Void
-	{
-		#if !android
-		if (currentSpawnId < lastSpawnGc) lastSpawnGc = currentSpawnId;
-		if (currentSpawnId - lastSpawnGc >= 2048)
-		{
-			var gi:Int = lastSpawnGc;
-			while (gi < currentSpawnId)
-			{
-				unspawnNotes[gi] = null;
-				gi++;
-			}
-			lastSpawnGc = currentSpawnId;
-		}
-		#end
-	}
+	function releaseConsumedNotes():Void NoteChartDomain.releaseConsumedNotes(this);
 
 	function noteSpawn():Void NoteChartDomain.noteSpawn(this);
 
@@ -3152,26 +2939,7 @@ class PlayState extends MusicBeatState
 		return false;
 	}
 
-	public function checkEventNote() {
-		if (rewinding) return; // 回溯中不触发谱面事件
-		while(eventNotes.length > 0) {
-			var leStrumTime:Float = eventNotes[0].strumTime;
-			if(Conductor.songPosition < leStrumTime) {
-				return;
-			}
-
-			var value1:String = '';
-			if(eventNotes[0].value1 != null)
-				value1 = eventNotes[0].value1;
-
-			var value2:String = '';
-			if(eventNotes[0].value2 != null)
-				value2 = eventNotes[0].value2;
-
-			triggerEvent(eventNotes[0].event, value1, value2, leStrumTime);
-			eventNotes.shift();
-		}
-	}
+	public function checkEventNote() NoteChartDomain.checkEventNote(this);
 
 	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
 		var flValue1:Null<Float> = Std.parseFloat(value1);
@@ -3420,77 +3188,14 @@ class PlayState extends MusicBeatState
 		callOnScripts('onEvent', [eventName, value1, value2, strumTime]);
 	}
 
-	public function moveCameraSection(?sec:Null<Int>):Void {
-		if(sec == null) sec = curSection;
-		if(sec < 0) sec = 0;
-
-		if(SONG.notes[sec] == null) return;
-
-		if (gf != null && SONG.notes[sec].gfSection)
-		{
-			camFollow.setPosition(gf.getMidpoint().x, gf.getMidpoint().y);
-			camFollow.x += gf.cameraPosition[0] + girlfriendCameraOffset[0];
-			camFollow.y += gf.cameraPosition[1] + girlfriendCameraOffset[1];
-			tweenCamIn();
-			callOnScripts('onMoveCamera', ['gf']);
-			return;
-		}
-
-		// 联机真双人-客户端镜像：本端演唱半边与谱面 mustHitSection 相反（客户端唱 Dad 半边），
-		// 反转 isDad，保证相机跟随「本屏当前演唱的角色」（房主端不变）。
-		var isDad:Bool = (SONG.notes[sec].mustHitSection != true) != onlineMirror;
-		moveCamera(isDad);
-		callOnScripts('onMoveCamera', [isDad ? 'dad' : 'boyfriend']);
-	}
+	public function moveCameraSection(?sec:Null<Int>):Void CameraHudDomain.moveCameraSection(this, sec);
 
 	var cameraTwn:FlxTween;
-	public function moveCamera(isDad:Bool)
-	{
-		if(isDad)
-		{
-			camFollow.setPosition(dad.getMidpoint().x + 150, dad.getMidpoint().y - 100);
-			camFollow.x += dad.cameraPosition[0] + opponentCameraOffset[0];
-			camFollow.y += dad.cameraPosition[1] + opponentCameraOffset[1];
-			tweenCamIn();
-		}
-		else
-		{
-			camFollow.setPosition(boyfriend.getMidpoint().x - 100, boyfriend.getMidpoint().y - 100);
-			camFollow.x -= boyfriend.cameraPosition[0] - boyfriendCameraOffset[0];
-			camFollow.y += boyfriend.cameraPosition[1] + boyfriendCameraOffset[1];
-
-			if (Paths.formatToSongPath(SONG.song) == 'tutorial' && cameraTwn == null && FlxG.camera.zoom != 1)
-			{
-				cameraTwn = FlxTween.tween(FlxG.camera, {zoom: 1}, (Conductor.stepCrochet * 4 / 1000), {ease: FlxEase.elasticInOut, onComplete:
-					function (twn:FlxTween)
-					{
-						cameraTwn = null;
-					}
-				});
-			}
-		}
-	}
+	public function moveCamera(isDad:Bool) CameraHudDomain.moveCamera(this, isDad);
 
 	public function tweenCamIn() CameraHudDomain.tweenCamIn(this);
 
-	public function finishSong(?ignoreNoteOffset:Bool = false):Void
-	{
-		if (endingSong || finishingSong) return; // 防重入：哑谱自动结算与空音频 onComplete / 延迟窗口内的重复触发
-		finishingSong = true;
-		updateTime = false;
-		FlxG.sound.music.volume = 0;
-		vocals.volume = 0;
-		vocals.pause();
-		opponentVocals.volume = 0;
-		opponentVocals.pause();
-		if(ClientPrefs.data.noteOffset <= 0 || ignoreNoteOffset) {
-			endCallback();
-		} else {
-			finishTimer = new FlxTimer().start(ClientPrefs.data.noteOffset / 1000, function(tmr:FlxTimer) {
-				endCallback();
-			});
-		}
-	}
+	public function finishSong(?ignoreNoteOffset:Bool = false):Void HostDomain.finishSong(this, ignoreNoteOffset);
 
 
 	public var transitioning = false;
@@ -3587,19 +3292,7 @@ class PlayState extends MusicBeatState
 	}
 	#end
 
-	public function KillNotes() {
-		botHitQueue.resize(0); // 丢弃待批处理的命中，避免引用已销毁音符
-		while(notes.length > 0) {
-			var daNote:Note = notes.members[0];
-			notes.invalidateNote(daNote); // 池化回收（替代直接 destroy）
-		}
-		unspawnNotes = [];
-		currentSpawnId = 0;
-		spamNotes = [];
-		Note.seqNote = [];
-		Note.seqHit = [];
-		eventNotes = [];
-	}
+	public function KillNotes() NoteChartDomain.KillNotes(this);
 
 	// 快速重开：不重新加载谱面、不重建整个状态，直接在当前状态上重置并从头开始本曲
 	public function restartSongWithoutReload(?forceRewind:Bool = false):Void
@@ -3843,22 +3536,7 @@ class PlayState extends MusicBeatState
 	// 快速重开：参照完整重开（resetState → create）重新加载默认角色
 	private function reloadDefaultCharacters():Void HostDomain.reloadDefaultCharacters(this);
 
-	private function destroyAllCharacters():Void
-	{
-		for (group in [boyfriendGroup, dadGroup, gfGroup])
-		{
-			if (group == null) continue;
-			for (member in group.members.copy())
-			{
-				if (member == null || !Std.isOfType(member, Character)) continue;
-				group.remove(member, true);
-				cast(member, Character).destroy();
-			}
-		}
-		boyfriendMap.clear();
-		dadMap.clear();
-		gfMap.clear();
-	}
+	private function destroyAllCharacters():Void HostDomain.destroyAllCharacters(this);
 
 	// 快速重开回溯：当前是否处于时间倒流阶段
 	public var rewinding:Bool = false;
@@ -3888,42 +3566,10 @@ class PlayState extends MusicBeatState
 	// stores the last combo score objects in an array
 	var lastScore:Array<FlxSprite> = [];
 
-	private function cachePopUpScore()
-	{
-		var uiPrefix:String = '';
-		var uiSuffix:String = '';
-		if (stageUI != "normal")
-		{
-			uiPrefix = '${stageUI}UI/';
-			if (PlayState.isPixelStage) uiSuffix = '-pixel';
-		}
-
-		for (rating in ratingsData)
-			Paths.image(uiPrefix + rating.image + uiSuffix);
-		for (i in 0...10)
-			Paths.image(uiPrefix + 'num' + i + uiSuffix);
-	}
+	private function cachePopUpScore() CameraHudDomain.cachePopUpScore(this);
 
 	// KE 判定评级（Kade Engine）：45/90/135ms 窗口，提前/晚到分开判断，随安全帧缩放
-	private function judgeRatingKE(note:Note):Rating
-	{
-		// botplay 命中时刻由其排期时刻定义（=音符自身 strumTime），帧延迟/批量弹出不影响评级
-		var signedDiff:Float = cpuControlled ? 0 : (note.strumTime - Conductor.songPosition);
-		var timeScale:Float = Conductor.safeZoneOffset / 166;
-		var off:Int = ClientPrefs.data.marvelousJudgement ? 1 : 0;
-
-		// Marvelous：比 Sick 更严（窗口 = Sick 的一半）
-		if (off == 1 && Math.abs(signedDiff) <= ratingsData[0].hitWindow * timeScale)
-			return ratingsData[0];
-
-		if (signedDiff > 135 * timeScale) return ratingsData[off + 3]; // way early
-		if (signedDiff > 90 * timeScale) return ratingsData[off + 2]; // early
-		if (signedDiff > 45 * timeScale) return ratingsData[off + 1]; // kinda there
-		if (signedDiff < -45 * timeScale) return ratingsData[off + 1]; // little late
-		if (signedDiff < -90 * timeScale) return ratingsData[off + 2]; // late
-		if (signedDiff < -135 * timeScale) return ratingsData[off + 3]; // late as fuck
-		return ratingsData[off]; // sick（marvelous 窗口外）
-	}
+	private function judgeRatingKE(note:Note):Rating return CameraHudDomain.judgeRatingKE(this, note);
 
 	private function popUpScore(note:Note = null, ?cappedMult:Int = null):Void
 	{
@@ -4254,37 +3900,9 @@ class PlayState extends MusicBeatState
 		if(!controls.controllerMode && key > -1) keyReleased(key);
 	}
 
-	private function keyReleased(key:Int)
-	{
-		if(!cpuControlled && startedCountdown && !paused && (!replayMode || replayInjecting))
-		{
-			// 回放录制：记录按键抬起事件
-			if (recordingReplay && currentReplay != null)
-				currentReplay.recordInput(Conductor.songPosition, key, true);
-			var spr:StrumNote = playerStrums.members[key];
-			if(spr != null)
-			{
-				spr.playAnim('static');
-				spr.resetAnim = 0;
-			}
-			callOnScripts('onKeyRelease', [key]);
-		}
-	}
+	private function keyReleased(key:Int) InputDomain.keyReleased(this, key);
 
-	public static function getKeyFromEvent(arr:Array<String>, key:FlxKey):Int
-	{
-		if(key != NONE)
-		{
-			for (i in 0...arr.length)
-			{
-				var note:Array<FlxKey> = Controls.instance.keyboardBinds[arr[i]];
-				for (noteKey in note)
-					if(key == noteKey)
-						return i;
-			}
-		}
-		return -1;
-	}
+	public static function getKeyFromEvent(arr:Array<String>, key:FlxKey):Int return EventDomain.getKeyFromEvent(arr, key);
 
 	// Hold notes
 	private function keysCheck():Void InputDomain.keysCheck(this);
@@ -4548,20 +4166,7 @@ class PlayState extends MusicBeatState
 
 	public function spawnNoteSplashOnNote(note:Note) NoteChartDomain.spawnNoteSplashOnNote(this, note);
 
-	public function spawnNoteSplash(x:Float, y:Float, data:Int, ?note:Note = null) {
-		// 【视觉/性能】密集谱自动游玩：每轨 250ms 最多 1 次溅射。原实现 botHitBatch 只限
-		// "每帧每轨 1 个"——700fps 下每秒最多 2800 个、同屏上千个溅射精灵：既是"五颜六色"
-		// 乱象，也是密集段渲染/更新的大头。节流后每轨约 2~4 个/秒，观感恢复正常。
-		if (densePerfMode && (cpuControlled || replayMode) && data >= 0 && data < 4)
-		{
-			var nowSplash:Float = Conductor.songPosition;
-			if (nowSplash - lastSplashLane[data] < 250) return;
-			lastSplashLane[data] = nowSplash;
-		}
-		var splash:NoteSplash = grpNoteSplashes.recycle(NoteSplash);
-		splash.setupNoteSplash(x, y, data, note);
-		grpNoteSplashes.add(splash);
-	}
+	public function spawnNoteSplash(x:Float, y:Float, data:Int, ?note:Note = null) NoteChartDomain.spawnNoteSplash(this, x, y, data, note);
 
 	override function destroy() {
 		#if LUA_ALLOWED
@@ -4763,45 +4368,11 @@ class PlayState extends MusicBeatState
 	}
 
 	#if LUA_ALLOWED
-	public function startLuasNamed(luaFile:String)
-	{
-		#if MODS_ALLOWED
-		var luaToLoad:String = Paths.modFolders(luaFile);
-		if(!FileSystem.exists(luaToLoad))
-			luaToLoad = Paths.getPreloadPath(luaFile);
-		
-		if(FileSystem.exists(luaToLoad))
-		#elseif sys
-		var luaToLoad:String = Paths.getPreloadPath(luaFile);
-		if(OpenFlAssets.exists(luaToLoad))
-		#end
-		{
-			for (script in luaArray)
-				if(script.scriptName == luaToLoad) return false;
-	
-			new FunkinLua(luaToLoad);
-			return true;
-		}
-		return false;
-	}
+	public function startLuasNamed(luaFile:String):Bool return HostDomain.startLuasNamed(this, luaFile);
 	#end
 	
 	#if HSCRIPT_ALLOWED
-	public function startHScriptsNamed(scriptFile:String)
-	{
-		var scriptToLoad:String = Paths.modFolders(scriptFile);
-		if(!FileSystem.exists(scriptToLoad))
-			scriptToLoad = Paths.getPreloadPath(scriptFile);
-		
-		if(FileSystem.exists(scriptToLoad))
-		{
-			if (SScript.global.exists(scriptToLoad)) return false;
-	
-			initHScript(scriptToLoad);
-			return true;
-		}
-		return false;
-	}
+	public function startHScriptsNamed(scriptFile:String):Bool return HostDomain.startHScriptsNamed(this, scriptFile);
 
 	public function initHScript(file:String, ?cneGlobals:Map<String, Dynamic> = null, ?cneCallbacks:Bool = false) HostDomain.initHScript(this, file, cneGlobals, cneCallbacks);
 	#end
@@ -4928,19 +4499,7 @@ class PlayState extends MusicBeatState
 		#end
 	}
 
-	function strumPlayAnim(isDad:Bool, id:Int, time:Float) {
-		var spr:StrumNote = null;
-		if(isDad) {
-			spr = opponentStrums.members[id];
-		} else {
-			spr = playerStrums.members[id];
-		}
-
-		if(spr != null) {
-			spr.playAnim('confirm', true);
-			spr.resetAnim = time;
-		}
-	}
+	function strumPlayAnim(isDad:Bool, id:Int, time:Float) NoteChartDomain.strumPlayAnim(this, isDad, id, time);
 
 	public var ratingName:String = '?';
 	public var ratingPercent:Float;
@@ -4957,25 +4516,7 @@ class PlayState extends MusicBeatState
 	public var runtimeShaders:Map<String, Array<String>> = new Map<String, Array<String>>();
 	// Psych 0.7.3 兼容：mod（FunkinMix 等）的 runHaxeCode 用 game.FlxRuntimeShaderMap 缓存运行时 shader 实例
 	public var FlxRuntimeShaderMap:Map<String, FlxRuntimeShader> = new Map<String, FlxRuntimeShader>();
-	public function createRuntimeShader(name:String):FlxRuntimeShader
-	{
-		if(!ClientPrefs.data.shaders) return new FlxRuntimeShader();
-
-		#if (!flash && MODS_ALLOWED && sys)
-		if(!runtimeShaders.exists(name) && !initLuaShader(name))
-		{
-			FlxG.log.warn('Shader $name is missing!');
-			return new FlxRuntimeShader();
-		}
-
-		backend.CrashHandler.logEvent('createRuntimeShader: ' + name);
-		var arr:Array<String> = runtimeShaders.get(name);
-		return new FlxRuntimeShader(arr[0], arr[1]);
-		#else
-		FlxG.log.warn("Platform unsupported for Runtime Shaders!");
-		return null;
-		#end
-	}
+	public function createRuntimeShader(name:String):FlxRuntimeShader return HostDomain.createRuntimeShader(this, name);
 
 	public function initLuaShader(name:String, ?glslVersion:Int = 120):Bool return HostDomain.initLuaShader(this, name, glslVersion);
 	#end
@@ -5028,141 +4569,24 @@ class PlayState extends MusicBeatState
 	}
 
 	/** 每帧联机驱动：网络收发、消息处理、房主时间同步、对手 HUD 刷新 */
-	function updateOnline(elapsed:Float):Void
-	{
-		Multiplayer.update();
-		processOnlineMessages();
-
-		// 握手超时保护：15 秒内未收到对方就绪/GO 信号则回大厅
-		if (onlineHoldCountdown)
-		{
-			onlineWaitTimer += elapsed;
-			if (onlineWaitTimer > 15)
-			{
-				onlineGoBackToLobby('连接超时：对方未就绪');
-				return;
-			}
-		}
-		else
-			onlineWaitTimer = 0;
-
-		if (onlineIsHost && startedCountdown && !paused && !endingSong)
-		{
-			onlineTimeSyncTimer += elapsed;
-			if (onlineTimeSyncTimer >= 0.5)
-			{
-				onlineTimeSyncTimer = 0;
-				Multiplayer.send('TIME|' + Conductor.songPosition);
-			}
-		}
-		refreshOppHud();
-	}
+	function updateOnline(elapsed:Float):Void OnlineDomain.updateOnline(this, elapsed);
 
 	function processOnlineMessages():Void OnlineDomain.processOnlineMessages(this);
 
-	function applyOppHit(data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
-	{
-		onlineOppScore += scoreDelta;
-		onlineOppCombo += mult;
-		if (onlineOppCombo > onlineOppMaxCombo) onlineOppMaxCombo = onlineOppCombo;
-		onlineOppHits += mult;
-		onlineOppTotalPlayed += mult;
-		onlineOppTotalNotesHit += getRatingModByName(rating) * mult;
-		onlineOppRatings.set(rating, (onlineOppRatings.exists(rating) ? onlineOppRatings.get(rating) : 0) + mult);
-		onlineOppHealth = FlxMath.bound(onlineOppHealth + healthDelta, 0, 2);
-		flashOppStrums(data, 'confirm', true);
-		// 真双人：对侧谱面由对方按键打击——按 chartSeq 消费对侧音符 + 对方角色唱歌 + 对方人声响起
-		onlineOppHitVisual(data, seq);
-	}
+	function applyOppHit(data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void NoteChartDomain.applyOppHit(this, data, rating, scoreDelta, healthDelta, mult, seq);
 
-	function applyOppMiss(data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
-	{
-		onlineOppScore += scoreDelta;
-		onlineOppMisses += mult;
-		onlineOppTotalPlayed += mult;
-		onlineOppCombo = 0;
-		onlineOppHealth = FlxMath.bound(onlineOppHealth + healthDelta, 0, 2);
-		// 攻防式：对方 Miss → 我方按比例回血
-		if (healthDelta < 0)
-			health = FlxMath.bound(health + (-healthDelta) * ONLINE_OPP_MISS_GAIN, 0, 2);
-		flashOppStrums(data, 'static', false);
-		// 真双人：对方 Miss —— 对侧音符不消费（自然飞过判定线，由回收窗清理），
-		// 仅播放对方角色 Miss 动画 + 对方人声静音
-		playOnlineOppMiss(data, findOnlineOppNoteBySeq(seq));
-	}
+	function applyOppMiss(data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void NoteChartDomain.applyOppMiss(this, data, scoreDelta, healthDelta, mult, seq);
 
 	// ==================== 联机真双人：对侧音符消费 / 对方演唱 ====================
 
 	/** 按 chartSeq 查对侧存活基准音符（seqNote 静态表 O(1)；已消费/已飞过返回 null） */
-	function findOnlineOppNoteBySeq(seq:Int):Note
-	{
-		if (seq < 0 || seq >= Note.seqNote.length) return null;
-		var n:Note = Note.seqNote[seq];
-		if (n != null && n.alive && n.exists && !n.blockHit) return n;
-		// seqNote 可能被同 chartSeq 的视觉副本（blockHit）覆盖：回退扫描基准音符
-		var found:Note = null;
-		if (notes != null)
-			notes.forEachAlive(function(c:Note) {
-				if (found == null && c.chartSeq == seq && !c.blockHit) found = c;
-			});
-		return found;
-	}
+	function findOnlineOppNoteBySeq(seq:Int):Note return NoteChartDomain.findOnlineOppNoteBySeq(this, seq);
 
 	/** 对方命中：消费对侧基准音符（含同 chartSeq 视觉副本）+ 对方角色唱歌 + 对方人声响起 */
-	function onlineOppHitVisual(data:Int, seq:Int):Void
-	{
-		var note:Note = findOnlineOppNoteBySeq(seq);
-		if (note != null)
-		{
-			note.wasGoodHit = true;
-			note.active = false;
-			note.visible = false;
-			notes.invalidateNote(note);
-			// 同簇视觉副本一并销毁（与玩家侧 processBotHits 一致，避免副本飞过判定线滞留）
-			if (note.chartSeq >= 0)
-			{
-				var i:Int = notes.members.length - 1;
-				while (i >= 0)
-				{
-					var sib:Note = notes.members[i];
-					if (sib != null && sib != note && sib.blockHit && sib.ignoreNote && sib.chartSeq == note.chartSeq)
-						notes.invalidateNote(sib);
-					i--;
-				}
-			}
-		}
-		playOnlineOppSing(data, note);
-		if (opponentVocals != null) opponentVocals.volume = 1;
-	}
+	function onlineOppHitVisual(data:Int, seq:Int):Void NoteChartDomain.onlineOppHitVisual(this, data, seq);
 
 	/** 对方角色唱歌动画（联机对侧命中触发；客户端镜像已交换角色引用，dad 恒为屏幕上“对方角色”） */
-	function playOnlineOppSing(data:Int, note:Note):Void
-	{
-		if (note != null && note.noAnimation) return;
-		var char:Character = dad;
-		if (note != null)
-		{
-			if (note.noteType == 'Hey!' && char != null && char.animOffsets.exists('hey'))
-			{
-				char.playAnim('hey', true);
-				char.specialAnim = true;
-				char.heyTimer = 0.6;
-				return;
-			}
-			if (note.gfNote) char = gf;
-		}
-		var altAnim:String = note != null ? note.animSuffix : '';
-		if (SONG.notes[curSection] != null)
-		{
-			if (SONG.notes[curSection].altAnim && !SONG.notes[curSection].gfSection)
-				altAnim = '-alt';
-		}
-		if (char != null)
-		{
-			char.playAnim(singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, data)))] + altAnim, true);
-			char.holdTimer = 0;
-		}
-	}
+	function playOnlineOppSing(data:Int, note:Note):Void OnlineDomain.playOnlineOppSing(this, data, note);
 
 	/** 对方 Miss 动画 + 对方人声静音（角色有 miss 动画才播） */
 	function playOnlineOppMiss(data:Int, note:Note):Void
@@ -5201,19 +4625,7 @@ class PlayState extends MusicBeatState
 		return parts.join(' ');
 	}
 
-	function refreshOppHealthFill():Void
-	{
-		if (onlineOppHealthFill == null) return;
-		var pct:Float = FlxMath.bound(onlineOppHealth, 0, 2) / 2;
-		var newW:Int = Std.int(onlineOppBarW * pct);
-		if (newW <= 0)
-		{
-			onlineOppHealthFill.visible = false;
-			return;
-		}
-		onlineOppHealthFill.visible = true;
-		onlineOppHealthFill.makeGraphic(newW, Std.int(onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
-	}
+	function refreshOppHealthFill():Void CameraHudDomain.refreshOppHealthFill(this);
 
 	function getRatingModByName(name:String):Float return CameraHudDomain.getRatingModByName(this, name);
 
@@ -5227,39 +4639,9 @@ class PlayState extends MusicBeatState
 	}
 
 	/** 单曲结束（含死亡）：上报本方 FINISH 并打开普通结算界面（联机精简版） */
-	function onlineFinishAndShowResults(died:Bool):Void
-	{
-		if (onlineFinished && subState != null) return;
-		if (!onlineFinished)
-		{
-			onlineFinished = true;
-			var acc:Float = Math.isNaN(ratingPercent) ? 0 : ratingPercent;
-			var counts:String = buildRatingCountsCsv();
-			onlineMyStats = [songScore, songHits, songMisses, totalNotesHit, totalPlayed, maxCombo, acc, counts];
-			Multiplayer.send('FINISH|' + songScore + '~' + songHits + '~' + songMisses + '~' + totalNotesHit
-				+ '~' + totalPlayed + '~' + maxCombo + '~' + acc + '~' + counts);
-		}
-		if (died)
-		{
-			try { FlxG.sound.music.stop(); vocals.stop(); opponentVocals.stop(); } catch (e:Dynamic) {}
-			persistentUpdate = false;
-			persistentDraw = false;
-		}
-		openOnlineResults();
-	}
+	function onlineFinishAndShowResults(died:Bool):Void OnlineDomain.onlineFinishAndShowResults(this, died);
 
-	function openOnlineResults():Void
-	{
-		if (subState != null) return;
-		persistentUpdate = false;
-		// 普通结算界面（联机下自动渲染为双栏对比版）：关闭（继续/ESC）后保持连接返回房间大厅
-		var onlineResults:ResultsSubState = new ResultsSubState();
-		onlineResults.closeCallback = function() {
-			persistentUpdate = true;
-			onlineBackToRoomLobby('对局结束，返回大厅');
-		};
-		openSubState(onlineResults);
-	}
+	function openOnlineResults():Void OnlineDomain.openOnlineResults(this);
 
 	function onlineGoBackToLobby(reason:String):Void OnlineDomain.onlineGoBackToLobby(this, reason);
 
@@ -5276,34 +4658,7 @@ class PlayState extends MusicBeatState
 	 * 联机结算界面打开后由 ResultsSubState 每帧调用：
 	 * PlayState.update 已冻结，仍需实时接收对方 FINISH / QUIT / DISCONNECTED。
 	 */
-	public function onlineResultsNetworkTick():Void
-	{
-		if (!isOnlineMode) return;
-		Multiplayer.update();
-		for (m in Multiplayer.pollMessages())
-		{
-			var parts:Array<String> = m.split('|');
-			switch (parts[0])
-			{
-				case 'FINISH':
-					onlineOppFinished = true;
-					if (parts.length >= 2)
-					{
-						var f:Array<String> = parts[1].split('~');
-						if (f.length >= 8)
-							onlineOppStats = [f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]];
-					}
-				case 'QUIT':
-					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
-					onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
-					return;
-				case 'DISCONNECTED':
-					onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
-					return;
-				default:
-			}
-		}
-	}
+	public function onlineResultsNetworkTick():Void OnlineDomain.onlineResultsNetworkTick(this);
 }
 
 /**

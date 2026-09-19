@@ -6,6 +6,9 @@ import backend.MusicBeatState;
 import states.OnlineMenuState;
 import states.PlayState;
 import backend.Conductor;
+import objects.Character;
+import objects.Note;
+import substates.ResultsSubState;
 
 /** 联机域（C4 首批迁出）。PlayState 保留同签名转发入口。 */
 @:access(states.PlayState)
@@ -144,5 +147,131 @@ class OnlineDomain
 			}
 		}
 		Multiplayer.reinjectMany(leftover);
+	}
+
+	/** 原 PlayState.updateOnline（作用域分析：零遮蔽，14 处成员引用已限定）。 */
+	public static function updateOnline(ps:PlayState, elapsed:Float):Void
+	{
+		Multiplayer.update();
+		ps.processOnlineMessages();
+
+		// 握手超时保护：15 秒内未收到对方就绪/GO 信号则回大厅
+		if (PlayState.onlineHoldCountdown)
+		{
+			ps.onlineWaitTimer += elapsed;
+			if (ps.onlineWaitTimer > 15)
+			{
+				ps.onlineGoBackToLobby('连接超时：对方未就绪');
+				return;
+			}
+		}
+		else
+			ps.onlineWaitTimer = 0;
+
+		if (PlayState.onlineIsHost && ps.startedCountdown && !ps.paused && !ps.endingSong)
+		{
+			ps.onlineTimeSyncTimer += elapsed;
+			if (ps.onlineTimeSyncTimer >= 0.5)
+			{
+				ps.onlineTimeSyncTimer = 0;
+				Multiplayer.send('TIME|' + Conductor.songPosition);
+			}
+		}
+		ps.refreshOppHud();
+	}
+
+	/** 原 PlayState.onlineResultsNetworkTick（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function onlineResultsNetworkTick(ps:PlayState):Void
+	{
+		if (!PlayState.isOnlineMode) return;
+		Multiplayer.update();
+		for (m in Multiplayer.pollMessages())
+		{
+			var parts:Array<String> = m.split('|');
+			switch (parts[0])
+			{
+				case 'FINISH':
+					ps.onlineOppFinished = true;
+					if (parts.length >= 2)
+					{
+						var f:Array<String> = parts[1].split('~');
+						if (f.length >= 8)
+							ps.onlineOppStats = [f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]];
+					}
+				case 'QUIT':
+					// 对方主动退出对局：保持连接回房间大厅（可再来一局）
+					ps.onlineBackToRoomLobby(parts.length > 1 ? parts[1] : '对方已退出对局');
+					return;
+				case 'DISCONNECTED':
+					ps.onlineGoBackToLobby(parts.length > 1 ? parts[1] : '连接已断开');
+					return;
+				default:
+			}
+		}
+	}
+
+	/** 原 PlayState.playOnlineOppSing（作用域分析：零遮蔽，10 处成员引用已限定）。 */
+	public static function playOnlineOppSing(ps:PlayState, data:Int, note:Note):Void
+	{
+		if (note != null && note.noAnimation) return;
+		var char:Character = ps.dad;
+		if (note != null)
+		{
+			if (note.noteType == 'Hey!' && char != null && char.animOffsets.exists('hey'))
+			{
+				char.playAnim('hey', true);
+				char.specialAnim = true;
+				char.heyTimer = 0.6;
+				return;
+			}
+			if (note.gfNote) char = ps.gf;
+		}
+		var altAnim:String = note != null ? note.animSuffix : '';
+		if (PlayState.SONG.notes[ps.curSection] != null)
+		{
+			if (PlayState.SONG.notes[ps.curSection].altAnim && !PlayState.SONG.notes[ps.curSection].gfSection)
+				altAnim = '-alt';
+		}
+		if (char != null)
+		{
+			char.playAnim(ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length - 1, data)))] + altAnim, true);
+			char.holdTimer = 0;
+		}
+	}
+
+	/** 原 PlayState.onlineFinishAndShowResults（作用域分析：零遮蔽，25 处成员引用已限定）。 */
+	public static function onlineFinishAndShowResults(ps:PlayState, died:Bool):Void
+	{
+		if (ps.onlineFinished && ps.subState != null) return;
+		if (!ps.onlineFinished)
+		{
+			ps.onlineFinished = true;
+			var acc:Float = Math.isNaN(ps.ratingPercent) ? 0 : ps.ratingPercent;
+			var counts:String = ps.buildRatingCountsCsv();
+			ps.onlineMyStats = [ps.songScore, ps.songHits, ps.songMisses, ps.totalNotesHit, ps.totalPlayed, ps.maxCombo, acc, counts];
+			Multiplayer.send('FINISH|' + ps.songScore + '~' + ps.songHits + '~' + ps.songMisses + '~' + ps.totalNotesHit
+				+ '~' + ps.totalPlayed + '~' + ps.maxCombo + '~' + acc + '~' + counts);
+		}
+		if (died)
+		{
+			try { FlxG.sound.music.stop(); ps.vocals.stop(); ps.opponentVocals.stop(); } catch (e:Dynamic) {}
+			ps.persistentUpdate = false;
+			ps.persistentDraw = false;
+		}
+		ps.openOnlineResults();
+	}
+
+	/** 原 PlayState.openOnlineResults（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function openOnlineResults(ps:PlayState):Void
+	{
+		if (ps.subState != null) return;
+		ps.persistentUpdate = false;
+		// 普通结算界面（联机下自动渲染为双栏对比版）：关闭（继续/ESC）后保持连接返回房间大厅
+		var onlineResults:ResultsSubState = new ResultsSubState();
+		onlineResults.closeCallback = function() {
+			ps.persistentUpdate = true;
+			ps.onlineBackToRoomLobby('对局结束，返回大厅');
+		};
+		ps.openSubState(onlineResults);
 	}
 }

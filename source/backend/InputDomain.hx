@@ -230,4 +230,22 @@ class InputDomain
 			ps.callOnScripts('onKeyPress', [key]);
 		}
 	}
+
+	/** 原 PlayState.keyReleased（作用域分析：零遮蔽，10 处成员引用已限定）。 */
+	public static function keyReleased(ps:PlayState, key:Int)
+	{
+		if(!ps.cpuControlled && ps.startedCountdown && !ps.paused && (!ps.replayMode || ps.replayInjecting))
+		{
+			// 回放录制：记录按键抬起事件
+			if (ps.recordingReplay && ps.currentReplay != null)
+				ps.currentReplay.recordInput(Conductor.songPosition, key, true);
+			var spr:StrumNote = ps.playerStrums.members[key];
+			if(spr != null)
+			{
+				spr.playAnim('static');
+				spr.resetAnim = 0;
+			}
+			ps.callOnScripts('onKeyRelease', [key]);
+		}
+	}
 }
