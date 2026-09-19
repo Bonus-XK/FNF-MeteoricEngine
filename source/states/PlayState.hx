@@ -51,8 +51,6 @@ import cutscenes.DialogueBoxPsych;
 
 import states.StoryMenuState;
 import states.FreeplayState;
-import states.editors.ChartingState;
-import states.editors.CharacterEditorState;
 
 import substates.PauseSubState;
 import substates.GameOverTheme;
@@ -1803,7 +1801,7 @@ class PlayState extends MusicBeatState
 				if (Std.isOfType(noteType, String))
 					typeStr = noteType;
 				else if (noteType != null)
-					typeStr = ChartingState.noteTypeList[noteType]; //Backward compatibility + Week 7 charts
+					typeStr = bridge.EditorBridge.noteTypeList()[noteType]; //Backward compatibility + Week 7 charts
 				// 固化拷贝：来自 JSON DOM 的字符串在 GC 后可能悬垂（安卓 hxcpp 实测），
 				// 非空类型仍生成全新字符串；空类型共享常量——11.8M 音符级谱面省去
 				// 每颗一次 ''+'' 分配与对应 GC 压力（Obsolescence-spam 加载提速点之一）。
@@ -2190,7 +2188,7 @@ class PlayState extends MusicBeatState
 		paused = true;
 		cancelMusicFadeTween();
 		#if desktop DiscordClient.resetClientID(); #end
-		MusicBeatState.switchState(new CharacterEditorState(SONG.player2));
+		bridge.EditorBridge.openCharacterEditor(SONG.player2);
 	}
 
 	public var isDead:Bool = false; //Don't mess with this on Lua!!!

@@ -11,7 +11,7 @@ import flixel.text.FlxText.FlxTextAlign;
 import flixel.text.FlxText.FlxTextBorderStyle;
 import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
-import states.editors.ChartWidgets.EditorButton;
+import objects.EditorButton;
 
 /**
  * 崩溃测试弹窗（主菜单输入 crash 后弹出）：

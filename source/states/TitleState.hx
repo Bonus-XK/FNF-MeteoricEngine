@@ -190,7 +190,7 @@ class TitleState extends MusicBeatState
 		#if FREEPLAY
 		MusicBeatState.switchState(new states.FreeplayState());
 		#elseif CHARTING
-		MusicBeatState.switchState(new ChartingState());
+		bridge.EditorBridge.openChartEditor();
 		#else
 		if(FlxG.save.data.flashing == null && !FlashingState.leftState) {
 			MusicBeatState.switchState(new FlashingState());

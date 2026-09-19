@@ -12,7 +12,6 @@ import backend.Song;
 import objects.Note;
 import objects.StrumNote;
 import states.PlayState;
-import states.editors.ChartingState;
 import objects.Note.CastNote;
 import backend.CrashHandler;
 import objects.Note.SpamNoteData;
@@ -113,7 +112,7 @@ class NoteChartDomain
 		DiscordClient.resetClientID();
 		#end
 		
-		MusicBeatState.switchState(new ChartingState());
+		bridge.EditorBridge.openChartEditor();
 	}
 
 	/** 原 PlayState.noteSpawn（作用域分析：零遮蔽，124 处成员引用已限定）。 */
@@ -522,7 +521,7 @@ class NoteChartDomain
 				swagNote.sustainLength = songNotes[2];
 				swagNote.gfNote = (section.gfSection == true && songNotes[1] < 4);
 				swagNote.noteType = songNotes[3];
-				if (!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]];
+				if (!Std.isOfType(songNotes[3], String)) swagNote.noteType = bridge.EditorBridge.noteTypeList()[songNotes[3]];
 
 				swagNote.scrollFactor.set();
 

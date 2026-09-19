@@ -7,7 +7,6 @@ import objects.BackButton;
 import objects.AchievementPopup;
 import backend.Achievements;
 
-import states.editors.MasterEditorMenu;
 import options.OptionsState;
 
 import flixel.addons.transition.FlxTransitionableState;
@@ -384,7 +383,7 @@ class MainMenuState extends MusicBeatState
 			if (controls.justPressed('debug_1'))
 			{
 				selectedSomethin = true;
-				MusicBeatState.switchState(new MasterEditorMenu());
+				bridge.EditorBridge.openMasterEditor();
 			}
 			#end
 
