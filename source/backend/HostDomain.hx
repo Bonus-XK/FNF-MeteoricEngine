@@ -39,6 +39,12 @@ import flixel.util.FlxStringUtil;
 import backend.MeteoricProfile;
 import backend.Replay.ReplayEvent;
 import flixel.FlxSubState;
+#if VIDEOS_ALLOWED
+#if (hxCodec >= "3.0.0") import hxcodec.flixel.FlxVideo as VideoHandler;
+#elseif (hxCodec >= "2.6.1") import hxcodec.VideoHandler as VideoHandler;
+#elseif (hxCodec == "2.6.0") import VideoHandler;
+#else import vlc.MP4Handler as VideoHandler; #end
+#end
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
