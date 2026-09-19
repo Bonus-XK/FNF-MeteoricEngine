@@ -367,6 +367,9 @@ def needed_imports(dom_src, body_masked, extra_types, dom_pkg):
             continue
         if pkg == dom_pkg or pkg in wildcards:
             continue
+        if '.' not in pkg:
+            unresolved.append(t)   # 裸名（如条件别名 import VideoHandler）无法机械补 → 报出人工处理
+            continue
         out.append('import %s;' % pkg)
     if unresolved:
         print('  ⚠ 未解析 import 的类型（需人工确认）：%s' % ', '.join(sorted(set(unresolved))))

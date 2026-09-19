@@ -15,6 +15,20 @@ import backend.Replay;
 import substates.ResultsSubState;
 import objects.StrumNote;
 import backend.WeekData;
+import sys.io.File;
+import sys.FileSystem;
+import backend.Mods;
+import lime.utils.Assets;
+import tea.SScript;
+import objects.Character;
+import backend.StageData;
+import backend.StageData.StageFile;
+import backend.Achievements;
+import backend.Difficulty;
+import backend.Discord.DiscordClient;
+import objects.MobileControls;
+import backend.Multiplayer;
+import substates.PauseSubState;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -200,5 +214,379 @@ class HostDomain
 			return false;
 		}
 		return true;
+	}
+
+	/** 原 PlayState.initLuaShader（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function initLuaShader(ps:PlayState, name:String, ?glslVersion:Int = 120):Bool
+	{
+		if(!ClientPrefs.data.shaders) return false;
+
+		#if (MODS_ALLOWED && !flash && sys)
+		if(ps.runtimeShaders.exists(name))
+		{
+			FlxG.log.warn('Shader $name was already initialized!');
+			return true;
+		}
+
+		var foldersToCheck:Array<String> = [Paths.mods('shaders/')];
+		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+			foldersToCheck.insert(0, Paths.mods(Mods.currentModDirectory + '/shaders/'));
+
+		for(mod in Mods.getGlobalMods())
+			foldersToCheck.insert(0, Paths.mods(mod + '/shaders/'));
+
+		for (folder in foldersToCheck)
+		{
+			if(FileSystem.exists(folder))
+			{
+				var frag:String = folder + name + '.frag';
+				var vert:String = folder + name + '.vert';
+				var found:Bool = false;
+				if(FileSystem.exists(frag))
+				{
+					frag = File.getContent(frag);
+					found = true;
+				}
+				else frag = null;
+
+				if(FileSystem.exists(vert))
+				{
+					vert = File.getContent(vert);
+					found = true;
+				}
+				else vert = null;
+
+				if(found)
+				{
+					ps.runtimeShaders.set(name, [frag, vert]);
+					//trace('Found shader $name!');
+					return true;
+				}
+			}
+		}
+		FlxG.log.warn('Missing shader $name .frag AND .vert files!');
+		#else
+		FlxG.log.warn('This platform doesn\'t support Runtime Shaders!');
+		#end
+		return false;
+	}
+
+	/** 原 PlayState.startCharacterScripts（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	public static function startCharacterScripts(ps:PlayState, name:String)
+	{
+		// Lua
+		#if LUA_ALLOWED
+		var doPush:Bool = false;
+		var luaFile:String = 'characters/' + name + '.lua';
+		#if MODS_ALLOWED
+		var replacePath:String = Paths.modFolders(luaFile);
+		if(FileSystem.exists(replacePath))
+		{
+			luaFile = replacePath;
+			doPush = true;
+		}
+		else
+		{
+			luaFile = Paths.getPreloadPath(luaFile);
+			if(FileSystem.exists(luaFile))
+				doPush = true;
+		}
+		#else
+		luaFile = Paths.getPreloadPath(luaFile);
+		if(Assets.exists(luaFile)) doPush = true;
+		#end
+
+		if(doPush)
+		{
+			for (script in ps.luaArray)
+			{
+				if(script.scriptName == luaFile)
+				{
+					doPush = false;
+					break;
+				}
+			}
+			if(doPush) new FunkinLua(luaFile);
+		}
+		#end
+
+		// HScript
+		#if HSCRIPT_ALLOWED
+		var doPush:Bool = false;
+		var scriptFile:String = 'characters/' + name + '.hx';
+		var replacePath:String = Paths.modFolders(scriptFile);
+		if(FileSystem.exists(replacePath))
+		{
+			scriptFile = replacePath;
+			doPush = true;
+		}
+		else
+		{
+			scriptFile = Paths.getPreloadPath(scriptFile);
+			if(FileSystem.exists(scriptFile))
+				doPush = true;
+		}
+
+		if(doPush)
+		{
+			if(SScript.global.exists(scriptFile))
+				doPush = false;
+
+			if(doPush) ps.initHScript(scriptFile);
+		}
+		#end
+	}
+
+	/** 原 PlayState.ensureCharactersAlive（作用域分析：零遮蔽，56 处成员引用已限定）。 */
+	public static function ensureCharactersAlive(ps:PlayState):Void
+	{
+		#if desktop
+		if (PlayState.SONG == null) return;
+		if (ps.boyfriend == null)
+		{
+			var cName:String = (PlayState.SONG.player1 != null && PlayState.SONG.player1.length > 0) ? PlayState.SONG.player1 : 'bf';
+			try
+			{
+				ps.boyfriend = ps.boyfriendMap.get(cName);
+				if (ps.boyfriend == null)
+				{
+					ps.boyfriend = new Character(0, 0, cName, true);
+					ps.boyfriendMap.set(cName, ps.boyfriend);
+				}
+				if (!ps.boyfriendGroup.members.contains(ps.boyfriend))
+				{
+					ps.startCharacterPos(ps.boyfriend);
+					ps.boyfriendGroup.add(ps.boyfriend);
+					ps.startCharacterScripts(ps.boyfriend.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] boyfriend 重建失败：' + e); }
+		}
+		if (ps.dad == null)
+		{
+			var cName:String = (PlayState.SONG.player2 != null && PlayState.SONG.player2.length > 0) ? PlayState.SONG.player2 : 'dad';
+			try
+			{
+				ps.dad = ps.dadMap.get(cName);
+				if (ps.dad == null)
+				{
+					ps.dad = new Character(0, 0, cName);
+					ps.dadMap.set(cName, ps.dad);
+				}
+				if (!ps.dadGroup.members.contains(ps.dad))
+				{
+					ps.startCharacterPos(ps.dad, true);
+					ps.dadGroup.add(ps.dad);
+					ps.startCharacterScripts(ps.dad.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] dad 重建失败：' + e); }
+		}
+		if (ps.gf == null)
+		{
+			var cName:String = (PlayState.SONG.gfVersion != null && PlayState.SONG.gfVersion.length > 0) ? PlayState.SONG.gfVersion : 'gf';
+			try
+			{
+				ps.gf = ps.gfMap.get(cName);
+				if (ps.gf == null)
+				{
+					ps.gf = new Character(0, 0, cName);
+					ps.gfMap.set(cName, ps.gf);
+				}
+				if (!ps.gfGroup.members.contains(ps.gf))
+				{
+					ps.startCharacterPos(ps.gf);
+					ps.gf.scrollFactor.set(0.95, 0.95);
+					ps.gfGroup.add(ps.gf);
+					ps.startCharacterScripts(ps.gf.curCharacter);
+				}
+			}
+			catch (e:Dynamic) { trace('[角色自愈] gf 重建失败：' + e); }
+		}
+		#end
+	}
+
+	/** 原 PlayState.reloadDefaultCharacters（作用域分析：零遮蔽，63 处成员引用已限定）。 */
+	public static function reloadDefaultCharacters(ps:PlayState):Void
+	{
+		// 销毁旧角色实例并清空缓存（角色脚本通过 PlayState 动态访问角色，不受影响）
+		ps.destroyAllCharacters();
+
+		// 重新创建默认角色（与 create() 逻辑一致：全新对象、正确位置与状态）
+		var stageData:StageFile = StageData.getStageFile(PlayState.curStage);
+		if (stageData == null) stageData = StageData.dummy();
+		if (!stageData.hide_girlfriend)
+		{
+			if (PlayState.SONG.gfVersion == null || PlayState.SONG.gfVersion.length < 1) PlayState.SONG.gfVersion = 'gf';
+			ps.gf = new Character(0, 0, PlayState.SONG.gfVersion);
+			ps.startCharacterPos(ps.gf);
+			ps.gf.scrollFactor.set(0.95, 0.95);
+			ps.gfGroup.add(ps.gf);
+			ps.gfMap.set(PlayState.SONG.gfVersion, ps.gf);
+			ps.startCharacterScripts(ps.gf.curCharacter);
+		}
+
+		ps.dad = new Character(0, 0, PlayState.SONG.player2);
+		ps.startCharacterPos(ps.dad, true);
+		ps.dadGroup.add(ps.dad);
+		ps.dadMap.set(PlayState.SONG.player2, ps.dad);
+		ps.startCharacterScripts(ps.dad.curCharacter);
+
+		ps.boyfriend = new Character(0, 0, PlayState.SONG.player1, true);
+		ps.startCharacterPos(ps.boyfriend);
+		ps.boyfriendGroup.add(ps.boyfriend);
+		ps.boyfriendMap.set(PlayState.SONG.player1, ps.boyfriend);
+		ps.startCharacterScripts(ps.boyfriend.curCharacter);
+
+		// JS Engine 移植：只显示 HUD——快速重开重建角色后保持角色组不可见
+		if (ClientPrefs.data.hudOnly)
+		{
+			ps.gfGroup.visible = false;
+			ps.dadGroup.visible = false;
+			ps.boyfriendGroup.visible = false;
+		}
+
+		if (ps.dad.curCharacter.startsWith('gf'))
+		{
+			ps.dad.setPosition(ps.GF_X, ps.GF_Y);
+			if (ps.gf != null) ps.gf.visible = false;
+		}
+
+		// 重新预加载 Event 会切换到的角色（与完整重开的 eventPushed 预加载一致）
+		if (ps.cachedEventNotes != null)
+		{
+			for (event in ps.cachedEventNotes)
+			{
+				if (event.event != 'Change Character' || event.value1 == null) continue;
+				var charType:Int = 0;
+				switch(event.value1.toLowerCase().trim())
+				{
+					case 'gf' | 'girlfriend': charType = 2;
+					case 'dad' | 'opponent': charType = 1;
+					default:
+						charType = Std.parseInt(event.value1);
+						if (Math.isNaN(charType)) charType = 0;
+				}
+				ps.addCharacterToList(event.value2, charType);
+			}
+		}
+
+		ps.iconP1.changeIcon(ps.boyfriend.healthIcon);
+		ps.iconP2.changeIcon(ps.dad.healthIcon);
+		ps.setOnScripts('boyfriendName', ps.boyfriend.curCharacter);
+		ps.setOnScripts('dadName', ps.dad.curCharacter);
+		if (ps.gf != null) ps.setOnScripts('gfName', ps.gf.curCharacter);
+		ps.reloadHealthBarColors();
+	}
+
+	/** 原 PlayState.checkForAchievement（作用域分析：零遮蔽，14 处成员引用已限定）。 */
+	public static function checkForAchievement(ps:PlayState, achievesToCheck:Array<String> = null):String
+	{
+		if(PlayState.chartingMode) return null;
+
+		var usedPractice:Bool = (ClientPrefs.getGameplaySetting('practice') || ClientPrefs.getGameplaySetting('botplay'));
+		for (i in 0...achievesToCheck.length) {
+			var achievementName:String = achievesToCheck[i];
+			if(!Achievements.isAchievementUnlocked(achievementName) && !ps.cpuControlled && Achievements.getAchievementIndex(achievementName) > -1) {
+				var unlock:Bool = false;
+				if (achievementName == WeekData.getWeekFileName() + '_nomiss') // any FC achievements, name should be "weekFileName_nomiss", e.g: "week3_nomiss";
+				{
+					if(PlayState.isStoryMode && PlayState.campaignMisses + ps.songMisses < 1 && Difficulty.getString().toUpperCase() == 'HARD'
+						&& PlayState.storyPlaylist.length <= 1 && !PlayState.changedDifficulty && !usedPractice)
+						unlock = true;
+				}
+				else
+				{
+					switch(achievementName)
+					{
+						case 'ur_bad':
+							unlock = (ps.ratingPercent < 0.2 && !ps.practiceMode);
+
+						case 'ur_good':
+							unlock = (ps.ratingPercent >= 1 && !usedPractice);
+
+						case 'roadkill_enthusiast':
+							unlock = (Achievements.henchmenDeath >= 50);
+
+						case 'oversinging':
+							unlock = (ps.boyfriend.holdTimer >= 10 && !usedPractice);
+
+						case 'hype':
+							unlock = (!ps.boyfriendIdled && !usedPractice);
+
+						case 'two_keys':
+							unlock = (!usedPractice && ps.keysPressed.length <= 2);
+
+						case 'toastie':
+							unlock = (/*ClientPrefs.data.framerate <= 60 &&*/ !ClientPrefs.data.shaders && ClientPrefs.data.lowQuality && !ClientPrefs.data.antialiasing);
+
+						case 'debugger':
+							unlock = (Paths.formatToSongPath(PlayState.SONG.song) == 'test' && !usedPractice);
+					}
+				}
+
+				if(unlock) {
+					Achievements.unlockAchievement(achievementName);
+					return achievementName;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** 原 PlayState.openPauseMenu（作用域分析：零遮蔽，19 处成员引用已限定）。 */
+	public static function openPauseMenu(ps:PlayState, fromRemote:Bool = false)
+	{
+		// 防重入：后台/失焦/按键可能在同一帧多次触发，避免打开多个暂停界面
+		if (ps.paused) return;
+
+		FlxG.camera.followLerp = 0;
+		ps.persistentUpdate = false;
+		ps.persistentDraw = true;
+		ps.paused = true;
+		// 联机：仅「主动暂停」广播 PAUSE；远程收到的 PAUSE 打开时不再回发，
+		// 否则对方点继续后会被这个回显 PAUSE 再次强制暂停（无法恢复游玩）
+		if (PlayState.isOnlineMode && !fromRemote) Multiplayer.send('PAUSE');
+		// 侧边栏（stage 级 TextField）不随 flixel 暂停，需手动隐藏，恢复后 updateJudgementTxt 自动显示
+		if (ps.hud != null && ps.hud.judgementField != null) ps.hud.judgementField.visible = false;
+
+		// 1 / 1000 chance for Gitaroo Man easter egg
+		/*if (FlxG.random.bool(0.1))
+		{
+			// gitaroo man easter egg
+			cancelMusicFadeTween();
+			MusicBeatState.switchState(new GitarooPause());
+		}
+		else {*/
+		if(FlxG.sound.music != null) {
+			FlxG.sound.music.pause();
+			ps.vocals.pause();
+			ps.opponentVocals.pause();
+		}
+		if(!ps.cpuControlled)
+		{
+			for (note in ps.playerStrums)
+				if(note.animation.curAnim != null && note.animation.curAnim.name != 'static')
+				{
+					note.playAnim('static');
+					note.resetAnim = 0;
+				}
+		}
+		#if mobile
+		// 暂停时隐藏游戏触控板，避免暂停界面还显示游戏方向键
+		if (objects.MobileControls.instance != null)
+		{
+			objects.MobileControls.instance.visible = false;
+		}
+		#end
+		// 防“暂停键判定两次”：此时 flixel 输入还未被 onStateSwitch 重置，
+		// 捕获打开暂停的按键是否仍按住 → 传给暂停菜单锁定确认，直到该键物理松开
+		var pauseKeyHeld:Bool = FlxG.keys.anyPressed(PauseSubState.getPauseKeys());
+		ps.openSubState(new PauseSubState(ps.boyfriend.getScreenPosition().x, ps.boyfriend.getScreenPosition().y, pauseKeyHeld));
+		//}
+
+		#if desktop
+		DiscordClient.changePresence(ps.detailsPausedText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
+		#end
 	}
 }

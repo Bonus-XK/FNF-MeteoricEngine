@@ -312,6 +312,11 @@ def scan(path, cls='PlayState', stop_at='GameHUD'):
             for mm in re.finditer(r'(?<![\w.])(?:var|final)\s+([A-Za-z_]\w*)', bl):
                 locals_.append(mm.group(1))
                 local_lines.setdefault(mm.group(1), abs_line)
+            for mm in re.finditer(r'\bfor\s*\(\s*([A-Za-z_]\w*)\s*=>\s*([A-Za-z_]\w*)\s+in\b', bl):
+                # 键值迭代 `for (k => v in map)`：两个名字都是循环绑定局部量
+                for g in (1, 2):
+                    locals_.append(mm.group(g))
+                    local_lines.setdefault(mm.group(g), abs_line)
             for mm in re.finditer(r'\bfor\s*\(\s*([A-Za-z_]\w*)\s+in\b', bl):
                 locals_.append(mm.group(1))
                 local_lines.setdefault(mm.group(1), abs_line)
