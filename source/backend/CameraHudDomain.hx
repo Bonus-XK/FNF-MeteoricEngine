@@ -155,4 +155,54 @@ class CameraHudDomain
 
 		// 判定计数侧边栏：位置由 GameHUD.updateJudgementTxt 每帧管理（openfl TextField）
 	}
+
+	/** 原 PlayState.generateStaticArrows（作用域分析：零遮蔽，9 处成员引用已限定）。 */
+	public static function generateStaticArrows(ps:PlayState, player:Int):Void
+	{
+		var hudNoteOff:Array<Float> = ps.hudGetOffset('note');
+		var strumLineX:Float = ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X;
+		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		strumLineX += hudNoteOff[0];
+		strumLineY += hudNoteOff[1];
+		for (i in 0...4)
+		{
+			// FlxG.log.add(i);
+			var targetAlpha:Float = 1;
+			if (player < 1)
+			{
+				if(!ClientPrefs.data.opponentStrums) targetAlpha = 0;
+				else if(ClientPrefs.data.middleScroll) targetAlpha = 0.35;
+				// 联机：对方箭头 = 单机同款对手段（左侧），强制可见（不受“显示对方箭头”设置影响）
+				if (PlayState.isOnlineMode) targetAlpha = 1;
+			}
+
+			var babyArrow:StrumNote = new StrumNote(strumLineX, strumLineY, i, player);
+			babyArrow.downScroll = ClientPrefs.data.downScroll;
+			if (!PlayState.isStoryMode && !ps.skipArrowStartTween)
+			{
+				//babyArrow.y -= 10;
+				babyArrow.alpha = 0;
+				FlxTween.tween(babyArrow, {/*y: babyArrow.y + 10,*/ alpha: targetAlpha}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + (0.2 * i)});
+			}
+			else
+				babyArrow.alpha = targetAlpha;
+
+			if (player == 1)
+				ps.playerStrums.add(babyArrow);
+			else
+			{
+				if(ClientPrefs.data.middleScroll)
+				{
+					babyArrow.x += 310;
+					if(i > 1) { //Up and Right
+						babyArrow.x += FlxG.width / 2 + 25;
+					}
+				}
+				ps.opponentStrums.add(babyArrow);
+			}
+
+			ps.strumLineNotes.add(babyArrow);
+			babyArrow.postAddedToGroup();
+		}
+	}
 }

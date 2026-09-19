@@ -49,6 +49,10 @@ def _qualified(s, pos):
         i -= 1
     if i < 0 or s[i] != '.':
         return False
+    # 限定形式还包含「索引/调用结果」上的访问：`arr[i].field`、`f().field`、`(expr).field`
+    # （实测踩坑：漏判 `unspawnNotes[middleId].strumTime`，生成 `…[middleId].ps.strumTime`）
+    if i - 1 >= 0 and s[i - 1] in '])':
+        return True
     j = i - 1
     while j >= 0 and (s[j].isalnum() or s[j] == '_'):
         j -= 1
@@ -67,8 +71,12 @@ def _is_prefix_token(s, pos, end, name):
     return j < len(s) and s[j] == '.'
 
 
-def bare_seq(masked, members, localsx):
-    """未限定裸标识符序列（名字 + 类别）；跳过我们引入的 ps./PlayState. 前缀名本身。"""
+def token_classes(masked, members, localsx):
+    """裸标识符 → 类别序列。类别：local / member:inst / member:static / kw / foreign / inst-unknown。
+
+    `inst-unknown` = 既非局部/成员、也非关键字，且**小写开头**的裸值（大写视为类/类型引用）。
+    这类名字几乎必然是继承来的成员（FlxState/MusicBeatState 的字段），迁到域模块后必须写 `ps.名`。
+    """
     out = []
     for mm in re.finditer(r'\b[A-Za-z_]\w*', masked):
         pos, n = mm.start(), mm.group(0)
@@ -76,15 +84,51 @@ def bare_seq(masked, members, localsx):
             continue
         if _is_prefix_token(masked, pos, mm.end(), n):
             continue
+        # 预处理指令行整体跳过：否则 `#end` 会被当作继承成员改写成 `#ps.end`
+        # （实测 typecheck 报 `Unknown token`），`#if/#elseif` 同理
+        ls = masked.rfind('\n', 0, pos) + 1
+        if masked[ls:pos].strip().startswith('#'):
+            continue
+        # 结构体字段名（`{alpha: v}` / `{…, startDelay: v}`）不是成员引用，绝不能加前缀。
+        # 实测踩坑：tween 选项对象 `{ease:…, startDelay:…}` 被写成 `{ps.ease:…}` → typecheck `Missing ;`。
+        j = mm.end()
+        while j < len(masked) and masked[j] in ' \t':
+            j += 1
+        k = pos - 1
+        while k >= 0 and masked[k] in ' \t\n':
+            k -= 1
+        if j < len(masked) and masked[j] == ':' and k >= 0 and masked[k] in '{,':
+            out.append((pos, n, 'key'))
+            continue
         if n in localsx:
             cls = 'local'
         elif n in members:
             cls = 'member:static' if members[n]['static'] else 'member:inst'
         elif n in sa.KW:
             cls = 'kw'
+        elif n[0].islower() and not re.match(r'\s*\(', masked[mm.end():]):
+            cls = 'inst-unknown'
         else:
             cls = 'foreign'
-        out.append((n, cls))
+        out.append((pos, n, cls))
+    return out
+
+
+def foreign_values(body_masked, members, localsx):
+    """体外来**值**引用：小写开头的裸标识符，既非局部/参数、也非成员、也不是调用。
+
+    这类名字几乎必然是**继承来的字段**（如 FlxState.subState）——迁到域模块后本域不可解析，
+    必须写成 `ps.subState` 才能访问。工具此前只覆盖「外来调用」，漏了「外来读值」（实测 typecheck
+    在 OnlineDomain 报 `Unknown identifier : subState`）。大写开头者视为类/类型引用，域模块可解析。
+    """
+    out = set()
+    for mm in re.finditer(r'\b([a-z_]\w*)\b', body_masked):
+        pos, n = mm.start(), mm.group(0)
+        if _qualified(body_masked, pos) or n in localsx or n in members or n in sa.KW:
+            continue
+        if re.match(r'\s*\(', body_masked[mm.end():]):
+            continue
+        out.add(n)
     return out
 
 
@@ -183,27 +227,30 @@ def param_names(params_text):
 
 
 def rewrite(body_raw, members, localsx):
-    """成员裸引用加前缀：实例 → `ps.`，静态 → `PlayState.`。"""
+    """成员裸引用加前缀：实例成员与继承成员 → `ps.`，静态成员 → `PlayState.`。"""
     body_masked = sa.mask(body_raw)
     edits = []
-    for mm in re.finditer(r'\b[A-Za-z_]\w*', body_masked):
-        pos, n = mm.start(), mm.group(0)
-        if _qualified(body_masked, pos) or n in localsx:
-            continue
-        mem = members.get(n)
-        if not mem:
-            continue
-        edits.append((pos, 'ps.' if not mem['static'] else 'PlayState.'))
+    for pos, n, cls in token_classes(body_masked, members, localsx):
+        if cls == 'member:inst' or cls == 'inst-unknown':
+            edits.append((pos, 'ps.'))
+        elif cls == 'member:static':
+            edits.append((pos, 'PlayState.'))
     for pos, pre in sorted(edits, key=lambda x: -x[0]):
         body_raw = body_raw[:pos] + pre + body_raw[pos:]
     return body_raw, len(edits)
 
 
 TYPE_INDEX = None
+STD_TYPES = {'Int', 'Float', 'Bool', 'String', 'Void', 'Dynamic', 'Array', 'Map', 'Null', 'Any',
+             'UInt', 'Date', 'Math', 'Std', 'StringBuf', 'Class', 'EnumValue', 'Iterable'}
 
 
 def build_type_index():
-    """全仓 source/ 下的 类/枚举/typedef 名 → package 索引（用于补具体 import）。"""
+    """全仓 source/ 下的 类/枚举/typedef 名 → 模块路径 索引（用于补具体 import）。
+
+    Haxe 模块语义：主类 = `<pkg>.<类名>`；同文件次类 = `<pkg>.<文件名>.<次类名>`
+    （实测踩坑：把 `PlayState.hx` 里的次类 GameHUD 当成独立模块会写出 `import states.GameHUD;` → 编译报错）。
+    """
     global TYPE_INDEX
     if TYPE_INDEX is not None:
         return TYPE_INDEX
@@ -213,26 +260,20 @@ def build_type_index():
         for fn in files:
             if not fn.endswith('.hx'):
                 continue
-            fp = os.path.join(dirpath, fn)
             try:
-                head = open(fp, encoding='utf-8', errors='replace').read()
+                head = open(os.path.join(dirpath, fn), encoding='utf-8', errors='replace').read()
             except OSError:
                 continue
             m = re.search(r'^\s*package\s+([\w.]+)\s*;', head, re.M)
             pkg = m.group(1) if m else ''
             base = fn[:-3]
-            for dm in re.finditer(r'^\s*(?:@:[\w.]+\s+)*(?:final\s+)?(?:class|enum|typedef|abstract|interface)\s+([A-Za-z_]\w*)',
-                                  head, re.M):
+            for dm in re.finditer(r'^\s*(?:@:[\w.]+\s+)*(?:final\s+)?'
+                                  r'(?:class|enum|typedef|abstract|interface)\s+([A-Za-z_]\w*)', head, re.M):
                 nm = dm.group(1)
-                # 主类 = 包名.类名；同文件次类 = 包名.文件名.次类名（Haxe 模块语义）
                 path = ('%s.%s' % (pkg, nm)) if nm == base else ('%s.%s.%s' % (pkg, base, nm))
                 idx.setdefault(nm, path)
     TYPE_INDEX = idx
     return idx
-
-
-STD_TYPES = {'Int', 'Float', 'Bool', 'String', 'Void', 'Dynamic', 'Array', 'Map', 'Null', 'Any',
-             'UInt', 'Date', 'Math', 'Std', 'StringBuf', 'Class', 'EnumValue', 'Iterable'}
 
 
 def needed_imports(dom_src, body_masked, extra_types, dom_pkg):
@@ -300,6 +341,11 @@ def main():
             return False
         if 'Domain.' in b:
             return False
+        # `#if false / #else / #end` 包裹声明的写法：`#end` 落在「声明行→体右括号」区间内，
+        # 跨度替换会连它一起删掉 → 预处理配平断裂（实测 typecheck 报 Unclosed conditional compilation block）。
+        if re.search(r'(?m)^\s*#(?:if|else|elseif|end)\b', b.split('{', 1)[0]):
+            return False
+        # 外来小写裸值不再拒绝：它们是继承成员，改写时会一并加 `ps.`，由 typecheck 复核
         if 'ps' in set(f['locals']) | set(f['params']):
             return False
         return f['span_body'] >= args.min_lines
@@ -337,16 +383,18 @@ def main():
             return 2
         localsx = set(f['locals']) | set(f['params'])
         old_masked = sa.mask(sp['body'])
-        old_seq = bare_seq(old_masked, members, localsx)
-        old_inst = sum(1 for _, c in old_seq if c == 'member:inst')
-        old_stat = sum(1 for _, c in old_seq if c == 'member:static')
+        old_seq = token_classes(old_masked, members, localsx)
+        old_inst = sum(1 for _, _, c in old_seq if c in ('member:inst', 'inst-unknown'))
+        old_stat = sum(1 for _, _, c in old_seq if c == 'member:static')
         old_ps = len(re.findall(r'(?<![\w])PlayState\s*\.', old_masked))
 
         new_body, npre = rewrite(sp['body'], members, localsx)
         new_masked = sa.mask(new_body)
-        new_seq = bare_seq(new_masked, members, localsx)
-        old_nonmember = [(nm, c) for nm, c in old_seq if not c.startswith('member')]
-        new_member_left = [(nm, c) for nm, c in new_seq if c.startswith('member')]
+        new_seq = [(nm, c) for _, nm, c in token_classes(new_masked, members, localsx)]
+        old_nonmember = [(nm, c) for _, nm, c in old_seq
+                         if not c.startswith('member') and c != 'inst-unknown']
+        new_member_left = [(nm, c) for nm, c in new_seq
+                           if c.startswith('member') or c == 'inst-unknown']
         got_ps = len(re.findall(r'(?<![\w])ps\s*\.', new_masked))
         got_stat = len(re.findall(r'(?<![\w])PlayState\s*\.', new_masked))
 
@@ -362,6 +410,15 @@ def main():
             print('  C ps %d/%d   PlayState %d/%d' % (got_ps, old_inst, got_stat, old_stat + old_ps), file=sys.stderr)
             return 3
 
+        head = '\n'.join(raw[f['line'] - 1:sp['decl_line'] + 1])
+        head = sp['params']  # 占位，实际判定见下
+        if re.search(r'(?m)^\s*#(?:if|else|elseif|end)\b',
+                     '\n'.join(raw[f['line'] - 1:]).split('{', 1)[0]):
+            print('✘ %s 的声明区含预处理指令，拒绝（#end 会落在迁出跨度内被吞）' % n, file=sys.stderr)
+            return 2
+        if len(re.findall(r'(?m)^\s*#if\b', sp['body'])) != len(re.findall(r'(?m)^\s*#end\b', sp['body'])):
+            print('✘ %s 的体预处理指令不配平，拒绝' % n, file=sys.stderr)
+            return 2
         pnames = param_names(sp['params'])
         arglist = ', '.join(pnames)
         if f['static']:
