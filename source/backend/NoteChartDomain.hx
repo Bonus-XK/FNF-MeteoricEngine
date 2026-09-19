@@ -23,6 +23,8 @@ import sys.FileSystem;
 import objects.NoteGroup;
 import states.PlayState.PreGenResult;
 import backend.Section.SwagSection;
+import objects.Character;
+import backend.Multiplayer;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。
@@ -661,5 +663,124 @@ class NoteChartDomain
 
 		ps.generatedMusic = true;
 		CrashHandler.mark('PlayState.generateChartNotes:done');
+	}
+
+	/** 原 PlayState.noteMissCommon（作用域分析：零遮蔽，37 处成员引用已限定）。 */
+	public static function noteMissCommon(ps:PlayState, direction:Int, note:Note = null)
+	{
+		// KE 结算散点图：主音符 Miss 记录（贴外沿窗口 = 视为最晚；空按/长条子段不记）
+		if (note != null && !note.isSustainNote && !ps.cpuControlled)
+		{
+			var outer:Float = (ps.ratingsData != null && ps.ratingsData.length > 0) ? ps.ratingsData[ps.ratingsData.length - 1].hitWindow : 166;
+			if (outer <= 0) outer = 166;
+			ps.judgementHistory.push({t: note.strumTime, d: outer, r: 'miss'});
+		}
+		// PF 移植：任何失误（含空按）即退出“全 Sick”金色 Combo
+		ps.allSicks = false;
+
+		// score and data
+		var subtract:Float = 0.05;
+		if(note != null) subtract = note.missHealth;
+		ps.health -= subtract * ps.healthLoss;
+
+		if(ps.instakillOnMiss)
+		{
+			ps.vocals.volume = 0;
+			ps.opponentVocals.volume = 0;
+			ps.doDeathCheck(true);
+		}
+		ps.combo = 0;
+
+		var missMult:Int = note != null ? Std.int(note.density) : 1; // H-Slice 移植：堆叠合并按 density 计 Miss
+		if (missMult < 1) missMult = 1;
+		ps.songScore -= 10 * missMult;
+		if(!ps.endingSong) ps.songMisses += missMult;
+		ps.totalPlayed += missMult;
+		ps.RecalculateRating(true);
+
+		// 联机：广播己方失误（分数增量/血量增量/密度 + 音符序号），对方据此扣对方血量并给自己回血，
+		// 并按 chartSeq 精确消费对侧音符/播放对方 Miss 动画
+		if (PlayState.isOnlineMode && !ps.cpuControlled)
+			Multiplayer.send('MISS|' + direction + '~' + (-10 * missMult) + '~' + (-(subtract * ps.healthLoss)) + '~' + missMult + '~' + (note != null ? note.chartSeq : -1));
+
+		// play character anims
+		var char:Character = ps.boyfriend;
+		if((note != null && note.gfNote) || (PlayState.SONG.notes[ps.curSection] != null && PlayState.SONG.notes[ps.curSection].gfSection)) char = ps.gf;
+
+		if(!ClientPrefs.data.hudOnly && char != null && char.hasMissAnimations)
+		{
+			var suffix:String = '';
+			if(note != null) suffix = note.animSuffix;
+
+			var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, direction)))] + 'miss' + suffix;
+			char.playAnim(animToPlay, true);
+
+			if(char != ps.gf && ps.combo > 5 && ps.gf != null && ps.gf.animOffsets.exists('sad'))
+			{
+				ps.gf.playAnim('sad');
+				ps.gf.specialAnim = true;
+			}
+		}
+		ps.vocals.volume = 0;
+	}
+
+	/** 原 PlayState.processBotHits（作用域分析：零遮蔽，24 处成员引用已限定）。 */
+	public static function processBotHits(ps:PlayState):Void
+	{
+		if (ps.botHitQueue.length == 0) return;
+		if (ps.rewinding) { ps.botHitQueue.resize(0); return; }
+		ps.botHitBatch = true;
+		ps.botBatchSeenSeq = new Map<Int, Bool>(); // 批内按 chartSeq 去重：同帧池化复活对象不二次计分
+		ps.notes.beginBatchKill(); // 【密集批·延迟移除】命中击杀登记，帧末一次 O(n) 清扫
+		for (note in ps.botHitQueue)
+		{
+			if (note == null || !note.alive || note.blockHit) continue;
+			if (note.chartSeq >= 0)
+			{
+				if (ps.botBatchSeenSeq.exists(note.chartSeq)) continue;
+				ps.botBatchSeenSeq.set(note.chartSeq, true);
+			}
+			// 【500 帧补丁】同簇视觉副本不再逐命中全表扫描，统一在批处理末尾一次 O(成员) 扫
+			if (ClientPrefs.data.noteJudgment == 'KE 判定' && note.isSustainNote)
+			{
+				// KE 判定：长条不参与判定，子段仅做视觉消除
+				note.wasGoodHit = true;
+				note.active = false;
+				note.visible = false;
+				ps.notes.invalidateNote(note);
+				continue;
+			}
+			ps.goodNoteHit(note);
+			if (!note.wasGoodHit) note.wasGoodHit = true; // ignore/伤害音符：只消费一次，避免下帧重复收集
+			// 批处理下 goodNoteHit 只回收批内第一颗（其余在 botBatchScoreShown 早退）——
+			// 这里对仍存活的命中音符统一视觉回收：命中即灭，杜绝"击中但飞过判定线"
+			if (!note.isSustainNote && note.alive)
+			{
+				note.active = false;
+				note.visible = false;
+				ps.notes.invalidateNote(note);
+			}
+		}
+		// 【500 帧补丁】批内兄弟视觉副本统一回收：原每命中全表扫描 O(命中×成员) → 本帧一次 O(成员)。
+		// 倒序 + splice 安全（与旧逐命中扫同款遍历方式）；botBatchSeenSeq 已含本帧全部命中 chartSeq。
+		if (ps.botBatchSeenSeq.keys().hasNext())
+		{
+			var mi:Int = ps.notes.members.length - 1;
+			while (mi >= 0)
+			{
+				var sib:Note = ps.notes.members[mi];
+				if (sib != null && sib.blockHit && sib.ignoreNote && sib.chartSeq >= 0
+					&& ps.botBatchSeenSeq.exists(sib.chartSeq))
+					ps.notes.invalidateNote(sib);
+				mi--;
+			}
+		}
+		ps.notes.endBatchKill(); // 【密集批·延迟移除】帧末一次 O(n) 清扫（含命中与兄弟副本）
+		ps.botHitBatch = false;
+		ps.botHitQueue.resize(0);
+		ps.botBatchAnimDone = [false, false, false, false];
+		ps.botBatchSplashDone = [false, false, false, false];
+		ps.botBatchHitsoundDone = false;
+		ps.botBatchScoreShown = false;
 	}
 }

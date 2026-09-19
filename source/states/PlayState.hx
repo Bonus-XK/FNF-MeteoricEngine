@@ -4748,63 +4748,7 @@ class PlayState extends MusicBeatState
 
 	function noteMissPress(direction:Int = 1, force:Bool = false):Void NoteChartDomain.noteMissPress(this, direction, force);
 
-	function noteMissCommon(direction:Int, note:Note = null)
-	{
-		// KE 结算散点图：主音符 Miss 记录（贴外沿窗口 = 视为最晚；空按/长条子段不记）
-		if (note != null && !note.isSustainNote && !cpuControlled)
-		{
-			var outer:Float = (ratingsData != null && ratingsData.length > 0) ? ratingsData[ratingsData.length - 1].hitWindow : 166;
-			if (outer <= 0) outer = 166;
-			judgementHistory.push({t: note.strumTime, d: outer, r: 'miss'});
-		}
-		// PF 移植：任何失误（含空按）即退出“全 Sick”金色 Combo
-		allSicks = false;
-
-		// score and data
-		var subtract:Float = 0.05;
-		if(note != null) subtract = note.missHealth;
-		health -= subtract * healthLoss;
-
-		if(instakillOnMiss)
-		{
-			vocals.volume = 0;
-			opponentVocals.volume = 0;
-			doDeathCheck(true);
-		}
-		combo = 0;
-
-		var missMult:Int = note != null ? Std.int(note.density) : 1; // H-Slice 移植：堆叠合并按 density 计 Miss
-		if (missMult < 1) missMult = 1;
-		songScore -= 10 * missMult;
-		if(!endingSong) songMisses += missMult;
-		totalPlayed += missMult;
-		RecalculateRating(true);
-
-		// 联机：广播己方失误（分数增量/血量增量/密度 + 音符序号），对方据此扣对方血量并给自己回血，
-		// 并按 chartSeq 精确消费对侧音符/播放对方 Miss 动画
-		if (isOnlineMode && !cpuControlled)
-			Multiplayer.send('MISS|' + direction + '~' + (-10 * missMult) + '~' + (-(subtract * healthLoss)) + '~' + missMult + '~' + (note != null ? note.chartSeq : -1));
-
-		// play character anims
-		var char:Character = boyfriend;
-		if((note != null && note.gfNote) || (SONG.notes[curSection] != null && SONG.notes[curSection].gfSection)) char = gf;
-		
-		if(!ClientPrefs.data.hudOnly && char != null && char.hasMissAnimations)
-		{
-			var suffix:String = '';
-			if(note != null) suffix = note.animSuffix;
-
-			var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, direction)))] + 'miss' + suffix;
-			char.playAnim(animToPlay, true);
-			
-			if(char != gf && combo > 5 && gf != null && gf.animOffsets.exists('sad'))
-			{
-				gf.playAnim('sad');
-				gf.specialAnim = true;
-			}
-		}
-		vocals.volume = 0;
-	}
+	function noteMissCommon(direction:Int, note:Note = null) NoteChartDomain.noteMissCommon(this, direction, note);
 
 	function opponentNoteHit(note:Note):Void
 	{
@@ -4873,64 +4817,7 @@ class PlayState extends MusicBeatState
 			currentReplay.addEvent(seq, t, d, r);
 	}
 
-	function processBotHits():Void
-	{
-		if (botHitQueue.length == 0) return;
-		if (rewinding) { botHitQueue.resize(0); return; }
-		botHitBatch = true;
-		botBatchSeenSeq = new Map<Int, Bool>(); // 批内按 chartSeq 去重：同帧池化复活对象不二次计分
-		notes.beginBatchKill(); // 【密集批·延迟移除】命中击杀登记，帧末一次 O(n) 清扫
-		for (note in botHitQueue)
-		{
-			if (note == null || !note.alive || note.blockHit) continue;
-			if (note.chartSeq >= 0)
-			{
-				if (botBatchSeenSeq.exists(note.chartSeq)) continue;
-				botBatchSeenSeq.set(note.chartSeq, true);
-			}
-			// 【500 帧补丁】同簇视觉副本不再逐命中全表扫描，统一在批处理末尾一次 O(成员) 扫
-			if (ClientPrefs.data.noteJudgment == 'KE 判定' && note.isSustainNote)
-			{
-				// KE 判定：长条不参与判定，子段仅做视觉消除
-				note.wasGoodHit = true;
-				note.active = false;
-				note.visible = false;
-				notes.invalidateNote(note);
-				continue;
-			}
-			goodNoteHit(note);
-			if (!note.wasGoodHit) note.wasGoodHit = true; // ignore/伤害音符：只消费一次，避免下帧重复收集
-			// 批处理下 goodNoteHit 只回收批内第一颗（其余在 botBatchScoreShown 早退）——
-			// 这里对仍存活的命中音符统一视觉回收：命中即灭，杜绝"击中但飞过判定线"
-			if (!note.isSustainNote && note.alive)
-			{
-				note.active = false;
-				note.visible = false;
-				notes.invalidateNote(note);
-			}
-		}
-		// 【500 帧补丁】批内兄弟视觉副本统一回收：原每命中全表扫描 O(命中×成员) → 本帧一次 O(成员)。
-		// 倒序 + splice 安全（与旧逐命中扫同款遍历方式）；botBatchSeenSeq 已含本帧全部命中 chartSeq。
-		if (botBatchSeenSeq.keys().hasNext())
-		{
-			var mi:Int = notes.members.length - 1;
-			while (mi >= 0)
-			{
-				var sib:Note = notes.members[mi];
-				if (sib != null && sib.blockHit && sib.ignoreNote && sib.chartSeq >= 0
-					&& botBatchSeenSeq.exists(sib.chartSeq))
-					notes.invalidateNote(sib);
-				mi--;
-			}
-		}
-		notes.endBatchKill(); // 【密集批·延迟移除】帧末一次 O(n) 清扫（含命中与兄弟副本）
-		botHitBatch = false;
-		botHitQueue.resize(0);
-		botBatchAnimDone = [false, false, false, false];
-		botBatchSplashDone = [false, false, false, false];
-		botBatchHitsoundDone = false;
-		botBatchScoreShown = false;
-	}
+	function processBotHits():Void NoteChartDomain.processBotHits(this);
 
 	function goodNoteHit(note:Note):Void
 	{
