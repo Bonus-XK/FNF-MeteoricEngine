@@ -54,7 +54,22 @@ jobs:
           java-version: 17
 
       - name: 安装 Android SDK
-        uses: android-actions/setup-android@v3
+        # android-actions/setup-android@v3 已失效：它去安装 Google 早已下架的 legacy 「tools」包
+        # → `Warning: Failed to find package 'tools'` → 该 action 抛错（runner：Node 24 +
+        # 预装 cmdline-tools/16.0）。runner 已预装完整 SDK，这里只补一个 cmdline-tools/latest
+        # 软链供**后续步骤**（未改动的「安装 NDK 21.4 与平台」）使用，不安装任何额外 SDK 包。
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          export ANDROID_SDK_ROOT="$SDK"
+          export ANDROID_HOME="$SDK"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          ls "$SDK/cmdline-tools" 2>/dev/null || true
+          if [ ! -e "$SDK/cmdline-tools/latest" ]; then
+            VER="$(ls -d "$SDK"/cmdline-tools/*/ 2>/dev/null | head -1)"
+            [ -n "$VER" ] && ln -s "$VER" "$SDK/cmdline-tools/latest"
+          fi
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --version
 
       - name: 安装 NDK 21.4 与平台
         run: |
