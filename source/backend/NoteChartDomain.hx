@@ -1301,4 +1301,131 @@ class NoteChartDomain
 		}
 		if (ps.opponentVocals != null) ps.opponentVocals.volume = 0;
 	}
+
+	/** 原 PlayState.beatHit（作用域分析：零遮蔽，57 处成员引用已限定）。 */
+	public static function beatHit(ps:PlayState)
+	{
+			if (ps.rewinding) return; // 回溯期间不触发拍点回调（角色/图标保持静止）
+
+			if(ps.lastBeatHit >= ps.curBeat) {
+				//trace('BEAT HIT: ' + curBeat + ', LAST HIT: ' + lastBeatHit);
+				return;
+			}
+
+			if (ps.generatedMusic)
+				ps.notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
+
+		if(ClientPrefs.data.sbIconBop){
+			if (ps.curBeat % ps.gfSpeed == 0) {
+				if (ps.curBeat % (ps.gfSpeed * 2) == 0) {
+					ps.iconP1.scale.set(0.8, 0.8);
+					ps.iconP2.scale.set(1.2, 1.3);
+
+					ps.iconP1.angle = -15;
+					ps.iconP2.angle = 15;
+				} else {
+					ps.iconP2.scale.set(0.8, 0.8);
+					ps.iconP1.scale.set(1.2, 1.3);
+
+					ps.iconP2.angle = -15;
+					ps.iconP1.angle = 15;
+				}
+			}
+		}
+
+			if (ClientPrefs.data.keIconBop)
+			{
+				// KE 引擎图标跳动：每拍放大 30px（相当于 scale + 30/frameWidth），随后在 update 中按时间缩回
+				ps.iconP1.scale.x += 30 / ps.iconP1.frameWidth;
+				ps.iconP1.scale.y = ps.iconP1.scale.x;
+				ps.iconP1.updateHitbox();
+				ps.iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
+				ps.iconP2.scale.x += 30 / ps.iconP2.frameWidth;
+				ps.iconP2.scale.y = ps.iconP2.scale.x;
+				ps.iconP2.updateHitbox();
+				ps.iconP2.origin.set(0, 0);
+			}
+			else
+			{
+				ps.iconP1.scale.set(1.2, 1.2);
+				ps.iconP2.scale.set(1.2, 1.2);
+
+				ps.iconP1.updateHitbox();
+				ps.iconP2.updateHitbox();
+			}
+
+			if (!ClientPrefs.data.hudOnly && ps.gf != null && ps.curBeat % Math.round(ps.gfSpeed * ps.gf.danceEveryNumBeats) == 0 && !ps.gf.getAnimationName().startsWith('sing') && !ps.gf.stunned)
+				ps.gf.dance();
+			if (!ClientPrefs.data.hudOnly && ps.boyfriend != null && ps.curBeat % ps.boyfriend.danceEveryNumBeats == 0 && !ps.boyfriend.getAnimationName().startsWith('sing') && !ps.boyfriend.stunned)
+				ps.boyfriend.dance();
+			if (!ClientPrefs.data.hudOnly && ps.dad != null && ps.curBeat % ps.dad.danceEveryNumBeats == 0 && !ps.dad.getAnimationName().startsWith('sing') && !ps.dad.stunned)
+				ps.dad.dance();
+
+			ps.meteoSuper_beatHit();
+			ps.lastBeatHit = ps.curBeat;
+
+			ps.setOnScripts('curBeat', ps.curBeat);
+			ps.callOnScripts('onBeatHit');
+	}
+
+	/** 原 PlayState.sectionHit（作用域分析：零遮蔽，30 处成员引用已限定）。 */
+	public static function sectionHit(ps:PlayState)
+	{
+		if (ps.rewinding) return; // 回溯中不移动镜头、不改 BPM
+		if (PlayState.SONG.notes[ps.curSection] != null)
+		{
+			if (ps.generatedMusic && !ps.endingSong && !ps.isCameraOnForcedPos)
+				ps.moveCameraSection();
+
+			if (ps.camZooming && FlxG.camera.zoom < 1.35 && ClientPrefs.data.camZooms)
+			{
+				FlxG.camera.zoom += 0.015 * ps.camZoomingMult;
+				ps.camHUD.zoom += 0.03 * ps.camZoomingMult;
+			}
+
+			if (PlayState.SONG.notes[ps.curSection].changeBPM)
+			{
+				Conductor.bpm = PlayState.SONG.notes[ps.curSection].bpm;
+				ps.setOnScripts('curBpm', Conductor.bpm);
+				ps.setOnScripts('crochet', Conductor.crochet);
+				ps.setOnScripts('stepCrochet', Conductor.stepCrochet);
+			}
+			ps.setOnScripts('mustHitSection', PlayState.SONG.notes[ps.curSection].mustHitSection);
+			ps.setOnScripts('altAnim', PlayState.SONG.notes[ps.curSection].altAnim);
+			ps.setOnScripts('gfSection', PlayState.SONG.notes[ps.curSection].gfSection);
+		}
+		ps.meteoSuper_sectionHit();
+
+		ps.setOnScripts('curSection', ps.curSection);
+		ps.callOnScripts('onSectionHit');
+	}
+
+	/** 原 PlayState.stepHit（作用域分析：零遮蔽，17 处成员引用已限定）。 */
+	public static function stepHit(ps:PlayState)
+	{
+		if (ps.rewinding) return; // 回溯期间不触发步点回调，避免重开音频
+
+		if(FlxG.sound.music.length > 0 && FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
+		{
+			// 音频不可用（length=0）时跳过漂移检测：空音频 music.time 恒 0，
+			// 会把 songPosition 误判为"漂移>20ms"→ resyncVocals 把时钟拉回 0（0:00 卡死根因）
+			var drift:Float = FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset);
+			if (Math.abs(drift) > (20 * ps.playbackRate)
+				|| (PlayState.SONG.needsVoices && Math.abs(ps.vocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * ps.playbackRate))
+				|| (PlayState.SONG.needsVoices && ps.opponentVocals.length > 0 && Math.abs(ps.opponentVocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * ps.playbackRate)))
+			{
+				ps.resyncVocals();
+			}
+		}
+
+		ps.meteoSuper_stepHit();
+
+		if(ps.curStep == ps.lastStepHit) {
+			return;
+		}
+
+		ps.lastStepHit = ps.curStep;
+		ps.setOnScripts('curStep', ps.curStep);
+		ps.callOnScripts('onStepHit');
+	}
 }

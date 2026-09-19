@@ -36,6 +36,10 @@ import backend.TurboDensity.TurboZone;
 import flixel.addons.display.FlxRuntimeShader;
 import backend.BaseStage;
 import psychlua.DebugLuaText;
+import flixel.util.FlxStringUtil;
+import backend.MeteoricProfile;
+import backend.Replay.ReplayEvent;
+import flixel.FlxSubState;
 
 /** HostDomain（C 组续跑新建域模块；函数体自 PlayState 迁出，转发入口保留在原处）。 */
 @:access(states.PlayState)
@@ -1333,5 +1337,574 @@ class HostDomain
 	{
 		ps.androidBackQueued = true;
 		return true;
+	}
+
+	/** 原 PlayState.update（作用域分析：零遮蔽，241 处成员引用已限定）。 */
+	public static function update(ps:PlayState, elapsed:Float)
+	{
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.begin();
+		#end
+
+		/*if (FlxG.keys.justPressed.NINE)
+		{
+			iconP1.swapOldIcon();
+		}*/
+
+		// 拆卸锁：endSong 结算拆卸后（转场/关闭回调窗口期）不再驱动本 State，
+		// 否则会访问已销毁的人物/判定线（Null Object Reference）
+		if (ps._visualsTorn)
+			return;
+
+		// 联机：网络收发 / 消息处理 / 时间同步 / 对手 HUD 刷新
+		if (PlayState.isOnlineMode)
+			ps.updateOnline(elapsed);
+
+		ps.callOnScripts('onUpdate', [elapsed]);
+
+		// 原生长条按压覆盖：每帧同步判定线位置
+		if (ps.holdCoverHandler != null)
+			ps.holdCoverHandler.syncPositions(ps.playerStrums, ps.opponentStrums);
+
+		// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
+		// （blissful-erect 接箭头闪退现场）——按谱面默认配置逐个重建缺失角色，绝不闪退
+		ps.ensureCharactersAlive();
+
+		// 延迟 GC（一次）：进曲 0.5s 后回收已剥离的谱面 DOM/解析暂存（倒计时期间，无音符生成）
+		if (ps._deferredGC)
+		{
+			ps._deferredGCTime += elapsed;
+			if (ps._deferredGCTime >= 0.5)
+			{
+				ps._deferredGC = false;
+				#if desktop
+				openfl.system.System.gc();
+				#end
+			}
+		}
+
+		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零，同时刷新 Score 栏
+		ps._npsTimer += elapsed;
+		if (ps._npsTimer >= 1)
+		{
+			ps.npsDisplay = ps._npsCount;
+			ps._npsCount = 0;
+			ps._npsTimer -= 1;
+			if (ClientPrefs.data.showNPS && !ps.endingSong && ps.scoreTxt != null) ps.updateScore();
+		}
+
+		// ===== HUD 权威校验（每帧） =====
+		// 1) hideHud 被 Mod/脚本临时改掉 → 立即恢复用户真实设置；
+		// 2) healthBar/图标/分数等 visible 被任何代码（Lua/Hscript/遗留逻辑）直接改掉
+		//    → 每帧强制拉回设置值。从根上杜绝“游玩中 UI 突然消失”。
+		// 注意：此函数只在非暂停/非结算（persistentUpdate=true）时执行，
+		// 不会干扰暂停界面、结算界面自身的显隐逻辑。
+		ps.enforceHUD();
+
+		// 自愈：paused 卡死但没有打开任何子界面（如 PauseSubState 构造中途异常、
+		// Lua 拦截 onPause 后遗留）时解锁，避免“暂停界面显示不出来”却把游戏冻结住。
+		if (ps.paused && ps.subState == null && !ps.isDead && !PlayState.chartingMode)
+		{
+			ps._pausedSelfHealFrames++;
+			if (ps._pausedSelfHealFrames >= 3)
+			{
+				ps._pausedSelfHealFrames = 0;
+				ps.paused = false;
+			}
+		}
+		else ps._pausedSelfHealFrames = 0;
+
+		// 镜头缓动。原实现把强度写死为 2.4（≈1.22s 才走完 95%），观感接近瞬移；
+		// 现改用设置档位提供的强度（0.3s / 0.5s / 0.8s），公式形状与帧率无关性均保持不变。
+		// 暂停/过场/外部接管（cameraSpeed=0）时写 0 → flixel 步长为 0，镜头钉住不动。
+		FlxG.camera.followLerp = 0;
+		if(!ps.inCutscene && !ps.paused) {
+			FlxG.camera.followLerp = FlxMath.bound(elapsed * ps.cameraSmoothSpeed() * ps.cameraSpeed * ps.playbackRate / (FlxG.updateFramerate / 60), 0, 1);
+		}
+
+		// 防御：mod 脚本/事件/竞态可能把 boyfriend 置空（blissful-erect 接箭头闪退现场），
+		// 待机块永不因角色缺失而崩
+		if(!ps.startingSong && !ps.endingSong && ps.boyfriend != null && ps.boyfriend.getAnimationName().startsWith('idle')) {
+			ps.boyfriendIdleTime += elapsed;
+			if(ps.boyfriendIdleTime >= 0.15) { // Kind of a mercy thing for making the achievement easier to get as it's apparently frustrating to some playerss
+				ps.boyfriendIdled = true;
+			}
+		} else {
+			ps.boyfriendIdleTime = 0;
+		}
+
+		var healthLerp:Float = FlxMath.lerp(ps.smoothHealth, ps.health, FlxMath.bound(elapsed * 9 * ps.playbackRate, 0, 1));
+		ps.smoothHealth = healthLerp;
+
+		ps.meteoSuper_update(elapsed);
+
+		// 快速重开回溯：时间倒流（箭头随 songPosition 回退而飞回）
+		if (ps.rewinding)
+		{
+			ps.rewindElapsed += elapsed;
+			if (ps.rewindElapsed >= ps.rewindDuration)
+			{
+				ps.rewinding = false;
+				Conductor.setPosition(0);
+				trace('[Rewind] FINISH, elapsed=' + ps.rewindElapsed);
+				ps.finishRestart();
+			}
+			else
+			{
+				// 变速回溯：一开始快、越接近终点越慢（cubicOut）；
+				// 终点 = 场上清空的位置（最早音符飞出出生窗口后），收尾正好落在最后几个箭头上
+				var rewindProgress:Float = ps.rewindElapsed / ps.rewindDuration;
+				Conductor.setPosition(FlxMath.lerp(ps.rewindFromPos, ps.rewindEndPos, FlxEase.cubeOut(rewindProgress)));
+
+				// 回溯中：箭头退回到“出生窗口”之外后回收，场上只保留正在倒流的箭头
+				var rewindWindow:Float = ps.spawnTime * ps.playbackRate;
+				if (ps.songSpeed < 1) rewindWindow /= ps.songSpeed;
+				var noteIdx:Int = ps.notes.members.length - 1;
+				while (noteIdx >= 0)
+				{
+					var rewindNote:Note = ps.notes.members[noteIdx];
+					if (rewindNote != null && rewindNote.alive)
+					{
+						var noteWindow:Float = rewindWindow;
+						if (rewindNote.multSpeed < 1) noteWindow /= rewindNote.multSpeed;
+						if (rewindNote.strumTime - Conductor.songPosition > noteWindow)
+						{
+							rewindNote.active = false;
+							rewindNote.visible = false;
+							ps.notes.invalidateNote(rewindNote);
+						}
+					}
+					noteIdx--;
+				}
+
+				// 场上已没有可见箭头时提前结束回溯，不再空转浪费等待时间
+				if (ps.notes.length == 0)
+				{
+					ps.rewinding = false;
+					Conductor.setPosition(0);
+					trace('[Rewind] FINISH (field empty), elapsed=' + ps.rewindElapsed);
+					ps.finishRestart();
+				}
+			}
+		}
+
+		ps.setOnScripts('curDecStep', ps.curDecStep);
+		ps.setOnScripts('curDecBeat', ps.curDecBeat);
+
+		// 每帧刷新动态 PlayState 值（Psych 0.7.3 setSpecialObject 等价物）
+		ps.setOnScripts('health', ps.health);
+		ps.setOnScripts('endingSong', ps.endingSong);
+		ps.setOnScripts('curBeat', ps.curBeat);
+		ps.setOnScripts('isCameraOnForcedPos', ps.isCameraOnForcedPos);
+
+		// HUD 每帧更新（图标跳动/跟随/阴影滚动/botplay 呼吸/可见性权威）全部收敛到 GameHUD
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('hud');
+		#end
+		if (ps.hud != null) ps.hud.update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('hud');
+		#end
+
+		if ((ps.controls.PAUSE || ps.androidBackQueued) && ps.startedCountdown && ps.canPause)
+		{
+			var ret:Dynamic = ps.callOnScripts('onPause', null, true);
+			if(ret != FunkinLua.Function_Stop) {
+				ps.openPauseMenu();
+			}
+		}
+		ps.androidBackQueued = false;
+
+		if (ps.controls.justPressed('debug_1') && !ps.endingSong && !ps.inCutscene)
+			ps.openChartEditor();
+
+		if (ps.controls.justPressed('debug_2') && !ps.endingSong && !ps.inCutscene)
+			ps.openCharacterEditor();
+
+		if (ps.startedCountdown && !ps.paused && !ps.rewinding)
+			Conductor.advance(FlxG.elapsed * 1000 * ps.playbackRate);
+
+		if (ps.startingSong)
+		{
+			if (ps.startedCountdown && Conductor.songPosition >= 0)
+			{
+
+				ps.startSong();
+			}
+			else if(!ps.startedCountdown)
+				Conductor.setPosition(-Conductor.crochet * 5);
+		}
+		else if (!ps.paused && ps.updateTime)
+		{
+			var curTime:Float = Math.max(0, Conductor.songPosition - ClientPrefs.data.noteOffset);
+			ps.songPercent = (curTime / ps.songLength);
+
+			var songCalc:Float = (ps.songLength - curTime);
+			if(ClientPrefs.data.timeBarType == '已过时间') songCalc = curTime;
+
+			var secondsTotal:Int = Math.floor(songCalc / 1000);
+			if(secondsTotal < 0) secondsTotal = 0;
+
+			if(ClientPrefs.data.timeBarType != '歌曲名称')
+				ps.timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
+		}
+
+		// 歌曲收尾兜底：音乐 onComplete（空音频/流式音频可能永不触发）与"歌曲位置越过时长"
+		// 双保险 —— 任意歌曲到达 max(音频长度, 谱面末尾) 都正常结算；正常运行下
+		// onComplete 先触发并置 endingSong/finishingSong，本分支不会重复执行。
+		if (!ps.endingSong && !ps.finishingSong && !ps.startingSong && !ps.paused && !ps.rewinding && !ps.inCutscene && ps.songLength > 0
+			&& Conductor.songPosition >= ps.songLength)
+		{
+			ps.finishSong();
+		}
+
+		if (ps.camZooming)
+		{
+			FlxG.camera.zoom = FlxMath.lerp(ps.defaultCamZoom, FlxG.camera.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
+			ps.camHUD.zoom = FlxMath.lerp(1, ps.camHUD.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
+		}
+
+		// Watch calls removed for performance
+
+		// RESET = Quick Game Over Screen（联机对局禁用重开，见 addOnlineHUD）
+		if (!ClientPrefs.data.noReset && ps.controls.RESET && ps.canReset && !ps.inCutscene && ps.startedCountdown && !ps.endingSong && !PlayState.isOnlineMode)
+		{
+			ps.health = 0;
+			trace("RESET = True");
+		}
+		ps.doDeathCheck();
+
+		ps.noteSpawn();
+
+		if (ps.generatedMusic)
+		{
+			if(!ps.inCutscene)
+			{
+				if(!ps.rewinding && !ps.cpuControlled && !ps.replayMode) {
+					ps.keysCheck();
+				} else {
+					// 回放 v2：按录制时间注入按键（走正常判定路径），并处理长按子段
+					if (ps.replayMode && ps.replayV2) ps.updateReplayInputs();
+					// 【结算崩溃修复】曲终（finishSong→endSong 启动转场/拆卸）后该恢复块不得再跑：
+					// 此帧结束前角色动画已被置空（curAnim=null → inlined getAnimationName NRE）。
+					// 加 endingSong/finishingSong 守卫 + 动画非空校验（曲终帧自动游玩/回放路径崩溃修复）。
+					var _bfAnim:Dynamic = ps.boyfriend != null ? ps.boyfriend.animation : null;
+					if (!ps.endingSong && !ps.finishingSong && !ClientPrefs.data.hudOnly
+						&& _bfAnim != null && _bfAnim.curAnim != null
+						&& ps.boyfriend.getAnimationName().startsWith('sing') && !ps.boyfriend.getAnimationName().endsWith('miss')
+						&& (ps.boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * ps.boyfriend.singDuration
+							|| ps.boyfriend.isAnimationFinished())) {
+						// 【视觉修复】原条件只靠 holdTimer 阈值：密集谱逐帧命中把 holdTimer 反复清零，
+						// 空段/曲间 BF 会一直卡在最后一个 sing 姿态。补上「sing 动画已播完」即回 idle 的兜底
+						// （isAnimationFinished 对 sparrow/atlas 角色都安全；Character 内部也已镜像阈值回 idle）。
+						ps.boyfriend.dance();
+						//boyfriend.animation.curAnim.finish();
+					}
+				}
+
+				#if METEORIC_PROFILE
+				backend.MeteoricProfile.phaseBegin('notes');
+				#end
+				if(ps.notes.length > 0)
+				{
+					if(ps.startedCountdown)
+					{
+						var fakeCrochet:Float = (60 / PlayState.SONG.bpm) * 1000;
+						var songPos:Float = Conductor.songPosition;
+						// 自动游玩命中提前量：实测本帧音频前进量的一半（帧轮询下偏差最小），
+						// 上限 20ms×倍速，防止卡顿帧后提前量过大导致提前命中掉出 Sick 窗口（45ms）
+						var songDelta:Float = songPos - ps.lastBotSongPos;
+						ps.lastBotSongPos = songPos;
+						var botAdvance:Float = Math.min(Math.max(songDelta, 1000 / FlxG.drawFramerate) * 0.5, 20 * ps.playbackRate);
+						// 【性能】手动循环替代 forEachAlive 闭包：免去每帧闭包分配与每音符一次虚调用；
+						// 语义与 forEachAlive 完全一致（先取后 ++、循环条件实时读长度、移除节点不回溯）
+						var noteSpeed:Float = ps.songSpeed / ps.playbackRate;
+						var killWindow:Float = ps.cpuControlled ? ClientPrefs.data.botplayKillWindow : ps.noteKillOffset;
+						var ni:Int = 0;
+						while (ni < ps.notes.members.length)
+						{
+							var daNote:Note = ps.notes.members[ni++];
+							if (daNote == null || !daNote.exists || !daNote.alive) continue;
+
+							// 【性能】不可见音符（重叠隐藏等）：跳过跟随/裁剪/判定——
+							// 与 hideOverlapped 选项"渲染裁剪，不参与判定"语义一致；仅保留超时回收
+							if (!daNote.visible)
+							{
+								if (!ps.rewinding && songPos - daNote.strumTime > killWindow)
+									ps.notes.invalidateNote(daNote);
+								continue;
+							}
+
+							var strumGroup:FlxTypedGroup<StrumNote> = ps.playerStrums;
+							if(!daNote.mustPress) strumGroup = ps.opponentStrums;
+
+							// 联机真双人：两侧谱面全部展示（自己打自己半边、对方打对半边）；
+							// 对侧音符不再隐藏，由对端 HIT/MISS 按 chartSeq 消费（见 applyOppHit/applyOppMiss）。
+
+							var strum:StrumNote = strumGroup.members[daNote.noteData];
+							if (strum == null)
+							{
+								// 防御 + 现场诊断：strum 缺失时跳过本音符（不整局崩溃），并打印现场
+								trace('[STRUM NULL] seq=' + daNote.chartSeq + ' d=' + daNote.noteData
+									+ ' must=' + daNote.mustPress + ' pLen=' + ps.playerStrums.length
+									+ ' oLen=' + ps.opponentStrums.length + ' pos=' + Std.int(Conductor.songPosition)
+									+ ' step=' + ps.curStep + ' gen=' + ps.generatedMusic + ' keepping=' + ps.keepStrumsOnRestart);
+								continue;
+							}
+							daNote.followStrumNote(strum, fakeCrochet, noteSpeed);
+
+							// 视觉副本（blockHit+ignoreNote）快捷路径：只跟随/长条裁剪/超时消亡，不做判定（大优化）
+							if (daNote.blockHit && daNote.ignoreNote)
+							{
+								// 长条副本同样需要判定键裁剪（否则滑过判定线后仍延伸不消失）
+								if (daNote.isSustainNote && strum != null && strum.sustainReduce)
+								{
+									daNote.wasGoodHit = true; // 副本纯视觉：满足裁剪条件
+									daNote.clipToStrumNote(strum);
+								}
+								if (!ps.rewinding && songPos - daNote.strumTime > killWindow)
+									ps.notes.invalidateNote(daNote);
+								continue;
+							}
+
+							if(daNote.mustPress)
+							{
+								if(!ps.rewinding && (ps.cpuControlled || ps.replayMode) && !daNote.blockHit && !daNote.wasGoodHit
+									&& (ps.replayMode || !daNote.botQueued)) // 自动游玩命中：排期与 alive-loop 双路互斥（botQueued 防重）
+								{
+									var shouldHit:Bool = false;
+									if (ps.replayMode && !ps.replayV2)
+									{
+										// 旧版回放（v1，无按键流）：按录制命中记录合成命中，
+										// 未记录的箭头自然滑过并触发 miss，与原局表现一致。
+										// 注意：v2（含按键流）不走这里——自动命中会在 strumTime 一到就抢先把
+										// 音符打掉，之后注入的真实按键（晚按）找不到可命中音符会变成 ghost miss，
+										// 导致回放 Miss 数膨胀（2 → 10）。v2 完全靠 updateReplayInputs 按键注入，
+										// 同时间同按键必然命中同一音符，与实玩 1:1 复刻。
+										if (ps.replayHitSeqs != null && daNote.chartSeq >= 0 && ps.replayHitSeqs.exists(daNote.chartSeq)
+											&& !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
+											shouldHit = true;
+									}
+									else if (!ps.replayMode && ((ps.botplayPlan != null && !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
+										|| (ps.botplayPlan == null && daNote.canBeHit && (daNote.isSustainNote || songPos + botAdvance >= daNote.strumTime))))
+										shouldHit = true;
+
+									if (shouldHit)
+									{
+										// 本帧命中的音符先收集，循环结束后统一批处理
+										// （堆叠命中时合并音效/粒子/动画/评分等副作用，避免单帧爆发卡顿）
+										daNote.botQueued = true; // 免杀保护：本帧不再被超时击杀
+										daNote.botSched = false;
+										ps.botHitQueue.push(daNote);
+									}
+								}
+							}
+							// 对手箭头：到达判定线即触发命中（旧条件是 wasGoodHit——对手音符从未被置位，
+							// 导致对手箭头永远不会被 opponentNoteHit 回收，直接飞过判定线）
+							// 联机：跳过该自动化命中（装饰音符，不闪烁/不触发动画），见上方 visible 屏蔽
+							else if (!ps.rewinding && !daNote.hitByOpponent && !daNote.ignoreNote
+								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0 && !PlayState.isOnlineMode)
+							{
+								ps.opponentNoteHit(daNote);
+								// 对手簇视觉副本同步销毁（与玩家侧 processBotHits 一致）：
+								// 副本只靠回收窗击杀会飞过判定线，巨堆叠段肉眼即"整簇飞走"。
+								// 【500 帧补丁】原实现每命中全表反向扫描（O(命中×成员)）→ 改为登记 chartSeq，
+								// 本帧主循环结束后统一一次 O(成员) 批扫（语义等价：同一批命中同帧销毁）。
+								if (daNote.chartSeq >= 0)
+								{
+									if (ps._oppHitSeqs == null) ps._oppHitSeqs = new Map<Int, Bool>();
+									ps._oppHitSeqs.set(daNote.chartSeq, true);
+								}
+							}
+
+							if(daNote.isSustainNote && strum != null && strum.sustainReduce) daNote.clipToStrumNote(strum);
+
+							// Kill extremely late notes and cause misses
+							// （已入自动命中队列的音符本帧免杀：逾期 1 帧由 processBotHits 记账，杜绝"入队后被击杀丢弃"）
+							// 自动游玩：未命中者极小窗口即回收（柱子顶端贴判定线裁齐，不残留 +52ms 残影）
+							if (!ps.rewinding && !daNote.botQueued && !(ps.cpuControlled && daNote.botSched) && songPos - daNote.strumTime > killWindow)
+							{
+								if (daNote.mustPress && !ps.cpuControlled &&!daNote.ignoreNote && !ps.endingSong && (daNote.tooLate || !daNote.wasGoodHit)
+								&& (ClientPrefs.data.noteJudgment != 'KE 判定' || !daNote.isSustainNote))
+									ps.noteMiss(daNote);
+
+								daNote.active = false;
+								daNote.visible = false;
+
+								ps.notes.invalidateNote(daNote);
+							}
+						}
+					}
+					else
+					{
+						// 【性能】倒计时分支同样手动循环（与 forEachAlive 语义一致）
+						var ni2:Int = 0;
+						while (ni2 < ps.notes.members.length)
+						{
+							var daNote:Note = ps.notes.members[ni2++];
+							if (daNote != null && daNote.exists && daNote.alive)
+							{
+								daNote.canBeHit = false;
+								daNote.wasGoodHit = false;
+							}
+						}
+					}
+					// 【500 帧补丁】对手命中兄弟视觉副本：本帧一次批扫（见登记处注释）
+					if (ps._oppHitSeqs != null)
+					{
+						var omi:Int = ps.notes.members.length - 1;
+						while (omi >= 0)
+						{
+							var osib:Note = ps.notes.members[omi];
+							if (osib != null && osib.blockHit && osib.ignoreNote && osib.chartSeq >= 0
+								&& ps._oppHitSeqs.exists(osib.chartSeq))
+								ps.notes.invalidateNote(osib);
+							omi--;
+						}
+						ps._oppHitSeqs = null;
+					}
+					ps.processBotHits();
+				#if METEORIC_PROFILE
+				backend.MeteoricProfile.phaseEnd('notes');
+				#end
+				}
+
+				// 回放（旧版）：按录制时间触发空按（无对应音符的按键），与原局按键时机一致。
+				// 回放 v2 的空按由按键注入自然复现，这里跳过避免重复 Miss。
+				if (ps.replayMode && !ps.replayV2 && !ps.rewinding && !ps.paused && !ps.endingSong && ps.startedCountdown)
+				{
+					while (ps.replayPressPtr < ps.replayPressMisses.length && Conductor.songPosition >= ps.replayPressMisses[ps.replayPressPtr].t)
+					{
+						var pm:ReplayEvent = ps.replayPressMisses[ps.replayPressPtr++];
+						ps.noteMissPress(pm.d);
+					}
+				}
+			}
+			ps.checkEventNote();
+		}
+
+		#if debug
+		if(!ps.endingSong && !ps.startingSong) {
+			if (FlxG.keys.justPressed.ONE) {
+				ps.KillNotes();
+				FlxG.sound.music.onComplete();
+			}
+			if(FlxG.keys.justPressed.TWO) { //Go 10 seconds into the future :O
+				ps.setSongTime(Conductor.songPosition + 10000);
+				ps.clearNotesBefore(Conductor.songPosition);
+			}
+		}
+		#end
+
+		ps.setOnScripts('cameraX', ps.camFollow.x);
+		ps.setOnScripts('cameraY', ps.camFollow.y);
+		ps.setOnScripts('botPlay', ps.cpuControlled);
+		ps.callOnScripts('onUpdatePost', [elapsed]);
+
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.end('PlayState.update');
+		#end
+	}
+
+	/** 原 PlayState.closeSubState（作用域分析：零遮蔽，24 处成员引用已限定）。 */
+	public static function closeSubState(ps:PlayState)
+	{
+		ps.stagesFunc(function(stage:BaseStage) stage.closeSubState());
+		if (ps.paused)
+		{
+			if (FlxG.sound.music != null && !ps.startingSong)
+			{
+				ps.resyncVocals();
+			}
+
+			if (ps.startTimer != null && !ps.startTimer.finished) ps.startTimer.active = true;
+			if (ps.finishTimer != null && !ps.finishTimer.finished) ps.finishTimer.active = true;
+			if (ps.songSpeedTween != null) ps.songSpeedTween.active = true;
+
+			var chars:Array<Character> = [ps.boyfriend, ps.gf, ps.dad];
+			for (char in chars)
+				if(char != null && char.colorTween != null)
+					char.colorTween.active = true;
+
+			#if LUA_ALLOWED
+			for (tween in ps.modchartTweens) tween.active = true;
+			for (timer in ps.modchartTimers) timer.active = true;
+			#end
+
+			// 联机：仅「主动恢复」通知对方解除暂停；远程 RESUME 恢复时不再回发
+			if (PlayState.isOnlineMode && !ps.onlineRemoteResume) Multiplayer.send('RESUME');
+
+			ps.paused = false;
+			ps.callOnScripts('onResume');
+			ps.resetRPC(ps.startTimer != null && ps.startTimer.finished);
+
+			#if mobile
+			// 恢复游戏触控板
+			if (objects.MobileControls.instance != null)
+			{
+				objects.MobileControls.instance.visible = true;
+			}
+			#end
+		}
+
+		ps.meteoSuper_closeSubState();
+	}
+
+	/** 原 PlayState.openSubState（作用域分析：零遮蔽，17 处成员引用已限定）。 */
+	public static function openSubState(ps:PlayState, SubState:FlxSubState)
+	{
+		ps.stagesFunc(function(stage:BaseStage) stage.openSubState(SubState));
+		if (ps.paused)
+		{
+			if (FlxG.sound.music != null)
+			{
+				FlxG.sound.music.pause();
+				ps.vocals.pause();
+				ps.opponentVocals.pause();
+			}
+
+			if (ps.startTimer != null && !ps.startTimer.finished) ps.startTimer.active = false;
+			if (ps.finishTimer != null && !ps.finishTimer.finished) ps.finishTimer.active = false;
+			if (ps.songSpeedTween != null) ps.songSpeedTween.active = false;
+
+			var chars:Array<Character> = [ps.boyfriend, ps.gf, ps.dad];
+			for (char in chars)
+				if(char != null && char.colorTween != null)
+					char.colorTween.active = false;
+
+			#if LUA_ALLOWED
+			for (tween in ps.modchartTweens) tween.active = false;
+			for (timer in ps.modchartTimers) timer.active = false;
+			#end
+		}
+
+		ps.meteoSuper_openSubState(SubState);
+	}
+
+	/** 原 PlayState.onFocusLost（作用域分析：零遮蔽，11 处成员引用已限定）。 */
+	public static function onFocusLost(ps:PlayState):Void
+	{
+		#if desktop
+		if (ps.health > 0 && !ps.paused) DiscordClient.changePresence(ps.detailsPausedText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
+		#end
+
+		#if mobile
+		// 退到后台时立即暂停，避免“看似暂停实际还在运行”
+		if (ps.startedCountdown && !ps.endingSong && !ps.paused && ps.canPause)
+			ps.openPauseMenu();
+		#end
+
+		ps.meteoSuper_onFocusLost();
+	}
+
+	/** 原 PlayState.onFocus（作用域分析：零遮蔽，4 处成员引用已限定）。 */
+	public static function onFocus(ps:PlayState):Void
+	{
+		if (ps.health > 0 && !ps.paused) ps.resetRPC(Conductor.songPosition > 0.0);
+		// Meteoric：从后台回到前台时恢复被冻结的音频（游戏仍停留在暂停菜单，等玩家手动返回）
+		#if mobile
+		ps.restoreBackgroundAudio();
+		#end
+		ps.meteoSuper_onFocus();
 	}
 }

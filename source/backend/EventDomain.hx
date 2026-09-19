@@ -138,4 +138,38 @@ class EventDomain
 		}
 		return 0;
 	}
+
+	/** 原 PlayState.eventPushedUnique（作用域分析：零遮蔽，3 处成员引用已限定）。 */
+	public static function eventPushedUnique(ps:PlayState, event:EventNote)
+	{
+		switch(event.event) {
+			case "Change Character":
+				var charType:Int = 0;
+				switch(event.value1.toLowerCase()) {
+					case 'gf' | 'girlfriend' | '1':
+						charType = 2;
+					case 'dad' | 'opponent' | '0':
+						charType = 1;
+					default:
+						var val1:Int = Std.parseInt(event.value1);
+						if(Math.isNaN(val1)) val1 = 0;
+						charType = val1;
+				}
+
+				var newCharacter:String = event.value2;
+				ps.addCharacterToList(newCharacter, charType);
+
+			case 'Play Sound':
+				ps.precacheList.set(event.value1, 'sound');
+				Paths.sound(event.value1);
+		}
+		ps.stagesFunc(function(stage:BaseStage) stage.eventPushedUnique(event));
+	}
+
+	/** 原 PlayState.recordReplayEvent（作用域分析：零遮蔽，5 处成员引用已限定）。 */
+	public static function recordReplayEvent(ps:PlayState, seq:Int, t:Float, d:Int, r:String):Void
+	{
+		if (ps.recordingReplay && ps.currentReplay != null && !ps.cpuControlled && !ps.replayMode)
+			ps.currentReplay.addEvent(seq, t, d, r);
+	}
 }

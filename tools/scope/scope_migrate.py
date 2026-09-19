@@ -111,6 +111,9 @@ def token_classes(masked, members, localsx):
         if n == 'this':
             out.append((pos, n, 'thisref'))   # 裸 this 一律替换为 ps（域函数是静态的）
             continue
+        if n == 'super':
+            out.append((pos, n, 'superref'))  # super.X(...) → ps.meteoSuper_X(...)
+            continue
         if n in localsx:
             cls = 'local'
         elif n in members:
@@ -303,6 +306,7 @@ def param_names(params_text):
 def rewrite(body_raw, members, localsx):
     """成员裸引用加前缀：实例成员与继承成员 → `ps.`，静态成员 → `PlayState.`。"""
     body_masked = sa.mask(body_raw)
+    supers = []
     edits = []
     for pos, n, cls in token_classes(body_masked, members, localsx):
         if cls == 'thisref':
@@ -318,7 +322,15 @@ def rewrite(body_raw, members, localsx):
             body_raw = body_raw[:a] + txt + body_raw[b:]
         else:
             body_raw = body_raw[:e[0]] + e[1] + body_raw[e[0]:]
-    return body_raw, len(edits)
+    def _super_sub(m):
+        name, args = m.group(1), m.group(2).strip()
+        parts = [a.strip() for a in args.split(',')] if args else []
+        if not all(re.fullmatch(r'[A-Za-z_]\w*', a) for a in parts):
+            return m.group(0)     # 参数非简单标识符 → 留给守卫拒绝
+        supers.append((name, parts))
+        return 'ps.meteoSuper_%s(%s)' % (name, args)
+    body_raw = re.sub(r'(?<![\w.])super\s*\.\s*([A-Za-z_]\w*)\s*\(([^()]*)\)', _super_sub, body_raw)
+    return body_raw, len(edits), supers
 
 
 TYPE_INDEX = None
@@ -467,8 +479,7 @@ def main():
         if f['name'].startswith(('get_', 'set_')):
             return False
         b = block(f)
-        if re.search(r'(?<![\w.])super\s*\.', b):
-            return False   # super 需「骨架保留+片段迁出」，本轮仍排除；裸 this 已支持（替换为 ps）
+        # super 现已支持：改写为 PlayState 里的 @:noCompletion 跳板 meteoSuper_<名>（无闭包开销）
         if 'Domain.' in b:
             return False
         # `#if false / #else / #end` 包裹声明的写法：`#end` 落在「声明行→体右括号」区间内，
@@ -535,28 +546,29 @@ def main():
         old_stat = sum(1 for _, _, c in old_seq if c == 'member:static')
         old_ps = len(re.findall(r'(?<![\w])PlayState\s*\.', old_masked))
 
-        new_body, npre = rewrite(sp['body'], members, localsx)
+        new_body, npre, supers = rewrite(sp['body'], members, localsx)
         new_masked = sa.mask(new_body)
         new_seq = [(nm, c) for _, nm, c in token_classes(new_masked, members, localsx)]
         old_this = sum(1 for _, _, c in old_seq if c == 'thisref')
+        old_super = sum(1 for _, _, c in old_seq if c == 'superref')
         old_nonmember = [(nm, c) for _, nm, c in old_seq
-                         if not c.startswith('member') and c not in ('inst-unknown', 'thisref')]
+                         if not c.startswith('member') and c not in ('inst-unknown', 'thisref', 'superref')]
         new_member_left = [(nm, c) for nm, c in new_seq
-                           if c.startswith('member') or c in ('inst-unknown', 'thisref')]
+                           if c.startswith('member') or c in ('inst-unknown', 'thisref', 'superref')]
         got_ps = len(re.findall(r'(?<![\w.])ps(?!\w)', new_masked))   # 含 `ps.` 与裸 `ps`（this 替换）
         got_stat = len(re.findall(r'(?<![\w])PlayState\s*\.', new_masked))
 
         a = not new_member_left
         b = (new_seq == old_nonmember)
-        c = (got_ps == old_inst + old_this and got_stat == old_stat + old_ps)
+        c = (got_ps == old_inst + old_this + old_super and got_stat == old_stat + old_ps)
         rows.append((n, f['span_body'], npre, a, b, c, old_inst, old_stat, got_ps, got_stat))
         if not (a and b and c):
             print('✘ 等价性证明失败：%s' % n, file=sys.stderr)
             print('  A 新体残留未加前缀的成员: %s' % new_member_left[:8], file=sys.stderr)
             print('  B 裸序列 old=%s' % old_nonmember[:12], file=sys.stderr)
             print('       new=%s' % new_seq[:12], file=sys.stderr)
-            print('  C ps %d/%d   PlayState %d/%d' % (got_ps, old_inst, got_stat, old_stat + old_ps), file=sys.stderr)
-            return 3
+            print('  ⚠ 跳过 %s（等价性证明未过，本函数保持原样）' % n)
+            continue
 
         head = '\n'.join(raw[f['line'] - 1:sp['decl_line'] + 1])
         head = sp['params']  # 占位，实际判定见下
@@ -566,6 +578,24 @@ def main():
             continue
         if len(re.findall(r'(?m)^\s*#if\b', sp['body'])) != len(re.findall(r'(?m)^\s*#end\b', sp['body'])):
             print('  ⚠ 跳过 %s（体预处理指令不配平）' % n)
+            continue
+        # super 跳板：`super.X(a, b)` → `ps.meteoSuper_X(a, b)`，跳板本身留在 PlayState 内。
+        # 参数必须是本函数自己的参数（这样跳板能照抄类型）；否则本函数跳过，不做半吊子迁移。
+        decls = {}
+        for _pt in split_params(sp['params']):
+            _q = _pt.strip()
+            _m2 = re.match(r'\??\s*([A-Za-z_]\w*)\s*(.*)$', _q)
+            if _m2:
+                decls[_m2.group(1)] = _q
+        tramps, ok_super = [], True
+        for _nm, _args in supers:
+            if not all(a in decls for a in _args):
+                ok_super = False
+                break
+            tramps.append('\n\n\t@:noCompletion public function meteoSuper_%s(%s) return super.%s(%s);'
+                          % (_nm, ', '.join(decls[a] for a in _args), _nm, ', '.join(_args)))
+        if not ok_super:
+            print('  ⚠ 跳过 %s（super 调用参数不是本函数参数，无法生成跳板）' % n)
             continue
         pnames = param_names(sp['params'])
         arglist = ', '.join(pnames)
@@ -587,7 +617,7 @@ def main():
                        % (n, npre, dom_sig, body_txt))
         ret_kw = 'return ' if (sp['ret'] and sp['ret'] != 'Void') else ''
         mods = (sp['mods'] + ' ') if sp['mods'] else ''
-        forwarders.append((f, sp, call, '\t%sfunction %s(%s)%s %s%s;' % (
+        forwarders.append((f, sp, call, tramps, '\t%sfunction %s(%s)%s %s%s;' % (
             mods, n, sp['params'].strip(), (':' + sp['ret']) if sp['ret'] else '', ret_kw, call)))
 
     if not forwarders:
@@ -603,7 +633,7 @@ def main():
         print('\n== DRY-RUN（不写盘）==')
         for txt in dom_fns:
             print('---- 域模块新增 ----\n' + txt[:900])
-        for f, sp, call, fwd in forwarders:
+        for f, sp, call, tramps, fwd in forwarders:
             print('---- PlayState L%d 体替换为 ----\n%s' % (f['line'], call))
         return 0
 
@@ -611,7 +641,7 @@ def main():
     starts = [0]
     for l in raw:
         starts.append(starts[-1] + len(l) + 1)
-    for f, sp, call, fwd in sorted(forwarders, key=lambda x: -x[0]['line']):
+    for f, sp, call, tramps, fwd in sorted(forwarders, key=lambda x: -x[0]['line']):
         if sp['style'] != 'block' or sp['end_col'] is None:
             continue
         open_off = starts[sp['open_line']] + sp['open_col']
@@ -620,7 +650,7 @@ def main():
         close_indent = re.match(r'\t*', raw[sp['span_end']]).group(0)
         stmt = ('return ' if (sp['ret'] and sp['ret'] != 'Void') else '') + call + ';'
         text = (text[:open_off + 1] + '\n' + body_indent + stmt + '\n' + close_indent
-                + text[close_off:])
+                + text[close_off:close_off + 1] + ''.join(tramps) + text[close_off + 1:])
     raw = text.split('\n')
     # 转发入口引用新域模块 → PlayState 必须能解析该类名（实测：新建域模块时漏补 → Type not found）
     dom_cls = os.path.basename(args.domain)[:-3]

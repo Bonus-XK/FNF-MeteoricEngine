@@ -1888,28 +1888,7 @@ class PlayState extends MusicBeatState
 
 	// called by every event with the same name
 	function eventPushedUnique(event:EventNote) {
-		switch(event.event) {
-			case "Change Character":
-				var charType:Int = 0;
-				switch(event.value1.toLowerCase()) {
-					case 'gf' | 'girlfriend' | '1':
-						charType = 2;
-					case 'dad' | 'opponent' | '0':
-						charType = 1;
-					default:
-						var val1:Int = Std.parseInt(event.value1);
-						if(Math.isNaN(val1)) val1 = 0;
-						charType = val1;
-				}
-
-				var newCharacter:String = event.value2;
-				addCharacterToList(newCharacter, charType);
-			
-			case 'Play Sound':
-				precacheList.set(event.value1, 'sound');
-				Paths.sound(event.value1);
-		}
-		stagesFunc(function(stage:BaseStage) stage.eventPushedUnique(event));
+		EventDomain.eventPushedUnique(this, event);
 	}
 
 	function eventEarlyTrigger(event:EventNote):Float return EventDomain.eventEarlyTrigger(this, event);
@@ -1934,101 +1913,31 @@ class PlayState extends MusicBeatState
 
 	override function openSubState(SubState:FlxSubState)
 	{
-		stagesFunc(function(stage:BaseStage) stage.openSubState(SubState));
-		if (paused)
-		{
-			if (FlxG.sound.music != null)
-			{
-				FlxG.sound.music.pause();
-				vocals.pause();
-				opponentVocals.pause();
-			}
-
-			if (startTimer != null && !startTimer.finished) startTimer.active = false;
-			if (finishTimer != null && !finishTimer.finished) finishTimer.active = false;
-			if (songSpeedTween != null) songSpeedTween.active = false;
-
-			var chars:Array<Character> = [boyfriend, gf, dad];
-			for (char in chars)
-				if(char != null && char.colorTween != null)
-					char.colorTween.active = false;
-
-			#if LUA_ALLOWED
-			for (tween in modchartTweens) tween.active = false;
-			for (timer in modchartTimers) timer.active = false;
-			#end
-		}
-
-		super.openSubState(SubState);
+		HostDomain.openSubState(this, SubState);
 	}
+
+	@:noCompletion public function meteoSuper_openSubState(SubState:FlxSubState) return super.openSubState(SubState);
 
 	override function closeSubState()
 	{
-		stagesFunc(function(stage:BaseStage) stage.closeSubState());
-		if (paused)
-		{
-			if (FlxG.sound.music != null && !startingSong)
-			{
-				resyncVocals();
-			}
-
-			if (startTimer != null && !startTimer.finished) startTimer.active = true;
-			if (finishTimer != null && !finishTimer.finished) finishTimer.active = true;
-			if (songSpeedTween != null) songSpeedTween.active = true;
-
-			var chars:Array<Character> = [boyfriend, gf, dad];
-			for (char in chars)
-				if(char != null && char.colorTween != null)
-					char.colorTween.active = true;
-
-			#if LUA_ALLOWED
-			for (tween in modchartTweens) tween.active = true;
-			for (timer in modchartTimers) timer.active = true;
-			#end
-
-			// 联机：仅「主动恢复」通知对方解除暂停；远程 RESUME 恢复时不再回发
-			if (isOnlineMode && !onlineRemoteResume) Multiplayer.send('RESUME');
-
-			paused = false;
-			callOnScripts('onResume');
-			resetRPC(startTimer != null && startTimer.finished);
-
-			#if mobile
-			// 恢复游戏触控板
-			if (objects.MobileControls.instance != null)
-			{
-				objects.MobileControls.instance.visible = true;
-			}
-			#end
-		}
-
-		super.closeSubState();
+		HostDomain.closeSubState(this);
 	}
+
+	@:noCompletion public function meteoSuper_closeSubState() return super.closeSubState();
 
 	override public function onFocus():Void
 	{
-		if (health > 0 && !paused) resetRPC(Conductor.songPosition > 0.0);
-		// Meteoric：从后台回到前台时恢复被冻结的音频（游戏仍停留在暂停菜单，等玩家手动返回）
-		#if mobile
-		restoreBackgroundAudio();
-		#end
-		super.onFocus();
+		HostDomain.onFocus(this);
 	}
+
+	@:noCompletion public function meteoSuper_onFocus() return super.onFocus();
 
 	override public function onFocusLost():Void
 	{
-		#if desktop
-		if (health > 0 && !paused) DiscordClient.changePresence(detailsPausedText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
-		#end
-
-		#if mobile
-		// 退到后台时立即暂停，避免“看似暂停实际还在运行”
-		if (startedCountdown && !endingSong && !paused && canPause)
-			openPauseMenu();
-		#end
-
-		super.onFocusLost();
+		HostDomain.onFocusLost(this);
 	}
+
+	@:noCompletion public function meteoSuper_onFocusLost() return super.onFocusLost();
 
 	// Updating Discord Rich Presence.
 	function resetRPC(?cond:Bool = false)
@@ -2261,469 +2170,10 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
-		#if METEORIC_PROFILE
-		backend.MeteoricProfile.begin();
-		#end
-
-		/*if (FlxG.keys.justPressed.NINE)
-		{
-			iconP1.swapOldIcon();
-		}*/
-
-		// 拆卸锁：endSong 结算拆卸后（转场/关闭回调窗口期）不再驱动本 State，
-		// 否则会访问已销毁的人物/判定线（Null Object Reference）
-		if (_visualsTorn)
-			return;
-
-		// 联机：网络收发 / 消息处理 / 时间同步 / 对手 HUD 刷新
-		if (isOnlineMode)
-			updateOnline(elapsed);
-
-		callOnScripts('onUpdate', [elapsed]);
-
-		// 原生长条按压覆盖：每帧同步判定线位置
-		if (holdCoverHandler != null)
-			holdCoverHandler.syncPositions(playerStrums, opponentStrums);
-
-		// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
-		// （blissful-erect 接箭头闪退现场）——按谱面默认配置逐个重建缺失角色，绝不闪退
-		ensureCharactersAlive();
-
-		// 延迟 GC（一次）：进曲 0.5s 后回收已剥离的谱面 DOM/解析暂存（倒计时期间，无音符生成）
-		if (_deferredGC)
-		{
-			_deferredGCTime += elapsed;
-			if (_deferredGCTime >= 0.5)
-			{
-				_deferredGC = false;
-				#if desktop
-				openfl.system.System.gc();
-				#end
-			}
-		}
-
-		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零，同时刷新 Score 栏
-		_npsTimer += elapsed;
-		if (_npsTimer >= 1)
-		{
-			npsDisplay = _npsCount;
-			_npsCount = 0;
-			_npsTimer -= 1;
-			if (ClientPrefs.data.showNPS && !endingSong && scoreTxt != null) updateScore();
-		}
-
-		// ===== HUD 权威校验（每帧） =====
-		// 1) hideHud 被 Mod/脚本临时改掉 → 立即恢复用户真实设置；
-		// 2) healthBar/图标/分数等 visible 被任何代码（Lua/Hscript/遗留逻辑）直接改掉
-		//    → 每帧强制拉回设置值。从根上杜绝“游玩中 UI 突然消失”。
-		// 注意：此函数只在非暂停/非结算（persistentUpdate=true）时执行，
-		// 不会干扰暂停界面、结算界面自身的显隐逻辑。
-		enforceHUD();
-
-		// 自愈：paused 卡死但没有打开任何子界面（如 PauseSubState 构造中途异常、
-		// Lua 拦截 onPause 后遗留）时解锁，避免“暂停界面显示不出来”却把游戏冻结住。
-		if (paused && subState == null && !isDead && !chartingMode)
-		{
-			_pausedSelfHealFrames++;
-			if (_pausedSelfHealFrames >= 3)
-			{
-				_pausedSelfHealFrames = 0;
-				paused = false;
-			}
-		}
-		else _pausedSelfHealFrames = 0;
-
-		// 镜头缓动。原实现把强度写死为 2.4（≈1.22s 才走完 95%），观感接近瞬移；
-		// 现改用设置档位提供的强度（0.3s / 0.5s / 0.8s），公式形状与帧率无关性均保持不变。
-		// 暂停/过场/外部接管（cameraSpeed=0）时写 0 → flixel 步长为 0，镜头钉住不动。
-		FlxG.camera.followLerp = 0;
-		if(!inCutscene && !paused) {
-			FlxG.camera.followLerp = FlxMath.bound(elapsed * cameraSmoothSpeed() * cameraSpeed * playbackRate / (FlxG.updateFramerate / 60), 0, 1);
-		}
-
-		// 防御：mod 脚本/事件/竞态可能把 boyfriend 置空（blissful-erect 接箭头闪退现场），
-		// 待机块永不因角色缺失而崩
-		if(!startingSong && !endingSong && boyfriend != null && boyfriend.getAnimationName().startsWith('idle')) {
-			boyfriendIdleTime += elapsed;
-			if(boyfriendIdleTime >= 0.15) { // Kind of a mercy thing for making the achievement easier to get as it's apparently frustrating to some playerss
-				boyfriendIdled = true;
-			}
-		} else {
-			boyfriendIdleTime = 0;
-		}
-
-		var healthLerp:Float = FlxMath.lerp(smoothHealth, health, FlxMath.bound(elapsed * 9 * playbackRate, 0, 1));
-		smoothHealth = healthLerp;
-
-		super.update(elapsed);
-
-		// 快速重开回溯：时间倒流（箭头随 songPosition 回退而飞回）
-		if (rewinding)
-		{
-			rewindElapsed += elapsed;
-			if (rewindElapsed >= rewindDuration)
-			{
-				rewinding = false;
-				Conductor.setPosition(0);
-				trace('[Rewind] FINISH, elapsed=' + rewindElapsed);
-				finishRestart();
-			}
-			else
-			{
-				// 变速回溯：一开始快、越接近终点越慢（cubicOut）；
-				// 终点 = 场上清空的位置（最早音符飞出出生窗口后），收尾正好落在最后几个箭头上
-				var rewindProgress:Float = rewindElapsed / rewindDuration;
-				Conductor.setPosition(FlxMath.lerp(rewindFromPos, rewindEndPos, FlxEase.cubeOut(rewindProgress)));
-
-				// 回溯中：箭头退回到“出生窗口”之外后回收，场上只保留正在倒流的箭头
-				var rewindWindow:Float = spawnTime * playbackRate;
-				if (songSpeed < 1) rewindWindow /= songSpeed;
-				var noteIdx:Int = notes.members.length - 1;
-				while (noteIdx >= 0)
-				{
-					var rewindNote:Note = notes.members[noteIdx];
-					if (rewindNote != null && rewindNote.alive)
-					{
-						var noteWindow:Float = rewindWindow;
-						if (rewindNote.multSpeed < 1) noteWindow /= rewindNote.multSpeed;
-						if (rewindNote.strumTime - Conductor.songPosition > noteWindow)
-						{
-							rewindNote.active = false;
-							rewindNote.visible = false;
-							notes.invalidateNote(rewindNote);
-						}
-					}
-					noteIdx--;
-				}
-
-				// 场上已没有可见箭头时提前结束回溯，不再空转浪费等待时间
-				if (notes.length == 0)
-				{
-					rewinding = false;
-					Conductor.setPosition(0);
-					trace('[Rewind] FINISH (field empty), elapsed=' + rewindElapsed);
-					finishRestart();
-				}
-			}
-		}
-
-		setOnScripts('curDecStep', curDecStep);
-		setOnScripts('curDecBeat', curDecBeat);
-
-		// 每帧刷新动态 PlayState 值（Psych 0.7.3 setSpecialObject 等价物）
-		setOnScripts('health', health);
-		setOnScripts('endingSong', endingSong);
-		setOnScripts('curBeat', curBeat);
-		setOnScripts('isCameraOnForcedPos', isCameraOnForcedPos);
-
-		// HUD 每帧更新（图标跳动/跟随/阴影滚动/botplay 呼吸/可见性权威）全部收敛到 GameHUD
-		#if METEORIC_PROFILE
-		backend.MeteoricProfile.phaseBegin('hud');
-		#end
-		if (hud != null) hud.update(elapsed);
-		#if METEORIC_PROFILE
-		backend.MeteoricProfile.phaseEnd('hud');
-		#end
-
-		if ((controls.PAUSE || androidBackQueued) && startedCountdown && canPause)
-		{
-			var ret:Dynamic = callOnScripts('onPause', null, true);
-			if(ret != FunkinLua.Function_Stop) {
-				openPauseMenu();
-			}
-		}
-		androidBackQueued = false;
-
-		if (controls.justPressed('debug_1') && !endingSong && !inCutscene)
-			openChartEditor();
-
-		if (controls.justPressed('debug_2') && !endingSong && !inCutscene)
-			openCharacterEditor();
-		
-		if (startedCountdown && !paused && !rewinding)
-			Conductor.advance(FlxG.elapsed * 1000 * playbackRate);
-
-		if (startingSong)
-		{
-			if (startedCountdown && Conductor.songPosition >= 0)
-			{
-		
-				startSong();
-			}
-			else if(!startedCountdown)
-				Conductor.setPosition(-Conductor.crochet * 5);
-		}
-		else if (!paused && updateTime)
-		{
-			var curTime:Float = Math.max(0, Conductor.songPosition - ClientPrefs.data.noteOffset);
-			songPercent = (curTime / songLength);
-
-			var songCalc:Float = (songLength - curTime);
-			if(ClientPrefs.data.timeBarType == '已过时间') songCalc = curTime;
-
-			var secondsTotal:Int = Math.floor(songCalc / 1000);
-			if(secondsTotal < 0) secondsTotal = 0;
-
-			if(ClientPrefs.data.timeBarType != '歌曲名称')
-				timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
-		}
-
-		// 歌曲收尾兜底：音乐 onComplete（空音频/流式音频可能永不触发）与"歌曲位置越过时长"
-		// 双保险 —— 任意歌曲到达 max(音频长度, 谱面末尾) 都正常结算；正常运行下
-		// onComplete 先触发并置 endingSong/finishingSong，本分支不会重复执行。
-		if (!endingSong && !finishingSong && !startingSong && !paused && !rewinding && !inCutscene && songLength > 0
-			&& Conductor.songPosition >= songLength)
-		{
-			finishSong();
-		}
-
-		if (camZooming)
-		{
-			FlxG.camera.zoom = FlxMath.lerp(defaultCamZoom, FlxG.camera.zoom, FlxMath.bound(1 - (elapsed * 3.125 * camZoomingDecay * playbackRate), 0, 1));
-			camHUD.zoom = FlxMath.lerp(1, camHUD.zoom, FlxMath.bound(1 - (elapsed * 3.125 * camZoomingDecay * playbackRate), 0, 1));
-		}
-
-		// Watch calls removed for performance
-
-		// RESET = Quick Game Over Screen（联机对局禁用重开，见 addOnlineHUD）
-		if (!ClientPrefs.data.noReset && controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong && !isOnlineMode)
-		{
-			health = 0;
-			trace("RESET = True");
-		}
-		doDeathCheck();
-
-		noteSpawn();
-
-		if (generatedMusic)
-		{
-			if(!inCutscene)
-			{
-				if(!rewinding && !cpuControlled && !replayMode) {
-					keysCheck();
-				} else {
-					// 回放 v2：按录制时间注入按键（走正常判定路径），并处理长按子段
-					if (replayMode && replayV2) updateReplayInputs();
-					// 【结算崩溃修复】曲终（finishSong→endSong 启动转场/拆卸）后该恢复块不得再跑：
-					// 此帧结束前角色动画已被置空（curAnim=null → inlined getAnimationName NRE）。
-					// 加 endingSong/finishingSong 守卫 + 动画非空校验（曲终帧自动游玩/回放路径崩溃修复）。
-					var _bfAnim:Dynamic = boyfriend != null ? boyfriend.animation : null;
-					if (!endingSong && !finishingSong && !ClientPrefs.data.hudOnly
-						&& _bfAnim != null && _bfAnim.curAnim != null
-						&& boyfriend.getAnimationName().startsWith('sing') && !boyfriend.getAnimationName().endsWith('miss')
-						&& (boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration
-							|| boyfriend.isAnimationFinished())) {
-						// 【视觉修复】原条件只靠 holdTimer 阈值：密集谱逐帧命中把 holdTimer 反复清零，
-						// 空段/曲间 BF 会一直卡在最后一个 sing 姿态。补上「sing 动画已播完」即回 idle 的兜底
-						// （isAnimationFinished 对 sparrow/atlas 角色都安全；Character 内部也已镜像阈值回 idle）。
-						boyfriend.dance();
-						//boyfriend.animation.curAnim.finish();
-					}
-				}
-
-				#if METEORIC_PROFILE
-				backend.MeteoricProfile.phaseBegin('notes');
-				#end
-				if(notes.length > 0)
-				{
-					if(startedCountdown)
-					{
-						var fakeCrochet:Float = (60 / SONG.bpm) * 1000;
-						var songPos:Float = Conductor.songPosition;
-						// 自动游玩命中提前量：实测本帧音频前进量的一半（帧轮询下偏差最小），
-						// 上限 20ms×倍速，防止卡顿帧后提前量过大导致提前命中掉出 Sick 窗口（45ms）
-						var songDelta:Float = songPos - lastBotSongPos;
-						lastBotSongPos = songPos;
-						var botAdvance:Float = Math.min(Math.max(songDelta, 1000 / FlxG.drawFramerate) * 0.5, 20 * playbackRate);
-						// 【性能】手动循环替代 forEachAlive 闭包：免去每帧闭包分配与每音符一次虚调用；
-						// 语义与 forEachAlive 完全一致（先取后 ++、循环条件实时读长度、移除节点不回溯）
-						var noteSpeed:Float = songSpeed / playbackRate;
-						var killWindow:Float = cpuControlled ? ClientPrefs.data.botplayKillWindow : noteKillOffset;
-						var ni:Int = 0;
-						while (ni < notes.members.length)
-						{
-							var daNote:Note = notes.members[ni++];
-							if (daNote == null || !daNote.exists || !daNote.alive) continue;
-
-							// 【性能】不可见音符（重叠隐藏等）：跳过跟随/裁剪/判定——
-							// 与 hideOverlapped 选项"渲染裁剪，不参与判定"语义一致；仅保留超时回收
-							if (!daNote.visible)
-							{
-								if (!rewinding && songPos - daNote.strumTime > killWindow)
-									notes.invalidateNote(daNote);
-								continue;
-							}
-
-							var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
-							if(!daNote.mustPress) strumGroup = opponentStrums;
-
-							// 联机真双人：两侧谱面全部展示（自己打自己半边、对方打对半边）；
-							// 对侧音符不再隐藏，由对端 HIT/MISS 按 chartSeq 消费（见 applyOppHit/applyOppMiss）。
-
-							var strum:StrumNote = strumGroup.members[daNote.noteData];
-							if (strum == null)
-							{
-								// 防御 + 现场诊断：strum 缺失时跳过本音符（不整局崩溃），并打印现场
-								trace('[STRUM NULL] seq=' + daNote.chartSeq + ' d=' + daNote.noteData
-									+ ' must=' + daNote.mustPress + ' pLen=' + playerStrums.length
-									+ ' oLen=' + opponentStrums.length + ' pos=' + Std.int(Conductor.songPosition)
-									+ ' step=' + curStep + ' gen=' + generatedMusic + ' keepping=' + keepStrumsOnRestart);
-								continue;
-							}
-							daNote.followStrumNote(strum, fakeCrochet, noteSpeed);
-
-							// 视觉副本（blockHit+ignoreNote）快捷路径：只跟随/长条裁剪/超时消亡，不做判定（大优化）
-							if (daNote.blockHit && daNote.ignoreNote)
-							{
-								// 长条副本同样需要判定键裁剪（否则滑过判定线后仍延伸不消失）
-								if (daNote.isSustainNote && strum != null && strum.sustainReduce)
-								{
-									daNote.wasGoodHit = true; // 副本纯视觉：满足裁剪条件
-									daNote.clipToStrumNote(strum);
-								}
-								if (!rewinding && songPos - daNote.strumTime > killWindow)
-									notes.invalidateNote(daNote);
-								continue;
-							}
-
-							if(daNote.mustPress)
-							{
-								if(!rewinding && (cpuControlled || replayMode) && !daNote.blockHit && !daNote.wasGoodHit
-									&& (replayMode || !daNote.botQueued)) // 自动游玩命中：排期与 alive-loop 双路互斥（botQueued 防重）
-								{
-									var shouldHit:Bool = false;
-									if (replayMode && !replayV2)
-									{
-										// 旧版回放（v1，无按键流）：按录制命中记录合成命中，
-										// 未记录的箭头自然滑过并触发 miss，与原局表现一致。
-										// 注意：v2（含按键流）不走这里——自动命中会在 strumTime 一到就抢先把
-										// 音符打掉，之后注入的真实按键（晚按）找不到可命中音符会变成 ghost miss，
-										// 导致回放 Miss 数膨胀（2 → 10）。v2 完全靠 updateReplayInputs 按键注入，
-										// 同时间同按键必然命中同一音符，与实玩 1:1 复刻。
-										if (replayHitSeqs != null && daNote.chartSeq >= 0 && replayHitSeqs.exists(daNote.chartSeq)
-											&& !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
-											shouldHit = true;
-									}
-									else if (!replayMode && ((botplayPlan != null && !daNote.tooLate && songPos + botAdvance >= daNote.strumTime)
-										|| (botplayPlan == null && daNote.canBeHit && (daNote.isSustainNote || songPos + botAdvance >= daNote.strumTime))))
-										shouldHit = true;
-
-									if (shouldHit)
-									{
-										// 本帧命中的音符先收集，循环结束后统一批处理
-										// （堆叠命中时合并音效/粒子/动画/评分等副作用，避免单帧爆发卡顿）
-										daNote.botQueued = true; // 免杀保护：本帧不再被超时击杀
-										daNote.botSched = false;
-										botHitQueue.push(daNote);
-									}
-								}
-							}
-							// 对手箭头：到达判定线即触发命中（旧条件是 wasGoodHit——对手音符从未被置位，
-							// 导致对手箭头永远不会被 opponentNoteHit 回收，直接飞过判定线）
-							// 联机：跳过该自动化命中（装饰音符，不闪烁/不触发动画），见上方 visible 屏蔽
-							else if (!rewinding && !daNote.hitByOpponent && !daNote.ignoreNote
-								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0 && !isOnlineMode)
-							{
-								opponentNoteHit(daNote);
-								// 对手簇视觉副本同步销毁（与玩家侧 processBotHits 一致）：
-								// 副本只靠回收窗击杀会飞过判定线，巨堆叠段肉眼即"整簇飞走"。
-								// 【500 帧补丁】原实现每命中全表反向扫描（O(命中×成员)）→ 改为登记 chartSeq，
-								// 本帧主循环结束后统一一次 O(成员) 批扫（语义等价：同一批命中同帧销毁）。
-								if (daNote.chartSeq >= 0)
-								{
-									if (_oppHitSeqs == null) _oppHitSeqs = new Map<Int, Bool>();
-									_oppHitSeqs.set(daNote.chartSeq, true);
-								}
-							}
-
-							if(daNote.isSustainNote && strum != null && strum.sustainReduce) daNote.clipToStrumNote(strum);
-
-							// Kill extremely late notes and cause misses
-							// （已入自动命中队列的音符本帧免杀：逾期 1 帧由 processBotHits 记账，杜绝"入队后被击杀丢弃"）
-							// 自动游玩：未命中者极小窗口即回收（柱子顶端贴判定线裁齐，不残留 +52ms 残影）
-							if (!rewinding && !daNote.botQueued && !(cpuControlled && daNote.botSched) && songPos - daNote.strumTime > killWindow)
-							{
-								if (daNote.mustPress && !cpuControlled &&!daNote.ignoreNote && !endingSong && (daNote.tooLate || !daNote.wasGoodHit)
-								&& (ClientPrefs.data.noteJudgment != 'KE 判定' || !daNote.isSustainNote))
-									noteMiss(daNote);
-
-								daNote.active = false;
-								daNote.visible = false;
-
-								notes.invalidateNote(daNote);
-							}
-						}
-					}
-					else
-					{
-						// 【性能】倒计时分支同样手动循环（与 forEachAlive 语义一致）
-						var ni2:Int = 0;
-						while (ni2 < notes.members.length)
-						{
-							var daNote:Note = notes.members[ni2++];
-							if (daNote != null && daNote.exists && daNote.alive)
-							{
-								daNote.canBeHit = false;
-								daNote.wasGoodHit = false;
-							}
-						}
-					}
-					// 【500 帧补丁】对手命中兄弟视觉副本：本帧一次批扫（见登记处注释）
-					if (_oppHitSeqs != null)
-					{
-						var omi:Int = notes.members.length - 1;
-						while (omi >= 0)
-						{
-							var osib:Note = notes.members[omi];
-							if (osib != null && osib.blockHit && osib.ignoreNote && osib.chartSeq >= 0
-								&& _oppHitSeqs.exists(osib.chartSeq))
-								notes.invalidateNote(osib);
-							omi--;
-						}
-						_oppHitSeqs = null;
-					}
-					processBotHits();
-				#if METEORIC_PROFILE
-				backend.MeteoricProfile.phaseEnd('notes');
-				#end
-				}
-
-				// 回放（旧版）：按录制时间触发空按（无对应音符的按键），与原局按键时机一致。
-				// 回放 v2 的空按由按键注入自然复现，这里跳过避免重复 Miss。
-				if (replayMode && !replayV2 && !rewinding && !paused && !endingSong && startedCountdown)
-				{
-					while (replayPressPtr < replayPressMisses.length && Conductor.songPosition >= replayPressMisses[replayPressPtr].t)
-					{
-						var pm:ReplayEvent = replayPressMisses[replayPressPtr++];
-						noteMissPress(pm.d);
-					}
-				}
-			}
-			checkEventNote();
-		}
-
-		#if debug
-		if(!endingSong && !startingSong) {
-			if (FlxG.keys.justPressed.ONE) {
-				KillNotes();
-				FlxG.sound.music.onComplete();
-			}
-			if(FlxG.keys.justPressed.TWO) { //Go 10 seconds into the future :O
-				setSongTime(Conductor.songPosition + 10000);
-				clearNotesBefore(Conductor.songPosition);
-			}
-		}
-		#end
-
-		setOnScripts('cameraX', camFollow.x);
-		setOnScripts('cameraY', camFollow.y);
-		setOnScripts('botPlay', cpuControlled);
-		callOnScripts('onUpdatePost', [elapsed]);
-
-		#if METEORIC_PROFILE
-		backend.MeteoricProfile.end('PlayState.update');
-		#end
+		HostDomain.update(this, elapsed);
 	}
+
+	@:noCompletion public function meteoSuper_update(elapsed:Float) return super.update(elapsed);
 
 	#if mobile
 	/** 游玩中按返回键 / 左上角 X：暂停游戏而不是退出（菜单里仍是退出到桌面） */
@@ -3800,8 +3250,7 @@ class PlayState extends MusicBeatState
 	// 自动游玩批处理：统一命中本帧收集的音符，堆叠时合并副作用
 	function recordReplayEvent(seq:Int, t:Float, d:Int, r:String):Void
 	{
-		if (recordingReplay && currentReplay != null && !cpuControlled && !replayMode)
-			currentReplay.addEvent(seq, t, d, r);
+		EventDomain.recordReplayEvent(this, seq, t, d, r);
 	}
 
 	function processBotHits():Void NoteChartDomain.processBotHits(this);
@@ -3879,129 +3328,26 @@ class PlayState extends MusicBeatState
 	var lastStepHit:Int = -1;
 	override function stepHit()
 	{
-		if (rewinding) return; // 回溯期间不触发步点回调，避免重开音频
-
-		if(FlxG.sound.music.length > 0 && FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
-		{
-			// 音频不可用（length=0）时跳过漂移检测：空音频 music.time 恒 0，
-			// 会把 songPosition 误判为"漂移>20ms"→ resyncVocals 把时钟拉回 0（0:00 卡死根因）
-			var drift:Float = FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset);
-			if (Math.abs(drift) > (20 * playbackRate)
-				|| (SONG.needsVoices && Math.abs(vocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate))
-				|| (SONG.needsVoices && opponentVocals.length > 0 && Math.abs(opponentVocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)))
-			{
-				resyncVocals();
-			}
-		}
-
-		super.stepHit();
-
-		if(curStep == lastStepHit) {
-			return;
-		}
-
-		lastStepHit = curStep;
-		setOnScripts('curStep', curStep);
-		callOnScripts('onStepHit');
+		NoteChartDomain.stepHit(this);
 	}
+
+	@:noCompletion public function meteoSuper_stepHit() return super.stepHit();
 
 	var lastBeatHit:Int = -1;
 
 	override function beatHit()
 	{
-		if (rewinding) return; // 回溯期间不触发拍点回调（角色/图标保持静止）
-
-		if(lastBeatHit >= curBeat) {
-			//trace('BEAT HIT: ' + curBeat + ', LAST HIT: ' + lastBeatHit);
-			return;
-		}
-
-		if (generatedMusic)
-			notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
-
-	if(ClientPrefs.data.sbIconBop){
-		if (curBeat % gfSpeed == 0) {
-			if (curBeat % (gfSpeed * 2) == 0) {
-				iconP1.scale.set(0.8, 0.8);
-				iconP2.scale.set(1.2, 1.3);
-				
-				iconP1.angle = -15;
-				iconP2.angle = 15;
-			} else {
-				iconP2.scale.set(0.8, 0.8);
-				iconP1.scale.set(1.2, 1.3);
-				
-				iconP2.angle = -15;
-				iconP1.angle = 15;
-			}
-		}
+		NoteChartDomain.beatHit(this);
 	}
 
-		if (ClientPrefs.data.keIconBop)
-		{
-			// KE 引擎图标跳动：每拍放大 30px（相当于 scale + 30/frameWidth），随后在 update 中按时间缩回
-			iconP1.scale.x += 30 / iconP1.frameWidth;
-			iconP1.scale.y = iconP1.scale.x;
-			iconP1.updateHitbox();
-			iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
-			iconP2.scale.x += 30 / iconP2.frameWidth;
-			iconP2.scale.y = iconP2.scale.x;
-			iconP2.updateHitbox();
-			iconP2.origin.set(0, 0);
-		}
-		else
-		{
-			iconP1.scale.set(1.2, 1.2);
-			iconP2.scale.set(1.2, 1.2);
-
-			iconP1.updateHitbox();
-			iconP2.updateHitbox();
-		}
-
-		if (!ClientPrefs.data.hudOnly && gf != null && curBeat % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && !gf.getAnimationName().startsWith('sing') && !gf.stunned)
-			gf.dance();
-		if (!ClientPrefs.data.hudOnly && boyfriend != null && curBeat % boyfriend.danceEveryNumBeats == 0 && !boyfriend.getAnimationName().startsWith('sing') && !boyfriend.stunned)
-			boyfriend.dance();
-		if (!ClientPrefs.data.hudOnly && dad != null && curBeat % dad.danceEveryNumBeats == 0 && !dad.getAnimationName().startsWith('sing') && !dad.stunned)
-			dad.dance();
-
-		super.beatHit();
-		lastBeatHit = curBeat;
-
-		setOnScripts('curBeat', curBeat);
-		callOnScripts('onBeatHit');
-	}
+	@:noCompletion public function meteoSuper_beatHit() return super.beatHit();
 
 	override function sectionHit()
 	{
-		if (rewinding) return; // 回溯中不移动镜头、不改 BPM
-		if (SONG.notes[curSection] != null)
-		{
-			if (generatedMusic && !endingSong && !isCameraOnForcedPos)
-				moveCameraSection();
-
-			if (camZooming && FlxG.camera.zoom < 1.35 && ClientPrefs.data.camZooms)
-			{
-				FlxG.camera.zoom += 0.015 * camZoomingMult;
-				camHUD.zoom += 0.03 * camZoomingMult;
-			}
-
-			if (SONG.notes[curSection].changeBPM)
-			{
-				Conductor.bpm = SONG.notes[curSection].bpm;
-				setOnScripts('curBpm', Conductor.bpm);
-				setOnScripts('crochet', Conductor.crochet);
-				setOnScripts('stepCrochet', Conductor.stepCrochet);
-			}
-			setOnScripts('mustHitSection', SONG.notes[curSection].mustHitSection);
-			setOnScripts('altAnim', SONG.notes[curSection].altAnim);
-			setOnScripts('gfSection', SONG.notes[curSection].gfSection);
-		}
-		super.sectionHit();
-		
-		setOnScripts('curSection', curSection);
-		callOnScripts('onSectionHit');
+		NoteChartDomain.sectionHit(this);
 	}
+
+	@:noCompletion public function meteoSuper_sectionHit() return super.sectionHit();
 
 	#if LUA_ALLOWED
 	public function startLuasNamed(luaFile:String):Bool return HostDomain.startLuasNamed(this, luaFile);
