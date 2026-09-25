@@ -54,6 +54,10 @@ class OptionsState extends MusicBeatState
 	var pane:OptionsPane;
 	var bg:FlxSprite;
 	var backBtn:BackButton;
+	/** 底部提示条面板（令牌化：主题变更时要原地重绘） */
+	var hintPanel:FlxSprite;
+	/** 主题变更监听者（必须在本状态 destroy 时摘除，否则静态监听表留下僵尸回调） */
+	var themeListener:Void->Void = null;
 
 	var focus:Int = FOCUS_CONTENT;
 	var timeForMoving:Float = 0;
@@ -212,7 +216,8 @@ class OptionsState extends MusicBeatState
 		add(backBtn.label);
 
 		// ---- 底部提示条 ----
-		add(OptionsUi.makePanel(40, 662, 1200, 48, 14));
+		hintPanel = OptionsUi.makePanel(40, 662, 1200, 48, 14);
+		add(hintPanel);
 		var hintText:String = 'Tab 切换分区/选项 · ↑↓ 选择 · ←→ 调整 · Enter 切换 · R 重置 · 点击左侧分区切换 · Esc 返回';
 		#if mobile
 		hintText = '点左侧分区切换 · 拖动选择 · ◀▶ 调整 · A 切换 · 点 < 返回';
@@ -262,6 +267,12 @@ class OptionsState extends MusicBeatState
 
 		// headless 分区的弹窗（如 Score 栏格式输入框）路由到本状态
 		BaseOptionsMenu.promptHost = this;
+
+		// 主题色变更 → 本页**立刻**全面换色（底板/高亮条/开关轨道/色板底板，见 rethemeNow）。
+		// 走 DesignTokens 的监听者机制：设置里手动改色与脚本 setThemeColor 两条路径都覆盖；
+		// 契约要求宿主 destroy 时摘除，否则静态监听表会留下对已销毁精灵的僵尸回调。
+		themeListener = function() rethemeNow();
+		DesignTokens.addThemeListener(themeListener);
 
 		super.create();
 
@@ -395,6 +406,23 @@ class OptionsState extends MusicBeatState
 	{
 		if (bg != null) bg.color = DesignTokens.menuTint;
 		if (pane != null) pane.refresh();
+	}
+
+	/**
+	 * 主题色变更后的**整页即时换色**（由 DesignTokens 的监听者派发；低频事件，禁止逐帧）。
+	 *
+	 * 为什么必须在这里做：单界面设置的分区实例是 headless 构造的（没有自己的 UI），
+	 * 改色时它们只会 applyTheme + 落盘（见 BaseOptionsMenu.refreshThemeVisuals 的 early-return），
+	 * 本页看得见的装饰全部归宿主（本状态）与 OptionsPane / SettingsRail 所有 —— 由宿主统一重绘。
+	 *
+	 * 只重绘令牌化装饰：面板底/描边、选中高亮条、色板底板、开关轨道；不动布局、不重建精灵、不做 tween。
+	 */
+	function rethemeNow():Void
+	{
+		if (bg != null) bg.color = DesignTokens.menuTint;
+		if (hintPanel != null) OptionsUi.rethemePanel(hintPanel, 1200, 48, 14);
+		if (rail != null) rail.refreshTheme();
+		if (pane != null) pane.refreshTheme();
 	}
 
 	// ===== 输入 =====
@@ -636,6 +664,12 @@ class OptionsState extends MusicBeatState
 	override function destroy()
 	{
 		FlxG.mouse.visible = false;
+		// 主题监听：静态表，必须摘除（否则离开设置页后每次改色都会回调到已销毁的精灵）
+		if (themeListener != null)
+		{
+			DesignTokens.removeThemeListener(themeListener);
+			themeListener = null;
+		}
 		// 落盘 → 再 loadPrefs：本类旧实现的 destroy 只有 loadPrefs（"应用存档值"），
 		// 分页时代靠各子页关闭时的 saveSettings 落盘；单界面没有那一步，必须在这里补（否则最后一次改动丢失）
 		ClientPrefs.saveSettings();

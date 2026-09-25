@@ -44,6 +44,10 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 	var descText:FlxText;
 	var selectorBar:FlxSprite;
+	/** 三块整屏面板（令牌化装饰：主题色变更时要原地重绘，故留引用） */
+	var leftPanel:FlxSprite;
+	var rightPanel:FlxSprite;
+	var bottomPanel:FlxSprite;
 	var selectorTween:FlxTween;
 	var backBtn:BackButton;
 	/** menuDesat 背景精灵（主题色切换时刷新 tint；暂停内嵌路径为纯黑遮罩，不参与主题化） */
@@ -109,6 +113,19 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	 * （箭头被 tween 到 y=90 压到选项行上、溅射被摆到面板外）。判据要用这个常驻标志。
 	 */
 	public var paneHosted:Bool = false;
+	/**
+	 * 【构造期快照】本实例是否是**以 headless 方式构造**出来的（= 没有建任何 UI 数组：
+	 * `rows` / `switchCols` / `valueTexts` 恒为空）。
+	 *
+	 * ⚠ 运行期**禁止**用静态 `headless` 判断这件事：它只在构造窗口内为 true，
+	 * `OptionsState.sectionInstance` 构造完立刻还原成 false → headless 实例在运行期被误判成"整屏实例"，
+	 * `refreshRows()` 进入循环读从未创建的 `rows[r]`（得到 null）→ `row.visible = true`
+	 * 触发原生空指针崩溃（2026-09-24 实测：设置 → 界面 → 切换主题色必崩，
+	 * 崩溃点 = BaseOptionsMenu.refreshRows，信号 11）。
+	 * `paneHosted` 是宿主**构造之后**才赋值的，构造期内仍是 false，同样当不了构造期判据 —— 故在此快照。
+	 * 同类先例：NoteSettingsSubState.panePreview（也是构造期读 `BaseOptionsMenu.headless` 存起来）。
+	 */
+	public var builtHeadless(default, null):Bool = false;
 	/** headless 下由宿主接管「打开选项弹窗」（如 Score 栏格式输入框） */
 	public static var promptHost:flixel.FlxState = null;
 	/**
@@ -128,6 +145,9 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	public function new()
 	{
 		super();
+
+		// ⚠ 必须在下面早退**之前**快照：静态 headless 只在构造窗口内为 true（详见 builtHeadless 注释）
+		builtHeadless = headless;
 
 		// headless：子类的 addOption 全在 super() 之前跑完，这里直接返回即可（不建 UI、不动 Discord/鼠标状态）
 		if (headless) return;
@@ -164,9 +184,12 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		add(bg);
 
 		// ---- 圆角磨砂面板 ----
-		add(makePanel(PANEL_L_X, PANEL_L_Y, PANEL_L_W, PANEL_L_H, 22));
-		add(makePanel(PANEL_R_X, PANEL_R_Y, PANEL_R_W, PANEL_R_H, 22));
-		add(makePanel(120, 662, 1040, 48, 14));
+		leftPanel = makePanel(PANEL_L_X, PANEL_L_Y, PANEL_L_W, PANEL_L_H, 22);
+		add(leftPanel);
+		rightPanel = makePanel(PANEL_R_X, PANEL_R_Y, PANEL_R_W, PANEL_R_H, 22);
+		add(rightPanel);
+		bottomPanel = makePanel(120, 662, 1040, 48, 14);
+		add(bottomPanel);
 
 		// ---- 标题 ----
 		var titleText:FlxText = new FlxText(LIST_X, 100, 0, title, 30);
@@ -305,7 +328,10 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	 */
 	public function openPrompt(sub:flixel.FlxSubState):Void
 	{
-		if (headless)
+		// ⚠ 同 builtHeadless 注释：本方法在**运行期**被调用（用户点「Score 栏格式」等选项），
+		//    此时静态 headless 已是 false，必须用构造期快照判断，否则弹窗会被 openSubState 到一个
+		//    不在状态树里的 headless 实例上（= 弹窗打不开）。
+		if (builtHeadless)
 		{
 			if (promptHost != null) promptHost.openSubState(sub);
 			return;
@@ -319,7 +345,9 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	// ===== 列表刷新 =====
 	function refreshRows()
 	{
-		if (headless) return; // 单界面宿主：渲染由 options.OptionsPane 负责
+		// ⚠ 判据必须是**构造期快照**：静态 headless 在运行期恒为 false，
+		//    用它判断会把 headless 实例放进下面的循环 → `rows[r]` 为 null → 原生空指针崩溃
+		if (builtHeadless) return; // 单界面宿主：渲染由 options.OptionsPane 负责
 		for (r in 0...ROWS_VISIBLE)
 		{
 			var idx:Int = scrollIndex + r;
@@ -400,13 +428,26 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	public function refreshThemeVisuals(?index:Null<Int>):Void
 	{
 		DesignTokens.applyTheme(index, false, true);
-		if (headless) return; // 令牌/存档已生效；本页 UI 由宿主 OptionsPane 刷新（见 OptionsPane.onValueChanged）
+		if (builtHeadless) return; // 令牌/存档已生效；本页 UI 由宿主 OptionsPane 刷新（见 OptionsPane.onValueChanged）
 
-		if (bgSprite != null)
-			bgSprite.color = DesignTokens.menuTint;
-
+		redrawThemedChrome(); // 面板/高亮条/色板底板：当场换色（低频事件，只重绘令牌化装饰）
 		refreshSwatches();
-		refreshRows();
+		refreshRows();        // 行内开关轨道由 refreshRows → ToggleSwitch.refreshTheme() 重绘
+	}
+
+	/**
+	 * 主题色变更后重绘本页的**令牌化装饰**：三块面板、选中高亮条、色板底板。
+	 * 低频事件（只在 refreshThemeVisuals 里调用）；不动布局、不重建精灵、不做 tween（meteoric-system 绘制纪律）。
+	 */
+	function redrawThemedChrome():Void
+	{
+		if (bgSprite != null) bgSprite.color = DesignTokens.menuTint; // 整屏 menuDesat 背景 tint
+		OptionsUi.rethemePanel(leftPanel, PANEL_L_W, PANEL_L_H, 22);
+		OptionsUi.rethemePanel(rightPanel, PANEL_R_W, PANEL_R_H, 22);
+		OptionsUi.rethemePanel(bottomPanel, 1040, 48, 14);
+		OptionsUi.rethemePanel(selectorBar, VALUE_X + VALUE_W - (LIST_X - 24), 44, 12, DesignTokens.rowHighlight, null);
+		if (swatchBar != null)
+			OptionsUi.rethemePanel(swatchBar, PANEL_R_W - SWATCH_BAR_PAD * 2, SWATCH_BAR_H, 12, DesignTokens.rowHover, DesignTokens.panelOutline);
 	}
 
 	// ===== 主题色色块区（可选挂载）=====
@@ -435,7 +476,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	 */
 	public function ensureThemeSwatchesAdded():Void
 	{
-		if (headless) return; // 单界面宿主自带色板区（OptionsPane.ensureSwatches）
+		if (builtHeadless) return; // 单界面宿主自带色板区（OptionsPane.ensureSwatches）
 		if (!_themeSwatchesWanted || _themeSwatchSpritesReady) return;
 		if (findThemeColorOption() == null) return;
 
@@ -503,7 +544,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	/** 色块选中态与键盘焦点：主题色行被选中时点亮主题色环，其余时候保持"当前档位"白环 */
 	function refreshSwatches():Void
 	{
-		if (headless) return; // 由 OptionsPane 的色板区负责
+		if (builtHeadless) return; // 由 OptionsPane 的色板区负责
 		if (themeSwatches == null) return;
 		themeSwatches.selectedIndex = DesignTokens.themeIndex;
 		var o:Option = findThemeColorOption();
@@ -1007,7 +1048,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	// ===== 选中变化 =====
 	function changeSelection(change:Int = 0)
 	{
-		if (headless) { onPaneSelectionChange(curSelected); return; } // 单界面宿主自己维护选中（OptionsPane.changeSelection）
+		if (builtHeadless) { onPaneSelectionChange(curSelected); return; } // 单界面宿主自己维护选中（OptionsPane.changeSelection）
 		curSelected += change;
 		if (curSelected < 0)
 			curSelected = optionsArray.length - 1;
@@ -1038,7 +1079,9 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		// 故默认传 null、在此解析 —— 同时保证取到的是「当前主题」的值，而不是类加载时的快照。
 		if (fill == null) fill = DesignTokens.panelFill;
 		if (border == null) border = DesignTokens.panelOutline;
-		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT);
+		// ⚠ unique = true：与 OptionsUi.makePanel 同一理由 —— 同尺寸+同色会命中缓存的同一张 BitmapData，
+		//    主题变更时的原地重绘会波及其它精灵（见 objects/ToggleSwitch 类注释第 1 条）。
+		var spr:FlxSprite = new FlxSprite(x, y).makeGraphic(Std.int(w), Std.int(h), FlxColor.TRANSPARENT, true);
 		FlxSpriteUtil.drawRoundRect(spr, 0, 0, w, h, radius, radius, fill);
 		if (border != null)
 			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});

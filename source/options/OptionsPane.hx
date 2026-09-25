@@ -494,6 +494,23 @@ class OptionsPane extends FlxGroup
 		refreshSwatches();
 	}
 
+	/**
+	 * 主题色变更：原地重绘本内容区的**令牌化装饰**（面板 / 选中高亮条 / 外链卡 / 色板底板），
+	 * 并让开关轨道按新 primary 重绘 —— 使"设置 → 界面 → 主题色"当场全面换色。
+	 *
+	 * 调用时机：DesignTokens 的主题变更派发（宿主 OptionsState 注册的监听者）。低频事件，禁止逐帧。
+	 * 行文字/值文字用的是语义色（白 / 0xFFCFCFDC / 0xFFD7D7E0），不参与主题化，故这里不碰。
+	 */
+	public function refreshTheme():Void
+	{
+		OptionsUi.rethemePanel(panel, PANEL_W, PANEL_H, 22);
+		OptionsUi.rethemePanel(selectorBar, BAR_W, BAR_H, 12, DesignTokens.rowHighlight, null);
+		if (extCard != null) OptionsUi.rethemePanel(extCard, PANEL_W - 48, 200, 14, DesignTokens.rowHover, DesignTokens.panelOutline);
+		if (swatchBar != null) OptionsUi.rethemePanel(swatchBar, BAR_W, STRIP_H, 14, DesignTokens.rowHover, DesignTokens.panelOutline);
+		for (sw in switchCols)
+			if (sw != null) sw.refreshTheme();
+	}
+
 	// ===== 主题色块区 =====
 
 	function ensureSwatches():Void

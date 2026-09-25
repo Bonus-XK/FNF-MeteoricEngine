@@ -75,12 +75,15 @@ class SettingsRail extends FlxGroup
 	var rows:Array<FlxText> = [];
 	var lastText:Array<String> = [];
 	var bar:FlxSprite;
+	/** 侧栏底板（主题色变更时要原地重绘，故留引用） */
+	var panel:FlxSprite;
 
 	public function new()
 	{
 		super();
 
-		add(OptionsUi.makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22));
+		panel = OptionsUi.makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22);
+		add(panel);
 
 		var title:FlxText = new FlxText(TITLE_X, TITLE_Y, TEXT_W, '设置', 30);
 		title.setFormat(Paths.font('future.ttf'), 30, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -105,6 +108,16 @@ class SettingsRail extends FlxGroup
 			rows.push(row);
 			lastText.push('');
 		}
+	}
+
+	/**
+	 * 主题色变更：原地重绘本组件里**令牌化**的两块（底板 + 选中高亮条），让侧栏立刻换色。
+	 * 低频事件（仅在 applyTheme 的监听者派发里调用），禁止放进 update/逐帧路径。
+	 */
+	public function refreshTheme():Void
+	{
+		OptionsUi.rethemePanel(panel, PANEL_W, PANEL_H, 22);
+		OptionsUi.rethemePanel(bar, BAR_W, BAR_H, 12, DesignTokens.rowHighlight, null);
 	}
 
 	public function setLabels(list:Array<String>):Void
