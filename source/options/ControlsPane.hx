@@ -73,20 +73,37 @@ class ControlsPane extends SettingsCanvas
 		[false, Lang.tOr('controls.key.debug_2', '按键 2'), 'debug_2', Lang.tOr('controls.keyBind.debug_2', '调试按键 2')],
 		[true],
 		[true],
-		// 「恢复默认按键」行带 RESTORE_TAG 哨兵：activateSelected/startBinding 用它判断
-		// 「这是按钮不是可绑定键位」。旧实现是拿中文 option[1] 比较（`== defaultKey`）——
-		// 一旦本地化就再也匹配不上，会把「恢复默认」误判成键位去启动绑定流程。
-		[true, Lang.tOr('controls.group.restoreDefaults', '恢复默认按键'), RESTORE_TAG]
+		// ⚠ 必须保持**长度 2**：buildList 用 `option.length >= 3` 区分「可绑定键位行」与
+		// 「标题行」。曾把它写成 [true, <译文>, RESTORE_TAG]（长度 3）想加哨兵，结果该行被
+		// 误判成键位行进入 curOptions → refreshList 去 keyBinds.get('__restoreDefaults')
+		// 得到 null → savKey[n] 空引用崩溃（2026-10-04 实测）。
+		// 所以：数组里保留**未翻译的中文原文**（defaultKey 比较依赖它），
+		// 翻译只发生在渲染处（refreshList 的标题分支调 rowLabel()）。
+		[true, '恢复默认按键']
 	];
 	var allRows:Array<Int> = [];         // 全列表：<0 标题/分隔（-i-1），>=0 可选项的 options 索引
 	var curOptions:Array<Int> = [];      // 可选项的 options 索引
 	var curOptionsValid:Array<Int> = []; // 可选项在全列表中的行号
-	/** 「恢复默认按键」行的哨兵标记（放在 options[i][2] 槽；该行不是可绑定键位，没有存档键） */
-	static final RESTORE_TAG:String = '__restoreDefaults';
-	/** 该行是否「恢复默认」按钮（按哨兵判断，与语言无关；旧实现是中文 option[1] 比较） */
+	/** 「恢复默认按键」行的**未翻译原文**（数组里存的就是它；不能用译文比） */
+	static var defaultKey:String = '恢复默认按键';
+
+	/** 该行是否「恢复默认」按钮（按未翻译原文比较 —— 数组里存的就是原文） */
 	static function isRestoreRow(option:Array<Dynamic>):Bool
 	{
-		return option != null && option.length > 2 && option[2] == RESTORE_TAG;
+		return option != null && option.length > 1 && option[1] == defaultKey;
+	}
+
+	/**
+	 * 行标签的显示文本（多语言翻译点）。
+	 * 绝大多数行的 option[1] 在**构造数组时**就已包好 Lang.tOr；
+	 * 但「恢复默认按键」行必须存原文（供 isRestoreRow 比较），故在此按需翻译。
+	 */
+	static function rowLabel(option:Array<Dynamic>):String
+	{
+		if (option == null || option.length <= 1) return '';
+		var raw:String = option[1];
+		if (raw == defaultKey) return Lang.tOr('controls.group.restoreDefaults', '恢复默认按键');
+		return raw;
 	}
 
 	var curSelected:Int = 0;
@@ -293,7 +310,7 @@ class ControlsPane extends SettingsCanvas
 			{
 				// 标题/分隔行
 				var titleOption:Array<Dynamic> = options[-(optIdx + 1)];
-				var titleText:String = (titleOption.length > 1) ? titleOption[1] : '';
+				var titleText:String = (titleOption.length > 1) ? rowLabel(titleOption) : '';
 				if (lastRowText[r] != titleText || !lastRowTitle[r])
 				{
 					lastRowText[r] = titleText;
@@ -317,11 +334,11 @@ class ControlsPane extends SettingsCanvas
 				var option:Array<Dynamic> = options[optIdx];
 				var isSel:Bool = (idx == num);
 
-				if (lastRowText[r] != option[1] || lastRowTitle[r])
+				if (lastRowText[r] != rowLabel(option) || lastRowTitle[r])
 				{
-					lastRowText[r] = option[1];
+					lastRowText[r] = rowLabel(option);
 					lastRowTitle[r] = false;
-					row.text = option[1];
+					row.text = rowLabel(option);
 					row.fieldWidth = 0;
 					row.x = LIST_X;
 					row.alignment = LEFT;

@@ -319,6 +319,15 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
      又用 `menuItems[curSelected] == '重试'` 判动作 —— 英文界面点 Retry 会**静默走成「继续」**。
      已改为内部 ID（`ACTION_RETRY`/`ACTION_REPLAY`/`ACTION_CONTINUE`）+ `actionLabel()` 显示映射。
      **规则：数组/表里存 ID，显示时翻译，判定用 ID**（同 `PauseSubState.menuItemsOG`）。
+  4. ⚠⚠ **别改「用数组长度做分类」的行的元素个数** —— 这是最隐蔽的一类。
+     `ControlsPane.options` 用 `option.length >= 3` 区分「可绑定键位行」与「标题/分隔行」，
+     键位行进 `curOptions`，`refreshList` 随后会 `ClientPrefs.keyBinds.get(option[2])` 取存档键。
+     给「恢复默认按键」行加第 3 个元素当哨兵 → 该行从标题行变成键位行 → `option[2]` 是
+     不存在的键 → `get` 返回 `null` → `savKey[n]` **空引用崩溃**（2026-10-04 实测，
+     表现为「翻到列表底部就崩」）。
+     正解：数组里保留**未翻译的中文原文**（`[true, '恢复默认按键']`，长度仍是 2），
+     翻译只发生在渲染处 —— `ControlsPane.rowLabel()` 识别出该行再 `Lang.tOr`。
+     **加元素前必须先确认这行的长度是否被用作分类依据。**
 - **检测手段**：改动后全仓库扫一遍
   `xxx[i] == '中文'` / `case '中文'` / `.contains('中文')` / `.remove('中文')`，
   逐个确认是「存档值比较（保留）」还是「显示文本比较（必须改 ID）」。
