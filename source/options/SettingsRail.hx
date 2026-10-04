@@ -89,10 +89,10 @@ class SettingsRail extends FlxGroup
 	var rowScrollIdx:Int = -1;
 	/** 上一次看到的选中行文本，用于检测换文案并复位 */
 	var rowScrollText:String = null;
-	/** 上次写入 textField 的 scrollH（相同则跳过重复写入；-1 = 尚未写过） */
-	var rowScrollDrawn:Int = -1;
-	/** 距上次重绘累积的秒数（节流用） */
-	var rowScrollAccum:Float = 0;
+	/** 当前行是否已把位图扩到全宽（跑马灯期间为 true） */
+	var rowFullW:Bool = false;
+	/** 每行当前实际字号；0 = 未缩放过（即ROW_FONT_SIZE） */
+	var rowRowSize:Array<Int> = [];
 
 	/** 跑马灯参数（px/秒 与 停留秒数） */
 	static final SCROLL_SPEED:Float = 26;
@@ -100,8 +100,15 @@ class SettingsRail extends FlxGroup
 	static final SCROLL_HOLD_END:Float = 1.6; // 滚到尾再停多久
 	/** 判定「超宽」的余量（px）：抗字体渲染误差，避免刚好齐边就抖动 */
 	static final OVERFLOW_EPS:Float = 1.0;
-	/** 位图重绘节流间隔（秒）≈20fps：FlxText 是缓存位图，改 scrollH 必须重绘才可见 */
-	static final SCROLL_REDRAW_INTERVAL:Float = 0.05;
+	/** 行文字标准字号 / 缩字号下限（兜底缩放用） */
+	static final ROW_FONT_SIZE:Int = 22;
+	static final ROW_FONT_MIN:Int = 14;
+	/**
+	 * 允许的最大全宽文本宽度（px）：文本左端最远 TEXT_X-(w-TEXT_W)、最右 TEXT_X+w，
+	 * 两者都必须落在面板内（PANEL_X..PANEL_X+PANEL_W）。
+	 * 取两侧约束的较小值：左界给出 198（=TEXT_W+32），右界给出 198（=PANEL_W-32）。
+	 */
+	static final MAX_FULL_W:Float = PANEL_W - (TEXT_X - PANEL_X);
 
 	var bar:FlxSprite;
 	/** 侧栏底板（主题色变更时要原地重绘，故留引用） */
@@ -126,8 +133,8 @@ class SettingsRail extends FlxGroup
 
 		for (r in 0...ROWS_RENDER)
 		{
-			var row:FlxText = new FlxText(TEXT_X, LIST_Y + (r * ROW_GAP), TEXT_W, '', 22);
-			row.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			var row:FlxText = new FlxText(TEXT_X, LIST_Y + (r * ROW_GAP), TEXT_W, '', ROW_FONT_SIZE);
+			row.setFormat(Paths.font('future.ttf'), ROW_FONT_SIZE, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			row.borderSize = 2;
 			row.antialiasing = ClientPrefs.data.antialiasing;
 			row.wordWrap = false; // 固定 166px 宽：长名靠跑马灯（仅选中行）看全，禁止折行压到下一行
@@ -137,6 +144,7 @@ class SettingsRail extends FlxGroup
 			rows.push(row);
 			lastText.push('');
 			rowTextW.push(-1);
+			rowRowSize.push(0);
 		}
 	}
 
@@ -309,10 +317,10 @@ class SettingsRail extends FlxGroup
 				lastText[r] = txt;
 				row.text = txt;
 				row.updateHitbox();
-				// FlxText 每次 set_text 都会复位内部 TextField 的 scrollX：
-				// 换文案必须重测宽度并把跑马灯状态清零，否则会带着旧偏移/旧宽度继续滚。
+				// 换文案 → 重测宽度（字号/文本都变了，缓存的宽度与缩放结果都作废）
 				rowTextW[r] = -1;
-				row.textField.scrollH = 0;
+				if (rowFullW || rowRowSize[r] > 0) restoreRow(row, r);
+				else row.x = TEXT_X;
 			}
 			row.y = LIST_Y + rel * ROW_GAP;
 
@@ -320,17 +328,9 @@ class SettingsRail extends FlxGroup
 			row.alpha = isSel ? 1 : 0.78;
 			row.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
 
-			// 跑马灯：只有选中行滚动；其余行一律停在起点（scrollH=0）
+			// 跑马灯：只有选中行滚动；其余行恢复定宽并停在起点
 			if (isSel) applyRowScroll(row, r, idx, txt);
-			else if (rowScrollDrawn != 0)
-			{
-				// 该行刚被取消选中、可能停在滚动中途 → 必须归零**并重绘**，
-				// 只改 scrollH 不重绘的话位图仍是滚动后的画面（视觉残留）。
-				rowScrollDrawn = 0;
-				rowScrollAccum = 0;
-				row.textField.scrollH = 0;
-				row.forceRegen();
-			}
+			else if (rowFullW || rowRowSize[r] > 0 || row.x != TEXT_X) restoreRow(row, r);
 		}
 
 		// 高亮条：跟随选中项，按同一插值位移（滑动期间与文字同步，不会"框先到、字后到"）
@@ -358,21 +358,26 @@ class SettingsRail extends FlxGroup
 		rowScrollWait = 0;
 		rowScrollIdx = -1;
 		rowScrollText = null;
-		rowScrollDrawn = -1;
-		rowScrollAccum = 0;
+		rowFullW = false;
 		for (r in 0...rows.length)
 		{
 			rowTextW[r] = -1;
-			if (rows[r] != null && rows[r].textField != null) rows[r].textField.scrollH = 0;
+			if (rows[r] != null) restoreRow(rows[r], r);
 		}
 	}
 
 	/**
 	 * 推进选中行的跑马灯（仅在文本超出 TEXT_W 时生效）。
 	 *
-	 * 循环：起手停留 → 匀速滚到末尾 → 末尾停留 → 瞬间归零 → 再停 → 再滚。
-	 * 用 `textField.scrollH` 而不是移动 FlxText.x：后者需要额外裁剪遮罩，
-	 * 会与「高亮条必须先 add」这条层级契约打架（遮罩要么裁掉高亮条、要么被行文字盖住）。
+	 * 实现 = **把行位图扩到全宽，再左右移动 row.x**，不是 textField.scrollH。
+	 * 为什么不用 scrollH：OpenFL `set_scrollH` 会做
+	 * `if (value > __textEngine.maxScrollH) value = maxScrollH`，
+	 * 而 autoSize=NONE + scrollBars=NONE 的 TextField 的 maxScrollH 恒为 0
+	 * → 写入被静默钳成 0，**永远不滚**（2026-10-04 实测：overflow=16.2 但 scrollH 纹丝不动）。
+	 * flixel 自家 FlxInputText 能用 scrollH 是因为它是可编辑输入框，滚动被启用。
+	 *
+	 * 移动 x 为什么安全：全宽文本左端最远到 TEXT_X - (textW - TEXT_W)，最右到 TEXT_X + textW；
+	 * 两者都被 MAX_FULL_W 卡在面板内（PANEL_X+PANEL_W 之内），不会溢到右侧内容面板。
 	 */
 	function applyRowScroll(row:FlxText, r:Int, idx:Int, txt:String):Void
 	{
@@ -385,27 +390,32 @@ class SettingsRail extends FlxGroup
 			rowScrollText = txt;
 			rowScroll = 0;
 			rowScrollWait = SCROLL_HOLD_START;
-			rowScrollDrawn = -1;
-			rowScrollAccum = 0;
-			row.textField.scrollH = 0;
-			row.forceRegen();
+			restoreRow(row, r);
 		}
 
-		// 量宽（懒测：只在成为选中行时测一次，缓存进 rowTextW）
+		// 量宽（懒测：只在成为选中行时测一次）
 		if (rowTextW[r] < 0) rowTextW[r] = row.textField.textWidth;
 
 		var overflow:Float = rowTextW[r] - TEXT_W;
 		if (overflow <= OVERFLOW_EPS)
 		{
-			if (rowScrollDrawn != 0)
-			{
-				rowScrollDrawn = 0;
-				row.textField.scrollH = 0;
-				row.forceRegen();
-			}
+			// 放得下 → 定宽 + 归位
+			if (rowFullW) restoreRow(row, r);
+			rowScroll = 0;
+			row.x = TEXT_X;
+			return;
+		}
+
+		// 超宽且全宽也放不进面板可用宽度 → 缩字号兜底（绝不溢到右侧内容面板）
+		if (rowTextW[r] > MAX_FULL_W)
+		{
+			shrinkRow(row, r);
 			rowScroll = 0;
 			return;
 		}
+
+		// 扩到全宽，让位图装下完整文本（之后靠移动 x 滚动）
+		if (!rowFullW) expandRow(row, r);
 
 		if (rowScrollWait > 0)
 		{
@@ -419,29 +429,63 @@ class SettingsRail extends FlxGroup
 			rowScroll = 0;
 			rowScrollWait = SCROLL_HOLD_END;
 		}
-		applyScrollH(row);
+		row.x = TEXT_X - rowScroll;
 	}
 
 	/**
-	 * 写入 scrollH 并按节流重绘位图。
-	 *
-	 * FlxText 把文本画进缓存 BitmapData，所以改 scrollH 后必须 forceRegen 才可见。
-	 * 但每帧重画一张 166×32 的位图属于"逐帧绘制"（违反 meteoric-system 绘制纪律），
-	 * 故节流到 ~20fps：位移按真实 elapsed 累积，只在攒够 ~0.05s 才画一次，
-	 * 视觉上是平滑滚动（26px/s × 0.05s ≈ 1.3px/步），开销可忽略。
+	 * 行位图扩到全宽。
+	 * 必须直接改 `textField.width` 而**不能**用 FlxText.width setter ——
+	 * 那个 setter（FlxText.hx:526-536）在 value>0 时会强制 `wordWrap = true`，
+	 * 单行会被折成两行、破坏布局。
 	 */
-	function applyScrollH(row:FlxText):Void
+	function expandRow(row:FlxText, r:Int):Void
 	{
-		var v:Int = Std.int(rowScroll);
-		if (v == rowScrollDrawn) return; // 位图已是这一位置，不必重画
-		rowScrollDrawn = v;
-		row.textField.scrollH = v; // scrollH 是 Int（openfl TextField 的类型）
-		rowScrollAccum += tickDt;
-		if (rowScrollAccum >= SCROLL_REDRAW_INTERVAL)
+		row.textField.wordWrap = false;
+		row.textField.autoSize = openfl.text.TextFieldAutoSize.NONE;
+		row.textField.width = rowTextW[r];
+		rowFullW = true;
+		row.forceRegen();
+	}
+
+	/** 恢复定宽与原字号 + 归位（放得下 / 取消选中 / 换行 / 换语言时调用） */
+	function restoreRow(row:FlxText, r:Int):Void
+	{
+		if (rowFullW)
 		{
-			rowScrollAccum = 0;
+			rowFullW = false;
+			row.textField.width = TEXT_W;
 			row.forceRegen();
 		}
+		if (rowRowSize[r] > 0 && rowRowSize[r] != ROW_FONT_SIZE)
+		{
+			rowRowSize[r] = 0;
+			applyRowFormat(row, ROW_FONT_SIZE);
+		}
+		row.x = TEXT_X;
+	}
+
+	/** 兜底：全宽也放不下时逐档缩字号，直到装进 TEXT_W（保证不溢出、不截断） */
+	function shrinkRow(row:FlxText, r:Int):Void
+	{
+		if (rowFullW) restoreRow(row, r);
+		if (rowRowSize[r] > 0) return; // 已经缩过
+		var size:Int = ROW_FONT_SIZE;
+		while (size > ROW_FONT_MIN)
+		{
+			size--;
+			applyRowFormat(row, size);
+			if (row.textField.textWidth <= TEXT_W + OVERFLOW_EPS) break;
+		}
+		rowRowSize[r] = size;
+	}
+
+	/** 应用行文字格式（字号变化时重设 + 重绘） */
+	function applyRowFormat(row:FlxText, size:Int):Void
+	{
+		row.setFormat(Paths.font('future.ttf'), size, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		row.borderSize = 2;
+		row.antialiasing = ClientPrefs.data.antialiasing;
+		row.forceRegen();
 	}
 
 	/** 本帧步长（秒）。由 update 写入，跑马灯在 renderRows 里读取，避免逐层传参。 */

@@ -271,17 +271,33 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   （禁止折行压下一行），英文分区名（"Customize HUD" / "Touch Controls"）会超出被裁掉。
   实现见 `SettingsRail.applyRowScroll()`：**只有选中行滚动**，其余行停在起点；
   循环 = 起手停 1.1s → 26px/s 匀速 → 尾部停 1.6s → 归零。
-  - ⚠ **`FlxText` 是把文本画进缓存 BitmapData**（`drawTextFieldTo`），不是每帧直渲 TextField。
-    所以改 `textField.scrollH` 后**必须调 `FlxText.forceRegen()`** 才可见 ——
-    本仓库为此在 `FlxText` 上加了 `forceRegen()`（原本 `_regen` 是私有的）。
-    **只改 scrollH 不重绘 = 视觉完全无变化**，极易误判成「API 没生效」。
-  - 位图重绘必须**节流**（`SCROLL_REDRAW_INTERVAL = 0.05s` ≈20fps）：
-    每帧重画一张 166×32 位图属于逐帧绘制，违反本 skill 的绘制纪律。
-  - `scrollH` 是 **Int**（不是 Float），要 `Std.int()`；API 名是 `scrollH`（**没有 `scrollX`**）。
-  - 取消选中 / 换行 / 换文案 / 语言切换（`setLabels`）都必须复位 `scrollH` **并 forceRegen**，
-    否则该行会永久停在滚动中途的画面。
-  - 内容区标题（`OptionsPane.titleText`，`TITLE_W = 892`）与右侧说明（`extHint`，自动折行）
-    宽度充裕，**不需要**跑马灯；只有侧栏这 166px 一处需要。
+  - ⚠⚠ **不要用 `textField.scrollH` 做跑马灯 —— 它在这个 FlxText 配置下是死的。**
+    OpenFL `set_scrollH` 首行就是 `if (value > __textEngine.maxScrollH) value = maxScrollH`，
+    而 `autoSize = NONE` + `scrollBars = NONE` 的 TextField 的 `maxScrollH` **恒为 0**
+    → 写入被静默钳成 0，**不报任何错**。
+    实测记录（2026-10-04）：`textW=182.2 overflow=+16.2`，逻辑与测量全部正确，
+    但 `scrollH` 纹丝不动 —— 这就是「压根不滚动」的真正原因（排查耗了两轮）。
+    flixel 自家 `FlxInputText` 能用 scrollH，是因为它是**可编辑输入框**，滚动被启用。
+  - ✅ **正确做法：把行位图扩到全宽，再移动 `row.x`**。
+    - 扩宽必须**直接改 `row.textField.width`**，
+      **不能用 `FlxText.width` setter** —— 它（`FlxText.hx:526-536`）在 `value>0` 时会强制
+      `wordWrap = true`，单行会被折成两行、破坏行距。
+    - 改完 `textField.width` 必须 `row.forceRegen()`：`FlxText` 是把文字画进**缓存 BitmapData**
+      （`drawTextFieldTo`），不置脏则视觉不变。本仓库为此给 `FlxText` 加了 `forceRegen()`
+      （原本 `_regen` 是私有的）。
+    - **不需要裁剪遮罩**：位移上限由常量 `MAX_FULL_W = PANEL_W - (TEXT_X - PANEL_X) = 198px` 卡住，
+      数学上保证文本两端始终落在面板内 `[PANEL_X, PANEL_X+PANEL_W]` = `[40, 270]`，
+      不会溢到右侧内容面板。实测最长英文分区名 182px < 198px，走滚动分支。
+    - **兜底**：超过 `MAX_FULL_W` 的极端长文案走 `shrinkRow()` 逐档缩字号
+      （`ROW_FONT_SIZE=22` → `ROW_FONT_MIN=14`），保证绝不溢出、绝不截断。
+  - 取消选中 / 换行 / 换文案 / 语言切换（`setLabels`）都必须 `restoreRow()`：
+    恢复 `textField.width = TEXT_W`、恢复原字号、`row.x = TEXT_X` 并重绘。
+- **测量文本宽度用 `textField.textWidth`**（`wordWrap=false` + 定宽下返回完整文本宽，
+  实测 166px 盒内 "Customize HUD" = 182.2px，可信）。
+  要一个**不受宽度约束**的探针就 `new FlxText(0, 0, 0, s, size)`（宽 0 → `autoSize=true`），
+  见 `CreditsState.fitToWidth()` —— 本仓库已验证的模式。
+  ⚠ release 双击运行时**没有控制台**，`trace()` 的 stdout 收不到；
+  诊断要落盘请照 `MeteoricProfile` 的 `File.append(path, false)` 写法。
 
 - **仍待接入**（不要以为已完成）：各**编辑器**页（Charting / LuaGraph / 角色 / 周目 / 对话）、
   `luagraph` 代码生成标签 —— 按需求方决定**跳过**。`Achievements.hx` 的成就名/说明已接入
