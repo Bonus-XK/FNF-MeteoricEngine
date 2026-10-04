@@ -647,7 +647,7 @@ class ControlsPane extends SettingsCanvas
 		title.borderSize = 2;
 		bindingGroup.add(title);
 
-		var tip:FlxText = new FlxText(px, py + 170, pw, '按任意键 绑定\n长按 ESC 取消 · 长按 BACKSPACE 删除\n点击 取消绑定', 22);
+		var tip:FlxText = new FlxText(px, py + 170, pw, Lang.tOr('controls.bindTip', '按任意键 绑定\n长按 ESC 取消 · 长按 BACKSPACE 删除\n点击 取消绑定'), 22);
 		tip.setFormat(Paths.font('future.ttf'), 22, DesignTokens.primary, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tip.borderSize = 2;
 		bindingGroup.add(tip);

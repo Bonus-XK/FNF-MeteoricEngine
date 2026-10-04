@@ -1529,5 +1529,21 @@
   "editor.dialogue.enName": "Dialogue Editor",
   "editor.dialogueChar.enName": "Dialogue Portrait Editor",
   "editor.noteSplash.enName": "Note Splash Debug",
-  "editor.luagraph.enName": "Lua Visual Script"
+  "editor.luagraph.enName": "Lua Visual Script",
+  "zip.systemFailClose": "）",
+  "copy.systemFailClose": "）",
+  "container.crashedTail": "）—— 目标引擎可能无法在本机启动；",
+  "container.quoteOpen": "「",
+  "container.returnedOpen": "已从「",
+  "container.fallbackName": "容器",
+  "lg.scriptsDirClose": "/scripts/）",
+  "lg.luaFileOpen": ".lua（",
+  "win.notes": "音符",
+  "rpc.notes": "音符设置菜单",
+  "win.playingReplay": " [回放]",
+  "start.copyProgressOpen": "%（",
+  "start.copyProgressClose": "）\\n\\n",
+  "controls.bindTip": "按任意键 绑定\\n长按 ESC 取消 · 长按 BACKSPACE 删除\\n点击 取消绑定",
+  "start.noStorageClose": "）",
+  "lg.errHatNotEventClose": "）"
 }

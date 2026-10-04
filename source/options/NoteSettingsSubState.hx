@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 
 import flixel.animation.FlxAnimation;
 import flixel.graphics.frames.FlxFrame;
@@ -42,8 +43,8 @@ class NoteSettingsSubState extends BaseOptionsMenu
 
 	public function new()
 	{
-		title = '音符';
-		rpcTitle = '音符设置菜单'; //for Discord Rich Presence
+		title = Lang.tOr('win.notes', '音符');
+		rpcTitle = Lang.tOr('rpc.notes', '音符设置菜单'); //for Discord Rich Presence
 
 		// 构造期的 headless 是准的（唯一可靠的"被单界面宿主构造"信号就在此时）
 		panePreview = BaseOptionsMenu.headless;

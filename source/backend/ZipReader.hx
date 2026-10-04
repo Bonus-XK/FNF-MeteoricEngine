@@ -351,7 +351,7 @@ class ZipExtractor
 			#end
 			var code:Int = Sys.command(cmd);
 			if (code != 0)
-				safeSend({t: 'err', msg: Lang.tOr('zip.systemFail', '系统解压失败（exit ') + code + '）'});
+				safeSend({t: 'err', msg: Lang.tOr('zip.systemFail', '系统解压失败（exit ') + code + Lang.tOr('zip.systemFailClose', '）')});
 			else
 				safeSend({t: 'done'});
 		}

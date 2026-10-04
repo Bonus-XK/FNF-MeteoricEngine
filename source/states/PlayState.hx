@@ -928,7 +928,7 @@ class PlayState extends MusicBeatState
 		// 每帧更新与可见性权威全部集中于此，PlayState 只保留玩法逻辑 =====
 		hud = new GameHUD(this);
 		hud.build();
-		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong + (replayMode ? ' [回放]' : '');
+		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong + (replayMode ? Lang.tOr('win.playingReplay', ' [回放]') : '');
 
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];

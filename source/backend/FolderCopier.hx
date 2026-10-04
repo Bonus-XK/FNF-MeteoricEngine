@@ -121,7 +121,7 @@ class FolderCopier
 			if (ok)
 				safeSend({t: 'done'});
 			else
-				safeSend({t: 'err', msg: Lang.tOr('copy.systemFail', '系统复制失败（exit ') + code + '）'});
+				safeSend({t: 'err', msg: Lang.tOr('copy.systemFail', '系统复制失败（exit ') + code + Lang.tOr('copy.systemFailClose', '）')});
 		}
 		catch (e:Dynamic)
 		{

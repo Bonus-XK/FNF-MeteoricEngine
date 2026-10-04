@@ -420,16 +420,16 @@ class ContainerSession
 				+ (quitRequested ? ' (hotkey)' : ''));
 		}
 
-		var name:String = (info != null) ? info.displayName : '容器';
+		var name:String = (info != null) ? info.displayName : Lang.tOr('container.fallbackName', '容器');
 		var code:Null<Int> = (codeTxt == null) ? null : Std.parseInt(codeTxt);
 		if (quitRequested)
-			notice = '已从「' + name + Lang.tOr('container.returning', '」返回，正在重启 Meteoric…');
+			notice = Lang.tOr('container.returnedOpen', '已从「') + name + Lang.tOr('container.returning', '」返回，正在重启 Meteoric…');
 		else if (code != null && code != 0)
 			// 非 0 退出码 = 目标引擎自己崩了/起不来。这条必须说清楚，否则玩家只会觉得“点了没反应”。
-			notice = '「' + name + Lang.tOr('container.crashed', '」异常退出（退出码 ') + code + '）—— 目标引擎可能无法在本机启动；'
+			notice = Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.crashed', '」异常退出（退出码 ') + code + Lang.tOr('container.crashedTail', '）—— 目标引擎可能无法在本机启动；')
 				+ Lang.tOr('container.crashedHint', '点「打开日志/容器目录」看 runtime/container.log，并先单独双击运行该引擎确认它能启动');
 		else
-			notice = '「' + name + Lang.tOr('container.exited', '」已退出（退出码 ') + (codeTxt == null ? '?' : codeTxt) + '），正在重启 Meteoric…';
+			notice = Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.exited', '」已退出（退出码 ') + (codeTxt == null ? '?' : codeTxt) + '），正在重启 Meteoric…';
 		FlxG.log.add('[Container] ' + notice);
 
 		active = false;
@@ -863,7 +863,7 @@ class ContainerSession
 			case Phase.Launching: Lang.tOr('container.startingNamed', '正在启动「') + name + '」…（' + waitSeconds + Lang.tOr('container.afterSecs', 's 后让位）');
 			case Phase.Hiding: Lang.tOr('container.yielding', '正在为「') + name + Lang.tOr('container.yieldingTail', '」让位（隐藏宿主窗口）…');
 			case Phase.Stopping: Lang.tOr('container.suspending', '正在挂起 Meteoric（') + name + Lang.tOr('container.suspendingTail', ' 即将独占窗口）…');
-			case Phase.Running: '「' + name + Lang.tOr('container.running', '」运行中') + (quitRequested ? Lang.tOr('container.exiting', '（正在退出…）') : '');
+			case Phase.Running: Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.running', '」运行中') + (quitRequested ? Lang.tOr('container.exiting', '（正在退出…）') : '');
 			case Phase.Returning: Lang.tOr('container.returningToMeteoric', '正在返回 Meteoric…');
 			case Phase.Idle: Lang.tOr('container.idle', '空闲');
 		}

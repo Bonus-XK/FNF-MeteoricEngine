@@ -1529,5 +1529,21 @@
   "editor.dialogue.enName": "Dialogue Editor",
   "editor.dialogueChar.enName": "Dialogue Portrait Editor",
   "editor.noteSplash.enName": "Note Splash Debug",
-  "editor.luagraph.enName": "Lua Visual Script"
+  "editor.luagraph.enName": "Lua Visual Script",
+  "zip.systemFailClose": ")",
+  "copy.systemFailClose": ")",
+  "container.crashedTail": ") - the target engine may not be able to start on this machine; ",
+  "container.quoteOpen": "\"",
+  "container.returnedOpen": "Returned from \"",
+  "container.fallbackName": "Container",
+  "lg.scriptsDirClose": "/scripts/)",
+  "lg.luaFileOpen": ".lua (",
+  "win.notes": "Notes",
+  "rpc.notes": "Note Settings",
+  "win.playingReplay": " [Replay]",
+  "start.copyProgressOpen": "% (",
+  "start.copyProgressClose": ")\\n\\n",
+  "controls.bindTip": "Press any key to bind\\nHold ESC to cancel · hold BACKSPACE to clear\\nClick to cancel the binding",
+  "start.noStorageClose": ")",
+  "lg.errHatNotEventClose": ")"
 }

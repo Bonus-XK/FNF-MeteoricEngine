@@ -107,7 +107,7 @@ class LuaCodeGen
 		{
 			var hdef:BlockDef = LuaBlockDefs.byEvent(s.event);
 			if (hdef == null) issues.push(Lang.tOr('lg.errUnknownStackType', '错误：未知的事件栈类型 “') + s.event + Lang.tOr('lg.errUnknownStackTypeTail', '”（可用：onCreate/onCreatePost/onUpdatePost/onBeatHit/onStepHit/onKeyPress/goodNoteHit/onSongStart/onDestroy）'));
-			else if (!hdef.hat) issues.push(Lang.tOr('lg.errHatNotEvent', '错误：事件栈的帽子块不是事件积木（') + s.event + '）');
+			else if (!hdef.hat) issues.push(Lang.tOr('lg.errHatNotEvent', '错误：事件栈的帽子块不是事件积木（') + s.event + Lang.tOr('lg.errHatNotEventClose', '）'));
 			checkChain(s.blocks, ctx, issues, tweenTags, waitTags);
 		}
 		if (containsWaitAny(doc))

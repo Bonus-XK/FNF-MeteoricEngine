@@ -236,7 +236,7 @@ class Main extends Sprite
 			else
 			{
 				_storageError = true;
-				_storageLabel.text = Lang.tOr('start.noStorage', '无法访问存储（') + err + '）';
+				_storageLabel.text = Lang.tOr('start.noStorage', '无法访问存储（') + err + Lang.tOr('start.noStorageClose', '）');
 			}
 		}
 		else
@@ -280,7 +280,8 @@ class Main extends Sprite
 
 			var pct = Math.round(st.copyPercent() * 100);
 			_storageLabel.text = Lang.tOr('start.copyingAssets', '正在复制游戏资源到 ') + st.root() + '/assets ...\n'
-				+ pct + '%（' + st.copyDoneCount() + '/' + st.copyTotal() + '）\n\n'
+				+ Lang.tOr('start.copyProgressOpen', '%（') + pct + '% (' + st.copyDoneCount() + '/' + st.copyTotal()
+				+ Lang.tOr('start.copyProgressClose', '）\n\n')
 				+ Lang.tOr('start.copyWhy', '首次启动需要复制资源，完成后会直接读取外部目录，方便替换/添加素材。');
 			return;
 		}

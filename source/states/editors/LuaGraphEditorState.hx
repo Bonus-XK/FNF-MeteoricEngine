@@ -1998,7 +1998,7 @@ class LuaGraphEditorState extends MusicBeatState
 			setStatus(Lang.tOr('lg.noGraphs', '该模组 scripts/ 下还没有图形化脚本（用「新建」开始）'), true);
 			return;
 		}
-		openPopup(Lang.tOr('lg.openGraphPrefix', '打开图形化脚本（') + Mods.currentModDirectory + '/scripts/）', list, function(pick) loadGraph(pick));
+		openPopup(Lang.tOr('lg.openGraphPrefix', '打开图形化脚本（') + Mods.currentModDirectory + Lang.tOr('lg.scriptsDirClose', '/scripts/）'), list, function(pick) loadGraph(pick));
 		#end
 	}
 
@@ -2098,7 +2098,7 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = false;
 			refreshStatus();
 			if (previewOpen) rebuildPreview();
-			setStatus(Lang.tOr('lg.savedTo', '已生成并保存：mods/') + Mods.currentModDirectory + '/scripts/' + name + '.lua（' + LuaCodeGen.countLines(lua)
+			setStatus(Lang.tOr('lg.savedTo', '已生成并保存：mods/') + Mods.currentModDirectory + '/scripts/' + name + Lang.tOr('lg.luaFileOpen', '.lua（') + LuaCodeGen.countLines(lua)
 				+ Lang.tOr('lg.savedTail', ' 行）与 ') + name + LuaGraphIO.GRAPH_EXT);
 		}
 		catch (e:Dynamic)

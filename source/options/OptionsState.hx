@@ -702,7 +702,10 @@ class OptionsState extends MusicBeatState
 	function enterContainersMenu():Void
 	{
 		// 返回时按标签恢复选中（列表顺序若变动，光靠索引会错位）
-		pendingSelectLabel = '容器';
+		// 必须与 buildRoster() 里容器分区的 label 用同一个 key：
+		// roster[i].label 是**已翻译**的，硬编码中文在英文界面下匹配不上，
+		// 返回设置页时会掉回第一个分区。
+		pendingSelectLabel = Lang.tOr('options.category.containers', '容器');
 		// ① 明确要求"这次不要入场转场"：`MusicBeatState.create()` 里是
 		//    `if(!skip) openSubState(new CustomFadeTransition(0.7, true))`，
 		//    而 `skip` 取自 `FlxTransitionableState.skipNextTransOut`（引擎自带开关）。
