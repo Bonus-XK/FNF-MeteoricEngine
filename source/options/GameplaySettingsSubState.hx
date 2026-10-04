@@ -32,16 +32,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 		
-		var option:Option = new Option('SB引擎图标跳动',
-		    '开启后，启用 SB Engine 风格的小图标跳动',
-			'sbIconBop',
-			'bool');
-	    addOption(option);
-
-		var option:Option = new Option('KE引擎图标跳动',
-		    '开启后，启用 Kade Engine 风格的小图标跳动（每拍放大后弹性缩回）',
-			'keIconBop',
-			'bool');
+		var option:Option = new Option('小图标跳动',
+		    '选择血量条两侧小图标随节拍跳动的样式。脉冲最贴合手、点头保留一点手绘律动；'
+			+ '错拍两侧反相、跳跃会上下弹起、挤压是卡通式压扁拉伸；关闭 = 完全静止',
+			'iconBopStyle',
+			'string',
+			backend.IconBop.CHOICES);
 	    addOption(option);
 		
 		var option:Option = new Option('平滑血量',

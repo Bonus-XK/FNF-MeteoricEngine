@@ -1201,44 +1201,8 @@ class NoteChartDomain
 			if (ps.generatedMusic)
 				ps.notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
 
-		if(ClientPrefs.data.sbIconBop){
-			if (ps.curBeat % ps.gfSpeed == 0) {
-				if (ps.curBeat % (ps.gfSpeed * 2) == 0) {
-					ps.iconP1.scale.set(0.8, 0.8);
-					ps.iconP2.scale.set(1.2, 1.3);
-
-					ps.iconP1.angle = -15;
-					ps.iconP2.angle = 15;
-				} else {
-					ps.iconP2.scale.set(0.8, 0.8);
-					ps.iconP1.scale.set(1.2, 1.3);
-
-					ps.iconP2.angle = -15;
-					ps.iconP1.angle = 15;
-				}
-			}
-		}
-
-			if (ClientPrefs.data.keIconBop)
-			{
-				// KE 引擎图标跳动：每拍放大 30px（相当于 scale + 30/frameWidth），随后在 update 中按时间缩回
-				ps.iconP1.scale.x += 30 / ps.iconP1.frameWidth;
-				ps.iconP1.scale.y = ps.iconP1.scale.x;
-				ps.iconP1.updateHitbox();
-				ps.iconP1.origin.set(0, 0); // Kade 风格：以左上角为缩放中心，放大时向右下扩展
-				ps.iconP2.scale.x += 30 / ps.iconP2.frameWidth;
-				ps.iconP2.scale.y = ps.iconP2.scale.x;
-				ps.iconP2.updateHitbox();
-				ps.iconP2.origin.set(0, 0);
-			}
-			else
-			{
-				ps.iconP1.scale.set(1.2, 1.2);
-				ps.iconP2.scale.set(1.2, 1.2);
-
-				ps.iconP1.updateHitbox();
-				ps.iconP2.updateHitbox();
-			}
+			// 小图标跳动（拍点触发端；样式、回弹曲线与切档清理统一在 backend/IconBop）
+			IconBop.beatHit(ps.iconP1, ps.iconP2, ps.playbackRate);
 
 			if (!ClientPrefs.data.hudOnly && ps.gf != null && ps.curBeat % Math.round(ps.gfSpeed * ps.gf.danceEveryNumBeats) == 0 && !ps.gf.getAnimationName().startsWith('sing') && !ps.gf.stunned)
 				ps.gf.dance();

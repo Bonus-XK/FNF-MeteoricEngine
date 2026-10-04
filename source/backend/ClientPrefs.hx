@@ -96,8 +96,22 @@ class SaveVariables {
 
 	@:keep public var ghostTapping:Bool = true;
 	@:keep public var smoothHealth:Bool = true;
-	@:keep public var sbIconBop:Bool = true;
+	/**
+	 * 小图标跳动样式（单枚举，= `backend.IconBop.CHOICES` 的元素）。
+	 * 默认「脉冲」；「关闭」= 完全静止。
+	 */
+	@:keep public var iconBopStyle:String = IconBop.DEFAULT_STYLE;
+	/**
+	 * 【已废弃 · 仅迁移用】旧「KE 引擎图标跳动」开关，值**不再被任何运行时代码读取**
+	 * （KE 现在是 `iconBopStyle` 的一个档位）。
+	 *
+	 * ⚠ 故意保留这个字段、不要删：安卓的设置迁移路径按 `SaveVariables` 的**字段名**回填
+	 * `meoptions`（见 `loadPrefs`），删掉字段就读不到老存档里的旧值，开过 KE 的玩家会丢偏好。
+	 * 待下个大版本确认无人依赖后再删（届时删字段 + 删这段迁移）。
+	 */
 	@:keep public var keIconBop:Bool = false;
+	/** 一次性迁移标记：`iconBopStyle` 从旧开关并入时只做一次（见 `loadPrefs`） */
+	@:keep public var iconBopMigrated:Bool = false;
 	@:keep public var timeBarType:String = '剩余时间';
 	@:keep public var newTimeBarStyle:Bool = false;
 	@:keep public var timeBarOpponentColors:Bool = false; // 时间条填充色跟随对方角色血量颜色（贴图样式下生效）
@@ -643,6 +657,17 @@ class ClientPrefs {
 		{
 			data.comboStackMigrated = true;
 			if (data.comboStacking) data.comboStacking = false;
+			saveSettings();
+		}
+
+		// 小图标跳动旧值迁移：原「SB引擎图标跳动」已移除，两个 bool 合并为单枚举 iconBopStyle。
+		// 开过 KE 的老玩家保留 KE 档；其余（含原来两个都关 = 上游无条件 scale(1.2) 的那批）
+		// 落到新默认「脉冲」。SB 的旧值不参与判定 —— 它在旧逻辑里与「上游原版跳动」是同一条分支，
+		// 而新默认「脉冲」已经取代了那条分支，所以不需要读取它（字段已从 SaveVariables 删除）。
+		if (!data.iconBopMigrated)
+		{
+			data.iconBopMigrated = true;
+			if (data.keIconBop) data.iconBopStyle = IconBop.KE;
 			saveSettings();
 		}
 

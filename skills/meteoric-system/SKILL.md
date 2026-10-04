@@ -438,6 +438,41 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
 - **成就与主题色的 key 派生**：`Achievements` 用存档 tag（英文、唯一）派生
   `achievement.<tag>.name|desc|trigger`；`DesignTokens` 用已有的 `THEME_KEYS` 派生 `theme.<key>`
   （新增 `themeNameAt(index)` 按下标取译文，`themeName()` 已委托它）。
+- **互斥样式一律用单枚举，不要堆 bool**（小图标跳动是本仓的样板）：
+  `ClientPrefs.data.iconBopStyle` = `backend/IconBop.CHOICES` 的元素，实现集中在
+  `source/backend/IconBop.hx`（触发端 `NoteChartDomain.beatHit` → `IconBop.beatHit`，
+  回弹端 `PlayState.GameHUD.update` → `IconBop.update`）。
+  - 旧的两个 bool 里，`keIconBop` **故意保留字段**（值不再被运行时代码读）—— 安卓的设置迁移
+    按 `SaveVariables` 的**字段名**回填 `meoptions`，删字段就读不到老存档。
+    **删存档字段前必须确认迁移路径**（`ClientPrefs.loadPrefs` 的两处回填 + `Reflect.fields` 白名单）。
+  - `update` 里要检测档位变化并**先强制归位**再按新档走：玩家可以在对局中途改设置。
+  - 每帧状态（位移 / 相位 / 交替奇偶）放静态 + 显式 `reset()`，在建 HUD 之后与
+    `resetForRestart()` 里各调一次 —— 否则重进曲目带着上一局的残留姿态起跳。
+  - ⚠⚠ **`FlxPoint.set` 在 flixel 6.2 有「单参把 y 清零」的重载** ——
+    `haxelib flixel/6,2,0/flixel/math/FlxPoint.hx:340` 注释原文
+    *"Sets the x coordinate of this point and zeroes the y coordinate."*
+    写 `scale.set(s)` 会把 `scale.y` 清 0 → **精灵被压成零高度、完全不可见**，
+    而 Haxe **不报任何错**（类型对、参数个数合法）。
+    旧版（5.2.2 / 6.0.0）是 `set(x:Float = 0, y:Float = 0)`，单参会同时赋 y，
+    所以 6.2 之前的老代码从不写单参 —— **升级 flixel 后这个坑才出现**。
+    **本引擎所有 `scale/offset/origin` 一律双参**：`set(v, v)`。
+    自检：`grep -rnE "\.(scale|offset|origin)\.set\([^,()]*\)" source` 应为空。
+- **回弹/动效一律用真弹簧，不要「指数衰减 + 残量截断」**：
+  指数衰减是**渐近**趋近目标，①永不过冲 → 缺生命力（"生硬"）；②只能在残量处硬截断归零，
+  那一刻位移是**跳变**的（150px 图标上 3% ≈ 4.5px 突跳，高帧率下肉眼可见 = "卡顿"）。
+  用 `v += (-k·x - c·v)·h; x += v·h`（半隐式欧拉）：过冲给生命力，且只有**位移与速度同时**
+  趋零才归零，归零瞬间无可见跳变。参数 ω=24/ζ=0.45（K=576, C=21.6）在本仓验证过
+  60/120/144/240fps 不抖动、不过冲发散。**改 K/C 前先扫参**：过冲 >25% 会晃、<10% 显软塌。
+  - 触发只改**位移**、保留**速度** → 连拍/快歌时自然衔接，不硬截断。
+  - 关键帧多段动画用**两端导数为 0** 的缓动（`easeInOutSine`/`easeInOutCubic`），
+    否则接缝处速度不连续（C¹ 断点），肉眼可见拐折。
+  - 落地/碰撞不要把速度硬钳到 0，用**恢复系数**反弹（`v = -v * e`）。
+- **语言包里的 `\n` 必须写**单**反斜杠**：`"a\nb"` 是换行，`"a\\nb"` 是**字面反斜杠+n**
+  （界面上直接显示 `\n`，多行提示挤成一行）。
+  2026-10-04 一次性查出 **zh 43 + en 38 处**过度转义（`start.*` 引导 / `install.*` /
+  `container.*` / `crash.*` 等），判据是 Haxe 侧 `Lang.tOr` 的**兜底原文一律写真换行** ——
+  兜底原文就是「本该长什么样」的基准，语言包必须与它一致。
+  `tools/i18n/check_i18n.py` 检查项 [1] 现在会拦这个（`转义过度`）。
 - **语言包投放顺序**（唯一入口 `Paths.langFile()`）：
   ① mod 的 `languages/<code>.json` → ② `Resources/languages/<code>.json`
   （安卓为 `<外部根>/languages/`）→ ③ 内置 `assets/languages/<code>.json`（zh/en）。

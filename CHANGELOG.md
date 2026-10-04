@@ -4,6 +4,93 @@
 
 ## 1.2.0 主要更新（自 1.1.3 以来）
 
+- **【重写】小图标跳动：两个 bool 合并为单枚举 + 5 种样式 + 「关闭」档**
+  （设置 → 玩法 → **小图标跳动**，默认「脉冲」）。原「SB引擎图标跳动」**已移除**。
+  - **新增 `source/backend/IconBop.hx`（单一实现点）**：原先触发端（`backend/NoteChartDomain.beatHit`）
+    与回弹端（`states/PlayState.GameHUD.update`）各写一份分支，而「两个开关都关」的兜底其实是
+    Psych 上游**无条件**的 `scale(1.2)`（`FNF-PsychEngine-0.7.1h/source/states/PlayState.hx:3064`，
+    上游根本没有开关）—— 三种行为塞在两个 bool 里，新样式只能继续加 if，且表达不了「完全静止」。
+    现改为单枚举 `ClientPrefs.data.iconBopStyle`，行为/参数/切档清理全在一个类里。
+  - **7 个档位**（存档值 = `IconBop.CHOICES` 元素，显示名走语言包 `optionValue.iconBopStyle.<i>`）：
+    | 档位 | 行为 | 参数 |
+    |---|---|---|
+    | 关闭 | **完全静止**（scale 恒 1 / angle 恒 0，此后每帧零开销） | — |
+    | 脉冲（默认） | 双方同步放大后弹性回弹 | 峰值 1.16，`pow(0.86, dt*60*rate)` |
+    | 错拍 | 两侧反相，逐拍互换涨/缩 | 1.14 / 0.94 |
+    | 点头 | 同步放大 + 微倾角 | 1.12 + ∓3.5°，25°/s 回正（约 0.14s） |
+    | 跳跃 | 上下弹起 + 落地压扁 | 高 14px、`scale 1.08`、重力 900px/s²、落地 0.96 |
+    | 挤压 | 卡通式压扁→拉伸→归位 | `(0.90,1.12)`→60ms→`(1.18,0.90)`→220ms 归位 |
+    | KE 引擎 | 历史实现原样（每拍放大 30px） | 指数衰减 `pow(0.5, dt*60*rate)` |
+  - **契约与稳健性**：
+    - 缩放一律 `updateHitbox()` + `origin(0,0)`；图标 x 由 `GameHUD.update` 每帧按 `150*scale.x`
+      重算（强绑血条中心），所以**缩放/旋转都不会漂移**，实现不碰 x。
+    - `IconBop.update` 的调用点在 x 重算**之前**（否则缩放与 x 错开一帧），`baseY` 取
+      `healthBar.y - 75`，与 `CameraHudDomain.hudRelayout` 的定位口径一致（跳跃档在此之上叠加位移）。
+    - **切档安全**：`update` 检测存档值变化会先强制归位（scale/angle/y/相位），支持对局中途改设置。
+    - 所有时间常数乘 `playbackRate`，0.5x / 1.5x 变速下跳动快慢不变。
+    - `IconBop.reset()` 在 `hud.build()` 之后与 `resetForRestart()` 里各调一次 ——
+      否则重进曲目/快速重开会带着上一局的跳跃位移、挤压相位起跳。
+  - **旧存档迁移**（`ClientPrefs.loadPrefs`，一次性、`iconBopMigrated` 标记）：开过 KE 的老玩家保留
+    **KE 引擎**档；其余（含原来两个都关 = 走上游 `scale(1.2)` 的那批）落到新默认**脉冲**。
+    SB 的旧值不参与判定 —— 它在旧逻辑里与「上游原版跳动」本就是同一条分支，而新默认已取代那条分支。
+    ⚠ `keIconBop` 字段**故意保留**（值不再被任何运行时代码读取）：安卓的设置迁移路径按
+    `SaveVariables` 的**字段名**回填 `meoptions`，删掉字段就读不到老存档的旧值。
+  - **行为变化（须知晓）**：默认手感从「每拍 1.2 硬缩放 + 线性回缩」变为「脉冲」；
+    想要完全静止请显式选「关闭」。
+  - **验证**：`./compile-mac.sh typecheck` 通过（exit 0，app 未被改动，ndll 已按墙钟版还原）；
+    `python3 tools/i18n/check_i18n.py` 7 项全 PASS（zh/en 各 1554 key，基线 840 项、新增 0）。
+    实机手感待用户验证。
+- **【修复】小图标跳动「只有挤压档能看见、其余全隐形」**（用户实机报告）：
+  **flixel 6.2.0 的 `FlxPoint.set` 新增了「单参把 y 清零」的重载**
+  （`haxelib flixel/6,2,0/flixel/math/FlxPoint.hx:340`，注释原文 *"Sets the x coordinate of this
+  point and zeroes the y coordinate."*）。`IconBop.setScale` 写的是单参 `scale.set(s)`
+  → `scale.y = 0` → **图标被压成零高度、完全不可见**，而 Haxe **不报任何错**（类型合法、参数个数合法）。
+  旧版（5.2.2 / 6.0.0）签名是 `set(x:Float = 0, y:Float = 0)`，单参会同时赋 y，
+  所以 6.2 之前的老代码从不写单参 —— **这个坑是随 flixel 升级才出现的**。
+  探针实测证据：238 帧采样里 `scale` 恒为 `1,0`、`height` 恒为 `0`；而挤压档恰好走双参
+  `setScaleXY`，所以它「偶尔可见」，完全对得上用户症状。
+  **修复**：改双参 `set(s, s)`；全仓扫 `scale/offset/origin` 的单参 `.set(` 确认无其他隐患。
+- **【修复】小图标跳动「生硬 / 卡顿」**：定位到 4 处**速度不连续**——
+  ① 指数衰减的残量硬截断（`ELASTIC_EPS` 把偏移 0.031 一帧跳到 0，150px 图标≈4.5px 突跳）；
+  ② 纯指数衰减渐近趋近、**永不过冲**，缺回弹生命力；
+  ③ 跳跃落地把 `bopY` 硬钳到 0 且下一帧 `scale` 硬跳（两处跳变叠加）；
+  ④ 挤压两段都用 `easeOutCubic`，段末导数 0、段首导数 3 → C¹ 断点。
+  **改为真·阻尼弹簧**（`v += (-k·x - c·v)·h; x += v·h`）：过冲提供生命力，且只有**位移与速度同时**
+  趋零才归零 → 归零瞬间无可见跳变。跳跃改抛体 + **恢复系数反弹 0.28**，落地压扁改为给弹簧
+  一个**向下速度冲量**（不再硬改位移）；挤压两段改用两端导数为 0 的缓动；触发只改位移、保留速度。
+  参数 ω=24 / ζ=0.45（`SPRING_K=576`、`SPRING_C=21.6`）为离线扫参所得，
+  逐帧轨迹 `1.134 → 0.973（过冲 16.6%）→ 1.000`，60/120/144/240fps 均验证不抖动、不过冲发散；
+  另加 `SPRING_H_MAX` 步长钳制防切窗长帧积分发散。
+- **【修复】点头档看不出来**：倾角只有 3.5°（绕左上角旋转，150px 图标远角仅抬 9.2px，被同帧缩放盖过）
+  且线性回正 0.14s 归零、**没有过冲**（点头的灵魂是越过中线再回来）。
+  改为倾角也走弹簧（与缩放共用 K/C），峰值 `NOD_ANGLE` 3.5° → **8°**，实测轨迹
+  `-8° → +1.3°（过冲）→ 0°`，远角位移 **17.6~20.3px**（约原 2 倍）。
+- **【修复】小图标跳动重构时误删 botplay 标签呼吸**（`GameHUD.update` 里的正弦呼吸块）——已还原。
+- **【修复】语言包「转义过度」批量 bug（zh 43 + en 38 处）**：`"a\\nb"` 是**字面反斜杠+n**
+  而非换行，导致多行提示在界面上挤成一行（用户先发现 Mod 页「没有安装任何 Mod」不换行）。
+  判据：Haxe 侧 `Lang.tOr` 的兜底原文**一律写真换行**（`CrashHandler.hx:390` 的
+  `'\n\n崩溃日志已保存到…'`、`LuaGraphEditorState.hx:2078` 等），兜底原文就是基准。
+  波及 `start.*` 首次启动引导 11 处、`install.*` 6 处、`container.*` 7 处、`crash.*`/`error.*` 5 处等。
+  **修复**：全部对齐为真换行；`tools/i18n/check_i18n.py` 检查项 [1] 新增「转义过度」检测，
+  此类 bug 以后会被门禁直接拦住。
+
+- **【新增】多语言系统（i18n）**：`source/backend/Lang.hx` 运行时 + JSON 语言包
+  （内置 `assets/languages/{zh,en}.json`，各 1554 key；社区包放 `Resources/languages/` 或 mod 的
+  `languages/`，定位唯一入口 `Paths.langFile()`）。回退链 `当前语言 → en → zh → key 本身`。
+  - 设置新增「语言」分区；**玩家可见文案一律走 `backend/Lang`**（`Lang.tOr(key, 原文)`），
+    **禁止按选项名做字符串嗅探**（要用 `o.variable`）。
+  - Option 的 key 按存档变量名派生：`option.<var>` / `optionDesc.<var>` / `optionValue.<var>.<i>`；
+    成就按存档 tag 派生 `achievement.<tag>.name|desc|trigger`；主题名派生 `theme.<key>`。
+  - 官方内容（歌曲名 / 艺术家 / 角色名 / Week 名）**不汉化**。
+  - **工具**：`tools/i18n/check_i18n.py`（7 项自检，只读，退出码 0 = PASS）、
+    `tools/i18n/hxscan.py`（字符串感知扫描器，处理 Haxe 跨行字符串 / `\"` 转义 /
+    正则字面量 `~/.../` / 注释四类误判）、`tools/i18n/intentional-skip.tsv`（有意不翻译基线，带原因列可审计）。
+  - 踩过的坑（改动前必读）：**译文参与比较/回填会静默失效**（如「记标签→回来按标签恢复选中」
+    比的是已译文字段，必须与生成处用**同一个 key**）；**中文当 `case` 选择器**的两处已重构为内部英文 ID
+    （`PauseSubState.menuItemsOG` / `PauseSettingsSubstate.rowsDef`），新代码禁止再这么写；
+    含平台分支（`#if`）的文案要按段拆多个 key；拆前后缀时收尾标点必须成对都拆。
+  - 详见 `skills/meteoric-system/SKILL.md` 的「多语言」一节。
+
 - **【重构】PlayState 宿主域拆分**：`source/states/PlayState.hx` **7,946 → 3,853 行（−51.5%）**。
   按「骨架保留 + 片段迁出」把实现迁入 8 个域模块（NoteChartDomain / CameraHudDomain / EventDomain /
   OnlineDomain / ReplayDomain / InputDomain / HostDomain 等），PlayState 只保留字段契约、生命周期骨架与

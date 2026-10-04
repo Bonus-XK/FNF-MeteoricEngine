@@ -81,6 +81,14 @@ def check_packs(z, e):
         if empty:
             # Lang.tOr 只判 None 不判空串，空值会让界面显示空白
             bad.append((f"{name} 空值（tOr 不判空串，会显示空白）", empty))
+        # 转义过度：值里出现**字面**反斜杠+n（JSON 写成 "\\\\n"）而不是换行。
+        # 症状 = 界面上直接显示 "\n" 两个字符，多行提示挤成一行（ModsMenuState 的
+        # 「没有安装任何 Mod」就是这样查出来的）。判据：字符串里有 '\' + 'n' 两字符。
+        # 对照组：Haxe 侧的 tOr 兜底原文一律写真换行（'\n\n崩溃日志…'），故语言包同义。
+        lit_nl = sorted(k for k, v in d.items() if k != "_meta"
+                        and isinstance(v, str) and "\\n" in v)
+        if lit_nl:
+            bad.append((f"{name} 转义过度：值里是字面 \\n 而非换行（JSON 少写一个反斜杠）", lit_nl))
     return zk, ek, bad
 
 

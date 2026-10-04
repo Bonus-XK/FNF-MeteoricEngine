@@ -17,6 +17,7 @@ import backend.StageData;
 import backend.WeekData;
 import backend.CameraHudDomain;
 import backend.EventDomain;
+import backend.IconBop;
 import backend.NoteChartDomain;
 import backend.Song;
 import backend.Section;
@@ -928,6 +929,9 @@ class PlayState extends MusicBeatState
 		// 每帧更新与可见性权威全部集中于此，PlayState 只保留玩法逻辑 =====
 		hud = new GameHUD(this);
 		hud.build();
+		// 小图标跳动：清空上一局的每帧状态（hop 位移 / squash 相位 / 交替奇偶 / 上一档位），
+		// 必须在 hud.build() 之后、第一次 GameHUD.update 之前 —— 否则重进曲目会带着旧位移起跳。
+		IconBop.reset();
 		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong + (replayMode ? Lang.tOr('win.playingReplay', ' [回放]') : '');
 
 		strumLineNotes.cameras = [camHUD];
@@ -3353,53 +3357,16 @@ class GameHUD
 
 	public function update(elapsed:Float):Void
 	{
-		// 图标角度回正（SB 图标跳动）
-		if (ClientPrefs.data.sbIconBop)
-		{
-			var speed:Float = 1;
-			if (iconP1.angle >= 0)
-			{
-				speed *= st.playbackRate;
-				if (iconP1.angle != 0) iconP1.angle -= speed;
-			}
-			else if (iconP1.angle != 0) iconP1.angle += speed;
-
-			if (iconP2.angle >= 0)
-			{
-				if (iconP2.angle != 0) iconP2.angle -= speed;
-			}
-			else if (iconP2.angle != 0) iconP2.angle += speed;
-		}
+		// 小图标跳动回弹（backend/IconBop 单一实现点：样式 / 回弹曲线 / 切档清理都在那边）。
+		// ⚠ 必须在本函数按 `150 * scale.x` 重算图标 x 的**之前**调用，否则缩放与 x 会错开一帧。
+		// baseY 取 `healthBar.y - 75`，与 CameraHudDomain.hudRelayout 的定位口径一致（跳跃档在此之上叠加位移）。
+		IconBop.update(iconP1, iconP2, elapsed, st.playbackRate, st.healthBar.y - 75);
 
 		// botplay 标签呼吸
 		if (botplayTxt != null && botplayTxt.visible)
 		{
 			st.botplaySine += 180 * elapsed;
 			botplayTxt.alpha = 1 - Math.sin((Math.PI * st.botplaySine) / 180);
-		}
-
-		// 图标跳动回缩
-		if (ClientPrefs.data.keIconBop)
-		{
-			var keDecay:Float = Math.pow(0.5, elapsed * 60 * st.playbackRate);
-			var keMultP1:Float = 1 + (iconP1.scale.x - 1) * keDecay;
-			iconP1.scale.set(keMultP1, keMultP1);
-			iconP1.updateHitbox();
-			iconP1.origin.set(0, 0);
-			var keMultP2:Float = 1 + (iconP2.scale.x - 1) * keDecay;
-			iconP2.scale.set(keMultP2, keMultP2);
-			iconP2.updateHitbox();
-			iconP2.origin.set(0, 0);
-		}
-		else
-		{
-			var iconDecay:Float = FlxMath.bound(1 - (elapsed * 9 * st.playbackRate), 0, 1);
-			var multP1:Float = FlxMath.lerp(1, iconP1.scale.x, iconDecay);
-			iconP1.scale.set(multP1, multP1);
-			iconP1.updateHitbox();
-			var multP2:Float = FlxMath.lerp(1, iconP2.scale.x, iconDecay);
-			iconP2.scale.set(multP2, multP2);
-			iconP2.updateHitbox();
 		}
 
 		// 图标强绑定血量条：x 跟随 barCenter，y 跟随血量条
@@ -3649,5 +3616,10 @@ class GameHUD
 		timeTxt.visible = st.updateTime;
 		timeBar.alpha = 0;
 		timeTxt.alpha = 0;
+
+		// 小图标跳动：清空每帧状态（跳跃档可能正停在半空、挤压档相位未走完）。
+		// reset() 会把 lastStyle 置空 → 下一次 IconBop.update 走切档分支，
+		// 顺带把图标强制归位（scale 1 / angle 0 / y 回基准），重开不会有残留姿态。
+		IconBop.reset();
 	}
 }

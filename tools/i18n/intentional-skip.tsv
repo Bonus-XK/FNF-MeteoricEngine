@@ -547,18 +547,15 @@ source/options/EffectsSubState.hx	选择进入暂停界面时播放的音乐：	
 source/options/EffectsSubState.hx	镜头缓动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	镜头缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	频闪效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GameplaySettingsSubState.hx	KE引擎图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GameplaySettingsSubState.hx	SB引擎图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	中间滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	关闭后，对手的箭头将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	向下滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	对手音符	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	小图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	平滑血量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	幽灵点击	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	开启后，使用旧版血量条样式（填充裁剪为血条内部形状、背景由血量条自行绘制），用于兼容 0.6.3 及以下版本的旧模组脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	开启后，双方箭头都会居中显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GameplaySettingsSubState.hx	开启后，启用 Kade Engine 风格的小图标跳动（每拍放大后弹性缩回）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GameplaySettingsSubState.hx	开启后，启用 SB Engine 风格的小图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	开启后，在没有可击打的箭头时乱按，也不会被判为 Miss	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	开启后，按下重置键不会触发任何效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	开启后，游戏窗口失去焦点（切到后台）时会自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -579,6 +576,8 @@ source/options/GameplaySettingsSubState.hx	玩法设置菜单	1	Option 兜底原
 source/options/GameplaySettingsSubState.hx	禁用重置键	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	血条覆盖	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	选择血量条两侧小图标随节拍跳动的样式。脉冲最贴合手、点头保留一点手绘律动；	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	错拍两侧反相、跳跃会上下弹起、挤压是卡通式压扁拉伸；关闭 = 完全静止	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	2x 清晰渲染（Retina 下画面锐利；大规模谱面约 700~1400 帧）。关闭 = 1x 高性能（画面略糊，帧率约 3 倍，轻松 2200+）。修改后需重启游戏生效	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	GPU缓存	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	Seiun 式音符快速路径：音符去 RGB 着色器、改用 ColorTransform 上色并直连 quad 合批（消除 shader 绑定开销，大规模谱面帧率大幅提升；音符颜色由三色渐变改为单色平涂）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
