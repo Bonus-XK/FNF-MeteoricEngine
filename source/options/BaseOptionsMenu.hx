@@ -153,8 +153,8 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		// headless：子类的 addOption 全在 super() 之前跑完，这里直接返回即可（不建 UI、不动 Discord/鼠标状态）
 		if (headless) return;
 
-		if (title == null) title = '设置';
-		if (rpcTitle == null) rpcTitle = '设置菜单';
+		if (title == null) title = Lang.tOr('settings.title', '设置');
+		if (rpcTitle == null) rpcTitle = Lang.tOr('settings.windowTitle', '设置菜单');
 
 		#if desktop
 		DiscordClient.changePresence(rpcTitle, null);

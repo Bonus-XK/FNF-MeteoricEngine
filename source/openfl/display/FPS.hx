@@ -169,12 +169,15 @@ class FPS extends TextField
 		if (currentFPS < 30)
 			_fpsColor = _warnColor;
 		else
+			// ⚠ mode 是**存储值**（ClientPrefs.data.fpsColor，存档里就是中文），
+			// 这里必须按原样比较 —— 不能本地化，否则匹配不上全部落default。
+			// 显示层的翻译由 Option 的 optionValue.fpsColor.* 负责（见 InterfaceSettingsSubState）。
 			_fpsColor = switch (mode) {
-				case "青色":    0xFF00FFFF;
-				case "蓝色":    0xFF0000FF;
-				case "红色":     0xFFFF0000;
-				case "绿色":   0xFF00FF00;
-				case "黄色":  0xFFFFFF00;
+				case '青色':    0xFF00FFFF;
+				case '蓝色':    0xFF0000FF;
+				case '红色':     0xFFFF0000;
+				case '绿色':   0xFF00FF00;
+				case '黄色':  0xFFFFFF00;
 				default:        _defaultColor;
 			};
 	}

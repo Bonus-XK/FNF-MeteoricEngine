@@ -249,7 +249,7 @@ class NoteOffsetState extends MusicBeatState
 			MusicBeatState.switchState(new options.OptionsState());
 			if(OptionsState.onPlayState)
 			{
-				if(ClientPrefs.data.pauseMusic != '无')
+				if(ClientPrefs.data.pauseMusic != Lang.tOr('common.none', '无'))
 					FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)));
 				else
 					FlxG.sound.music.volume = 0;
@@ -462,7 +462,7 @@ class NoteOffsetState extends MusicBeatState
 			MusicBeatState.switchState(new options.OptionsState());
 			if(OptionsState.onPlayState)
 			{
-				if(ClientPrefs.data.pauseMusic != '无')
+				if(ClientPrefs.data.pauseMusic != Lang.tOr('common.none', '无'))
 					FlxG.sound.playMusic(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)));
 				else
 					FlxG.sound.music.volume = 0;

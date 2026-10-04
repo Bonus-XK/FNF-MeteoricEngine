@@ -228,10 +228,10 @@ class FreeplayState extends MusicBeatState
 
 		// ---- 底部提示（中文） ----
 		#if PRELOAD_ALL
-		var leText:String = "Enter / A / 点击 进入歌曲 · 空格 试听 · CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放 · Esc 返回";
+		var leText:String = Lang.tOr('freeplay.hint', "Enter / A / 点击 进入歌曲 · 空格 试听 · CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放 · Esc 返回");
 		var size:Int = 16;
 		#else
-		var leText:String = "<!>未完全加载文件！CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放";
+		var leText:String = Lang.tOr('freeplay.hintIncomplete', "<!>未完全加载文件！CTRL 游玩设置 · L 脚本管理 · R 重置分数 · P 回放");
 		var size:Int = 16;
 		#end
 		bottomHint = new FlxText(PANEL_B_X, PANEL_B_Y + 10, PANEL_B_W, leText, size);

@@ -44,39 +44,50 @@ class ControlsPane extends SettingsCanvas
 
 	//Show on gamepad - Display name - Save file key - Rebind display name
 	var options:Array<Dynamic> = [
-		[true, '音符键'],
-		[true, '左', 'note_left', '音符 左'],
-		[true, '下', 'note_down', '音符 下'],
-		[true, '上', 'note_up', '音符 上'],
-		[true, '右', 'note_right', '音符 右'],
+		// 多语言：显示名走 Lang.tOr；键位行的 key 由**英文存档键**派生（与 Option 同法）
+		// （note_left / ui_left …），标题行用固定 slug。存储值与判定逻辑一律不碰。
+		[true, Lang.tOr('controls.group.notes', '音符键')],
+		[true, Lang.tOr('controls.key.note_left', '左'), 'note_left', Lang.tOr('controls.keyBind.note_left', '音符 左')],
+		[true, Lang.tOr('controls.key.note_down', '下'), 'note_down', Lang.tOr('controls.keyBind.note_down', '音符 下')],
+		[true, Lang.tOr('controls.key.note_up', '上'), 'note_up', Lang.tOr('controls.keyBind.note_up', '音符 上')],
+		[true, Lang.tOr('controls.key.note_right', '右'), 'note_right', Lang.tOr('controls.keyBind.note_right', '音符 右')],
 		[true],
-		[true, '界面'],
-		[true, '左', 'ui_left', '界面 左'],
-		[true, '下', 'ui_down', '界面 下'],
-		[true, '上', 'ui_up', '界面 上'],
-		[true, '右', 'ui_right', '界面 右'],
+		[true, Lang.tOr('controls.group.ui', '界面')],
+		[true, Lang.tOr('controls.key.ui_left', '左'), 'ui_left', Lang.tOr('controls.keyBind.ui_left', '界面 左')],
+		[true, Lang.tOr('controls.key.ui_down', '下'), 'ui_down', Lang.tOr('controls.keyBind.ui_down', '界面 下')],
+		[true, Lang.tOr('controls.key.ui_up', '上'), 'ui_up', Lang.tOr('controls.keyBind.ui_up', '界面 上')],
+		[true, Lang.tOr('controls.key.ui_right', '右'), 'ui_right', Lang.tOr('controls.keyBind.ui_right', '界面 右')],
 		[true],
-		[true, '重置', 'reset', '重置'],
-		[true, '确认', 'accept', '确认'],
-		[true, '返回', 'back', '返回'],
-		[true, '暂停', 'pause', '暂停'],
+		[true, Lang.tOr('controls.key.reset', '重置'), 'reset', Lang.tOr('controls.keyBind.reset', '重置')],
+		[true, Lang.tOr('controls.key.accept', '确认'), 'accept', Lang.tOr('controls.keyBind.accept', '确认')],
+		[true, Lang.tOr('controls.key.back', '返回'), 'back', Lang.tOr('controls.keyBind.back', '返回')],
+		[true, Lang.tOr('controls.key.pause', '暂停'), 'pause', Lang.tOr('controls.keyBind.pause', '暂停')],
 		[false],
-		[false, '音量键'],
-		[false, '静音', 'volume_mute', '音量 静音'],
-		[false, '增大', 'volume_up', '音量 增大'],
-		[false, '减小', 'volume_down', '音量 减小'],
+		[false, Lang.tOr('controls.group.volume', '音量键')],
+		[false, Lang.tOr('controls.key.volume_mute', '静音'), 'volume_mute', Lang.tOr('controls.keyBind.volume_mute', '音量 静音')],
+		[false, Lang.tOr('controls.key.volume_up', '增大'), 'volume_up', Lang.tOr('controls.keyBind.volume_up', '音量 增大')],
+		[false, Lang.tOr('controls.key.volume_down', '减小'), 'volume_down', Lang.tOr('controls.keyBind.volume_down', '音量 减小')],
 		[false],
-		[false, '调试键'],
-		[false, '按键 1', 'debug_1', '调试按键 1'],
-		[false, '按键 2', 'debug_2', '调试按键 2'],
+		[false, Lang.tOr('controls.group.debug', '调试键')],
+		[false, Lang.tOr('controls.key.debug_1', '按键 1'), 'debug_1', Lang.tOr('controls.keyBind.debug_1', '调试按键 1')],
+		[false, Lang.tOr('controls.key.debug_2', '按键 2'), 'debug_2', Lang.tOr('controls.keyBind.debug_2', '调试按键 2')],
 		[true],
 		[true],
-		[true, '恢复默认按键']
+		// 「恢复默认按键」行带 RESTORE_TAG 哨兵：activateSelected/startBinding 用它判断
+		// 「这是按钮不是可绑定键位」。旧实现是拿中文 option[1] 比较（`== defaultKey`）——
+		// 一旦本地化就再也匹配不上，会把「恢复默认」误判成键位去启动绑定流程。
+		[true, Lang.tOr('controls.group.restoreDefaults', '恢复默认按键'), RESTORE_TAG]
 	];
 	var allRows:Array<Int> = [];         // 全列表：<0 标题/分隔（-i-1），>=0 可选项的 options 索引
 	var curOptions:Array<Int> = [];      // 可选项的 options 索引
 	var curOptionsValid:Array<Int> = []; // 可选项在全列表中的行号
-	static var defaultKey:String = '恢复默认按键';
+	/** 「恢复默认按键」行的哨兵标记（放在 options[i][2] 槽；该行不是可绑定键位，没有存档键） */
+	static final RESTORE_TAG:String = '__restoreDefaults';
+	/** 该行是否「恢复默认」按钮（按哨兵判断，与语言无关；旧实现是中文 option[1] 比较） */
+	static function isRestoreRow(option:Array<Dynamic>):Bool
+	{
+		return option != null && option.length > 2 && option[2] == RESTORE_TAG;
+	}
 
 	var curSelected:Int = 0;
 	var curAlt:Bool = false;
@@ -575,7 +586,7 @@ class ControlsPane extends SettingsCanvas
 	function activateSelected()
 	{
 		var option:Array<Dynamic> = options[curOptions[curSelected]];
-		if (option[1] == defaultKey)
+		if (isRestoreRow(option))
 		{
 			// 恢复默认
 			ClientPrefs.resetKeys(!onKeyboardMode);
@@ -594,7 +605,7 @@ class ControlsPane extends SettingsCanvas
 	function startBinding()
 	{
 		var option:Array<Dynamic> = options[curOptions[curSelected]];
-		if (option[1] == defaultKey) return;
+		if (isRestoreRow(option)) return;
 
 		binding = true;
 		holdingEsc = 0;

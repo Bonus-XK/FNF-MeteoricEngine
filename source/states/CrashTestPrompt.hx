@@ -66,7 +66,7 @@ class CrashTestPrompt extends FlxSubState
 			buttons.push({btn: btn, choice: i});
 		}
 
-		var cancelBtn:EditorButton = new EditorButton(x + 24, y + h - 44, btnW, 34, '取消', function()
+		var cancelBtn:EditorButton = new EditorButton(x + 24, y + h - 44, btnW, 34, Lang.tOr('common.cancel', '取消'), function()
 		{
 			close();
 			if (onChoice != null) onChoice(2);

@@ -248,7 +248,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		var newText:String;
 		if (opt.type == 'bool')
 		{
-			newText = (opt.getValue() == true) ? '开' : '关';
+			newText = (opt.getValue() == true) ? Lang.tOr('common.on', '开') : Lang.tOr('common.off', '关');
 		}
 		else if (opt.type == 'string')
 		{

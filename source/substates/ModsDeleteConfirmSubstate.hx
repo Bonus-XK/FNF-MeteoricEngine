@@ -63,11 +63,11 @@ class ModsDeleteConfirmSubstate extends MusicBeatSubstate
 		add(msg);
 
 		// 按钮
-		confirmBtn = new ModsButton(px + pw / 2 - 190, py + ph - 66, 170, 44, '确认删除', function() { confirm(); });
+		confirmBtn = new ModsButton(px + pw / 2 - 190, py + ph - 66, 170, 44, Lang.tOr('mods.confirmDelete', '确认删除'), function() { confirm(); });
 		confirmBtn.setLabelColor(0xFFFF6B6B);
 		add(confirmBtn);
 
-		cancelBtn = new ModsButton(px + pw / 2 + 20, py + ph - 66, 170, 44, '取消', function() { cancel(); });
+		cancelBtn = new ModsButton(px + pw / 2 + 20, py + ph - 66, 170, 44, Lang.tOr('common.cancel', '取消'), function() { cancel(); });
 		add(cancelBtn);
 
 		super.create();

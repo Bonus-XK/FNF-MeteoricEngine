@@ -234,7 +234,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 				lbl.color = (idx == curSelected) ? FlxColor.WHITE : (entry.enabled ? 0xFF9A9AA8 : 0xFF666677);
 
 				grpValues[i].visible = true;
-				grpValues[i].text = entry.enabled ? '开' : '关';
+				grpValues[i].text = entry.enabled ? Lang.tOr('common.on', '开') : Lang.tOr('common.off', '关');
 				grpValues[i].color = (idx == curSelected) ? FlxColor.WHITE : (entry.enabled ? 0xFF7CFC9A : 0xFFFF8A8A);
 			}
 			else

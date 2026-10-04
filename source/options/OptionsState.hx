@@ -194,7 +194,7 @@ class OptionsState extends MusicBeatState
 		Lib.application.window.title = "FNF':Meteoric Engine - 设置菜单";
 
 		#if desktop
-		DiscordClient.changePresence("设置菜单", null);
+		DiscordClient.changePresence(Lang.tOr('settings.discordTitle', "设置菜单"), null);
 		#end
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));

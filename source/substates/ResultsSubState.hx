@@ -74,7 +74,10 @@ class ResultsSubState extends MusicBeatSubstate
 	public var resultAction:String = 'continue';
 
 	var grpMenuShit:FlxTypedGroup<MenuText>;
-	var menuItems:Array<String> = [Lang.tOr('results.retry', '重试'), Lang.tOr('results.continue', '继续')];
+	// 菜单项**内部 ID**（多语言）：显示走 actionLabel()，判定走 ID 比较。
+	// 旧实现 menuItems 存中文文本、并用 `menuItems[curSelected] == '重试'` 判定动作 ——
+	// 一本地化就再也匹配不上：英文界面点 Retry 会误判成 continue（静默走错分支）。
+	var menuItems:Array<String> = [ACTION_RETRY, ACTION_CONTINUE];
 	var curSelected:Int = 0;
 
 	var menuSelector:FlxSprite;
@@ -96,7 +99,7 @@ class ResultsSubState extends MusicBeatSubstate
 	{
 		super();
 
-		if (hasReplay) menuItems = [Lang.tOr('results.retry', '重试'), Lang.tOr('results.playReplay', '回放本局'), Lang.tOr('results.continue', '继续')];
+		if (hasReplay) menuItems = [ACTION_RETRY, ACTION_REPLAY, ACTION_CONTINUE];
 
 		// 固定渲染在专用相机上：zoom=1、scroll=(0,0)，不受游戏相机缩放影响
 		var resultsCam:FlxCamera = (PlayState.instance != null && PlayState.instance.camOther != null) ? PlayState.instance.camOther : FlxG.camera;
@@ -376,7 +379,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(grpMenuShit);
 		for (i in 0...menuItems.length)
 		{
-			var item:MenuText = new MenuText(x + TEXT_PAD, y + 12 + (i * MENU_LINE_GAP * 1.3), menuItems[i], true, 34);
+			var item:MenuText = new MenuText(x + TEXT_PAD, y + 12 + (i * MENU_LINE_GAP * 1.3), actionLabel(menuItems[i]), true, 34);
 			item.isMenuItem = false;
 			item.ID = i;
 			grpMenuShit.add(item);
@@ -555,10 +558,28 @@ class ResultsSubState extends MusicBeatSubstate
 		if (accepted)
 		{
 			FlxG.sound.play(Paths.sound('confirmMenu'));
-			resultAction = (menuItems[curSelected] == '重试') ? 'retry'
-				: ((menuItems[curSelected] == '回放本局') ? 'replay' : 'continue');
+			// 判定用内部 ID（与语言无关）；不能拿显示文本比较
+			resultAction = (menuItems[curSelected] == ACTION_RETRY) ? 'retry'
+				: ((menuItems[curSelected] == ACTION_REPLAY) ? 'replay' : 'continue');
 			close();
 		}
+	}
+
+	/** 菜单项内部 ID（稳定、与语言无关） */
+	static final ACTION_RETRY:String = 'retry';
+	static final ACTION_REPLAY:String = 'replay';
+	static final ACTION_CONTINUE:String = 'continue';
+
+	/** 菜单项 ID → 显示文本（多语言唯一翻译点） */
+	function actionLabel(id:String):String
+	{
+		switch (id)
+		{
+			case ACTION_RETRY: return Lang.tOr('results.retry', '重试');
+			case ACTION_REPLAY: return Lang.tOr('results.playReplay', '回放本局');
+			case ACTION_CONTINUE: return Lang.tOr('results.continue', '继续');
+		}
+		return id;
 	}
 
 	function getHintText():String

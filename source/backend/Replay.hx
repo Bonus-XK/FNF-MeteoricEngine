@@ -166,7 +166,7 @@ class Replay
 		}
 		catch (e:Dynamic)
 		{
-			trace('保存回放失败：' + e);
+			trace(Lang.tOr('replay.saveFailed', '保存回放失败：') + e);
 		}
 		return '';
 	}

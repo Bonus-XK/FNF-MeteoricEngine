@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 
 import flixel.*;
 import flixel.addons.ui.FlxUIButton;
@@ -112,7 +113,7 @@ class TextInputPrompt extends MusicBeatSubstate
 		FlxG.stage.addChild(inputField);
 
 		// 按钮（flixel-ui 系统风格，future 字体中文标签）
-		buttonAccept = new FlxUIButton(0, 0, '确定', function() {
+		buttonAccept = new FlxUIButton(0, 0, Lang.tOr('common.confirm', '确定'), function() {
 			if (okCallback != null) okCallback(inputField.text);
 			close();
 		});
@@ -122,7 +123,7 @@ class TextInputPrompt extends MusicBeatSubstate
 		buttonAccept.y = panel.y + panel.height - 44;
 		add(buttonAccept);
 
-		buttonCancel = new FlxUIButton(0, 0, '取消', function() {
+		buttonCancel = new FlxUIButton(0, 0, Lang.tOr('common.cancel', '取消'), function() {
 			if (cancelCallback != null) cancelCallback();
 			close();
 		});

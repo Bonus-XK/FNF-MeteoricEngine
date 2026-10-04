@@ -305,6 +305,24 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   ⚠ release 双击运行时**没有控制台**，`trace()` 的 stdout 收不到；
   诊断要落盘请照 `MeteoricProfile` 的 `File.append(path, false)` 写法。
 
+- ⚠⚠ **三类「中文不能本地化」的位置，翻译前必须逐个确认**（这几类都踩过）：
+  1. **存档值比较**：`ClientPrefs.data.timeBarType == '已过时间'`、
+     `noteJudgment == 'KE 判定'`、`FPS.hx` 里 `switch (ClientPrefs.data.fpsColor.toUpperCase())`
+     的 `case '青色'` —— 存档里存的就是中文，改了会全部落 `default`（功能静默失效）。
+     正确做法：**存储值保持中文原样**，显示翻译交给 `optionValue.<字段名>.<档位下标>`
+     （`Option` 构造期自动生成 `displayOptions`）。已补齐此前漏掉的
+     `optionValue.framerateMode.*`（档位是运行时 `push` 构造，提取器抓不到）
+     与 `optionValue.CustomFade.*`（档位引用 `CustomFadeTransition.MODE_*` 常量）。
+  2. **`inline var` 常量**：`CustomFadeTransition.MODE_MOVE = '移动'` 是编译期常量，
+     包 `Lang.tOr` 直接编译失败（*Inline variable initialization must be a constant value*）。
+  3. **拿显示文本当选择器**：`ResultsSubState` 曾把 `menuItems` 存成翻译后的文本，
+     又用 `menuItems[curSelected] == '重试'` 判动作 —— 英文界面点 Retry 会**静默走成「继续」**。
+     已改为内部 ID（`ACTION_RETRY`/`ACTION_REPLAY`/`ACTION_CONTINUE`）+ `actionLabel()` 显示映射。
+     **规则：数组/表里存 ID，显示时翻译，判定用 ID**（同 `PauseSubState.menuItemsOG`）。
+- **检测手段**：改动后全仓库扫一遍
+  `xxx[i] == '中文'` / `case '中文'` / `.contains('中文')` / `.remove('中文')`，
+  逐个确认是「存档值比较（保留）」还是「显示文本比较（必须改 ID）」。
+
 - **仍待接入**（不要以为已完成）：各**编辑器**页（Charting / LuaGraph / 角色 / 周目 / 对话）、
   `luagraph` 代码生成标签 —— 按需求方决定**跳过**。`Achievements.hx` 的成就名/说明已接入
   （key 用存档 tag，如 `achievement.week1_nomiss.name`；成就解锁存档用的是 tag 不是名字，

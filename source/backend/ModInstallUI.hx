@@ -154,9 +154,9 @@ class ModInstallUI extends MusicBeatSubstate
 		add(resultText);
 
 		// ---- 圆角磨砂按钮（与 Mods 菜单同一组件）----
-		cancelButton = new ModsButton(0, 0, 160, 44, '取消', function() ModInstaller.get().cancelTask());
+		cancelButton = new ModsButton(0, 0, 160, 44, Lang.tOr('common.cancel', '取消'), function() ModInstaller.get().cancelTask());
 		add(cancelButton);
-		okButton = new ModsButton(0, 0, 160, 44, '确定', function() onOk());
+		okButton = new ModsButton(0, 0, 160, 44, Lang.tOr('common.confirm', '确定'), function() onOk());
 		add(okButton);
 
 		super.create();
@@ -255,7 +255,7 @@ class ModInstallUI extends MusicBeatSubstate
 
 		okButton.visible = false;
 		cancelButton.visible = m.canCancel;
-		cancelButton.setText('取消');
+		cancelButton.setText(Lang.tOr('common.cancel', '取消'));
 		cancelButton.x = FlxG.width / 2 - 80;
 		cancelButton.y = card.y + CARD_H - 66;
 	}
@@ -283,11 +283,11 @@ class ModInstallUI extends MusicBeatSubstate
 		}
 
 		okButton.visible = true;
-		okButton.setText('确定');
+		okButton.setText(Lang.tOr('common.confirm', '确定'));
 		okButton.x = FlxG.width / 2 - 190;
 		okButton.y = card.y + CARD_H - 66;
 		cancelButton.visible = true;
-		cancelButton.setText('取消');
+		cancelButton.setText(Lang.tOr('common.cancel', '取消'));
 		cancelButton.x = FlxG.width / 2 + 30;
 		cancelButton.y = card.y + CARD_H - 66;
 	}
