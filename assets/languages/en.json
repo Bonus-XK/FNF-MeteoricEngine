@@ -432,7 +432,6 @@
   "update.dontShowAgain": "Don't Show Again",
   "credits.title": "Credits",
   "credits.members": "Team Members",
-  "credits.meteoricCoder": "Wrote the code for Meteoric Engine and made huge contributions to the ME engine!",
   "credits.homepage": "Homepage:",
   "credits.noHomepage": "No homepage",
   "title.version": "Version ",
@@ -1548,5 +1547,10 @@
   "lg.errHatNotEventClose": ")",
   "play.watermarkSuffix": "| Meteoric Engine v",
   "pause.settings.noteOffset": "Note Offset & Combo",
-  "container.exitedTail": "), restarting Meteoric…"
+  "container.exitedTail": "), restarting Meteoric…",
+  "credits.bonuxDesc": "Lead creator of Meteoric Engine,\na 12-year-old middle schooler",
+  "credits.fnfMainProgrammer": "FNF's main programmer",
+  "credits.fnfAnimator": "FNF's animator",
+  "credits.fnfArtist": "FNF's artist",
+  "credits.fnfComposer": "FNF's composer"
 }

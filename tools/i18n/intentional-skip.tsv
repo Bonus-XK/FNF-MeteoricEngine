@@ -801,15 +801,8 @@ source/psychlua/LuaClass.hx	    -- 会触发 __newindex 存到 __constructor，�
 source/psychlua/LuaClass.hx	    -- 包装器不存进类表，用户写 function Enemy:new(...) 时\\n	1	生成进用户 Lua 类的注释文本
 source/states/ContainersMenuState.hx	  ·  	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/ContainersMenuState.hx	」…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
-source/states/CreditsState.hx	FNF的主程序员	1	署名与角色描述（内容）
-source/states/CreditsState.hx	FNF的动画制作者	1	署名与角色描述（内容）
-source/states/CreditsState.hx	FNF的曲师	1	署名与角色描述（内容）
-source/states/CreditsState.hx	FNF的画师	1	署名与角色描述（内容）
-source/states/CreditsState.hx	Meteoric Engine的主创作者，\\n是个12岁的初中生awa	1	署名与角色描述（内容）
-source/states/CreditsState.hx	Rs-Drfeaoer\\n早期版本Meteoric Engine测试成员	1	署名与角色描述（内容）
 source/states/CreditsState.hx	…	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/CreditsState.hx	。	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
-source/states/CreditsState.hx	是我，复合肥！\\n早期版本Meteoric Engine测试成员	1	署名与角色描述（内容）
 source/states/CreditsState.hx	！	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/CreditsState.hx	？	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/MainMenuState.hx	[CRASH-TEST] 触发 Haxe 级报错	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
