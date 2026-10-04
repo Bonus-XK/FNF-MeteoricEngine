@@ -121,7 +121,7 @@ class ReplaySubState extends MusicBeatSubstate
 		#end
 
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = "FNF':Meteoric Engine - 回放列表";
+		Lib.application.window.title = Lang.tOr('replay.windowTitle', "FNF':Meteoric Engine - 回放列表");
 
 		reloadList();
 	}
@@ -164,7 +164,7 @@ class ReplaySubState extends MusicBeatSubstate
 			for (row in rows) row.visible = false;
 			emptyText.visible = true;
 		}
-		hintText.text = replays.length > 0 ? '回车 播放 · 退格 删除 · ESC 返回' : 'ESC 返回';
+		hintText.text = replays.length > 0 ? Lang.tOr('replay.hint', '回车 播放 · 退格 删除 · ESC 返回') : Lang.tOr('replay.hintSimple', 'ESC 返回');
 	}
 
 	function changeSelection(change:Int = 0):Void

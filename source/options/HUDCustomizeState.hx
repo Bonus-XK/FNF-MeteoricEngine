@@ -49,12 +49,12 @@ class HUDCustomizeState extends MusicBeatState
 
 	var elements:Array<String> = ['timeBar', 'healthBar', 'score', 'watermark', 'judgementTxt', 'note'];
 	var elementNames:Map<String, String> = [
-		'note' => '音符',
-		'timeBar' => '时间条',
-		'healthBar' => '血量条',
-		'score' => '计分文字',
-		'watermark' => '水印',
-		'judgementTxt' => '判定计数'
+		'note' => Lang.tOr('hudCustomize.notes', '音符'),
+		'timeBar' => Lang.tOr('hudCustomize.timeBar', '时间条'),
+		'healthBar' => Lang.tOr('hudCustomize.healthBar', '血量条'),
+		'score' => Lang.tOr('hudCustomize.scoreText', '计分文字'),
+		'watermark' => Lang.tOr('hudCustomize.watermark', '水印'),
+		'judgementTxt' => Lang.tOr('hudCustomize.judgementCounter', '判定计数')
 	];
 
 	var borders:Array<Array<FlxSprite>> = [];
@@ -412,9 +412,9 @@ class HUDCustomizeState extends MusicBeatState
 	function updateHint():Void
 	{
 		var off:Array<Float> = hudGetOffset(elements[curSelected]);
-		hintText.text = '当前：' + elementNames[elements[curSelected]]
-			+ '  ·  偏移 X ' + Std.int(off[0]) + ' / Y ' + Std.int(off[1])
-			+ '  ·  拖动或方向键调整  ·  R 重置全部  ·  ESC 完成';
+		hintText.text = Lang.tOr('hudCustomize.current', '当前：') + elementNames[elements[curSelected]]
+			+ Lang.tOr('hudCustomize.offsetX', '  ·  偏移 X ') + Std.int(off[0]) + ' / Y ' + Std.int(off[1])
+			+ Lang.tOr('hudCustomize.hint2', '  ·  拖动或方向键调整  ·  R 重置全部  ·  ESC 完成');
 	}
 
 	function applyDrag(dx:Float, dy:Float):Void

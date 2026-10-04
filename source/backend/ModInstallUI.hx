@@ -315,7 +315,7 @@ class ModInstallUI extends MusicBeatSubstate
 		resultText.y = card.y + 215;
 
 		okButton.visible = true;
-		okButton.setText('好的');
+		okButton.setText(Lang.tOr('common.ok', '好的'));
 		okButton.x = FlxG.width / 2 - 80;
 		okButton.y = card.y + CARD_H - 66;
 		cancelButton.visible = false;

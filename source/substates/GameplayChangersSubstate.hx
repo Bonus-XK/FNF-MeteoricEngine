@@ -227,16 +227,16 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	{
 		switch (name)
 		{
-			case 'Scroll Type': return '滚动方式';
-			case 'Scroll Speed': return '滚动速度';
-			case 'Playback Rate': return '播放速率';
-			case 'Health Gain Multiplier': return '血量回复倍率';
-			case 'Health Loss Multiplier': return '血量损失倍率';
-			case 'Instakill on Miss': return '失误即死';
-			case 'Opponent Push': return '对方推条';
-			case 'God Mode': return '上帝模式';
-			case 'AutoPlay': return '自动游玩';
-			case 'Infinite Loop': return '无限轮回';
+			case 'Scroll Type': return Lang.tOr('gameplay.scrollType', '滚动方式');
+			case 'Scroll Speed': return Lang.tOr('gameplay.scrollSpeed', '滚动速度');
+			case 'Playback Rate': return Lang.tOr('gameplay.playbackRate', '播放速率');
+			case 'Health Gain Multiplier': return Lang.tOr('gameplay.healthGain', '血量回复倍率');
+			case 'Health Loss Multiplier': return Lang.tOr('gameplay.healthLoss', '血量损失倍率');
+			case 'Instakill on Miss': return Lang.tOr('gameplay.instakill', '失误即死');
+			case 'Opponent Push': return Lang.tOr('gameplay.opponentPush', '对方推条');
+			case 'God Mode': return Lang.tOr('gameplay.godMode', '上帝模式');
+			case 'AutoPlay': return Lang.tOr('gameplay.botplay', '自动游玩');
+			case 'Infinite Loop': return Lang.tOr('gameplay.cycles', '无限轮回');
 		}
 		return name;
 	}
@@ -254,8 +254,8 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		{
 			switch (Std.string(opt.getValue()))
 			{
-				case 'multiplicative': newText = '乘法';
-				case 'constant': newText = '恒定';
+				case 'multiplicative': newText = Lang.tOr('gameplay.scrollTypeMultiplicative', '乘法');
+				case 'constant': newText = Lang.tOr('gameplay.scrollTypeConstant', '恒定');
 				default: newText = Std.string(opt.getValue());
 			}
 		}

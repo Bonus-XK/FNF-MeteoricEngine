@@ -21,7 +21,7 @@ import flixel.util.FlxSpriteUtil;
  */
 class MobileControlsSubState extends MusicBeatSubstate
 {
-	public static final MODE_NAMES:Array<String> = ['右手按键', '左手按键', '自定义布局', '双手按键', '全屏判定区', '无按键'];
+	public static final MODE_NAMES:Array<String> = [Lang.tOr('mobile.mode.right', '右手按键'), Lang.tOr('mobile.mode.left', '左手按键'), Lang.tOr('mobile.mode.custom', '自定义布局'), Lang.tOr('mobile.mode.both', '双手按键'), Lang.tOr('mobile.mode.judgeArea', '全屏判定区'), Lang.tOr('mobile.mode.none', '无按键')];
 
 	var curMode:Int = 0;
 	var preview:MobileControls = null;
@@ -93,11 +93,11 @@ class MobileControlsSubState extends MusicBeatSubstate
 		// 按钮
 		exitBtn = makeBtn(FlxG.width - 270, FlxG.height - 84, 250, 60, null);
 		exitBtn.color = 0xFF3AA86B;
-		exitLabel = makeLabel(exitBtn, '保存并退出');
+		exitLabel = makeLabel(exitBtn, Lang.tOr('mobile.saveAndExit', '保存并退出'));
 
 		resetBtn = makeBtn(FlxG.width - 270, FlxG.height - 156, 250, 60, null);
 		resetBtn.color = 0xFFB05454;
-		resetLabel = makeLabel(resetBtn, '恢复默认');
+		resetLabel = makeLabel(resetBtn, Lang.tOr('mobile.restoreDefault', '恢复默认'));
 		resetBtn.visible = false;
 		resetLabel.visible = false;
 
@@ -186,15 +186,15 @@ class MobileControlsSubState extends MusicBeatSubstate
 		resetLabel.visible = custom;
 		for (t in posTexts) t.visible = custom;
 		hintText.text = custom
-			? '拖动 4 个方向键调整位置 · < / > 切换布局 · 点击右上角保存'
-			: '< / > 切换布局 · 点击右上角保存';
+			? Lang.tOr('mobile.hint.custom', '拖动 4 个方向键调整位置 · < / > 切换布局 · 点击右上角保存')
+			: Lang.tOr('mobile.hint.layout', '< / > 切换布局 · 点击右上角保存');
 		if (custom) updatePosTexts();
 	}
 
 	function updatePosTexts():Void
 	{
 		if (preview == null) return;
-		var labels:Array<String> = ['左键', '下键', '上键', '右键'];
+		var labels:Array<String> = [Lang.tOr('mobile.key.left', '左键'), Lang.tOr('mobile.key.down', '下键'), Lang.tOr('mobile.key.up', '上键'), Lang.tOr('mobile.key.right', '右键')];
 		for (i in 0...4)
 		{
 			var zones:Array<FlxSprite> = preview.padButtons.get(MobileControls.CUSTOM_ORDER[i]);

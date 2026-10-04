@@ -52,8 +52,24 @@ class PauseSubState extends MusicBeatSubstate
 
 	var grpMenuShit:FlxTypedGroup<MenuText>;
 
+	// ===== 菜单项内部 ID（多语言）=====
+	// 关键设计：**内部一律用稳定英文 ID**，中文只在 displayLabel() 一处翻译。
+	// 旧实现把中文串当 menuItemsOG 的值并直接当 switch 的 case 选择器 —— 那样一本地化
+	// 分支就全断了；现在 ID 与语言解耦，显示与行为彻底分离。
+	static final ID_RESUME:String = 'resume';
+	static final ID_RESTART:String = 'restart';
+	static final ID_SKIP:String = 'skipTime';
+	static final ID_DIFFICULTY:String = 'changeDifficulty';
+	static final ID_SCRIPTS:String = 'scriptManager';
+	static final ID_GAMEPLAY:String = 'gameplaySettings';
+	static final ID_OPTIONS:String = 'options';
+	static final ID_EXIT:String = 'exitToMenu';
+	static final ID_EXIT_CHARTING:String = 'exitCharting';
+	static final ID_END_SONG:String = 'endSong';
+	static final ID_BACK:String = 'back';
+
 	var menuItems:Array<String> = [];
-	var menuItemsOG:Array<String> = ['返回游戏', '重新开始', '跳过时间', '更换难度', '脚本管理', '游玩设置', '设置', '返回主菜单'];
+	var menuItemsOG:Array<String> = [ID_RESUME, ID_RESTART, ID_SKIP, ID_DIFFICULTY, ID_SCRIPTS, ID_GAMEPLAY, ID_OPTIONS, ID_EXIT];
 	var difficultyChoices = [];
 	var curSelected:Int = 0;
 
@@ -116,21 +132,20 @@ class PauseSubState extends MusicBeatSubstate
 		cameras[0].zoom = 1;
 		cameras[0].scroll.set(0, 0);
 
-		if(Difficulty.list.length < 2) menuItemsOG.remove('更换难度'); //No need to change difficulty if there is only one!
-		if(PlayState.instance.startingSong) menuItemsOG.remove('跳过时间'); //歌曲还没开始时无需跳转
+		if(Difficulty.list.length < 2) menuItemsOG.remove(ID_DIFFICULTY); //No need to change difficulty if there is only one!
+		if(PlayState.instance.startingSong) menuItemsOG.remove(ID_SKIP); //歌曲还没开始时无需跳转
 
 		if(PlayState.chartingMode)
 		{
-			menuItemsOG.insert(2, '退出编铺模式');
-			menuItemsOG.insert(3, '结束歌曲');
+			menuItemsOG.insert(2, ID_EXIT_CHARTING);
+			menuItemsOG.insert(3, ID_END_SONG);
 		}
 		menuItems = menuItemsOG;
 
-		for (i in 0...Difficulty.list.length) {
-			var diff:String = Difficulty.getString(i);
-			difficultyChoices.push(translateDifficulty(diff));
-		}
-		difficultyChoices.push('返回');
+		// 存**原始难度名**（Easy/Normal/Hard），不再预翻译成中文：
+		// 预翻译会把「行为值」和「显示文案」绑死，切换语言后档位标签仍是旧语言。
+		for (i in 0...Difficulty.list.length) difficultyChoices.push(Difficulty.getString(i));
+		difficultyChoices.push(ID_BACK);
 
 		pauseMusic = new FlxSound();
 		// 暂停音乐资源缺失时绝不能阻止暂停界面打开（否则会出现“暂停界面显示不出来”但游戏已冻结）
@@ -138,7 +153,7 @@ class PauseSubState extends MusicBeatSubstate
 		{
 			if(songName != null) {
 				pauseMusic.loadEmbedded(Paths.music(songName), true, true);
-			} else if (songName != '无') {
+			} else if (songName != Lang.tOr('pause.musicNone', '无')) {
 				pauseMusic.loadEmbedded(Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic)), true, true);
 			}
 			trace('[PAUSE] PauseSubState new: pauseMusic=' + songName);
@@ -195,11 +210,11 @@ class PauseSubState extends MusicBeatSubstate
 		FlxTween.tween(infoPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
 		// ---- 信息文本（一律左对齐，右侧永不越界） ----
-		var levelInfo:FlxText = makeInfoText('游玩曲目：' + PlayState.SONG.song, INFO_Y_START);
-		var levelDifficulty:FlxText = makeInfoText('游玩难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
-		var blueballedTxt:FlxText = makeInfoText('死亡次数：' + PlayState.deathCounter, INFO_Y_START + INFO_LINE_GAP * 2);
+		var levelInfo:FlxText = makeInfoText(Lang.tOr('pause.songLabel', '游玩曲目：') + PlayState.SONG.song, INFO_Y_START);
+		var levelDifficulty:FlxText = makeInfoText(Lang.tOr('pause.difficultyLabel', '游玩难度：') + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
+		var blueballedTxt:FlxText = makeInfoText(Lang.tOr('pause.deathsLabel', '死亡次数：') + PlayState.deathCounter, INFO_Y_START + INFO_LINE_GAP * 2);
 
-		practiceText = makeInfoText('上帝模式已激活！', INFO_Y_START + INFO_LINE_GAP * 3, DesignTokens.secondary);
+		practiceText = makeInfoText(Lang.tOr('pause.godModeActive', '上帝模式已激活！'), INFO_Y_START + INFO_LINE_GAP * 3, DesignTokens.secondary);
 		practiceText.visible = PlayState.instance.practiceMode;
 		if(PlayState.instance.practiceMode) FlxTween.tween(practiceText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
@@ -230,7 +245,7 @@ class PauseSubState extends MusicBeatSubstate
 		add(statTitle);
 		FlxTween.tween(statTitle, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
-		var statDefs:Array<String> = ['当前分数', '失误数', '当前连击', '评分', '准确度', '命中 / 总音符', '歌曲进度'];
+		var statDefs:Array<String> = [Lang.tOr('pause.score', '当前分数'), Lang.tOr('pause.misses', '失误数'), Lang.tOr('pause.combo', '当前连击'), Lang.tOr('pause.rating', '评分'), Lang.tOr('pause.accuracy', '准确度'), Lang.tOr('pause.hitsTotal', '命中 / 总音符'), Lang.tOr('pause.songProgress', '歌曲进度')];
 		for (i in 0...statDefs.length)
 		{
 			var rowY:Float = STATS_ROW_START + (i * STATS_ROW_GAP);
@@ -292,7 +307,7 @@ class PauseSubState extends MusicBeatSubstate
 
 		regenMenu();
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = "FNF':Meteoric Engine - 暂停";
+		Lib.application.window.title = Lang.tOr('pause.windowTitle', "FNF':Meteoric Engine - 暂停");
 
 		trace('[PAUSE] 新暂停界面已加载 | 画布=' + FlxG.width + 'x' + FlxG.height + ' | 菜单项=' + menuItems.length);
 		trace('[PAUSE] 信息文本最右缘=' + (blueballedTxt.x + blueballedTxt.width) + ' | 安全上限=' + SAFE_RIGHT);
@@ -512,7 +527,7 @@ class PauseSubState extends MusicBeatSubstate
 		var daSelected:String = menuItems[curSelected];
 		switch (daSelected)
 		{
-			case '跳过时间':
+			case ID_SKIP:
 				if (controls.UI_LEFT_P)
 				{
 					FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
@@ -573,7 +588,7 @@ class PauseSubState extends MusicBeatSubstate
 					trace('错误！$e');
 
 					var errorStr:String = e.toString();
-					if(errorStr.startsWith('[file_contents,assets/data/')) errorStr = '丢失的文件：' + errorStr.substring(27, errorStr.length-1); //Missing chart
+					if(errorStr.startsWith('[file_contents,assets/data/')) errorStr = Lang.tOr('pause.missingFiles', '丢失的文件：') + errorStr.substring(27, errorStr.length-1); //Missing chart
 					missingText.text = '加载铺面文件时出错！\n$errorStr';
 					missingText.screenCenter(Y);
 					missingText.visible = true;
@@ -591,22 +606,22 @@ class PauseSubState extends MusicBeatSubstate
 
 			switch (daSelected)
 			{
-				case "返回游戏":
+				case ID_RESUME:
 					close();
 					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
 					#if METEORIC_PROFILE
 					trace('[TITLE] resume set lib="' + Lib.application.window.title + '" limeSame=' + (lime.app.Application.current.window == Lib.application.window));
 					#end
-				case '更换难度':
+				case ID_DIFFICULTY:
 					menuItems = difficultyChoices;
 					deleteSkipTimeText();
 					regenMenu();
-				case "重新开始":
+				case ID_RESTART:
 					restartSong();
-				case "退出编铺模式":
+				case ID_EXIT_CHARTING:
 					restartSong();
 					PlayState.chartingMode = false;
-				case '跳过时间':
+				case ID_SKIP:
 					if(curTime < Conductor.songPosition)
 					{
 						PlayState.startOnTime = curTime;
@@ -624,12 +639,12 @@ class PauseSubState extends MusicBeatSubstate
 						}
 						close();
 					}
-				case '结束歌曲':
+				case ID_END_SONG:
 					close();
 					PlayState.instance.notes.clear();
 					PlayState.instance.unspawnNotes = [];
 					PlayState.instance.finishSong(true);
-				case '游玩设置':
+				case ID_GAMEPLAY:
 					persistentUpdate = false;
 					var gameplaySettingsSubState:GameplayChangersSubstate = new GameplayChangersSubstate();
 					gameplaySettingsSubState.closeCallback = function() {
@@ -638,18 +653,18 @@ class PauseSubState extends MusicBeatSubstate
 							practiceText.visible = PlayState.instance.practiceMode;
 					};
 					openSubState(gameplaySettingsSubState);
-				case '脚本管理':
+				case ID_SCRIPTS:
 					persistentUpdate = false;
 					var scriptManagerSubState:ScriptManagerSubstate = new ScriptManagerSubstate();
 					scriptManagerSubState.closeCallback = function() {
 						persistentUpdate = true;
 					};
 					openSubState(scriptManagerSubState);
-				case '设置':
+				case ID_OPTIONS:
 					// 嵌入式设置：直接叠加分类列表子页，关闭后回到暂停菜单（保持暂停、不重载曲目）。
 					// 设置改动即时生效；需重载的项（判定模式/音符皮肤等）在下次重开曲目时生效。
 					openSubState(new PauseSettingsSubstate());
-				case "返回主菜单":
+				case ID_EXIT:
 					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;
 					PlayState.seenCutscene = false;
@@ -835,22 +850,46 @@ class PauseSubState extends MusicBeatSubstate
 	{
 		switch (fc)
 		{
-			case 'FC': return '（全连）';
-			case 'SDCB': return '（单断）';
-			case 'Clear': return '（通过）';
+			case 'FC': return Lang.tOr('results.rank.fc', '（全连）');
+			case 'SDCB': return Lang.tOr('results.rank.sdcb', '（单断）');
+			case 'Clear': return Lang.tOr('results.rank.clear', '（通过）');
 		}
 		return (fc == null || fc == '') ? '' : fc;
 	}
 
+	/** 难度名 → 显示文本（'Easy'/'Normal'/'Hard' 走语言包，其余原样） */
 	function translateDifficulty(d:String):String
 	{
 		switch (d)
 		{
-			case 'Easy': return '简单';
-			case 'Normal': return '普通';
-			case 'Hard': return '困难';
+			case 'Easy': return Lang.t('difficulty.easy');
+			case 'Normal': return Lang.t('difficulty.normal');
+			case 'Hard': return Lang.t('difficulty.hard');
 		}
 		return d;
+	}
+
+	/**
+	 * 菜单内部 ID → 显示文本。**多语言的唯一翻译点**（regenMenu 唯一消费方）。
+	 * 难度档位不是 ID 而是原始难度名，故先试 ID 表、未命中再走难度翻译。
+	 */
+	function displayLabel(id:String):String
+	{
+		switch (id)
+		{
+			case ID_RESUME: return Lang.t('pause.resume');
+			case ID_RESTART: return Lang.t('pause.restart');
+			case ID_SKIP: return Lang.t('pause.skipTime');
+			case ID_DIFFICULTY: return Lang.t('pause.changeDifficulty');
+			case ID_SCRIPTS: return Lang.t('pause.scriptManager');
+			case ID_GAMEPLAY: return Lang.t('pause.gameplaySettings');
+			case ID_OPTIONS: return Lang.t('pause.options');
+			case ID_EXIT: return Lang.t('pause.exitToMenu');
+			case ID_EXIT_CHARTING: return Lang.t('pause.exitCharting');
+			case ID_END_SONG: return Lang.t('pause.endSong');
+			case ID_BACK: return Lang.t('common.back');
+		}
+		return translateDifficulty(id);
 	}
 
 	function regenMenu():Void {
@@ -863,12 +902,12 @@ class PauseSubState extends MusicBeatSubstate
 
 		for (i in 0...menuItems.length) {
 			// 静态列表：选项固定在各自位置，切换时只改变高亮，不做整列滚动
-			var item = new MenuText(MENU_X, MENU_Y + (i * MENU_LINE_GAP * 1.3), menuItems[i], true, 34);
+			var item = new MenuText(MENU_X, MENU_Y + (i * MENU_LINE_GAP * 1.3), displayLabel(menuItems[i]), true, 34);
 			item.isMenuItem = false;
 			item.ID = i;
 			grpMenuShit.add(item);
 
-			if(menuItems[i] == '跳过时间')
+			if(menuItems[i] == ID_SKIP)
 			{
 				skipTimeText = new FlxText(0, 0, 0, '', 44);
 				skipTimeText.setFormat(Paths.font("future.ttf"), 44, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);

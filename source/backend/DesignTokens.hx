@@ -225,7 +225,7 @@ class DesignTokens
 		var i:Int = themeIndex;
 		if (index != null) i = index;
 		if (i < 0 || i >= THEME_COUNT) i = 0;
-		return THEME_NAMES[i];
+		return themeNameAt(i);
 	}
 
 	/** 当前主题 key（英文，供脚本/调试比对）；index 省略或越界 → 用当前主题 */
@@ -235,6 +235,16 @@ class DesignTokens
 		if (index != null) i = index;
 		if (i < 0 || i >= THEME_COUNT) i = 0;
 		return THEME_KEYS[i];
+	}
+
+	/**
+	 * 色板显示名（多语言）：按 THEME_KEYS 的英文 key 取译文，缺译文回落 THEME_NAMES 原文。
+	 * 与 themeName() 的区别：本函数按 index 取，不读运行时 themeIndex。
+	 */
+	public static function themeNameAt(index:Int):String
+	{
+		if (index < 0 || index >= THEME_COUNT) index = 0;
+		return Lang.tOr('theme.' + THEME_KEYS[index], THEME_NAMES[index]);
 	}
 
 	/** 色板全部显示名（脚本查询用，返回副本避免外部改写） */

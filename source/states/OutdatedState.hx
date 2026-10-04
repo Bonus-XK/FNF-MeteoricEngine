@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import flixel.util.FlxSpriteUtil;
 import objects.UIButton;
@@ -102,13 +103,13 @@ class OutdatedState extends MusicBeatState
 		content.add(panel);
 
 		// ---- 标题 ----
-		content.add(makeText(px, py + PAD + 4, PANEL_W, '发现新版本！', 30, FlxColor.WHITE));
+		content.add(makeText(px, py + PAD + 4, PANEL_W, Lang.tOr('update.found', '发现新版本！'), 30, FlxColor.WHITE));
 
 		// ---- 版本对比：左「当前」→ 右「最新」 ----
 		var rowY:Float = py + 132;
 		var half:Float = PANEL_W * 0.5;
 
-		var curCaption:FlxText = makeText(px, rowY, half, '当前版本', 18, 0xFFD7D7E0);
+		var curCaption:FlxText = makeText(px, rowY, half, Lang.tOr('update.currentVersion', '当前版本'), 18, 0xFFD7D7E0);
 		curCaption.color = 0xFFD7D7E0;
 		content.add(curCaption);
 		content.add(makeText(px, rowY + 26, half, Main.meVersion, 32, FlxColor.WHITE));
@@ -122,20 +123,20 @@ class OutdatedState extends MusicBeatState
 		var remoteVer:String = (TitleState.updateVersion != null && TitleState.updateVersion.length > 0)
 			? TitleState.updateVersion : '—';
 
-		var newCaption:FlxText = makeText(px + half, rowY, half, '最新版本', 18, 0xFFD7D7E0);
+		var newCaption:FlxText = makeText(px + half, rowY, half, Lang.tOr('update.latestVersion', '最新版本'), 18, 0xFFD7D7E0);
 		content.add(newCaption);
 		content.add(makeText(px + half, rowY + 26, half, remoteVer, 32, DesignTokens.primary));
 
 		// ---- 说明文字（次级色，不抢标题） ----
-		content.add(makeText(px + PAD, rowY + 96, PANEL_W - PAD * 2, '请尽快升级到最新的 Meteoric Engine，以获得新功能与问题修复。', 20, 0xFFD7D7E0));
+		content.add(makeText(px + PAD, rowY + 96, PANEL_W - PAD * 2, Lang.tOr('update.desc', '请尽快升级到最新的 Meteoric Engine，以获得新功能与问题修复。'), 20, 0xFFD7D7E0));
 
 		// ---- 两个按钮（旧版的文字链接 → 真按钮）----
 		var btnY:Float = py + PANEL_H - 208;
 		var totalW:Float = BTN_W * 2 + BTN_GAP;
 		var btnX:Float = px + (PANEL_W - totalW) * 0.5;
 
-		btnDownload = new UIButton(btnX, btnY, BTN_W, BTN_H, '前往下载更新', UIButton.VARIANT_FILLED, goDownload);
-		btnIgnore = new UIButton(btnX + BTN_W + BTN_GAP, btnY, BTN_W, BTN_H, '忽略更新', UIButton.VARIANT_TONAL, goNext);
+		btnDownload = new UIButton(btnX, btnY, BTN_W, BTN_H, Lang.tOr('update.download', '前往下载更新'), UIButton.VARIANT_FILLED, goDownload);
+		btnIgnore = new UIButton(btnX + BTN_W + BTN_GAP, btnY, BTN_W, BTN_H, Lang.tOr('update.ignore', '忽略更新'), UIButton.VARIANT_TONAL, goNext);
 		content.add(btnDownload);
 		content.add(btnIgnore);
 
@@ -152,11 +153,11 @@ class OutdatedState extends MusicBeatState
 		content.add(toggleLabel);
 
 		toggleHint = makeText(px + PAD, tglY + 40, PANEL_W - PAD * 2,
-			'关闭后本提示不再弹出（可在设置里重新打开检测更新）', 16, 0xFF9A9AA8);
+			Lang.tOr('update.notifyDesc', '关闭后本提示不再弹出（可在设置里重新打开检测更新）'), 16, 0xFF9A9AA8);
 		content.add(toggleHint);
 
 		// ---- 底部操作提示（面板内坐标：py 是面板顶，绝不能再拿"屏幕绝对底线"当相对偏移）----
-		content.add(makeText(px, py + PANEL_H - 44, PANEL_W, 'Enter 前往下载 · Esc 忽略 · 点击开关切换提醒', 16, 0xFF9A9AA8));
+		content.add(makeText(px, py + PANEL_H - 44, PANEL_W, Lang.tOr('update.hint', 'Enter 前往下载 · Esc 忽略 · 点击开关切换提醒'), 16, 0xFF9A9AA8));
 
 		add(content);
 
@@ -271,7 +272,7 @@ class OutdatedState extends MusicBeatState
 	{
 		var on:Bool = ClientPrefs.data.updateNotify;
 
-		toggleLabel.text = on ? '稍后提醒' : '不再提示';
+		toggleLabel.text = on ? Lang.tOr('update.remindLater', '稍后提醒') : Lang.tOr('update.dontShowAgain', '不再提示');
 		toggleLabel.color = on ? FlxColor.WHITE : DesignTokens.secondary;
 
 		// 轨道重绘 / 圆钮目标 / 首次落位全在组件内，这里只喂状态

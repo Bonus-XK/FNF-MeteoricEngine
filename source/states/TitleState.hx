@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.WeekData;
 import backend.Highscore;
@@ -726,13 +727,13 @@ class TitleState extends MusicBeatState
 				case 3:
 					addMoreText('by Real-bonuX', 40, 26, 0xFFFFFFFF);
 				case 4:
-					addMoreText('版本 ' + Main.meVersion, 40, 22, 0xFF9A9A9A);
+					addMoreText(Lang.tOr('title.version', '版本 ') + Main.meVersion, 40, 22, 0xFF9A9A9A);
 				case 5:
 					deleteCoolText();
 				case 6:
-					createCoolText(['基于 Psych Engine 0.7.1h'], 30, 24, 0xFFAAAAAA);
+					createCoolText([Lang.tOr('title.basedOn', '基于 Psych Engine 0.7.1h')], 30, 24, 0xFFAAAAAA);
 				case 8:
-					addMoreText('特别鸣谢', 30, 24, 0xFFAAAAAA);
+					addMoreText(Lang.tOr('title.specialThanks', '特别鸣谢'), 30, 24, 0xFFAAAAAA);
 					ngSpr.visible = true;
 					ngSpr.alpha = 0;
 					FlxTween.tween(ngSpr, {alpha: 1}, 0.4, {ease: FlxEase.cubeOut});

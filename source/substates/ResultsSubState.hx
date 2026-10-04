@@ -74,7 +74,7 @@ class ResultsSubState extends MusicBeatSubstate
 	public var resultAction:String = 'continue';
 
 	var grpMenuShit:FlxTypedGroup<MenuText>;
-	var menuItems:Array<String> = ['重试', '继续'];
+	var menuItems:Array<String> = [Lang.tOr('results.retry', '重试'), Lang.tOr('results.continue', '继续')];
 	var curSelected:Int = 0;
 
 	var menuSelector:FlxSprite;
@@ -96,7 +96,7 @@ class ResultsSubState extends MusicBeatSubstate
 	{
 		super();
 
-		if (hasReplay) menuItems = ['重试', '回放本局', '继续'];
+		if (hasReplay) menuItems = [Lang.tOr('results.retry', '重试'), Lang.tOr('results.playReplay', '回放本局'), Lang.tOr('results.continue', '继续')];
 
 		// 固定渲染在专用相机上：zoom=1、scroll=(0,0)，不受游戏相机缩放影响
 		var resultsCam:FlxCamera = (PlayState.instance != null && PlayState.instance.camOther != null) ? PlayState.instance.camOther : FlxG.camera;
@@ -134,19 +134,19 @@ class ResultsSubState extends MusicBeatSubstate
 		FlxTween.tween(infoPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
 		var infoTexts:Array<FlxText> = [];
-		infoTexts.push(makeInfoText('曲目：' + PlayState.SONG.song, INFO_Y_START));
-		infoTexts.push(makeInfoText('难度：' + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP));
-		infoTexts.push(makeInfoText('评级：' + st.ratingName + fcText(st.ratingFC), INFO_Y_START + INFO_LINE_GAP * 2));
+		infoTexts.push(makeInfoText(Lang.tOr('results.song', '曲目：') + PlayState.SONG.song, INFO_Y_START));
+		infoTexts.push(makeInfoText(Lang.tOr('results.difficultyLabel', '难度：') + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP));
+		infoTexts.push(makeInfoText(Lang.tOr('results.rankLabel', '评级：') + st.ratingName + fcText(st.ratingFC), INFO_Y_START + INFO_LINE_GAP * 2));
 		var modeText:FlxText;
 		if (invalidResult)
 		{
 			var why:Array<String> = [];
-			if (st.usedAutoplay) why.push('自动游玩');
-			if (st.usedGodMode) why.push('上帝模式');
-			modeText = makeInfoText(why.join(' + ') + '（成绩无效）', INFO_Y_START + INFO_LINE_GAP * 3, 0xFFFF6B6B);
+			if (st.usedAutoplay) why.push(Lang.tOr('results.botplay', '自动游玩'));
+			if (st.usedGodMode) why.push(Lang.tOr('results.godMode', '上帝模式'));
+			modeText = makeInfoText(why.join(' + ') + Lang.tOr('results.invalidScore', '（成绩无效）'), INFO_Y_START + INFO_LINE_GAP * 3, 0xFFFF6B6B);
 		}
 		else
-			modeText = makeInfoText('正常模式', INFO_Y_START + INFO_LINE_GAP * 3);
+			modeText = makeInfoText(Lang.tOr('results.normalMode', '正常模式'), INFO_Y_START + INFO_LINE_GAP * 3);
 		infoTexts.push(modeText);
 		for (i in 0...infoTexts.length)
 		{
@@ -239,7 +239,7 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(newRecordText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 		}
 
-		var statDefs:Array<String> = ['当前分数', '最佳分数', '最高连击', '失误数', '命中 / 总音符', '准确度'];
+		var statDefs:Array<String> = [Lang.tOr('results.currentScore', '当前分数'), Lang.tOr('results.bestScore', '最佳分数'), '最高连击', '失误数', '命中 / 总音符', '准确度'];
 		var statVals:Array<String> = [
 			FlxStringUtil.formatMoney(st.songScore),
 			FlxStringUtil.formatMoney(bestScore),
@@ -305,7 +305,7 @@ class ResultsSubState extends MusicBeatSubstate
 			var cnt:Int = 0;
 			for (e in entries)
 				if (e.r != 'miss') { sum += e.d; cnt++; }
-			var meanStr:String = (cnt > 0) ? ('平均偏移 Mean ' + CoolUtil.floorDecimal(sum / cnt, 2) + ' ms') : '平均偏移 Mean -';
+			var meanStr:String = (cnt > 0) ? (Lang.tOr('results.meanOffset', '平均偏移 Mean ') + CoolUtil.floorDecimal(sum / cnt, 2) + ' ms') : '平均偏移 Mean -';
 			var winStr:String = 'SICK ' + ClientPrefs.data.sickWindow + ' / GOOD ' + ClientPrefs.data.goodWindow
 				+ ' / BAD ' + ClientPrefs.data.badWindow + ' / SHIT 166';
 			var meanText:FlxText = new FlxText(innerX, GRAPH_Y + GRAPH_H - 22, innerW, meanStr + '　' + winStr, 13);
@@ -333,7 +333,7 @@ class ResultsSubState extends MusicBeatSubstate
 		buildMenu(PANEL_X, MENU_Y, PANEL_W);
 
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = "FNF':Meteoric Engine - 结算";
+		Lib.application.window.title = Lang.tOr('results.windowTitle', "FNF':Meteoric Engine - 结算");
 
 		loadUIscripts('results');
 	}
@@ -565,19 +565,19 @@ class ResultsSubState extends MusicBeatSubstate
 	{
 		if (PlayState.isStoryMode)
 		{
-			if (PlayState.storyPlaylist.length > 1) return '回车确认 · ESC 继续（播放下一首）';
-			return '回车确认 · ESC 继续（完成周目，返回剧情选关）';
+			if (PlayState.storyPlaylist.length > 1) return Lang.tOr('results.hint.nextSong', '回车确认 · ESC 继续（播放下一首）');
+			return Lang.tOr('results.hint.weekComplete', '回车确认 · ESC 继续（完成周目，返回剧情选关）');
 		}
-		return '回车确认 · ESC 继续（返回自由选歌）';
+		return Lang.tOr('results.hint.backToFreeplay', '回车确认 · ESC 继续（返回自由选歌）');
 	}
 
 	function fcText(fc:String):String
 	{
 		switch (fc)
 		{
-			case 'FC': return '（全连）';
-			case 'SDCB': return '（单断）';
-			case 'Clear': return '（通过）';
+			case 'FC': return Lang.tOr('results.rank.fc', '（全连）');
+			case 'SDCB': return Lang.tOr('results.rank.sdcb', '（单断）');
+			case 'Clear': return Lang.tOr('results.rank.clear', '（通过）');
 		}
 		return (fc == null || fc == '') ? '' : fc;
 	}
@@ -586,9 +586,9 @@ class ResultsSubState extends MusicBeatSubstate
 	{
 		switch (d)
 		{
-			case 'Easy': return '简单';
-			case 'Normal': return '普通';
-			case 'Hard': return '困难';
+			case 'Easy': return Lang.t('difficulty.easy');
+			case 'Normal': return Lang.t('difficulty.normal');
+			case 'Hard': return Lang.t('difficulty.hard');
 		}
 		return d;
 	}

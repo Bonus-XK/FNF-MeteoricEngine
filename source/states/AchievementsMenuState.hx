@@ -87,8 +87,8 @@ class AchievementsMenuState extends MusicBeatState
 		add(makePanel(40, 662, 1160, 48, 14));
 
 		// ---- 面板标题 ----
-		addTitle(PANEL_L_X + 48, 100, '成就列表');
-		addTitle(PANEL_R_X + 32, 100, '成就详情');
+		addTitle(PANEL_L_X + 48, 100, Lang.tOr('achievements.listTitle', '成就列表'));
+		addTitle(PANEL_R_X + 32, 100, Lang.tOr('achievements.detailTitle', '成就详情'));
 
 		// ---- 成就数据 ----
 		Achievements.loadAchievements();
@@ -402,7 +402,7 @@ class AchievementsMenuState extends MusicBeatState
 		}
 		else if (hidden)
 		{
-			statusText.text = '隐藏成就 · 未解锁';
+			statusText.text = Lang.tOr('achievements.hiddenLocked', '隐藏成就 · 未解锁');
 			statusText.color = 0xFF8A93A5;
 		}
 		else

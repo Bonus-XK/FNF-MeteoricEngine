@@ -157,7 +157,7 @@ class ContainersMenuState extends MusicBeatState
 		rightTitle.scrollFactor.set();
 		add(rightTitle);
 
-		var subTitle:FlxText = new FlxText(LIST_X, 142, 0, '放入 ' + ContainerStore.CONTAINERS_DIR + '/<名称>/ 后点「重新扫描」', 15);
+		var subTitle:FlxText = new FlxText(LIST_X, 142, 0, Lang.tOr('containers.dropHint', '放入 ') + ContainerStore.CONTAINERS_DIR + '/<名称>/ 后点「重新扫描」', 15);
 		subTitle.setFormat(Paths.font('future.ttf'), 15, TEXT_DIM, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		subTitle.scrollFactor.set();
 		add(subTitle);
@@ -183,7 +183,7 @@ class ContainersMenuState extends MusicBeatState
 
 		emptyText = new FlxText(LIST_X, LIST_Y + 40, Std.int(PANEL_L_W - 90),
 			'（还没有容器）\n\n把目标引擎放进：\n' + ContainerStore.containersRoot() + '/<名称>/\n'
-			+ '再补一个 ' + ContainerManifestParser.FILE_NAME + '（见 CONTAINERS.md 示例）', 17);
+			+ Lang.tOr('containers.addMore', '再补一个 ') + ContainerManifestParser.FILE_NAME + Lang.tOr('containers.addMoreHint', '（见 CONTAINERS.md 示例）'), 17);
 		emptyText.setFormat(Paths.font('future.ttf'), 17, TEXT_DIM, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		emptyText.borderSize = 1.5;
 		emptyText.scrollFactor.set();
@@ -204,9 +204,9 @@ class ContainersMenuState extends MusicBeatState
 		// 布局：4 键等宽贴合 40..1240 的操作条（1200 宽）。
 		// 顺序按使用频率：开关（首次必须点）→ 切换 → 重新扫描 → 打开文件夹。
 		toggleBtn = new ContainerButton(52, 642, 250, 44, '', function() toggleEnabled());
-		switchBtn = new ContainerButton(314, 642, 250, 44, '切换到此容器', function() attemptLaunch());
-		rescanBtn = new ContainerButton(576, 642, 210, 44, '重新扫描', function() refresh(true));
-		folderBtn = new ContainerButton(798, 642, 260, 44, '打开日志/容器目录', function() openSelectedFolder());
+		switchBtn = new ContainerButton(314, 642, 250, 44, Lang.tOr('containers.switchTo', '切换到此容器'), function() attemptLaunch());
+		rescanBtn = new ContainerButton(576, 642, 210, 44, Lang.tOr('containers.rescan', '重新扫描'), function() refresh(true));
+		folderBtn = new ContainerButton(798, 642, 260, 44, Lang.tOr('containers.openLog', '打开日志/容器目录'), function() openSelectedFolder());
 		add(toggleBtn);
 		add(switchBtn);
 		add(rescanBtn);
@@ -335,7 +335,7 @@ class ContainersMenuState extends MusicBeatState
 				var idx:Int = scrollOffset + i;
 				if (idx < count && containers[idx].folder == activeFolder)
 				{
-					rowTexts[i].text += '   ← 运行中';
+					rowTexts[i].text += Lang.tOr('containers.running', '   ← 运行中');
 					break;
 				}
 			}
@@ -360,14 +360,14 @@ class ContainersMenuState extends MusicBeatState
 		detName.text = info.displayName;
 
 		var meta:String = '';
-		if (info.version != null && info.version.length > 0) meta += '版本 ' + info.version + '   ';
-		if (info.engine != null && info.engine.length > 0) meta += '目标引擎 ' + info.engine + '   ';
-		if (info.author != null && info.author.length > 0) meta += '作者 ' + info.author;
+		if (info.version != null && info.version.length > 0) meta += Lang.tOr('containers.version', '版本 ') + info.version + '   ';
+		if (info.engine != null && info.engine.length > 0) meta += Lang.tOr('containers.targetEngine', '目标引擎 ') + info.engine + '   ';
+		if (info.author != null && info.author.length > 0) meta += Lang.tOr('containers.author', '作者 ') + info.author;
 		detMeta.text = meta;
 
-		detDesc.text = (info.description != null && info.description.length > 0) ? info.description : '（无描述）';
+		detDesc.text = (info.description != null && info.description.length > 0) ? info.description : Lang.tOr('containers.noDescription', '（无描述）');
 
-		var pathTxt:String = '目录：' + info.path + '\n主程序：' + (info.appPath == null ? '未找到' : info.appPath);
+		var pathTxt:String = Lang.tOr('containers.folder', '目录：') + info.path + '\n主程序：' + (info.appPath == null ? Lang.tOr('containers.notFound', '未找到') : info.appPath);
 		detPath.text = pathTxt;
 
 		detProblem.text = (info.problem != null) ? ('⚠ ' + info.problem) : '';
@@ -378,7 +378,7 @@ class ContainersMenuState extends MusicBeatState
 		var hotkeyTxt:String = describeHotkey();
 		detHint.text = Lang.tOr('containers.exitMode', '退出方式 ') + exitMode + '   ·   等待窗口 ' + wait + 's\n'
 			+ '退出容器：直接关掉目标引擎窗口，Meteoric 会自动唤醒并重启\n'
-			+ '返回热键 ' + hotkeyTxt + hotkeyHowto()
+			+ Lang.tOr('containers.backHotkey', '返回热键 ') + hotkeyTxt + hotkeyHowto()
 			+ '\n退出后 Meteoric 会自动重启（本体整机复位）';
 
 		switchBtn.visible = true;
@@ -389,14 +389,14 @@ class ContainersMenuState extends MusicBeatState
 	function describeHotkey():String
 	{
 		var keys:Array<flixel.input.keyboard.FlxKey> = ClientPrefs.data.containerExitKeys;
-		if (keys == null || keys.length < 1) return '（未绑定）';
+		if (keys == null || keys.length < 1) return Lang.tOr('containers.unbound', '（未绑定）');
 		var out:Array<String> = [];
 		for (k in keys)
 		{
 			// FlxKey 是 abstract Int：静态平台上不可为 null，不做判空（编译期实证）
 			out.push(backend.InputFormatter.getKeyName(k));
 		}
-		return out.length > 0 ? out.join(' + ') : '（未绑定）';
+		return out.length > 0 ? out.join(' + ') : Lang.tOr('containers.unbound', '（未绑定）');
 	}
 
 	/**
@@ -572,8 +572,8 @@ class ContainersMenuState extends MusicBeatState
 		updateToggleLabel();
 		updateDetails();
 		setInfo(ClientPrefs.data.containersEnabled
-			? '容器功能已启用 —— 选中容器后按 Enter 或点「切换到此容器」'
-			: '容器功能已关闭（关闭后不允许启动容器）');
+			? Lang.tOr('containers.featureEnabled', '容器功能已启用 —— 选中容器后按 Enter 或点「切换到此容器」')
+			: Lang.tOr('containers.featureDisabled', '容器功能已关闭（关闭后不允许启动容器）'));
 	}
 
 	/** 同步开关按钮文案与配色（启用=强调色，关闭=暗色）。 */
@@ -632,7 +632,7 @@ class ContainersMenuState extends MusicBeatState
 		if (selectedSomethin) return;
 		if (containers.length < 1)
 		{
-			setError('没有可启动的容器');
+			setError(Lang.tOr('containers.noLaunchable', '没有可启动的容器'));
 			return;
 		}
 		var info:ContainerInfo = containers[curSelected];
@@ -654,7 +654,7 @@ class ContainersMenuState extends MusicBeatState
 		var err:String = ContainerSession.launch(info);
 		if (err != null)
 		{
-			setError('启动失败：' + err);
+			setError(Lang.tOr('containers.launchFailed', '启动失败：') + err);
 			FlxG.sound.play(Paths.sound('cancelMenu'), 0.6);
 			return;
 		}

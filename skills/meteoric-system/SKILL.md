@@ -250,20 +250,35 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   监听器**必须在 `destroy()` 摘除**（`Lang.removeLangListener`），否则离页后回调到已销毁精灵。
 - 语言分区：设置 → 语言（`LanguageSettingsSubState`），字符串选项，
   显示名走 `displayOptions`（存语言代码、显示 `nativeName`），切换即 `Lang.load()`。
-- **已接入的界面**（zh/en 各 368 key，逐项对齐）：
+- **已接入的界面**（zh/en 各 512 key，逐项对齐）：
   设置全部子页（100 个选项的名称/说明/档位显示名，经 `Option` 一处接入）、
-  设置外壳与提示行、暂停内嵌设置、游玩设置、脚本管理、回放、Mod 列表/删除、
-  容器列表、成就、主菜单版本提示、结算页、错误页、Freeplay/Story 分数行、
-  HUD 自定义、偏移校准、制作人员、触屏设置、崩溃测试。
+  设置外壳与提示行、暂停菜单（**含主项，英文 ID + `displayLabel` 单点翻译**）、
+  暂停内嵌设置（`sectionLabel`）、游玩设置、脚本管理、回放、Mod 列表/删除、
+  容器列表、成就（含 `Achievements.hx` 的名/说明/触发方式）、主菜单版本提示、
+  结算页、错误页、Freeplay/Story 分数行、HUD 自定义、偏移校准、制作人员、
+  触屏设置、更新提示、崩溃测试、主题色名（`theme.*`）。
 - ⚠ **改这类文案时的两个坑**：
-  ① 带尾随空格的串（`'连击: '`、`'回放列表 - '`）—— 本地化后**必须保留尾随空格**，
-     否则与后面的字符串拼接会粘在一起；
+  ① 带尾随空格的串（`'连击: '`、`'回放列表 - '`、`'版本 '`、`'选择难度：< '`）
+     —— 本地化后**必须保留尾随空格**，否则与后面的字符串拼接会粘在一起；
   ② 同一行里有多个中文字面量时，逐个替换要**从右往左**做（插入文本会改变左侧偏移量，
      从左往右会串位把代码写坏）。`MainMenuState` 的 `新版本：…（点击查看）` 就是这种行。
-- **仍待接入**（不要以为已完成）：联机菜单（`OnlineMenuState`）、角色选择
-  （`CharacterSelectState`）—— 这两处有**联机协议字符串**与大量动态拼接中段，
-  必须逐处判断"是显示文案还是协议字段"，不能机械替换；
-  暂停菜单主项（`PauseSubState.menuItemsOG`，中文串被当 `case` 选择器，需先抽内部英文 ID）。
+- **迁移脚本的安全规则**（`tools/` 下的批量脚本务必照此）：
+  只替换「展示位」，跳过 ① 注释行 ② `new Option(...)` 实参（已是 `tOr` 的原文兜底）
+  ③ 任何「中文当选择器/比较值」的位置（`case '中文'` / `== '中文'` / `.remove('中文')`）。
+  注意 `case 'Scroll Type': return '滚动方式';` 这种**是展示位**，不要误跳。
+- **仍待接入**（不要以为已完成）：各**编辑器**页（Charting / LuaGraph / 角色 / 周目 / 对话）、
+  `luagraph` 代码生成标签 —— 按需求方决定**跳过**。`Achievements.hx` 的成就名/说明已接入
+  （key 用存档 tag，如 `achievement.week1_nomiss.name`；成就解锁存档用的是 tag 不是名字，
+  所以本地化名字**不会**破坏存档）。
+- ⚠ **中文当 `case` 选择器的两个地方已重构**（改这类代码务必照此模式）：
+  - `PauseSubState.menuItemsOG` → 内部英文 ID（`ID_RESUME`/`ID_SKIP`/…），
+    显示统一走 `displayLabel(id)`；难度档位存**原始难度名**（`Easy`/`Normal`/`Hard`）而非预翻译中文。
+  - `PauseSettingsSubstate.rowsDef` → 内部英文 ID（`'notes'`/`'graphics'`/…），
+    显示统一走 `sectionLabel(id)`。
+  旧写法把中文串当 `switch` 的 `case` 值，一旦本地化分支就全断。**新代码禁止再这么写。**
+- **成就与主题色的 key 派生**：`Achievements` 用存档 tag（英文、唯一）派生
+  `achievement.<tag>.name|desc|trigger`；`DesignTokens` 用已有的 `THEME_KEYS` 派生 `theme.<key>`
+  （新增 `themeNameAt(index)` 按下标取译文，`themeName()` 已委托它）。
 - **语言包投放顺序**（唯一入口 `Paths.langFile()`）：
   ① mod 的 `languages/<code>.json` → ② `Resources/languages/<code>.json`
   （安卓为 `<外部根>/languages/`）→ ③ 内置 `assets/languages/<code>.json`（zh/en）。

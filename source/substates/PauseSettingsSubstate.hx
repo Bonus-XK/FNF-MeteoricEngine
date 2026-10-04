@@ -40,12 +40,37 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	static final ROW_GAP:Float = 56;      // 与主菜单设置一致
 	static final ROWS_VISIBLE:Int = 8;    // 可见行窗口
 
+	// 分区**内部 ID**（多语言）：与 OptionsState.buildRoster 用同一套 options.category.* key。
+	// 旧实现用中文字面量当值并直接当 switch 的 case 选择器 —— 一本地化分支就全断。
 	var rowsDef:Array<String> = [
-		'音符', '箭头配色', '界面', '画面', '效果', '玩法', '判定', '性能', '编程', '按键设置', '自定义界面', '调整延迟与Combo'
+		'notes', 'noteColors', 'interface', 'graphics', 'effects', 'gameplay', 'judgement',
+		'performance', 'programming', 'controls', 'hudCustomize', 'noteOffset'
 		#if mobile
-		, '移动触控'
+		, 'mobileTouch'
 		#end
 	];
+
+	/** 分区 ID → 侧栏显示文本（多语言唯一翻译点） */
+	function sectionLabel(id:String):String
+	{
+		switch(id)
+		{
+			case 'notes': return Lang.tOr('options.category.notes', '音符');
+			case 'noteColors': return Lang.tOr('options.category.noteColors', '箭头配色');
+			case 'interface': return Lang.tOr('options.category.interface', '界面');
+			case 'graphics': return Lang.tOr('options.category.graphics', '画面');
+			case 'effects': return Lang.tOr('options.category.effects', '效果');
+			case 'gameplay': return Lang.tOr('options.category.gameplay', '玩法');
+			case 'judgement': return Lang.tOr('options.category.judgement', '判定');
+			case 'performance': return Lang.tOr('options.category.performance', '性能');
+			case 'programming': return Lang.tOr('options.category.programming', '编程');
+			case 'controls': return Lang.tOr('options.category.controls', '按键设置');
+			case 'hudCustomize': return Lang.tOr('options.category.hudCustomize', '自定义界面');
+			case 'noteOffset': return Lang.tOr('pause.settings.noteOffset', '调整延迟与Combo');
+			case 'mobileTouch': return Lang.tOr('options.category.mobileTouch', '移动触控');
+		}
+		return id;
+	}
 
 	var rows:Array<FlxText> = [];
 	var rowStartY:Float = LIST_Y - 2;
@@ -84,7 +109,8 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	{
 		var idx:Int = scrollOffset + r;
 		if (idx < 0 || idx >= rowsDef.length) return '';
-		return rowsDef[idx];
+		// rowsDef 存的是内部 ID，显示时才翻译（sectionLabel 是唯一翻译点）
+		return sectionLabel(rowsDef[idx]);
 	}
 
 	/** 点击落在列表某行：第一次点击只选中（**不打开**），第二次点击同一行才打开对应子页。
@@ -110,37 +136,37 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 	{
 		switch(rowsDef[curSelected])
 		{
-			case '音符':
+			case 'notes':
 				openCamSubState(new options.NoteSettingsSubState());
-			case '箭头配色':
+			case 'noteColors':
 				openCamSubState(new options.NotesSubState());
-			case '界面':
+			case 'interface':
 				openCamSubState(new options.InterfaceSettingsSubState());
-			case '画面':
+			case 'graphics':
 				openCamSubState(new options.GraphicsSettingsSubState());
-			case '效果':
+			case 'effects':
 				openCamSubState(new options.EffectsSubState());
-			case '玩法':
+			case 'gameplay':
 				openCamSubState(new options.GameplaySettingsSubState());
-			case '判定':
+			case 'judgement':
 				openCamSubState(new options.JudgmentSettingsSubState());
-			case '性能':
+			case 'performance':
 				openCamSubState(new options.PerformanceSubState());
-			case '编程':
+			case 'programming':
 				openCamSubState(new options.ProgrammingSettingsSubState());
-			case '按键设置':
+			case 'controls':
 				openCamSubState(new options.ControlsSubState());
-			case '自定义界面':
+			case 'hudCustomize':
 				// 全屏页：退出后经 OptionsState → goBack 重载曲目并自动回到暂停菜单（PlayState.autoOpenPause）
 				options.OptionsState.onPlayState = true;
 				PlayState.autoOpenPause = true;
 				MusicBeatState.switchState(new options.HUDCustomizeState());
-			case '调整延迟与Combo':
+			case 'noteOffset':
 				options.OptionsState.onPlayState = true;
 				PlayState.autoOpenPause = true;
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			#if mobile
-			case '移动触控':
+			case 'mobileTouch':
 				openCamSubState(new objects.MobileControlsSubState());
 			#end
 		}

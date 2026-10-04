@@ -120,7 +120,7 @@ class NoteOffsetState extends MusicBeatState
 		repositionCombo();
 
 		// Note delay stuff
-		beatText = new MenuText(0, 0, '节拍命中！', true, 32);
+		beatText = new MenuText(0, 0, Lang.tOr('noteOffset.beatHit', '节拍命中！'), true, 32);
 		beatText.setScale(0.6, 0.6);
 		beatText.x += 260;
 		beatText.alpha = 0;
@@ -602,20 +602,20 @@ class NoteOffsetState extends MusicBeatState
 		var str:String;
 		var str2:String;
 		if(onComboMenu)
-			str = 'Combo偏移';
+			str = Lang.tOr('noteOffset.comboOffsetShort', 'Combo偏移');
 		else
-			str = '箭头/节拍延迟';
+			str = Lang.tOr('noteOffset.arrowBeatDelay', '箭头/节拍延迟');
 
 		if(!controls.controllerMode)
 		{
 			#if android
-			str2 = '(按 A 切换)';
+			str2 = Lang.tOr('noteOffset.switchA', '(按 A 切换)');
 			#else
-			str2 = '(按 空格 切换)';
+			str2 = Lang.tOr('noteOffset.switchSpace', '(按 空格 切换)');
 			#end
 		}
 		else
-			str2 = '(按手柄的 Start 切换)';
+			str2 = Lang.tOr('noteOffset.switchStart', '(按手柄的 Start 切换)');
 
 		changeModeText.text = '< ${str.toUpperCase()} ${str2.toUpperCase()} >';
 	}

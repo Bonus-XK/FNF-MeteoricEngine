@@ -902,9 +902,9 @@ class FreeplayState extends MusicBeatState
 
 		lastDifficultyName = Difficulty.getString(curDifficulty);
 		if (Difficulty.list.length > 1)
-			diffText.text = '选择难度：< ' + lastDifficultyName.toUpperCase() + ' >';
+			diffText.text = Lang.tOr('freeplay.difficultySelect', '选择难度：< ') + lastDifficultyName.toUpperCase() + ' >';
 		else
-			diffText.text = '难度：' + lastDifficultyName.toUpperCase();
+			diffText.text = Lang.tOr('freeplay.difficulty', '难度：') + lastDifficultyName.toUpperCase();
 
 		missingText.visible = false;
 		missingTextBG.visible = false;

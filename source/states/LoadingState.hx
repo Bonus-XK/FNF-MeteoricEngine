@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import lime.app.Promise;
 import lime.app.Future;
@@ -206,7 +207,7 @@ class LoadingState extends MusicBeatState
 			var _syncChartPath:String = Song.resolveChartPath(pendingChartJson, pendingChartFolder);
 			if (_syncChartPath == null)
 			{
-				chartError = '谱面文件不存在：' + pendingChartJson;
+				chartError = Lang.tOr('loading.chartMissing', '谱面文件不存在：') + pendingChartJson;
 				onChartLoadFailed();
 			}
 			else
@@ -230,7 +231,7 @@ class LoadingState extends MusicBeatState
 			var filePath:String = Song.resolveChartPath(pendingChartJson, pendingChartFolder);
 			if (filePath == null)
 			{
-				chartError = '谱面文件不存在：' + pendingChartJson;
+				chartError = Lang.tOr('loading.chartMissing', '谱面文件不存在：') + pendingChartJson;
 				onChartLoadFailed();
 			}
 			else
@@ -622,14 +623,14 @@ class LoadingState extends MusicBeatState
 
 	static function getDiffName(jsonInput:String, songName:String):String
 	{
-		if (jsonInput == null || songName == null || jsonInput.length <= songName.length) return '普通';
+		if (jsonInput == null || songName == null || jsonInput.length <= songName.length) return Lang.t('difficulty.normal');
 		var suffix:String = jsonInput.substr(songName.length);
 		return switch(suffix)
 		{
-			case '' | '-normal' | '-normal-': '普通';
-			case '-easy': '简单';
-			case '-hard': '困难';
-			default: suffix.length > 1 ? suffix.substr(1) : '普通';
+			case '' | '-normal' | '-normal-': Lang.t('difficulty.normal');
+			case '-easy': Lang.t('difficulty.easy');
+			case '-hard': Lang.t('difficulty.hard');
+			default: suffix.length > 1 ? suffix.substr(1) : Lang.t('difficulty.normal');
 		};
 	}
 
@@ -782,7 +783,7 @@ class LoadingState extends MusicBeatState
 		var dots:String = '';
 		for (i in 0...dotsCount) dots += '.';
 		if (!loadFailed)
-			statusText.text = (chartLoaded ? '即将开始' : '正在解析谱面') + dots;
+			statusText.text = (chartLoaded ? Lang.tOr('loading.startingSoon', '即将开始') : Lang.tOr('loading.parsingChart', '正在解析谱面')) + dots;
 
 		if(callbacks != null) {
 			// 加载完成后直接补满到 100%，避免渐进接近拖慢进入时机

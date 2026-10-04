@@ -282,12 +282,12 @@ class ModsMenuState extends MusicBeatState
 		hasModsUI.push(restartText);
 
 		// ---- 操作按钮 ----
-		toggleBtn = new ModsButton(772, 540, 170, 44, '启用', function() { toggleSelected(); });
-		upBtn = new ModsButton(952, 540, 96, 44, '上移', function() { moveMod(-1); });
-		downBtn = new ModsButton(1058, 540, 96, 44, '下移', function() { moveMod(1); });
-		allOnBtn = new ModsButton(772, 590, 130, 44, '全部启用', function() { setAllMods(true); });
-		allOffBtn = new ModsButton(912, 590, 130, 44, '全部禁用', function() { setAllMods(false); });
-		deleteBtn = new ModsButton(1052, 590, 130, 44, '删除', function() { deleteSelected(); });
+		toggleBtn = new ModsButton(772, 540, 170, 44, Lang.tOr('mods.enable', '启用'), function() { toggleSelected(); });
+		upBtn = new ModsButton(952, 540, 96, 44, Lang.tOr('mods.moveUp', '上移'), function() { moveMod(-1); });
+		downBtn = new ModsButton(1058, 540, 96, 44, Lang.tOr('mods.moveDown', '下移'), function() { moveMod(1); });
+		allOnBtn = new ModsButton(772, 590, 130, 44, Lang.tOr('mods.enableAll', '全部启用'), function() { setAllMods(true); });
+		allOffBtn = new ModsButton(912, 590, 130, 44, Lang.tOr('mods.disableAll', '全部禁用'), function() { setAllMods(false); });
+		deleteBtn = new ModsButton(1052, 590, 130, 44, Lang.tOr('mods.delete', '删除'), function() { deleteSelected(); });
 		deleteBtn.setLabelColor(0xFFFF6B6B); // 危险操作：红色
 
 		buttons = [toggleBtn, upBtn, downBtn, allOnBtn, allOffBtn, deleteBtn];
@@ -797,7 +797,7 @@ class ModsMenuState extends MusicBeatState
 		cardName.updateHitbox();
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
-		cardStatus.text = isOn ? '已启用' : '已停用（按 Enter 或点击启用）';
+		cardStatus.text = isOn ? '已启用' : Lang.tOr('mods.disabledHint', '已停用（按 Enter 或点击启用）');
 		#if (MODS_ALLOWED && sys)
 		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
 		if (bridge.CneBridge.isCneMod(mod.folder))
@@ -876,7 +876,7 @@ class ModsMenuState extends MusicBeatState
 
 		var mod:ModMetadata = mods[curSelected];
 		clipText(nameText, mod.name, INFO_W - 20);
-		var folderLabel:String = '文件夹：' + mod.folder;
+		var folderLabel:String = Lang.tOr('mods.folder', '文件夹：') + mod.folder;
 		#if (MODS_ALLOWED && sys)
 		// 右侧信息：CNE 格式 mod 且兼容开关未开时给出可操作的提示（开关位置写在提示里）
 		if (bridge.CneBridge.isCneMod(mod.folder) && !bridge.CneBridge.isEnabled())
@@ -886,7 +886,7 @@ class ModsMenuState extends MusicBeatState
 
 		var enabledCount:Int = 0;
 		for (values in modsList) if (values[1] == true) enabledCount++;
-		countText.text = '已启用 ' + enabledCount + ' / 共 ' + mods.length;
+		countText.text = '已启用 ' + enabledCount + Lang.tOr('mods.countSeparator', ' / 共 ') + mods.length;
 		countText.updateHitbox();
 
 		descText.wordWrap = true;
@@ -975,7 +975,7 @@ class ModsMenuState extends MusicBeatState
 		for (btn in buttons) btn.visible = true;
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
-		toggleBtn.setText(isOn ? '停用' : '启用');
+		toggleBtn.setText(isOn ? Lang.tOr('mods.disable', '停用') : Lang.tOr('mods.enable', '启用'));
 		toggleBtn.setLabelColor(isOn ? 0xFF7BFF9E : DesignTokens.primary);
 	}
 
@@ -1065,7 +1065,7 @@ class ModsMenuState extends MusicBeatState
 		}
 		catch (e:Dynamic)
 		{
-			trace('删除 Mod 目录失败：' + Std.string(e));
+			trace(Lang.tOr('mods.deleteDirFailed', '删除 Mod 目录失败：') + Std.string(e));
 		}
 
 		// 2) 从内存列表移除
