@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import states.editors.ChartWidgets.EditorButton;
 import states.editors.ChartWidgets.EditorDropdown;
@@ -375,7 +376,7 @@ class ChartingState extends MusicBeatState
 		panel.build();
 		add(panel);
 
-		hintTxt = makeText(10, 660, 620, 'W/S 滚动 · A/D 小节 · ↑/↓ 吸附 · ←/→ 量化 · Z/X 缩放 · 空格 播放 · ESC 试玩 · Enter 游玩 · Ctrl+Z 撤销', 12, 0xFF8A8FA8);
+		hintTxt = makeText(10, 660, 620, Lang.tOr('chart.hint.navigate', 'W/S 滚动 · A/D 小节 · ↑/↓ 吸附 · ←/→ 量化 · Z/X 缩放 · 空格 播放 · ESC 试玩 · Enter 游玩 · Ctrl+Z 撤销'), 12, 0xFF8A8FA8);
 		add(hintTxt);
 
 		statusTxt = makeText(PANEL_X + 10, 660, PANEL_W - 20, '', 12, 0xFF8A8FA8, RIGHT);
@@ -430,19 +431,19 @@ class ChartingState extends MusicBeatState
 		var grp = panel.tabGroups[0];
 		var TAB:Int = 0;
 
-		UI_songTitle = new EditorInput(CONTENT_X, CONTENT_Y, 300, '曲目名称', _song.song, function(text:String)
+		UI_songTitle = new EditorInput(CONTENT_X, CONTENT_Y, 300, Lang.tOr('chart.songName', '曲目名称'), _song.song, function(text:String)
 		{
 			_song.song = text;
 		});
 		panel.register(TAB, UI_songTitle);
 
-		var check_voices:EditorToggle = new EditorToggle(CONTENT_X, CONTENT_Y + 52, '需要人声', _song.needsVoices, function(v:Bool)
+		var check_voices:EditorToggle = new EditorToggle(CONTENT_X, CONTENT_Y + 52, Lang.tOr('chart.needsVocals', '需要人声'), _song.needsVoices, function(v:Bool)
 		{
 			_song.needsVoices = v;
 		});
 		panel.register(TAB, check_voices);
 
-		stepperSongBPM = new EditorStepper(CONTENT_X, CONTENT_Y + 98, CONTENT_RW, '歌曲 BPM', _song.bpm, 1, 400, 1, 3, function(v:Float)
+		stepperSongBPM = new EditorStepper(CONTENT_X, CONTENT_Y + 98, CONTENT_RW, Lang.tOr('chart.songBpm', '歌曲 BPM'), _song.bpm, 1, 400, 1, 3, function(v:Float)
 		{
 			_song.bpm = v;
 			Conductor.mapBPMChanges(_song);
@@ -452,7 +453,7 @@ class ChartingState extends MusicBeatState
 		});
 		panel.register(TAB, stepperSongBPM);
 
-		stepperSongSpeed = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, CONTENT_RW, '歌曲速度', _song.speed, 0.1, 10, 0.1, 2, function(v:Float)
+		stepperSongSpeed = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, CONTENT_RW, Lang.tOr('chart.songSpeed', '歌曲速度'), _song.speed, 0.1, 10, 0.1, 2, function(v:Float)
 		{
 			_song.speed = v;
 		});
@@ -492,21 +493,21 @@ class ChartingState extends MusicBeatState
 		}
 		#end
 
-		ddPlayer1 = new EditorDropdown(CONTENT_X, CONTENT_Y + 152, CONTENT_RW, '玩家 1', characters, Std.int(Math.max(0, characters.indexOf(_song.player1))), function(i:Int)
+		ddPlayer1 = new EditorDropdown(CONTENT_X, CONTENT_Y + 152, CONTENT_RW, Lang.tOr('chart.player1', '玩家 1'), characters, Std.int(Math.max(0, characters.indexOf(_song.player1))), function(i:Int)
 		{
 			_song.player1 = characters[i];
 			updateHeads();
 		}, panel.dropdownLayer);
 		panel.register(TAB, ddPlayer1);
 
-		ddGF = new EditorDropdown(CONTENT_X, CONTENT_Y + 206, CONTENT_RW, '女友', characters, Std.int(Math.max(0, characters.indexOf(_song.gfVersion))), function(i:Int)
+		ddGF = new EditorDropdown(CONTENT_X, CONTENT_Y + 206, CONTENT_RW, Lang.tOr('chart.girlfriend', '女友'), characters, Std.int(Math.max(0, characters.indexOf(_song.gfVersion))), function(i:Int)
 		{
 			_song.gfVersion = characters[i];
 			updateHeads();
 		}, panel.dropdownLayer);
 		panel.register(TAB, ddGF);
 
-		ddPlayer2 = new EditorDropdown(CONTENT_X, CONTENT_Y + 260, CONTENT_RW, '玩家 2', characters, Std.int(Math.max(0, characters.indexOf(_song.player2))), function(i:Int)
+		ddPlayer2 = new EditorDropdown(CONTENT_X, CONTENT_Y + 260, CONTENT_RW, Lang.tOr('chart.player2', '玩家 2'), characters, Std.int(Math.max(0, characters.indexOf(_song.player2))), function(i:Int)
 		{
 			_song.player2 = characters[i];
 			updateHeads();
@@ -549,38 +550,38 @@ class ChartingState extends MusicBeatState
 
 		if(stages.length < 1) stages.push('stage');
 
-		stageDropDown = new EditorDropdown(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 152, CONTENT_RW, '舞台', stages, Std.int(Math.max(0, stages.indexOf(_song.stage))), function(i:Int)
+		stageDropDown = new EditorDropdown(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 152, CONTENT_RW, Lang.tOr('chart.stage', '舞台'), stages, Std.int(Math.max(0, stages.indexOf(_song.stage))), function(i:Int)
 		{
 			_song.stage = stages[i];
 		}, panel.dropdownLayer);
 		panel.register(TAB, stageDropDown);
 
 		var y:Float = CONTENT_Y + 314;
-		var saveButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '保存', function()
+		var saveButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.save', '保存'), function()
 		{
 			saveLevel();
 		}, 13, true);
 		panel.register(TAB, saveButton);
 
-		var reloadSong:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '重新加载音频', function()
+		var reloadSong:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.reloadAudio', '重新加载音频'), function()
 		{
 			currentSongName = Paths.formatToSongPath(UI_songTitle.field.text);
 			loadSong();
 			updateWaveform();
-			panel.showToast('音频已重新加载');
+			panel.showToast(Lang.tOr('chart.audioReloaded', '音频已重新加载'));
 		}, 13);
 		panel.register(TAB, reloadSong);
 
 		y += 44;
-		var saveEventsBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '保存事件', function()
+		var saveEventsBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.saveEvents', '保存事件'), function()
 		{
 			saveEvents();
 		}, 13);
 		panel.register(TAB, saveEventsBtn);
 
-		var reloadSongJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '重新加载 JSON', function()
+		var reloadSongJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.reloadJson', '重新加载 JSON'), function()
 		{
-			openSubState(new Prompt('重新加载将清空当前进度，是否继续？', 0, function() {
+			openSubState(new Prompt(Lang.tOr('chart.reloadConfirm', '重新加载将清空当前进度，是否继续？'), 0, function() {
 				loadJson(_song.song.toLowerCase());
 			},
 			null, ignoreWarnings));
@@ -588,14 +589,14 @@ class ChartingState extends MusicBeatState
 		panel.register(TAB, reloadSongJson);
 
 		y += 44;
-		var loadAutosaveBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '加载自动保存', function()
+		var loadAutosaveBtn:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.loadAutosave', '加载自动保存'), function()
 		{
 			PlayState.setSong(Song.parseJSONshit(FlxG.save.data.autosave));
 			MusicBeatState.resetState();
 		}, 13);
 		panel.register(TAB, loadAutosaveBtn);
 
-		var loadEventJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '加载事件', function()
+		var loadEventJson:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.loadEvents', '加载事件'), function()
 		{
 			var songName:String = Paths.formatToSongPath(_song.song);
 			var file:String = Paths.json(songName + '/events');
@@ -610,26 +611,26 @@ class ChartingState extends MusicBeatState
 				_song.events = events.events;
 				changeSection(curSec);
 			}
-			else panel.showToast('未找到事件文件');
+			else panel.showToast(Lang.tOr('chart.noEventFile', '未找到事件文件'));
 		}, 13);
 		panel.register(TAB, loadEventJson);
 
 		y += 44;
-		var clear_notes:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '清空音符', function()
+		var clear_notes:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.clearNotes', '清空音符'), function()
 		{
-			openSubState(new Prompt('将清空全部音符，是否继续？', 0, function(){
+			openSubState(new Prompt(Lang.tOr('chart.clearNotesConfirm', '将清空全部音符，是否继续？'), 0, function(){
 				for (sec in 0..._song.notes.length) {
 					_song.notes[sec].sectionNotes = [];
 				}
 				updateGrid();
-				panel.showToast('全部音符已清空');
+				panel.showToast(Lang.tOr('chart.notesCleared', '全部音符已清空'));
 			}, null, ignoreWarnings));
 		}, 13, true);
 		panel.register(TAB, clear_notes);
 
-		var clear_events:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '清空事件', function()
+		var clear_events:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.clearEvents', '清空事件'), function()
 		{
-			openSubState(new Prompt('将清空全部事件，是否继续？', 0, clearEvents, null, ignoreWarnings));
+			openSubState(new Prompt(Lang.tOr('chart.clearEventsConfirm', '将清空全部事件，是否继续？'), 0, clearEvents, null, ignoreWarnings));
 		}, 13, true);
 		panel.register(TAB, clear_events);
 	}
@@ -639,21 +640,21 @@ class ChartingState extends MusicBeatState
 		var grp = panel.tabGroups[1];
 		var TAB:Int = 1;
 
-		stepperBeats = new EditorStepper(CONTENT_X, CONTENT_Y, CONTENT_RW, '小节拍数', getSectionBeats(), 1, 16, 1, 1, function(v:Float)
+		stepperBeats = new EditorStepper(CONTENT_X, CONTENT_Y, CONTENT_RW, Lang.tOr('chart.sectionBeats', '小节拍数'), getSectionBeats(), 1, 16, 1, 1, function(v:Float)
 		{
 			_song.notes[curSec].sectionBeats = v;
 			reloadGridLayer();
 		});
 		panel.register(TAB, stepperBeats);
 
-		stepperSectionBPM = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, CONTENT_RW, '小节 BPM', _song.notes[curSec].bpm, 0, 999, 1, 1, function(v:Float)
+		stepperSectionBPM = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, CONTENT_RW, Lang.tOr('chart.sectionBpm', '小节 BPM'), _song.notes[curSec].bpm, 0, 999, 1, 1, function(v:Float)
 		{
 			_song.notes[curSec].bpm = v;
 			updateGrid();
 		});
 		panel.register(TAB, stepperSectionBPM);
 
-		check_mustHitSection = new EditorToggle(CONTENT_X, CONTENT_Y + 54, 'Must Hit 小节', _song.notes[curSec].mustHitSection, function(v:Bool)
+		check_mustHitSection = new EditorToggle(CONTENT_X, CONTENT_Y + 54, Lang.tOr('chart.mustHitSection', 'Must Hit 小节'), _song.notes[curSec].mustHitSection, function(v:Bool)
 		{
 			_song.notes[curSec].mustHitSection = v;
 			updateGrid();
@@ -661,7 +662,7 @@ class ChartingState extends MusicBeatState
 		});
 		panel.register(TAB, check_mustHitSection);
 
-		check_gfSection = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 54, 'GF 小节', _song.notes[curSec].gfSection, function(v:Bool)
+		check_gfSection = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 54, Lang.tOr('chart.gfSection', 'GF 小节'), _song.notes[curSec].gfSection, function(v:Bool)
 		{
 			_song.notes[curSec].gfSection = v;
 			updateGrid();
@@ -669,7 +670,7 @@ class ChartingState extends MusicBeatState
 		});
 		panel.register(TAB, check_gfSection);
 
-		check_changeBPM = new EditorToggle(CONTENT_X, CONTENT_Y + 104, '本小节换速', _song.notes[curSec].changeBPM, function(v:Bool)
+		check_changeBPM = new EditorToggle(CONTENT_X, CONTENT_Y + 104, Lang.tOr('chart.changeBpm', '本小节换速'), _song.notes[curSec].changeBPM, function(v:Bool)
 		{
 			_song.notes[curSec].changeBPM = v;
 			Conductor.mapBPMChanges(_song);
@@ -677,20 +678,20 @@ class ChartingState extends MusicBeatState
 		});
 		panel.register(TAB, check_changeBPM);
 
-		check_altAnim = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 104, 'Alt 动画', _song.notes[curSec].altAnim, function(v:Bool)
+		check_altAnim = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 104, Lang.tOr('chart.altAnim', 'Alt 动画'), _song.notes[curSec].altAnim, function(v:Bool)
 		{
 			_song.notes[curSec].altAnim = v;
 		});
 		panel.register(TAB, check_altAnim);
 
-		check_notesSec = new EditorToggle(CONTENT_X, CONTENT_Y + 154, '音符', true);
+		check_notesSec = new EditorToggle(CONTENT_X, CONTENT_Y + 154, Lang.tOr('chart.notes', '音符'), true);
 		panel.register(TAB, check_notesSec);
 
-		check_eventsSec = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 154, '事件', true);
+		check_eventsSec = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 154, Lang.tOr('chart.events', '事件'), true);
 		panel.register(TAB, check_eventsSec);
 
 		var y:Float = CONTENT_Y + 198;
-		var copyButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '复制本节', function()
+		var copyButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.copySection', '复制本节'), function()
 		{
 			notesCopied = [];
 			sectionToCopy = curSec;
@@ -716,15 +717,15 @@ class ChartingState extends MusicBeatState
 					notesCopied.push([strumTime, -1, copiedEventArray]);
 				}
 			}
-			panel.showToast('本节已复制');
+			panel.showToast(Lang.tOr('chart.sectionCopied', '本节已复制'));
 		}, 13);
 		panel.register(TAB, copyButton);
 
-		var pasteButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '粘贴本节', function()
+		var pasteButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.pasteSection', '粘贴本节'), function()
 		{
 			if(notesCopied == null || notesCopied.length < 1)
 			{
-				panel.showToast('剪贴板为空');
+				panel.showToast(Lang.tOr('chart.clipboardEmpty', '剪贴板为空'));
 				return;
 			}
 
@@ -761,12 +762,12 @@ class ChartingState extends MusicBeatState
 				}
 			}
 			updateGrid();
-			panel.showToast('已粘贴到本节');
+			panel.showToast(Lang.tOr('chart.pastedToSection', '已粘贴到本节'));
 		}, 13);
 		panel.register(TAB, pasteButton);
 
 		y += 44;
-		var clearSectionButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '清空本节', function()
+		var clearSectionButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.clearSection', '清空本节'), function()
 		{
 			if(check_notesSec.checked)
 			{
@@ -789,11 +790,11 @@ class ChartingState extends MusicBeatState
 			}
 			updateGrid();
 			updateNoteUI();
-			panel.showToast('本节已清空');
+			panel.showToast(Lang.tOr('chart.sectionCleared', '本节已清空'));
 		}, 13, true);
 		panel.register(TAB, clearSectionButton);
 
-		var swapSection:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '交换轨道', function()
+		var swapSection:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.swapTracks', '交换轨道'), function()
 		{
 			for (i in 0..._song.notes[curSec].sectionNotes.length)
 			{
@@ -802,15 +803,15 @@ class ChartingState extends MusicBeatState
 				_song.notes[curSec].sectionNotes[i] = note;
 			}
 			updateGrid();
-			panel.showToast('轨道已交换');
+			panel.showToast(Lang.tOr('chart.tracksSwapped', '轨道已交换'));
 		}, 13);
 		panel.register(TAB, swapSection);
 
 		y += 44;
-		stepperCopy = new EditorStepper(CONTENT_X, y, 130, '往前几节', 1, -999, 999, 1, 0);
+		stepperCopy = new EditorStepper(CONTENT_X, y, 130, Lang.tOr('chart.sectionsForward', '往前几节'), 1, -999, 999, 1, 0);
 		panel.register(TAB, stepperCopy);
 
-		var copyLastButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '复制前 N 节', function()
+		var copyLastButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.copyPrevSections', '复制前 N 节'), function()
 		{
 			var value:Int = Std.int(stepperCopy.value);
 			if(value == 0) return;
@@ -843,12 +844,12 @@ class ChartingState extends MusicBeatState
 				}
 			}
 			updateGrid();
-			panel.showToast('已复制上一节');
+			panel.showToast(Lang.tOr('chart.copiedPrevSection', '已复制上一节'));
 		}, 13);
 		panel.register(TAB, copyLastButton);
 
 		y += 44;
-		var duetButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, '二重奏', function()
+		var duetButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.duet', '二重奏'), function()
 		{
 			var duetNotes:Array<Array<Dynamic>> = [];
 			for (note in _song.notes[curSec].sectionNotes)
@@ -869,11 +870,11 @@ class ChartingState extends MusicBeatState
 			}
 
 			updateGrid();
-			panel.showToast('已生成二重奏');
+			panel.showToast(Lang.tOr('chart.duetCreated', '已生成二重奏'));
 		}, 13);
 		panel.register(TAB, duetButton);
 
-		var mirrorButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, '镜像翻转', function()
+		var mirrorButton:EditorButton = new EditorButton(CONTENT_X + CONTENT_RW + 24, y, CONTENT_RW, 34, Lang.tOr('chart.mirror', '镜像翻转'), function()
 		{
 			for (note in _song.notes[curSec].sectionNotes)
 			{
@@ -884,7 +885,7 @@ class ChartingState extends MusicBeatState
 				note[1] = boob;
 			}
 			updateGrid();
-			panel.showToast('已镜像翻转');
+			panel.showToast(Lang.tOr('chart.mirrored', '已镜像翻转'));
 		}, 13);
 		panel.register(TAB, mirrorButton);
 	}
@@ -894,7 +895,7 @@ class ChartingState extends MusicBeatState
 		var grp = panel.tabGroups[2];
 		var TAB:Int = 2;
 
-		strumTimeInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, '音符时间 (毫秒)', '0', function(text:String)
+		strumTimeInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, Lang.tOr('chart.noteTime', '音符时间 (毫秒)'), '0', function(text:String)
 		{
 			if(curSelectedNote != null && curSelectedNote[2] != null)
 			{
@@ -906,7 +907,7 @@ class ChartingState extends MusicBeatState
 		}, true);
 		panel.register(TAB, strumTimeInputText);
 
-		stepperSusLength = new EditorStepper(CONTENT_X, CONTENT_Y + 54, 300, '长条长度 (毫秒)', 0, 0, Conductor.stepCrochet * 64, Math.ceil(Conductor.stepCrochet / 2), 0, function(v:Float)
+		stepperSusLength = new EditorStepper(CONTENT_X, CONTENT_Y + 54, 300, Lang.tOr('chart.sustainLength', '长条长度 (毫秒)'), 0, 0, Conductor.stepCrochet * 64, Math.ceil(Conductor.stepCrochet / 2), 0, function(v:Float)
 		{
 			if(curSelectedNote != null && curSelectedNote[2] != null)
 			{
@@ -948,7 +949,7 @@ class ChartingState extends MusicBeatState
 			displayNameList[i] = i + '. ' + displayNameList[i];
 		}
 
-		noteTypeDropDown = new EditorDropdown(CONTENT_X, CONTENT_Y + 108, 300, '音符类型', displayNameList, 0, function(i:Int)
+		noteTypeDropDown = new EditorDropdown(CONTENT_X, CONTENT_Y + 108, 300, Lang.tOr('chart.noteType', '音符类型'), displayNameList, 0, function(i:Int)
 		{
 			currentType = i;
 			if(curSelectedNote != null && curSelectedNote[1] > -1 && curSelectedNote[2] != null) {
@@ -958,7 +959,7 @@ class ChartingState extends MusicBeatState
 		}, panel.dropdownLayer);
 		panel.register(TAB, noteTypeDropDown);
 
-		var delBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 168, CONTENT_RW, 34, '删除选中', function()
+		var delBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 168, CONTENT_RW, 34, Lang.tOr('chart.deleteSelected', '删除选中'), function()
 		{
 			if(curSelectedNote != null)
 			{
@@ -971,11 +972,11 @@ class ChartingState extends MusicBeatState
 		}, 13, true);
 		panel.register(TAB, delBtn);
 
-		var hint:FlxText = makeText(CONTENT_X, CONTENT_Y + 230, CONTENT_W, '点击网格放置音符
+		var hint:FlxText = makeText(CONTENT_X, CONTENT_Y + 230, CONTENT_W, Lang.tOr('chart.notesHint', '点击网格放置音符
 拖拽向下拉出长条
 点击音符：删除 · Ctrl+点击：选中
 Alt+点击：更换类型 · Q/E：调整长条
-滚轮：滚动时间', 12, 0xFF7C8198);
+滚轮：滚动时间'), 12, 0xFF7C8198);
 		grp.add(hint);
 	}
 
@@ -1024,7 +1025,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 			leEvents.push(eventStuff[i][0]);
 		}
 
-		eventDropDown = new EditorDropdown(CONTENT_X, CONTENT_Y, 300, '事件类型', leEvents, 0, function(i:Int)
+		eventDropDown = new EditorDropdown(CONTENT_X, CONTENT_Y, 300, Lang.tOr('chart.eventType', '事件类型'), leEvents, 0, function(i:Int)
 		{
 			descText.text = eventStuff[i][1];
 			if (curSelectedNote != null && curSelectedNote[2] == null)
@@ -1035,7 +1036,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 		}, panel.dropdownLayer);
 		panel.register(TAB, eventDropDown);
 
-		value1InputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 140, '值 1', '', function(text:String)
+		value1InputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 140, Lang.tOr('chart.value1', '值 1'), '', function(text:String)
 		{
 			if(curSelectedNote != null && curSelectedNote[2] == null)
 			{
@@ -1048,7 +1049,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 		});
 		panel.register(TAB, value1InputText);
 
-		value2InputText = new EditorInput(CONTENT_X + 160, CONTENT_Y + 54, 140, '值 2', '', function(text:String)
+		value2InputText = new EditorInput(CONTENT_X + 160, CONTENT_Y + 54, 140, Lang.tOr('chart.value2', '值 2'), '', function(text:String)
 		{
 			if(curSelectedNote != null && curSelectedNote[2] == null)
 			{
@@ -1062,7 +1063,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 		panel.register(TAB, value2InputText);
 
 		var btnY:Float = CONTENT_Y + 112;
-		var removeButton:EditorButton = new EditorButton(CONTENT_X, btnY, 70, 34, '删除', function()
+		var removeButton:EditorButton = new EditorButton(CONTENT_X, btnY, 70, 34, Lang.tOr('chart.delete', '删除'), function()
 		{
 			if(curSelectedNote != null && curSelectedNote[2] == null)
 			{
@@ -1088,7 +1089,7 @@ Alt+点击：更换类型 · Q/E：调整长条
 		}, 12, true);
 		panel.register(TAB, removeButton);
 
-		var addButton:EditorButton = new EditorButton(CONTENT_X + 80, btnY, 70, 34, '添加', function()
+		var addButton:EditorButton = new EditorButton(CONTENT_X + 80, btnY, 70, 34, Lang.tOr('chart.add', '添加'), function()
 		{
 			if(curSelectedNote != null && curSelectedNote[2] == null)
 			{
@@ -1102,28 +1103,28 @@ Alt+点击：更换类型 · Q/E：调整长条
 		}, 12);
 		panel.register(TAB, addButton);
 
-		var moveLeftButton:EditorButton = new EditorButton(CONTENT_X + 160, btnY, 70, 34, '上一个', function()
+		var moveLeftButton:EditorButton = new EditorButton(CONTENT_X + 160, btnY, 70, 34, Lang.tOr('chart.prev', '上一个'), function()
 		{
 			changeEventSelected(-1);
 		}, 12);
 		panel.register(TAB, moveLeftButton);
 
-		var moveRightButton:EditorButton = new EditorButton(CONTENT_X + 240, btnY, 70, 34, '下一个', function()
+		var moveRightButton:EditorButton = new EditorButton(CONTENT_X + 240, btnY, 70, 34, Lang.tOr('chart.next', '下一个'), function()
 		{
 			changeEventSelected(1);
 		}, 12);
 		panel.register(TAB, moveRightButton);
 
-		selectedEventText = new FlxText(CONTENT_X, CONTENT_Y + 160, CONTENT_W, '选中事件：无', 12);
+		selectedEventText = new FlxText(CONTENT_X, CONTENT_Y + 160, CONTENT_W, Lang.tOr('chart.noEventSelected', '选中事件：无'), 12);
 		selectedEventText.setFormat(Paths.font('future.ttf'), 12, 0xFFD7D7E0, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		grp.add(selectedEventText);
 
-		var listLabel:FlxText = makeText(CONTENT_X, CONTENT_Y + 306, 200, '事件操作提示', 13, 0xFFD7D7E0);
+		var listLabel:FlxText = makeText(CONTENT_X, CONTENT_Y + 306, 200, Lang.tOr('chart.eventHintTitle', '事件操作提示'), 13, 0xFFD7D7E0);
 		grp.add(listLabel);
 
-		var tip:FlxText = makeText(CONTENT_X, CONTENT_Y + 330, CONTENT_W, '点击网格左侧事件轨道放置事件音符
+		var tip:FlxText = makeText(CONTENT_X, CONTENT_Y + 330, CONTENT_W, Lang.tOr('chart.eventsHint', '点击网格左侧事件轨道放置事件音符
 选中事件后可在此编辑类型与数值
-Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
+Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		grp.add(tip);
 	}
 
@@ -1134,12 +1135,12 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 			curEventSelected += change;
 			if(curEventSelected < 0) curEventSelected = Std.int(curSelectedNote[1].length) - 1;
 			else if(curEventSelected >= curSelectedNote[1].length) curEventSelected = 0;
-			selectedEventText.text = '选中事件：' + (curEventSelected + 1) + ' / ' + curSelectedNote[1].length;
+			selectedEventText.text = Lang.tOr('chart.selectedEvent', '选中事件：') + (curEventSelected + 1) + ' / ' + curSelectedNote[1].length;
 		}
 		else
 		{
 			curEventSelected = 0;
-			selectedEventText.text = '选中事件：无';
+			selectedEventText.text = Lang.tOr('chart.noEventSelected', '选中事件：无');
 		}
 		updateNoteUI();
 	}
@@ -1161,28 +1162,28 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		var grp = panel.tabGroups[4];
 		var TAB:Int = 4;
 
-		metronome = new EditorToggle(CONTENT_X, CONTENT_Y, '节拍器', FlxG.save.data.chart_metronome == true, function(v:Bool)
+		metronome = new EditorToggle(CONTENT_X, CONTENT_Y, Lang.tOr('chart.metronome', '节拍器'), FlxG.save.data.chart_metronome == true, function(v:Bool)
 		{
 			FlxG.save.data.chart_metronome = v;
 			FlxG.save.flush();
 		});
 		panel.register(TAB, metronome);
 
-		disableAutoScrolling = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, '禁用自动滚动', FlxG.save.data.chart_noAutoScroll == true, function(v:Bool)
+		disableAutoScrolling = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y, Lang.tOr('chart.disableAutoScroll', '禁用自动滚动'), FlxG.save.data.chart_noAutoScroll == true, function(v:Bool)
 		{
 			FlxG.save.data.chart_noAutoScroll = v;
 			FlxG.save.flush();
 		});
 		panel.register(TAB, disableAutoScrolling);
 
-		metronomeStepper = new EditorStepper(CONTENT_X, CONTENT_Y + 44, CONTENT_RW, '节拍器 BPM', _song.bpm, 1, 1500, 5, 1, null);
+		metronomeStepper = new EditorStepper(CONTENT_X, CONTENT_Y + 44, CONTENT_RW, Lang.tOr('chart.metronomeBpm', '节拍器 BPM'), _song.bpm, 1, 1500, 5, 1, null);
 		panel.register(TAB, metronomeStepper);
 
-		metronomeOffsetStepper = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 44, CONTENT_RW, '偏移 (毫秒)', 0, 0, 1000, 25, 1, null);
+		metronomeOffsetStepper = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 44, CONTENT_RW, Lang.tOr('chart.offset', '偏移 (毫秒)'), 0, 0, 1000, 25, 1, null);
 		panel.register(TAB, metronomeOffsetStepper);
 
 		#if desktop
-		waveformUseInstrumental = new EditorToggle(CONTENT_X, CONTENT_Y + 98, '伴奏波形', FlxG.save.data.chart_waveformInst == true, function(v:Bool)
+		waveformUseInstrumental = new EditorToggle(CONTENT_X, CONTENT_Y + 98, Lang.tOr('chart.instWave', '伴奏波形'), FlxG.save.data.chart_waveformInst == true, function(v:Bool)
 		{
 			if (waveformUseVoices != null) waveformUseVoices.setChecked(false, false);
 			FlxG.save.data.chart_waveformVoices = false;
@@ -1192,7 +1193,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		});
 		panel.register(TAB, waveformUseInstrumental);
 
-		waveformUseVoices = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, '人声波形', FlxG.save.data.chart_waveformVoices == true, function(v:Bool)
+		waveformUseVoices = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 98, Lang.tOr('chart.vocalWave', '人声波形'), FlxG.save.data.chart_waveformVoices == true, function(v:Bool)
 		{
 			if (waveformUseInstrumental != null) waveformUseInstrumental.setChecked(false, false);
 			FlxG.save.data.chart_waveformInst = false;
@@ -1203,7 +1204,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		panel.register(TAB, waveformUseVoices);
 		#end
 
-		check_vortex = new EditorToggle(CONTENT_X, CONTENT_Y + 148, 'Vortex 编辑器', FlxG.save.data.chart_vortex == true, function(v:Bool)
+		check_vortex = new EditorToggle(CONTENT_X, CONTENT_Y + 148, Lang.tOr('chart.vortexEditor', 'Vortex 编辑器'), FlxG.save.data.chart_vortex == true, function(v:Bool)
 		{
 			FlxG.save.data.chart_vortex = v;
 			vortex = FlxG.save.data.chart_vortex;
@@ -1211,7 +1212,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		});
 		panel.register(TAB, check_vortex);
 
-		mouseScrollingQuant = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 148, '鼠标量化滚动', FlxG.save.data.mouseScrollingQuant == true, function(v:Bool)
+		mouseScrollingQuant = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 148, Lang.tOr('chart.quantizeScroll', '鼠标量化滚动'), FlxG.save.data.mouseScrollingQuant == true, function(v:Bool)
 		{
 			FlxG.save.data.mouseScrollingQuant = v;
 			mouseQuant = FlxG.save.data.mouseScrollingQuant;
@@ -1219,7 +1220,7 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		});
 		panel.register(TAB, mouseScrollingQuant);
 
-		check_warnings = new EditorToggle(CONTENT_X, CONTENT_Y + 198, '忽略进度警告', FlxG.save.data.ignoreWarnings == true, function(v:Bool)
+		check_warnings = new EditorToggle(CONTENT_X, CONTENT_Y + 198, Lang.tOr('chart.ignoreProgressWarnings', '忽略进度警告'), FlxG.save.data.ignoreWarnings == true, function(v:Bool)
 		{
 			FlxG.save.data.ignoreWarnings = v;
 			ignoreWarnings = FlxG.save.data.ignoreWarnings;
@@ -1227,20 +1228,20 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		});
 		panel.register(TAB, check_warnings);
 
-		stepperRate = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 198, CONTENT_RW, '播放速度', playbackSpeed, 0.5, 3, 0.05, 2, function(v:Float)
+		stepperRate = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 198, CONTENT_RW, Lang.tOr('chart.playbackSpeed', '播放速度'), playbackSpeed, 0.5, 3, 0.05, 2, function(v:Float)
 		{
 			playbackSpeed = v;
 		});
 		panel.register(TAB, stepperRate);
 
-		check_mute_inst = new EditorToggle(CONTENT_X, CONTENT_Y + 252, '静音伴奏 (编辑中)', false, function(v:Bool)
+		check_mute_inst = new EditorToggle(CONTENT_X, CONTENT_Y + 252, Lang.tOr('chart.muteInstWhileEditing', '静音伴奏 (编辑中)'), false, function(v:Bool)
 		{
 			var vol:Float = v ? 0 : 1;
 			if (FlxG.sound.music != null) FlxG.sound.music.volume = vol;
 		});
 		panel.register(TAB, check_mute_inst);
 
-		check_mute_vocals = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 252, '静音人声 (编辑中)', false, function(v:Bool)
+		check_mute_vocals = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 252, Lang.tOr('chart.muteVocalsWhileEditing', '静音人声 (编辑中)'), false, function(v:Bool)
 		{
 			if(vocals != null) {
 				var vol:Float = v ? 0 : 1;
@@ -1249,27 +1250,27 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		});
 		panel.register(TAB, check_mute_vocals);
 
-		playSoundBf = new EditorToggle(CONTENT_X, CONTENT_Y + 302, 'BF 音符音效', FlxG.save.data.chart_playSoundBf == true, function(v:Bool)
+		playSoundBf = new EditorToggle(CONTENT_X, CONTENT_Y + 302, Lang.tOr('chart.bfNoteSound', 'BF 音符音效'), FlxG.save.data.chart_playSoundBf == true, function(v:Bool)
 		{
 			FlxG.save.data.chart_playSoundBf = v;
 			FlxG.save.flush();
 		});
 		panel.register(TAB, playSoundBf);
 
-		playSoundDad = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 302, 'Dad 音符音效', FlxG.save.data.chart_playSoundDad == true, function(v:Bool)
+		playSoundDad = new EditorToggle(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 302, Lang.tOr('chart.dadNoteSound', 'Dad 音符音效'), FlxG.save.data.chart_playSoundDad == true, function(v:Bool)
 		{
 			FlxG.save.data.chart_playSoundDad = v;
 			FlxG.save.flush();
 		});
 		panel.register(TAB, playSoundDad);
 
-		instVolume = new EditorStepper(CONTENT_X, CONTENT_Y + 352, CONTENT_RW, '伴奏音量', 1, 0, 1, 0.1, 1, function(v:Float)
+		instVolume = new EditorStepper(CONTENT_X, CONTENT_Y + 352, CONTENT_RW, Lang.tOr('chart.instVolume', '伴奏音量'), 1, 0, 1, 0.1, 1, function(v:Float)
 		{
 			if (FlxG.sound.music != null) FlxG.sound.music.volume = v;
 		});
 		panel.register(TAB, instVolume);
 
-		voicesVolume = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 352, CONTENT_RW, '人声音量', 1, 0, 1, 0.1, 1, function(v:Float)
+		voicesVolume = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 352, CONTENT_RW, Lang.tOr('chart.vocalVolume', '人声音量'), 1, 0, 1, 0.1, 1, function(v:Float)
 		{
 			if (vocals != null) vocals.volume = v;
 		});
@@ -1287,47 +1288,47 @@ Ctrl+点击事件音符可选中', 12, 0xFF7C8198);
 		var grp = panel.tabGroups[5];
 		var TAB:Int = 5;
 
-		gameOverCharacterInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, '游戏结束角色', _song.gameOverChar != null ? _song.gameOverChar : '', function(text:String) { _song.gameOverChar = text; });
+		gameOverCharacterInputText = new EditorInput(CONTENT_X, CONTENT_Y, 300, Lang.tOr('chart.gameOverChar', '游戏结束角色'), _song.gameOverChar != null ? _song.gameOverChar : '', function(text:String) { _song.gameOverChar = text; });
 		panel.register(TAB, gameOverCharacterInputText);
 
-		gameOverSoundInputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 300, '死亡音效 (sounds/)', _song.gameOverSound != null ? _song.gameOverSound : '', function(text:String) { _song.gameOverSound = text; });
+		gameOverSoundInputText = new EditorInput(CONTENT_X, CONTENT_Y + 54, 300, Lang.tOr('chart.deathSound', '死亡音效 (sounds/)'), _song.gameOverSound != null ? _song.gameOverSound : '', function(text:String) { _song.gameOverSound = text; });
 		panel.register(TAB, gameOverSoundInputText);
 
-		gameOverLoopInputText = new EditorInput(CONTENT_X, CONTENT_Y + 108, 300, '结束循环音乐 (music/)', _song.gameOverLoop != null ? _song.gameOverLoop : '', function(text:String) { _song.gameOverLoop = text; });
+		gameOverLoopInputText = new EditorInput(CONTENT_X, CONTENT_Y + 108, 300, Lang.tOr('chart.endLoopMusic', '结束循环音乐 (music/)'), _song.gameOverLoop != null ? _song.gameOverLoop : '', function(text:String) { _song.gameOverLoop = text; });
 		panel.register(TAB, gameOverLoopInputText);
 
-		gameOverEndInputText = new EditorInput(CONTENT_X, CONTENT_Y + 162, 300, '结束重试音乐 (music/)', _song.gameOverEnd != null ? _song.gameOverEnd : '', function(text:String) { _song.gameOverEnd = text; });
+		gameOverEndInputText = new EditorInput(CONTENT_X, CONTENT_Y + 162, 300, Lang.tOr('chart.endRetryMusic', '结束重试音乐 (music/)'), _song.gameOverEnd != null ? _song.gameOverEnd : '', function(text:String) { _song.gameOverEnd = text; });
 		panel.register(TAB, gameOverEndInputText);
 
 		var check_disableNoteRGB:EditorToggle;
-		check_disableNoteRGB = new EditorToggle(CONTENT_X, CONTENT_Y + 222, '禁用音符 RGB', _song.disableNoteRGB == true, function(v:Bool)
+		check_disableNoteRGB = new EditorToggle(CONTENT_X, CONTENT_Y + 222, Lang.tOr('chart.disableNoteRgb', '禁用音符 RGB'), _song.disableNoteRGB == true, function(v:Bool)
 		{
 			_song.disableNoteRGB = v;
 			updateGrid();
 		});
 		panel.register(TAB, check_disableNoteRGB);
 
-		noteSkinInputText = new EditorInput(CONTENT_X, CONTENT_Y + 276, 250, '音符皮肤', _song.arrowSkin != null ? _song.arrowSkin : '', function(text:String) { _song.arrowSkin = text; });
+		noteSkinInputText = new EditorInput(CONTENT_X, CONTENT_Y + 276, 250, Lang.tOr('chart.noteSkin', '音符皮肤'), _song.arrowSkin != null ? _song.arrowSkin : '', function(text:String) { _song.arrowSkin = text; });
 		panel.register(TAB, noteSkinInputText);
 
-		var reloadNotesButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 278, 160, 34, '应用音符皮肤', function() {
+		var reloadNotesButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 278, 160, 34, Lang.tOr('chart.applyNoteSkin', '应用音符皮肤'), function() {
 			_song.arrowSkin = noteSkinInputText.field.text;
 			updateGrid();
-			panel.showToast('音符皮肤已应用');
+			panel.showToast(Lang.tOr('chart.noteSkinApplied', '音符皮肤已应用'));
 		}, 12);
 		panel.register(TAB, reloadNotesButton);
 
-		noteSplashesInputText = new EditorInput(CONTENT_X, CONTENT_Y + 330, 250, '溅射皮肤', _song.splashSkin != null ? _song.splashSkin : '', function(text:String) { _song.splashSkin = text; });
+		noteSplashesInputText = new EditorInput(CONTENT_X, CONTENT_Y + 330, 250, Lang.tOr('chart.splashSkin', '溅射皮肤'), _song.splashSkin != null ? _song.splashSkin : '', function(text:String) { _song.splashSkin = text; });
 		panel.register(TAB, noteSplashesInputText);
 
-		var reloadSplashButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 332, 160, 34, '应用溅射皮肤', function() {
+		var reloadSplashButton:EditorButton = new EditorButton(CONTENT_X + 268, CONTENT_Y + 332, 160, 34, Lang.tOr('chart.applySplashSkin', '应用溅射皮肤'), function() {
 			_song.splashSkin = noteSplashesInputText.field.text;
 			updateGrid();
-			panel.showToast('溅射皮肤已应用');
+			panel.showToast(Lang.tOr('chart.splashSkinApplied', '溅射皮肤已应用'));
 		}, 12);
 		panel.register(TAB, reloadSplashButton);
 
-		var exportBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 386, CONTENT_W, 34, '导出谱面…', function()
+		var exportBtn:EditorButton = new EditorButton(CONTENT_X, CONTENT_Y + 386, CONTENT_W, 34, Lang.tOr('chart.export', '导出谱面…'), function()
 		{
 			openExportPrompt();
 		}, 13);

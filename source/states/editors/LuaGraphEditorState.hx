@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -116,26 +117,28 @@ class LuaGraphEditorState extends MusicBeatState
 	/**
 	 * 两行快捷键提示。**每行必须 ≤ BAR_TEXT_W**：`create()` 会跑 `fitText()` 兜底截断，
 	 * 自检会打印两行的实测宽度与是否被截断（`truncated=`）—— 改文案时请跟着看这一行日志。
+	 * 刻意用函数而不是 static var：inline var 要求常量初始化（不能调 Lang.tOr），
+	 * 而普通 static var 只求值一次，运行时切换语言后译文会被缓存住不更新。
 	 */
-	static inline var HINT_ROW1:String = '拖拽=放置/移动 · 点击参数=编辑 · [ ] 分类 · PgUp/PgDn 选块 · Insert 插入 · F1 说明';
-	static inline var HINT_ROW2:String = '←/→ 选参数 · Enter 编辑 · Del 删除 · Ctrl+Z/Y 撤销重做 · Ctrl+S 保存 · Tab 预览';
+	static function hintRow1():String return Lang.tOr('lg.hint.canvas', '拖拽=放置/移动 · 点击参数=编辑 · [ ] 分类 · PgUp/PgDn 选块 · Insert 插入 · F1 说明');
+	static function hintRow2():String return Lang.tOr('lg.hint.keys', '←/→ 选参数 · Enter 编辑 · Del 删除 · Ctrl+Z/Y 撤销重做 · Ctrl+S 保存 · Tab 预览');
 
 	/**
 	 * `F1` 操作说明：**完整键位表**（底栏两行只放高频项，放不全的键位在这里）。
 	 * 复用通用弹层 ⇒ 自动获得：`raiseOverlay()`（永远在积木之上）、滚轮/↑↓ 翻页、Enter/点击确认、Esc 关闭。
 	 * 每行必须 ≤ 556px（弹层正文宽度 pw-64 = 620-64）；自检会打印实测最大宽度 `help fit: max=…/556`。
 	 */
-	static var HELP_LINES:Array<String> = [
-		'鼠标：拖积木到插入线/凹槽松手即接上 · 点参数槽就地编辑',
-		'点事件帽块 = 选中整条事件栈（Del 删除，Ctrl+Z 撤销）',
-		'滚轮：画布/积木列表滚动 · 点画布空白 = 取消选中',
-		'[ ] 切换分类 · ,/. 或 PgUp/PgDn 上下选积木',
-		'Insert：插入高亮积木（选中项之后；无选中则插到最后一条栈）',
-		'←/→：切换参数并微调枚举/数字 · Enter：编辑选中参数',
-		'Del/Backspace：删除选中积木；选中帽块时删整条事件栈',
-		'Ctrl+Z / Ctrl+Y：撤销 / 重做 · Ctrl+C/X/V：复制/剪切/粘贴',
-		'Ctrl+S 保存生成 · Ctrl+O 打开 · F2 重命名',
-		'Tab：预览生成的 Lua · Esc：返回编辑器菜单 · F1：本说明'
+	static function helpLines():Array<String> return [
+		Lang.tOr('lg.help.mouse', '鼠标：拖积木到插入线/凹槽松手即接上 · 点参数槽就地编辑'),
+		Lang.tOr('lg.help.stack', '点事件帽块 = 选中整条事件栈（Del 删除，Ctrl+Z 撤销）'),
+		Lang.tOr('lg.help.wheel', '滚轮：画布/积木列表滚动 · 点画布空白 = 取消选中'),
+		Lang.tOr('lg.help.category', '[ ] 切换分类 · ,/. 或 PgUp/PgDn 上下选积木'),
+		Lang.tOr('lg.help.insert', 'Insert：插入高亮积木（选中项之后；无选中则插到最后一条栈）'),
+		Lang.tOr('lg.help.arrow', '←/→：切换参数并微调枚举/数字 · Enter：编辑选中参数'),
+		Lang.tOr('lg.help.del', 'Del/Backspace：删除选中积木；选中帽块时删整条事件栈'),
+		Lang.tOr('lg.help.undo', 'Ctrl+Z / Ctrl+Y：撤销 / 重做 · Ctrl+C/X/V：复制/剪切/粘贴'),
+		Lang.tOr('lg.help.save', 'Ctrl+S 保存生成 · Ctrl+O 打开 · F2 重命名'),
+		Lang.tOr('lg.help.tab', 'Tab：预览生成的 Lua · Esc：返回编辑器菜单 · F1：本说明')
 	];
 
 	/** 弹层正文可用宽度（renderPopup 的 pw - 64）与操作说明字号，供自检断言使用 */
@@ -244,7 +247,7 @@ class LuaGraphEditorState extends MusicBeatState
 	{
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - Lua 图形化编程";
+		Lib.application.window.title = Lang.tOr('lg.windowTitle', "FNF':Meteoric Engine - Lua 图形化编程");
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.scrollFactor.set();
@@ -257,10 +260,10 @@ class LuaGraphEditorState extends MusicBeatState
 		add(makePanel(CAN_X, CAN_Y, CAN_W, CAN_H, 22));
 		add(makePanel(BAR_X, BAR_Y, BAR_W, BAR_H, 14));
 
-		add(makeText(CAT_X + 18, CAT_Y + 16, 0, '分类', 24, DesignTokens.primary));
-		palTitle = makeText(BLK_X + 18, BLK_Y + 16, 0, '积木', 24, DesignTokens.primary);
+		add(makeText(CAT_X + 18, CAT_Y + 16, 0, Lang.tOr('lg.category', '分类'), 24, DesignTokens.primary));
+		palTitle = makeText(BLK_X + 18, BLK_Y + 16, 0, Lang.tOr('lg.blocks', '积木'), 24, DesignTokens.primary);
 		add(palTitle);
-		add(makeText(CAN_X + 16, CAN_Y + 16, 0, '画布（拖拽积木到这里）', 24, DesignTokens.primary));
+		add(makeText(CAN_X + 16, CAN_Y + 16, 0, Lang.tOr('lg.canvasHint', '画布（拖拽积木到这里）'), 24, DesignTokens.primary));
 
 		// 画布顶部固定两行：第 1 行 = 面板标题，第 2 行 = 「模组/脚本」（右对齐、单行、超长省略）。
 		// 原先宽 280 + 默认 wordWrap（FlxText 在 fieldWidth>0 时强制换行）→ 长模组名折 3 行压进画布内容区。
@@ -271,7 +274,7 @@ class LuaGraphEditorState extends MusicBeatState
 
 		// 空画布提示：只在"没有任何可绘制事件栈"时出现（见 hasDrawableStack）。
 		// 位置改到画布中部：旧位置 y = CAN_Y+90 正好落在第一条事件栈上 → 提示与帽块叠字。
-		canvasEmptyHint = makeText(CAN_X + 40, CAN_Y + 150, CAN_W - 80, '画布是空的：从左侧「积木」面板拖一块事件积木（如“当每拍时”）到这里开始。', 18, 0xFFCFCFDC);
+		canvasEmptyHint = makeText(CAN_X + 40, CAN_Y + 150, CAN_W - 80, Lang.tOr('lg.canvasEmpty', '画布是空的：从左侧「积木」面板拖一块事件积木（如“当每拍时”）到这里开始。'), 18, 0xFFCFCFDC);
 		canvasEmptyHint.wordWrap = true;
 		add(canvasEmptyHint);
 
@@ -281,28 +284,28 @@ class LuaGraphEditorState extends MusicBeatState
 		add(palDesc);
 
 		// 状态条（三行：状态 + 快捷键提示 ×2）
-		statusText = makeText(BAR_X + 24, BAR_Y + 3, BAR_TEXT_W, '就绪', 17, FlxColor.WHITE);
+		statusText = makeText(BAR_X + 24, BAR_Y + 3, BAR_TEXT_W, Lang.tOr('lg.ready', '就绪'), 17, FlxColor.WHITE);
 		statusText.wordWrap = false;
 		add(statusText);
 		// 提示拆两行：一行装不下完整键位（实测 ~1100px vs 可用 636px）；fitText 兜底 + 自检打印实测宽度
 		hintText = makeText(BAR_X + 24, BAR_Y + 22, BAR_TEXT_W, '', BAR_HINT_FONT, 0xFFCFCFDC);
 		hintText.wordWrap = false;
 		add(hintText);
-		hintText.text = fitText(HINT_ROW1, BAR_HINT_FONT, BAR_TEXT_W);
+		hintText.text = fitText(hintRow1(), BAR_HINT_FONT, BAR_TEXT_W);
 		hintText2 = makeText(BAR_X + 24, BAR_Y + 38, BAR_TEXT_W, '', BAR_HINT_FONT, 0xFFCFCFDC);
 		hintText2.wordWrap = false;
 		add(hintText2);
-		hintText2.text = fitText(HINT_ROW2, BAR_HINT_FONT, BAR_TEXT_W);
+		hintText2.text = fitText(hintRow2(), BAR_HINT_FONT, BAR_TEXT_W);
 
 		// 操作按钮（标签字号 18：见 BAR_BTN_LABEL 注释，26px 会折行并被窗口底边切掉）
 		var bx:Float = BAR_X + BAR_W - 5 * BAR_BTN_W - 4 * BAR_BTN_GAP;
 		var by:Float = BAR_Y + 13;
 		var bh:Float = 32;
-		btnNew = new UIButton(bx, by, BAR_BTN_W, bh, '新建', UIButton.VARIANT_TONAL, newScript, BAR_BTN_LABEL);
-		btnOpen = new UIButton(bx + 104, by, BAR_BTN_W, bh, '打开', UIButton.VARIANT_TONAL, openChooser, BAR_BTN_LABEL);
-		btnSave = new UIButton(bx + 208, by, BAR_BTN_W, bh, '保存生成', UIButton.VARIANT_FILLED, saveScript, BAR_BTN_LABEL);
-		btnRename = new UIButton(bx + 312, by, BAR_BTN_W, bh, '重命名', UIButton.VARIANT_TONAL, renameScript, BAR_BTN_LABEL);
-		btnPreview = new UIButton(bx + 416, by, BAR_BTN_W, bh, '预览 Lua', UIButton.VARIANT_TONAL, openPreview, BAR_BTN_LABEL);
+		btnNew = new UIButton(bx, by, BAR_BTN_W, bh, Lang.tOr('lg.new', '新建'), UIButton.VARIANT_TONAL, newScript, BAR_BTN_LABEL);
+		btnOpen = new UIButton(bx + 104, by, BAR_BTN_W, bh, Lang.tOr('lg.open', '打开'), UIButton.VARIANT_TONAL, openChooser, BAR_BTN_LABEL);
+		btnSave = new UIButton(bx + 208, by, BAR_BTN_W, bh, Lang.tOr('lg.save', '保存生成'), UIButton.VARIANT_FILLED, saveScript, BAR_BTN_LABEL);
+		btnRename = new UIButton(bx + 312, by, BAR_BTN_W, bh, Lang.tOr('lg.rename', '重命名'), UIButton.VARIANT_TONAL, renameScript, BAR_BTN_LABEL);
+		btnPreview = new UIButton(bx + 416, by, BAR_BTN_W, bh, Lang.tOr('lg.preview', '预览 Lua'), UIButton.VARIANT_TONAL, openPreview, BAR_BTN_LABEL);
 		buttons = [btnNew, btnOpen, btnSave, btnRename, btnPreview];
 		for (b in buttons) add(b);
 
@@ -373,19 +376,19 @@ class LuaGraphEditorState extends MusicBeatState
 				stLog('load graph FAILED: ' + Std.string(e));
 			}
 			// 底栏提示防回归断言：两行实测宽度必须 ≤ BAR_TEXT_W，且底栏不得越过窗口底部（720）安全线
-			stLog('hint fit: row1=' + Std.int(LuaBlockSprite.textWidth(HINT_ROW1, BAR_HINT_FONT)) + '/' + Std.int(BAR_TEXT_W)
-				+ ' row2=' + Std.int(LuaBlockSprite.textWidth(HINT_ROW2, BAR_HINT_FONT)) + '/' + Std.int(BAR_TEXT_W)
-				+ ' truncated=' + (((hintText != null && hintText.text != HINT_ROW1)
-					|| (hintText2 != null && hintText2.text != HINT_ROW2)) ? 'yes' : 'no')
+			stLog('hint fit: row1=' + Std.int(LuaBlockSprite.textWidth(hintRow1(), BAR_HINT_FONT)) + '/' + Std.int(BAR_TEXT_W)
+				+ ' row2=' + Std.int(LuaBlockSprite.textWidth(hintRow2(), BAR_HINT_FONT)) + '/' + Std.int(BAR_TEXT_W)
+				+ ' truncated=' + (((hintText != null && hintText.text != hintRow1())
+					|| (hintText2 != null && hintText2.text != hintRow2())) ? 'yes' : 'no')
 				+ ' barBottom=' + Std.int(BAR_Y + BAR_H));
 			// F1 操作说明的每行也必须落在弹层正文宽度内
 			var helpMax:Int = 0;
-			for (l in HELP_LINES)
+			for (l in helpLines())
 			{
 				var w:Int = Std.int(LuaBlockSprite.textWidth(l, HELP_FONT));
 				if (w > helpMax) helpMax = w;
 			}
-			stLog('help fit: max=' + helpMax + '/' + Std.int(POPUP_TEXT_W) + ' rows=' + HELP_LINES.length);
+			stLog('help fit: max=' + helpMax + '/' + Std.int(POPUP_TEXT_W) + ' rows=' + helpLines().length);
 			return;
 		}
 		if (selfTestStep == 1 && selfTestT >= 1.1)
@@ -396,7 +399,7 @@ class LuaGraphEditorState extends MusicBeatState
 			var arr:Array<GBlock> = GDoc.containerOf(doc, path);
 			var b:GBlock = new GBlock('misc_print');
 			b.params = LuaBlockDefs.get('misc_print').defaultParams();
-			b.set('text', '自检插入的积木');
+			b.set('text', Lang.tOr('lg.selftestBlock', '自检插入的积木'));
 			pushUndo();
 			arr.insert(0, b);
 			selPath = [0, 0];
@@ -487,7 +490,7 @@ class LuaGraphEditorState extends MusicBeatState
 			// 层级契约取证：**复现用户报的"神秘堆叠"场景** —— 弹层已打开，随后重建画布。
 			// 没有 `raiseOverlay()` 时，重建把积木 add 到 members 末尾 → 积木压住弹层
 			// （实测截图：弹层错误行被「当脚本创建时」拦腰盖住）。此步把修复后的层级留在画面上供截图。
-			openPopup('自检 · 层级检查', ['弹层必须压在画布积木之上（raiseOverlay 生效）'], null);
+			openPopup(Lang.tOr('lg.selftestTitle', '自检 · 层级检查'), [Lang.tOr('lg.selftestLine', '弹层必须压在画布积木之上（raiseOverlay 生效）')], null);
 			rebuildCanvas();
 			stLog('overlay restack: popupOpen=' + popupOpen + ' blocks=' + doc.blockCount()
 				+ ' popupIdx=' + (popupSprites.length > 0 ? members.indexOf(popupSprites[0]) : -1)
@@ -616,7 +619,7 @@ class LuaGraphEditorState extends MusicBeatState
 			if (idx < defs.length) t.text = (defs[idx].hat ? '▸ ' : '▪ ') + defs[idx].label;
 		}
 		refreshPaletteHighlight();
-		palTitle.text = '积木 · ' + LuaBlockDefs.catLabel(LuaBlockDefs.CATEGORIES[catIndex][0]);
+		palTitle.text = Lang.tOr('lg.blockPrefix', '积木 · ') + LuaBlockDefs.catLabel(LuaBlockDefs.CATEGORIES[catIndex][0]);
 	}
 
 	function refreshPaletteHighlight():Void
@@ -851,8 +854,8 @@ class LuaGraphEditorState extends MusicBeatState
 	function refreshStatus():Void
 	{
 		var mod:String = Mods.currentModDirectory;
-		var full:String = '模组：' + ((mod == null || mod.length == 0) ? '未选择' : mod) + '　脚本：' + doc.name + '.lua'
-			+ (dirty ? '　●未保存' : '');
+		var full:String = Lang.tOr('lg.modLabel', '模组：') + ((mod == null || mod.length == 0) ? Lang.tOr('lg.modNone', '未选择') : mod) + Lang.tOr('lg.scriptLabel', '　脚本：') + doc.name + '.lua'
+			+ (dirty ? Lang.tOr('lg.unsaved', '　●未保存') : '');
 		// 单行 + 超长省略：模组名可以很长，但绝不允许换行压进画布内容区（④ 的根因）
 		nameText.text = fitText(full, 16, CAN_NAME_W);
 	}
@@ -1034,7 +1037,7 @@ class LuaGraphEditorState extends MusicBeatState
 			FlxG.sound.play(Paths.sound('confirmMenu'), 0.5);
 			rebuildCanvas();
 			refreshStatus();
-			setStatus('已新增事件栈：' + def.label + '（拖积木到凹槽或插入线上松手即接入）');
+			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.label + Lang.tOr('lg.dropHint1', '（拖积木到凹槽或插入线上松手即接入）'));
 			return;
 		}
 		var b:GBlock = new GBlock(def.id);
@@ -1061,7 +1064,7 @@ class LuaGraphEditorState extends MusicBeatState
 			var st:GStack = (bp[0] >= 0 && bp[0] < doc.stacks.length) ? doc.stacks[bp[0]] : null;
 			var hd:BlockDef = (st == null) ? null : LuaBlockDefs.byEvent(st.event);
 			refreshSelectionVisual();
-			setStatus('已选中事件栈：' + ((hd != null) ? hd.label : (st == null ? '未知' : st.event)) + '（Del 删除整条栈）');
+			setStatus(Lang.tOr('lg.stackSelected', '已选中事件栈：') + ((hd != null) ? hd.label : (st == null ? Lang.tOr('lg.unknown', '未知') : st.event)) + Lang.tOr('lg.stackDelHint', '（Del 删除整条栈）'));
 			return;
 		}
 		dragOriginIndex = bp[bp.length - 1];
@@ -1197,11 +1200,11 @@ class LuaGraphEditorState extends MusicBeatState
 				var arr:Array<GBlock> = GDoc.containerOf(doc, dragOriginContainer);
 				var at:Int = Std.int(Math.max(0, Math.min(dragOriginIndex, arr.length)));
 				arr.insert(at, block);
-				setStatus('放回原位：要接进事件栈，拖到插入线或凹槽上松手', true);
+				setStatus(Lang.tOr('lg.putBack', '放回原位：要接进事件栈，拖到插入线或凹槽上松手'), true);
 			}
 			else
 			{
-				setStatus('没接上：拖到插入线或凹槽上再松手', true);
+				setStatus(Lang.tOr('lg.notConnected', '没接上：拖到插入线或凹槽上再松手'), true);
 			}
 			FlxG.sound.play(Paths.sound('cancelMenu'), 0.5);
 			rebuildCanvas();
@@ -1215,7 +1218,7 @@ class LuaGraphEditorState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.5);
 		rebuildCanvas();
 		refreshStatus();
-		setStatus('已放置积木（共 ' + doc.blockCount() + ' 块）');
+		setStatus(Lang.tOr('lg.placed', '已放置积木（共 ') + doc.blockCount() + Lang.tOr('lg.blocksParen', ' 块）'));
 	}
 
 	// ==================================================================
@@ -1428,7 +1431,7 @@ class LuaGraphEditorState extends MusicBeatState
 				rebuildCanvas();
 				refreshStatus();
 			default:
-				setStatus('参数「' + p.label + '」需要按 Enter 输入');
+				setStatus(Lang.tOr('lg.paramOpen', '参数「') + p.label + Lang.tOr('lg.paramNeedEnter', '」需要按 Enter 输入'));
 		}
 	}
 
@@ -1466,7 +1469,7 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = true;
 			rebuildCanvas();
 			refreshStatus();
-			setStatus('已新增事件栈：' + def.label + '（拖积木到凹槽或按 Insert 接入）');
+			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.label + Lang.tOr('lg.dropHint2', '（拖积木到凹槽或按 Insert 接入）'));
 			return;
 		}
 		var b:GBlock = new GBlock(def.id);
@@ -1492,7 +1495,7 @@ class LuaGraphEditorState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 		rebuildCanvas();
 		refreshStatus();
-		setStatus('已插入：' + def.label);
+		setStatus(Lang.tOr('lg.inserted', '已插入：') + def.label);
 	}
 
 	function deleteSelected():Void
@@ -1500,7 +1503,7 @@ class LuaGraphEditorState extends MusicBeatState
 		// 无选中时给反馈，不要静默（点一下画布空白就会清选中，用户会以为"删除坏了"）
 		if (selPath == null)
 		{
-			setStatus('没选中东西：先点一下画布上的积木，或点事件帽块删整条事件栈', true);
+			setStatus(Lang.tOr('lg.nothingSelected', '没选中东西：先点一下画布上的积木，或点事件帽块删整条事件栈'), true);
 			return;
 		}
 
@@ -1512,7 +1515,7 @@ class LuaGraphEditorState extends MusicBeatState
 			var si:Int = selPath[0];
 			if (si < 0 || si >= doc.stacks.length)
 			{
-				setStatus('删除失败：这条事件栈已经不存在了', true);
+				setStatus(Lang.tOr('lg.delStackFail', '删除失败：这条事件栈已经不存在了'), true);
 				selPath = null;
 				return;
 			}
@@ -1527,7 +1530,7 @@ class LuaGraphEditorState extends MusicBeatState
 			FlxG.sound.play(Paths.sound('cancelMenu'), 0.5);
 			rebuildCanvas();
 			refreshStatus();
-			setStatus('已删除事件栈：' + lbl + (inner > 0 ? '（含 ' + inner + ' 块积木）' : '') + '（Ctrl+Z 可撤销）');
+			setStatus(Lang.tOr('lg.stackDeleted', '已删除事件栈：') + lbl + (inner > 0 ? Lang.tOr('lg.containsPrefix', '（含 ') + inner + Lang.tOr('lg.blocksCountSuffix', ' 块积木）') : '') + Lang.tOr('lg.undoable', '（Ctrl+Z 可撤销）'));
 			return;
 		}
 
@@ -1536,7 +1539,7 @@ class LuaGraphEditorState extends MusicBeatState
 		if (b == null)
 		{
 			popUndoWithoutChange();
-			setStatus('删除失败：这块积木已经不在图里了', true);
+			setStatus(Lang.tOr('lg.delBlockFail', '删除失败：这块积木已经不在图里了'), true);
 			return;
 		}
 		selPath = null;
@@ -1544,7 +1547,7 @@ class LuaGraphEditorState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('cancelMenu'), 0.5);
 		rebuildCanvas();
 		refreshStatus();
-		setStatus('已删除积木（Ctrl+Z 可撤销）');
+		setStatus(Lang.tOr('lg.blockDeleted', '已删除积木（Ctrl+Z 可撤销）'));
 	}
 
 	function copySelected(cut:Bool):Void
@@ -1553,14 +1556,14 @@ class LuaGraphEditorState extends MusicBeatState
 		if (b == null) return;
 		clipboard = b.clone();
 		if (cut) deleteSelected();
-		else setStatus('已复制积木（Ctrl+V 粘贴）');
+		else setStatus(Lang.tOr('lg.blockCopied', '已复制积木（Ctrl+V 粘贴）'));
 	}
 
 	function pasteClipboard():Void
 	{
 		if (clipboard == null)
 		{
-			setStatus('剪贴板是空的', true);
+			setStatus(Lang.tOr('lg.clipboardEmpty', '剪贴板是空的'), true);
 			return;
 		}
 		var containerPath:Array<Int> = null;
@@ -1582,7 +1585,7 @@ class LuaGraphEditorState extends MusicBeatState
 		dirty = true;
 		rebuildCanvas();
 		refreshStatus();
-		setStatus('已粘贴积木');
+		setStatus(Lang.tOr('lg.blockPasted', '已粘贴积木'));
 	}
 
 	function pushUndo():Void
@@ -1601,24 +1604,24 @@ class LuaGraphEditorState extends MusicBeatState
 	{
 		if (undoStack.length == 0)
 		{
-			setStatus('没有可撤销的操作');
+			setStatus(Lang.tOr('lg.noUndo', '没有可撤销的操作'));
 			return;
 		}
 		redoStack.push(doc.toJsonString());
 		applySnapshot(undoStack.pop());
-		setStatus('已撤销');
+		setStatus(Lang.tOr('lg.undone', '已撤销'));
 	}
 
 	function redo():Void
 	{
 		if (redoStack.length == 0)
 		{
-			setStatus('没有可重做的操作');
+			setStatus(Lang.tOr('lg.noRedo', '没有可重做的操作'));
 			return;
 		}
 		undoStack.push(doc.toJsonString());
 		applySnapshot(redoStack.pop());
-		setStatus('已重做');
+		setStatus(Lang.tOr('lg.redone', '已重做'));
 	}
 
 	function applySnapshot(json:String):Void
@@ -1630,7 +1633,7 @@ class LuaGraphEditorState extends MusicBeatState
 		}
 		catch (e:Dynamic)
 		{
-			setStatus('撤销失败：' + Std.string(e), true);
+			setStatus(Lang.tOr('lg.undoFail', '撤销失败：') + Std.string(e), true);
 			return;
 		}
 		doc.name = name;
@@ -1653,7 +1656,7 @@ class LuaGraphEditorState extends MusicBeatState
 				var slotPath:Array<Int> = spr.blockPath.copy();
 				var b:GBlock = GDoc.blockAt(doc, slotPath);
 				var cur:String = b == null ? '' : b.get(slot.name, '');
-				openPopup('选择「' + slot.label + '」的取值', options, function(pick)
+				openPopup(Lang.tOr('lg.pickValueOf', '选择「') + slot.label + Lang.tOr('lg.pickValueTail', '」的取值'), options, function(pick)
 				{
 					var bb:GBlock = GDoc.blockAt(doc, slotPath);
 					if (bb == null) return;
@@ -1674,7 +1677,7 @@ class LuaGraphEditorState extends MusicBeatState
 				add(inputBox);
 				inputBox.setNativeFocus(true);
 				inputHadFocus = true;
-				setStatus('编辑「' + slot.label + '」：输入后按 Enter 确认（Esc 取消）');
+				setStatus(Lang.tOr('lg.editOpen', '编辑「') + slot.label + Lang.tOr('lg.editHint', '」：输入后按 Enter 确认（Esc 取消）'));
 		}
 	}
 
@@ -1703,7 +1706,7 @@ class LuaGraphEditorState extends MusicBeatState
 		{
 			if (Math.isNaN(Std.parseFloat(StringTools.trim(raw))))
 			{
-				setStatus('「' + slot.label + '」必须是数字，已保留原值', true);
+				setStatus('「' + slot.label + Lang.tOr('lg.mustBeNumber', '」必须是数字，已保留原值'), true);
 				return;
 			}
 		}
@@ -1712,7 +1715,7 @@ class LuaGraphEditorState extends MusicBeatState
 		dirty = true;
 		rebuildCanvas();
 		refreshStatus();
-		setStatus('已修改参数「' + slot.label + '」');
+		setStatus(Lang.tOr('lg.paramChanged', '已修改参数「') + slot.label + '」');
 	}
 
 	function closeInputBox():Void
@@ -1739,7 +1742,7 @@ class LuaGraphEditorState extends MusicBeatState
 	/** `F1` 操作说明：完整键位表（底栏两行只放高频项）。复用弹层 ⇒ 自动在积木之上、可滚动、Esc 关闭。 */
 	function openHelp():Void
 	{
-		openPopup('操作说明（F1 / Esc 关闭 · ↑↓ 或滚轮 翻页）', HELP_LINES.copy(), null);
+		openPopup(Lang.tOr('lg.helpTitle', '操作说明（F1 / Esc 关闭 · ↑↓ 或滚轮 翻页）'), helpLines(), null);
 	}
 
 	function openPopup(title:String, items:Array<String>, pick:String->Void, ?current:String):Void
@@ -1799,7 +1802,7 @@ class LuaGraphEditorState extends MusicBeatState
 			popupTexts.push(rt);
 		}
 
-		var hint:FlxText = makeText(px + 24, py + ph - 34, pw - 48, '滚轮/↑↓ 选择 · 点击或 Enter 确认 · Esc 取消', 14, 0xFFCFCFDC);
+		var hint:FlxText = makeText(px + 24, py + ph - 34, pw - 48, Lang.tOr('lg.popupHint', '滚轮/↑↓ 选择 · 点击或 Enter 确认 · Esc 取消'), 14, 0xFFCFCFDC);
 		add(hint);
 		popupTexts.push(hint);
 	}
@@ -1818,7 +1821,7 @@ class LuaGraphEditorState extends MusicBeatState
 		if (FlxG.keys.justPressed.ESCAPE)
 		{
 			closePopup();
-			setStatus('已取消');
+			setStatus(Lang.tOr('lg.cancelled', '已取消'));
 			return;
 		}
 		var moved:Int = 0;
@@ -1902,13 +1905,13 @@ class LuaGraphEditorState extends MusicBeatState
 		previewSprites.push(panel);
 
 		var gen:String = '';
-		try gen = LuaCodeGen.generate(doc) catch (e:Dynamic) gen = '-- 生成失败：' + Std.string(e) + '\n';
+		try gen = LuaCodeGen.generate(doc) catch (e:Dynamic) gen = Lang.tOr('lg.genFailPrefix', '-- 生成失败：') + Std.string(e) + '\n';
 		previewAll = gen.split('\n');
 
 		var issues:Array<String> = LuaCodeGen.validate(doc);
-		var head:String = '生成预览（只读，不会自动执行）　共 ' + previewAll.length + ' 行　积木 ' + doc.blockCount() + ' 块';
+		var head:String = Lang.tOr('lg.previewHeader', '生成预览（只读，不会自动执行）　共 ') + previewAll.length + Lang.tOr('lg.linesLabel', ' 行　积木 ') + doc.blockCount() + Lang.tOr('lg.blocksTail', ' 块');
 		add(makePreviewText(px + 24, py + 16, pw - 48, head, 20, FlxColor.WHITE));
-		var issueLine:String = (issues.length == 0) ? '校验：通过（无错误与警告）' : ('校验：' + issues.length + ' 条提示 —— ' + issues[0]);
+		var issueLine:String = (issues.length == 0) ? Lang.tOr('lg.validateOk', '校验：通过（无错误与警告）') : (Lang.tOr('lg.validatePrefix', '校验：') + issues.length + Lang.tOr('lg.issuesSuffix', ' 条提示 —— ') + issues[0]);
 		add(makePreviewText(px + 24, py + 44, pw - 48, issueLine, 15,
 			(issues.length == 0) ? COLOR_OK : COLOR_ERROR));
 
@@ -1925,7 +1928,7 @@ class LuaGraphEditorState extends MusicBeatState
 			if (line.length > 96) line = line.substr(0, 96) + '…';
 			add(makePreviewText(px + 24, py + 78 + i * 21, pw - 48, (idx + 1) + '  ' + line, 15, 0xFFE6E6F0));
 		}
-		add(makePreviewText(px + 24, py + ph - 30, pw - 48, '滚轮/PgUp/PgDn 翻页 · Tab 或 Esc 关闭', 14, 0xFFCFCFDC));
+		add(makePreviewText(px + 24, py + ph - 30, pw - 48, Lang.tOr('lg.popupPageHint', '滚轮/PgUp/PgDn 翻页 · Tab 或 Esc 关闭'), 14, 0xFFCFCFDC));
 	}
 
 	function makePreviewText(x:Float, y:Float, w:Float, txt:String, size:Int, color:Int):FlxText
@@ -1965,7 +1968,7 @@ class LuaGraphEditorState extends MusicBeatState
 	// ==================================================================
 	function newScript():Void
 	{
-		openPopup('新建：选择模板', LuaGraphTemplates.NAMES, function(pick)
+		openPopup(Lang.tOr('lg.newPickTemplate', '新建：选择模板'), LuaGraphTemplates.NAMES, function(pick)
 		{
 			var idx:Int = LuaGraphTemplates.NAMES.indexOf(pick);
 			if (idx < 0) idx = 0;
@@ -1977,7 +1980,7 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = true;
 			rebuildCanvas();
 			refreshStatus();
-			setStatus('已套用模板：' + pick + '（保存后生成 .lua 与 .luagraph.json）');
+			setStatus(Lang.tOr('lg.templateApplied', '已套用模板：') + pick + Lang.tOr('lg.templateNote', '（保存后生成 .lua 与 .luagraph.json）'));
 		});
 	}
 
@@ -1986,16 +1989,16 @@ class LuaGraphEditorState extends MusicBeatState
 		#if sys
 		if (!LuaGraphIO.hasTargetMod())
 		{
-			setStatus('未选择模组：请返回编辑器菜单，用 ←/→ 选择目标模组', true);
+			setStatus(Lang.tOr('lg.noMod', '未选择模组：请返回编辑器菜单，用 ←/→ 选择目标模组'), true);
 			return;
 		}
 		var list:Array<String> = LuaGraphIO.listGraphs();
 		if (list.length == 0)
 		{
-			setStatus('该模组 scripts/ 下还没有图形化脚本（用「新建」开始）', true);
+			setStatus(Lang.tOr('lg.noGraphs', '该模组 scripts/ 下还没有图形化脚本（用「新建」开始）'), true);
 			return;
 		}
-		openPopup('打开图形化脚本（' + Mods.currentModDirectory + '/scripts/）', list, function(pick) loadGraph(pick));
+		openPopup(Lang.tOr('lg.openGraphPrefix', '打开图形化脚本（') + Mods.currentModDirectory + '/scripts/）', list, function(pick) loadGraph(pick));
 		#end
 	}
 
@@ -2013,18 +2016,18 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = false;
 			rebuildCanvas();
 			refreshStatus();
-			setStatus('已打开：' + name + '（积木 ' + doc.blockCount() + ' 块）');
+			setStatus(Lang.tOr('lg.opened', '已打开：') + name + '（积木 ' + doc.blockCount() + Lang.tOr('lg.blocksParen', ' 块）'));
 		}
 		catch (e:Dynamic)
 		{
-			setStatus('打开失败：' + Std.string(e), true);
+			setStatus(Lang.tOr('lg.openFail', '打开失败：') + Std.string(e), true);
 		}
 		#end
 	}
 
 	function renameScript():Void
 	{
-		openSubState(new TextInputPrompt('脚本名称', '生成的 .lua 与 .luagraph.json 都用这个名字', doc.name, function(v:String)
+		openSubState(new TextInputPrompt(Lang.tOr('lg.scriptNameTitle', '脚本名称'), Lang.tOr('lg.scriptNameHint', '生成的 .lua 与 .luagraph.json 都用这个名字'), doc.name, function(v:String)
 		{
 			var clean:String = LuaGraphIO.sanitizeFileName(v);
 			if (clean != doc.name)
@@ -2032,7 +2035,7 @@ class LuaGraphEditorState extends MusicBeatState
 				doc.name = clean;
 				dirty = true;
 				refreshStatus();
-				setStatus('已改名：' + clean + '（保存时按新名字写盘）');
+				setStatus(Lang.tOr('lg.renamed', '已改名：') + clean + Lang.tOr('lg.renamedNote', '（保存时按新名字写盘）'));
 			}
 		}));
 	}
@@ -2042,19 +2045,19 @@ class LuaGraphEditorState extends MusicBeatState
 		#if sys
 		if (!LuaGraphIO.hasTargetMod())
 		{
-			setStatus('未选择模组：请返回编辑器菜单，用 ←/→ 选择目标模组后再保存', true);
+			setStatus(Lang.tOr('lg.noModSave', '未选择模组：请返回编辑器菜单，用 ←/→ 选择目标模组后再保存'), true);
 			return;
 		}
 		var issues:Array<String> = LuaCodeGen.validate(doc);
 		var errors:Array<String> = [];
 		for (i in issues)
-			if (StringTools.startsWith(i, '错误：')) errors.push(i);
+			if (StringTools.startsWith(i, Lang.tOr('lg.errorsLabel', '错误：'))) errors.push(i);
 		if (errors.length > 0)
 		{
 			var msg:String = errors[0];
-			if (errors.length > 1) msg += '（另有 ' + (errors.length - 1) + ' 条错误）';
-			setStatus('无法保存：' + msg, true);
-			openPopup('无法保存：请先修正以下问题', errors, null);
+			if (errors.length > 1) msg += Lang.tOr('lg.moreErrorsOpen', '（另有 ') + (errors.length - 1) + Lang.tOr('lg.moreErrorsClose', ' 条错误）');
+			setStatus(Lang.tOr('lg.cannotSave', '无法保存：') + msg, true);
+			openPopup(Lang.tOr('lg.cannotSaveTitle', '无法保存：请先修正以下问题'), errors, null);
 			return;
 		}
 
@@ -2072,12 +2075,12 @@ class LuaGraphEditorState extends MusicBeatState
 			}
 			else
 			{
-				openSubState(new Prompt('脚本 ' + name + '.lua 已存在，且不是图形化编辑器生成的。\n继续会把现有内容整体搬进文件底部的「自定义代码区」（不会丢失），确定吗？',
+				openSubState(new Prompt(Lang.tOr('lg.scriptExistsPrefix', '脚本 ') + name + Lang.tOr('lg.scriptExistsMsg', '.lua 已存在，且不是图形化编辑器生成的。\n继续会把现有内容整体搬进文件底部的「自定义代码区」（不会丢失），确定吗？'),
 					0, function()
 				{
 					doc.custom = existed;
 					writeAll(name);
-				}, null, false, '确定', '取消'));
+				}, null, false, Lang.tOr('common.confirm', '确定'), Lang.tOr('common.cancel', '取消')));
 			}
 			return;
 		}
@@ -2095,12 +2098,12 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = false;
 			refreshStatus();
 			if (previewOpen) rebuildPreview();
-			setStatus('已生成并保存：mods/' + Mods.currentModDirectory + '/scripts/' + name + '.lua（' + LuaCodeGen.countLines(lua)
-				+ ' 行）与 ' + name + LuaGraphIO.GRAPH_EXT);
+			setStatus(Lang.tOr('lg.savedTo', '已生成并保存：mods/') + Mods.currentModDirectory + '/scripts/' + name + '.lua（' + LuaCodeGen.countLines(lua)
+				+ Lang.tOr('lg.savedTail', ' 行）与 ') + name + LuaGraphIO.GRAPH_EXT);
 		}
 		catch (e:Dynamic)
 		{
-			setStatus('保存失败：' + Std.string(e), true);
+			setStatus(Lang.tOr('lg.saveFail', '保存失败：') + Std.string(e), true);
 		}
 		#end
 	}
@@ -2112,10 +2115,10 @@ class LuaGraphEditorState extends MusicBeatState
 			MusicBeatState.switchState(new MasterEditorMenu());
 			return;
 		}
-		openSubState(new Prompt('当前图形化脚本有未保存的改动，确定要离开吗？', 1, function()
+		openSubState(new Prompt(Lang.tOr('lg.leaveConfirm', '当前图形化脚本有未保存的改动，确定要离开吗？'), 1, function()
 		{
 			MusicBeatState.switchState(new MasterEditorMenu());
-		}, null, false, '离开', '继续编辑'));
+		}, null, false, Lang.tOr('lg.leave', '离开'), Lang.tOr('lg.keepEditing', '继续编辑')));
 	}
 
 	// ==================================================================
