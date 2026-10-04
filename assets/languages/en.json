@@ -515,5 +515,17 @@
   "achievement.toastie.trigger": "Finish a song with low quality on and shaders plus antialiasing off",
   "achievement.debugger.name": "Debugger",
   "achievement.debugger.desc": "Load and clear a test song in the chart editor",
-  "achievement.debugger.trigger": "Load and clear a test song in the chart editor (practice and autoplay disabled)"
+  "achievement.debugger.trigger": "Load and clear a test song in the chart editor (practice and autoplay disabled)",
+  "options.category.noteOffset": "Note Offset",
+  "options.title.noteOffset": "Note Offset & Combo",
+  "options.hint.noteOffset": "Beat calibration treats the metronome as the measured subject (it needs a fullscreen beat animation and offset feedback), so it stays a separate fullscreen screen.\nClick it in the left rail to open it directly (pressing Enter on keyboard selection works too); you return to the pause menu automatically afterwards (when entered from a song).",
+  "options.category.hudCustomize": "Customize HUD",
+  "options.title.hudCustomize": "Customize HUD",
+  "options.hint.hudCustomize": "HUD customization is a fullscreen drag editor (drag the health bar / score / time bar and save their positions), so it stays a separate fullscreen screen.\nClick it in the left rail to open it directly (pressing Enter on keyboard selection works too).",
+  "options.category.containers": "Containers",
+  "options.title.containers": "Containers",
+  "options.hint.containers": "Container management is a separate fullscreen screen (list + details + action bar): containers ship their own engine UI, so you jump straight to it.\nClick it in the left rail to open it directly (pressing Enter on keyboard selection works too). Note: launching a container restarts Meteoric entirely, so it does not fit as a subpage inside the options screen.",
+  "options.category.mobileTouch": "Touch Controls",
+  "options.title.mobileTouch": "Touch Controls",
+  "options.hint.mobileTouch": "The touch control layout is a separate fullscreen editor (drag the buttons and save the layout).\nClick it in the left rail to open it directly (pressing A on keyboard selection works too)."
 }

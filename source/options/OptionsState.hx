@@ -144,35 +144,39 @@ class OptionsState extends MusicBeatState
 		};
 		list.push(e);
 
-		e = new SectionEntry('调整延迟', '调整延迟与Combo');
+		e = new SectionEntry(Lang.tOr('options.category.noteOffset', '调整延迟'), Lang.tOr('options.title.noteOffset', '调整延迟与Combo'));
 		e.external = true;
-		e.hint = '节拍校准以"节拍"为被测对象（需要整屏播放节拍动画与偏移反馈），因此保持独立整屏界面。\n'
-			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）；退出后自动回到暂停菜单（曲目内进入时）。';
+		e.hint = Lang.tOr('options.hint.noteOffset',
+			'节拍校准以"节拍"为被测对象（需要整屏播放节拍动画与偏移反馈），因此保持独立整屏界面。\n'
+			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）；退出后自动回到暂停菜单（曲目内进入时）。');
 		e.open = function() MusicBeatState.switchState(new options.NoteOffsetState());
 		list.push(e);
 
-		e = new SectionEntry('自定义界面', '自定义界面');
+		e = new SectionEntry(Lang.tOr('options.category.hudCustomize', '自定义界面'), Lang.tOr('options.title.hudCustomize', '自定义界面'));
 		e.external = true;
-		e.hint = 'HUD 自定义是整屏拖拽编辑器（拖动血条/分数/时间条并保存位置），保持独立整屏界面。\n'
-			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。';
+		e.hint = Lang.tOr('options.hint.hudCustomize',
+			'HUD 自定义是整屏拖拽编辑器（拖动血条/分数/时间条并保存位置），保持独立整屏界面。\n'
+			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。');
 		e.open = function() MusicBeatState.switchState(new options.HUDCustomizeState());
 		list.push(e);
 
 		#if desktop
-		e = new SectionEntry('容器', '容器');
+		e = new SectionEntry(Lang.tOr('options.category.containers', '容器'), Lang.tOr('options.title.containers', '容器'));
 		e.external = true;
-		e.hint = '容器管理是独立整屏界面（列表 + 详情 + 操作条）：容器自带引擎界面，直接跳转过去用。\n'
+		e.hint = Lang.tOr('options.hint.containers',
+			'容器管理是独立整屏界面（列表 + 详情 + 操作条）：容器自带引擎界面，直接跳转过去用。\n'
 			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。'
-			+ '注意：启动容器会让 Meteoric 整机重启，所以它不适合嵌进设置界面里当子页。';
+			+ '注意：启动容器会让 Meteoric 整机重启，所以它不适合嵌进设置界面里当子页。');
 		e.open = enterContainersMenu;
 		list.push(e);
 		#end
 
 		#if mobile
-		e = new SectionEntry('移动触控', '移动触控');
+		e = new SectionEntry(Lang.tOr('options.category.mobileTouch', '移动触控'), Lang.tOr('options.title.mobileTouch', '移动触控'));
 		e.external = true;
-		e.hint = '移动触控布局是独立整屏编辑器（拖动按键并保存布局）。\n'
-			+ '点左侧分区栏即直接打开（选中后按 A 同样直达）。';
+		e.hint = Lang.tOr('options.hint.mobileTouch',
+			'移动触控布局是独立整屏编辑器（拖动按键并保存布局）。\n'
+			+ '点左侧分区栏即直接打开（选中后按 A 同样直达）。');
 		e.open = function() openSubState(new objects.MobileControlsSubState());
 		list.push(e);
 		#end

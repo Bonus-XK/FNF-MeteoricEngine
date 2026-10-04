@@ -515,5 +515,17 @@
   "achievement.toastie.trigger": "开启低画质、关闭着色器与抗锯齿后通关一首曲目",
   "achievement.debugger.name": "调试者",
   "achievement.debugger.desc": "在谱面编辑器加载并通关测试曲目",
-  "achievement.debugger.trigger": "在谱面编辑器中加载测试曲目并通关（不可开启练习或自动游玩）"
+  "achievement.debugger.trigger": "在谱面编辑器中加载测试曲目并通关（不可开启练习或自动游玩）",
+  "options.category.noteOffset": "调整延迟",
+  "options.title.noteOffset": "调整延迟与Combo",
+  "options.hint.noteOffset": "节拍校准以\"节拍\"为被测对象（需要整屏播放节拍动画与偏移反馈），因此保持独立整屏界面。\n点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）；退出后自动回到暂停菜单（曲目内进入时）。",
+  "options.category.hudCustomize": "自定义界面",
+  "options.title.hudCustomize": "自定义界面",
+  "options.hint.hudCustomize": "HUD 自定义是整屏拖拽编辑器（拖动血条/分数/时间条并保存位置），保持独立整屏界面。\n点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。",
+  "options.category.containers": "容器",
+  "options.title.containers": "容器",
+  "options.hint.containers": "容器管理是独立整屏界面（列表 + 详情 + 操作条）：容器自带引擎界面，直接跳转过去用。\n点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。注意：启动容器会让 Meteoric 整机重启，所以它不适合嵌进设置界面里当子页。",
+  "options.category.mobileTouch": "移动触控",
+  "options.title.mobileTouch": "移动触控",
+  "options.hint.mobileTouch": "移动触控布局是独立整屏编辑器（拖动按键并保存布局）。\n点左侧分区栏即直接打开（选中后按 A 同样直达）。"
 }
