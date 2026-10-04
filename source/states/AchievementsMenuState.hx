@@ -33,7 +33,7 @@ class AchievementsMenuState extends MusicBeatState
 	static final ICON_Y:Float = 140;
 	static final ICON_SIZE:Float = 160;
 
-	var achievementList:Array<Int> = [];  // achievementsStuff 索引（全部成就，含隐藏）
+	var achievementList:Array<Int> = [];  // Achievements.RAW 索引（全部成就，含隐藏）
 	var unlockedCount:Int = 0;
 
 	var rows:Array<FlxText> = [];
@@ -92,10 +92,10 @@ class AchievementsMenuState extends MusicBeatState
 
 		// ---- 成就数据 ----
 		Achievements.loadAchievements();
-		for (i in 0...Achievements.achievementsStuff.length)
+		for (i in 0...Achievements.count())
 		{
 			achievementList.push(i);
-			if (Achievements.isAchievementUnlocked(Achievements.achievementsStuff[i][2]))
+			if (Achievements.isAchievementUnlocked(Achievements.tagOf(i)))
 				unlockedCount++;
 		}
 
@@ -226,12 +226,12 @@ class AchievementsMenuState extends MusicBeatState
 
 	function getTag(listIdx:Int):String
 	{
-		return Achievements.achievementsStuff[getAchievementIdx(listIdx)][2];
+		return Achievements.tagOf(getAchievementIdx(listIdx));
 	}
 
 	function isHidden(listIdx:Int):Bool
 	{
-		return Achievements.achievementsStuff[getAchievementIdx(listIdx)][3] == true;
+		return Achievements.isHidden(getAchievementIdx(listIdx));
 	}
 
 	override function update(elapsed:Float)
@@ -392,7 +392,7 @@ class AchievementsMenuState extends MusicBeatState
 		bigIcon.x = ICON_X;
 		bigIcon.y = ICON_Y;
 
-		nameText.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(curSelected)][0] : Lang.tOr('achievements.unknown', '？？？');
+		nameText.text = (unlocked || !hidden) ? Achievements.nameOf(getAchievementIdx(curSelected)) : Lang.tOr('achievements.unknown', '？？？');
 		nameText.updateHitbox();
 
 		if (unlocked)
@@ -413,12 +413,12 @@ class AchievementsMenuState extends MusicBeatState
 		statusText.updateHitbox();
 
 		descText.text = (unlocked || !hidden)
-			? Achievements.achievementsStuff[getAchievementIdx(curSelected)][1]
+			? Achievements.descOf(getAchievementIdx(curSelected))
 			: Lang.tOr('achievements.hiddenHint', '这是一个隐藏成就\n完成特定条件后解锁');
 		descText.updateHitbox();
 
 		triggerText.text = (unlocked || !hidden)
-			? Achievements.achievementsStuff[getAchievementIdx(curSelected)][4]
+			? Achievements.triggerOf(getAchievementIdx(curSelected))
 			: Lang.tOr('achievements.unknown', '？？？');
 		triggerText.updateHitbox();
 
@@ -454,7 +454,7 @@ class AchievementsMenuState extends MusicBeatState
 			var isSel:Bool = (idx == curSelected);
 
 			row.visible = true;
-			row.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(idx)][0] : Lang.tOr('achievements.unknown', '？？？');
+			row.text = (unlocked || !hidden) ? Achievements.nameOf(getAchievementIdx(idx)) : Lang.tOr('achievements.unknown', '？？？');
 			row.alpha = isSel ? 1 : 0.55;
 			row.color = unlocked ? (isSel ? FlxColor.WHITE : 0xFFD7D7E0) : 0xFF8A93A5;
 			row.updateHitbox();

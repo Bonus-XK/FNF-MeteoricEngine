@@ -3289,7 +3289,7 @@ class GameHUD
 		songTxt.borderSize = 1;
 		songTxt.visible = (!ClientPrefs.data.hideHud && !ClientPrefs.data.hideWatermark);
 		st.add(songTxt);
-		songTxt.text = st.curSong + " (" + st.storyDifficultyText + ") " + "| 流星引擎 v" + Main.meVersion;
+		songTxt.text = st.curSong + " (" + st.storyDifficultyText + ") " + Lang.tOr('play.watermarkSuffix', "| 流星引擎 v") + Main.meVersion;
 
 		botplayTxt = new FlxText(400, timeBar.y + 55, FlxG.width - 800, st.replayMode ? "REPLAY" : "AutoPlay", 32);
 		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);

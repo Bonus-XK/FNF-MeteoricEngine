@@ -1545,5 +1545,8 @@
   "start.copyProgressClose": ")\\n\\n",
   "controls.bindTip": "Press any key to bind\\nHold ESC to cancel · hold BACKSPACE to clear\\nClick to cancel the binding",
   "start.noStorageClose": ")",
-  "lg.errHatNotEventClose": ")"
+  "lg.errHatNotEventClose": ")",
+  "play.watermarkSuffix": "| Meteoric Engine v",
+  "pause.settings.noteOffset": "Note Offset & Combo",
+  "container.exitedTail": "), restarting Meteoric…"
 }

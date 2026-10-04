@@ -1,0 +1,23 @@
+Meteoric Engine — FPS 显示器重构 · 构建与类型检查证据（2026-09-20）
+================================================================
+工具链: Haxe 4.2.5 / lime 8.2.2 / OpenFL 9.2.1 / flixel 5.2.2 / hxcpp
+基线: master @ 3d99c0f (v1.2.0)
+
+[1] 只读类型检查
+命令: ./compile-mac.sh typecheck
+结果: exit_code = 0
+输出: [typecheck] ✔ 类型检查通过（app 未被改动）
+补充: 该模式自带 ndll 备份/还原；本次运行中脚本自愈命中过已知坏指纹(size=8660712)，
+      已用 tools/lime.ndll.wallclock 覆盖并重签名，校验 md5 = cd890285f1d3def18d9f5aafc04a198d
+
+[2] macOS release 构建
+命令: ./compile-mac.sh
+结果: exit_code = 0
+输出: [post-build] restored wallclock lime.ndll + re-signed (md5: cd890285f1d3def18d9f5aafc04a198d)
+      [post-build] restored user mods from tools/user_mods_prev/
+
+[3] 帧率回归（主菜单场景，读卡片自带读数；同一台机器）
+重构前           : 1218 fps
+半透明卡片版(缺陷): 980 fps   ← 用户反馈的“帧率明显下降”
+交付版(不透明面板): 1163 fps
+恢复率           : (1163-980)/(1218-980) = 76.9%

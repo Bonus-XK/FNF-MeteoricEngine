@@ -429,7 +429,7 @@ class ContainerSession
 			notice = Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.crashed', '」异常退出（退出码 ') + code + Lang.tOr('container.crashedTail', '）—— 目标引擎可能无法在本机启动；')
 				+ Lang.tOr('container.crashedHint', '点「打开日志/容器目录」看 runtime/container.log，并先单独双击运行该引擎确认它能启动');
 		else
-			notice = Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.exited', '」已退出（退出码 ') + (codeTxt == null ? '?' : codeTxt) + '），正在重启 Meteoric…';
+			notice = Lang.tOr('container.quoteOpen', '「') + name + Lang.tOr('container.exited', '」已退出（退出码 ') + (codeTxt == null ? '?' : codeTxt) + Lang.tOr('container.exitedTail', '），正在重启 Meteoric…');
 		FlxG.log.add('[Container] ' + notice);
 
 		active = false;

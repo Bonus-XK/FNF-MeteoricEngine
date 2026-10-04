@@ -51,7 +51,8 @@ class ChartingPanel extends FlxSpriteGroup
 
 	var tabBtns:Array<{bg:FlxSprite, txt:FlxText}> = [];
 	var lastHoveredTab:Int = -2;
-	static final TAB_LABELS:Array<String> = [Lang.tOr('chart.panel.song', '歌曲'), Lang.tOr('chart.panel.section', '小节'), Lang.tOr('chart.panel.notes', '音符'), Lang.tOr('chart.panel.events', '事件'), Lang.tOr('chart.panel.arrangement', '编曲'), Lang.tOr('chart.panel.data', '数据')];
+	// 刻意用函数而非 static final：静态字段只求值一次，运行时切换语言后不刷新（校验器 [5] 会抓）。
+	static function tabLabels():Array<String> return [Lang.tOr('chart.panel.song', '歌曲'), Lang.tOr('chart.panel.section', '小节'), Lang.tOr('chart.panel.notes', '音符'), Lang.tOr('chart.panel.events', '事件'), Lang.tOr('chart.panel.arrangement', '编曲'), Lang.tOr('chart.panel.data', '数据')];
 
 	public function new()
 	{
@@ -63,19 +64,19 @@ class ChartingPanel extends FlxSpriteGroup
 		add(makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22));
 		add(makeText(CONTENT_X, PANEL_Y + 14, CONTENT_W, Lang.tOr('chart.panel.settings', '编谱设置'), 22, 0xFFFFFFFF));
 
-		for (i in 0...TAB_LABELS.length)
+		for (i in 0...tabLabels().length)
 		{
 			var btnBg:FlxSprite = new FlxSprite(PANEL_X + 12 + i * 76, PANEL_Y + 52).makeGraphic(74, 30, FlxColor.TRANSPARENT, true);
 			btnBg.antialiasing = ClientPrefs.data.antialiasing;
 			btnBg.scrollFactor.set();
 			redrawBox(btnBg, 74, 30, 10, 0x1CFFFFFF, 0x45FFFFFF);
 			add(btnBg);
-			var btnTxt:FlxText = makeText(PANEL_X + 12 + i * 76, PANEL_Y + 58, 74, TAB_LABELS[i], 13, 0xFFB8B8C8, CENTER);
+			var btnTxt:FlxText = makeText(PANEL_X + 12 + i * 76, PANEL_Y + 58, 74, tabLabels()[i], 13, 0xFFB8B8C8, CENTER);
 			add(btnTxt);
 			tabBtns.push({bg: btnBg, txt: btnTxt});
 		}
 
-		for (i in 0...TAB_LABELS.length)
+		for (i in 0...tabLabels().length)
 		{
 			var grp:FlxSpriteGroup = new FlxSpriteGroup();
 			grp.visible = false;

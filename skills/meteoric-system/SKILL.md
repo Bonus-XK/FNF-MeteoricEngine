@@ -346,10 +346,15 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   路径会被吞掉。必须拆成**前缀走翻译 + 变量拼接**：
   `Lang.tOr('splash.savedTo','已保存到: ') + path`。
   判定：有插值（`$var` / `${expr}`）就拆，无插值可整体包。
-- ⚠ **`static var X = Lang.tOr(...)` 会把译文缓存住**：静态字段只求值一次，
-  运行时切换语言后仍显示旧语言。译文若挂在静态字段上，改成
-  `static function x():String return Lang.tOr(...)`（每次重新求值）。
-  （仓库约定是「一律 tOr 带兜底」，所以这条只能靠改成函数解决。）
+- ⚠ **`static` 字段里放译文会缓存住，运行时切语言不刷新**。三种形态都要改：
+  - `static var X:String = Lang.tOr(...)` → `static function x():String return Lang.tOr(...)`
+  - `static final X:Array<String> = [Lang.tOr(...), ...]` → `static function x():Array<String> return [...]`
+  - 数据表（成就/积木这类「中文原文 + 存档 tag」）→ **拆成 RAW 表 + 显示取值函数**，
+    存档/逻辑索引留在 RAW，显示走 `Lang.tOr('前缀.' + tag + '.后缀', RAW[i][n])`。
+    （成就已这么改：`Achievements.RAW` + `nameOf/descOf/triggerOf/tagOf/isHidden`。）
+  ⚠ 检查器最初用单行正则抓这个，抓不到跨行数组字面量 —— 现在改成**结构化判定**
+  （定位声明 → 按括号深度取到 depth 0 的 `;` → 在初始化表达式里找 `Lang.t*`）。
+  改完务必重跑 `check_i18n.py` 的 [5] 项。
 - ⚠ **`static inline var` 连兜底都包不了**：`inline var` 要求常量初始化，
   `Lang.tOr(...)` 是函数调用 → 编译期直接报
   `Inline variable initialization must be a constant value`。必须改成
@@ -373,6 +378,12 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   （2026-10-04 实测漏过一条 `'（积木 '`。）
 - 校验派生 key（如 `lg.block.*`）时，静态扫 `Lang.tOr('` 抓不到 —— key 是运行时拼的。
   要从积木表反推应需集合再比对，见批次脚本里的「按积木表应需 N 个 key」。
+- ✅ **改完文案跑 `python3 tools/i18n/check_i18n.py`**（退出码 0 = PASS）。
+  7 项检查覆盖：语言包完整性 / 字面量 key / Option·luagraph·主题名派生 key /
+  `Lang.t` 安全性 / **static 字段缓存译文** / 中英括号对称 / CJK 覆盖率（对照基线）。
+  注入测试确认过 6 类错误都能抓到。新增未翻译项会让它失败 —— 有意保留就跑
+  `--update-baseline` 认可（基线带「原因」列，可审计）。
+  见 `tools/i18n/README.md`。
 
 ## 「有没有漏」的四种盲区（2026-10-04 全踩过）
 

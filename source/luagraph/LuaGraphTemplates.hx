@@ -8,7 +8,9 @@ import backend.Lang;
  */
 class LuaGraphTemplates
 {
-	public static var NAMES:Array<String> = [Lang.tOr('lg.tpl.blank', '空白脚本'), Lang.tOr('lg.tpl.keysfx', '按键生成特效'), Lang.tOr('lg.tpl.camzoom', '镜头缩放'), Lang.tOr('lg.tpl.spritetween', '精灵补间')];
+	// 刻意用函数而非 static var：静态字段只求值一次，运行时切换语言后
+	// 「新建：选择模板」弹窗会停在旧语言（校验器 [5] 会抓）。
+	public static function names():Array<String> return [Lang.tOr('lg.tpl.blank', '空白脚本'), Lang.tOr('lg.tpl.keysfx', '按键生成特效'), Lang.tOr('lg.tpl.camzoom', '镜头缩放'), Lang.tOr('lg.tpl.spritetween', '精灵补间')];
 
 	public static function make(index:Int, name:String):GDoc
 	{

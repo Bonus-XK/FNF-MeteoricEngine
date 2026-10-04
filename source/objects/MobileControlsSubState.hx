@@ -21,7 +21,9 @@ import flixel.util.FlxSpriteUtil;
  */
 class MobileControlsSubState extends MusicBeatSubstate
 {
-	public static final MODE_NAMES:Array<String> = [Lang.tOr('mobile.mode.right', '右手按键'), Lang.tOr('mobile.mode.left', '左手按键'), Lang.tOr('mobile.mode.custom', '自定义布局'), Lang.tOr('mobile.mode.both', '双手按键'), Lang.tOr('mobile.mode.judgeArea', '全屏判定区'), Lang.tOr('mobile.mode.none', '无按键')];
+	// 刻意用函数而非 static final：静态字段只求值一次，运行时切换语言后
+	// 这份模式名会一直停在旧语言（校验器 [5] 会抓）。
+	public static function modeNames():Array<String> return [Lang.tOr('mobile.mode.right', '右手按键'), Lang.tOr('mobile.mode.left', '左手按键'), Lang.tOr('mobile.mode.custom', '自定义布局'), Lang.tOr('mobile.mode.both', '双手按键'), Lang.tOr('mobile.mode.judgeArea', '全屏判定区'), Lang.tOr('mobile.mode.none', '无按键')];
 
 	var curMode:Int = 0;
 	var preview:MobileControls = null;
@@ -180,7 +182,7 @@ class MobileControlsSubState extends MusicBeatSubstate
 
 	function updateUI():Void
 	{
-		if (modeText != null) modeText.text = MODE_NAMES[curMode];
+		if (modeText != null) modeText.text = modeNames()[curMode];
 		var custom:Bool = (curMode == MobileControls.MODE_CUSTOM);
 		resetBtn.visible = custom;
 		resetLabel.visible = custom;
@@ -206,8 +208,8 @@ class MobileControlsSubState extends MusicBeatSubstate
 	function changeMode(change:Int):Void
 	{
 		curMode += change;
-		if (curMode < 0) curMode = MODE_NAMES.length - 1;
-		if (curMode >= MODE_NAMES.length) curMode = 0;
+		if (curMode < 0) curMode = modeNames().length - 1;
+		if (curMode >= modeNames().length) curMode = 0;
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 		rebuildPreview();
 	}

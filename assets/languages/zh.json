@@ -1545,5 +1545,8 @@
   "start.copyProgressClose": "）\\n\\n",
   "controls.bindTip": "按任意键 绑定\\n长按 ESC 取消 · 长按 BACKSPACE 删除\\n点击 取消绑定",
   "start.noStorageClose": "）",
-  "lg.errHatNotEventClose": "）"
+  "lg.errHatNotEventClose": "）",
+  "play.watermarkSuffix": "| 流星引擎 v",
+  "pause.settings.noteOffset": "调整延迟与Combo",
+  "container.exitedTail": "），正在重启 Meteoric…"
 }

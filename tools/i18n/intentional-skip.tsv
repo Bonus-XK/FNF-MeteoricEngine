@@ -1,0 +1,851 @@
+# 有意不翻译的剩余中文字面量基线（路径\t字面量\t处数）。
+# 由 `python3 tools/i18n/check_i18n.py --update-baseline` 生成。
+# 新增未翻译项会让 check_i18n 失败 —— 确认是有意保留后再更新基线。
+source/backend/Achievements.hx	不再耍花招	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	你有没有尝试过在烤面包机上运行游戏	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	公路杀手爱好者	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	只有我们两个	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	只用两个或更少的按键通关一首曲目（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	只用两个按键完成一首曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	叫我杀手	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	周五狂欢夜	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	唱得太投入了……？	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在不进入空闲状态的情况下完成一首曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在周五 18:00 之后打开游戏	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第一周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第七周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第三周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第二周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第五周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第六周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在故事模式中用困难难度通关第四周，全程无失误（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在星期五的晚上游玩本游戏	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在谱面编辑器中加载测试曲目并通关（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	在谱面编辑器加载并通关测试曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	多么混乱的演出！	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	女士杀手	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	她也叫我爸爸	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	完成一首准确率低于 20% 的曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	完成一首准确率达到 100% 的曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	完美主义者	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	开启低画质、关闭着色器与抗锯齿后通关一首曲目	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	我的老天！	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	无失误的圣诞	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	活力四射	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	游玩中长按箭头键累计 10 秒（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	烤面包机玩家	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第一周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第七周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第三周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第二周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第五周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第六周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	用困难难度无失误通关第四周	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	目睹死亡界面 50 次	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	累计死亡 50 次（累计看到 50 次死亡界面）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	调试者	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	通关一首曲目且全程未触发空闲动画（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	通关一首曲目，最终准确率低于 20%（不可开启练习模式）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	通关一首曲目，最终准确率达到 100%（不可开启练习或自动游玩）	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	长按任意箭头十秒钟	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/Achievements.hx	高分！	1	成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf
+source/backend/CameraHudDomain.hx	歌曲名称	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	KE 判定	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	PE 判定	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	剩余时间	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	新版	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	无上限	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	旧判定	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	星辉	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	淡入淡出	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	移动	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	自动	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	默认	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ContainerLauncher.hx	      # 宿主已经死了 ⇒ 不留孤儿容器\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	      # 热键请求退出\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	      echo "=== [ME] activator: 连续 3 次失败，放弃自动前台化（授权被拒时请到 系统设置 → 隐私与安全性 → 自动化 勾选 Meteoric）" >> "$$LOG_FILE"\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	    # 先问“它现在是不是已经在前台了”，是则什么都不做（AppleScript 通篇不出现 $ 字面量，避免 Haxe 插值）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	    # 必须排除过小 pid：wrapper 起手会写 0 占位，而 Windows 的「系统空闲进程」\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	    # 恒为 pid 0；若不排除，脚本会立刻判定 target=0 然后 "no pid, give up"，永远不激活。\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  #    四道闸：进程还活着 / 已在前台即停 / 连续确定性失败即停 / 最多 	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  #   注意**不能**用 Get-NetTCPConnection —— 它只列出有 TCP 连接的进程，\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  #   第一轮就 "target gone" 退出，前台化永远不执行（写这脚本时的真实翻车点）。\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  #   而单机 FNF 引擎通常没有任何网络连接，会导致 alive 恒为 false、\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  # 2) 反复把它设为 frontmost，直到它已经在前台（已在前台就不动，避免反复抢焦点）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  # SDL 信号处理器会把 SIGINT/SIGTERM 变成引擎自身的退出请求，目标引擎不需要这层语义\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  # 目标引擎独立启动，起手忽略 HUP/INT：宿主被终端 Ctrl+C 时 wrapper 仍能收尾唤醒\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	  # 进程已死就别再试。用 Get-Process -Id 探活并抑制报错噪音：\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	 轮\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# 1) 等目标引擎写出 pid（此时它多半还没创建窗口）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# 1) 等目标引擎把 pid 写出来（此时它多半还没创建窗口）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# Meteoric Engine 容器前台化脚本 (Windows) —— 每次启动重写，请勿手工修改\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# Meteoric Engine 容器前台化脚本（每次启动重写，请勿手工修改）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# Meteoric Engine 容器包装器（每次启动重写，请勿手工修改）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# 容器: 	3	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	# 等目标引擎退出后唤醒宿主（宿主此时多半处于 SIGSTOP）\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem   宿主每帧 poll exit.txt，并核对目标进程是否真的退出，必要时自己 taskkill。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem   理由是那部分逻辑能在开发机上被类型检查与单元化，而 cmd 脚本只能在真机试错。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem ---- 拉起目标引擎 ----\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem ---- 收尾：退出码 + 阶段 ----\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem /B 不新建控制台窗口；/WAIT 等它退出后 cmd 才继续 —— 「父进程等待子进程退出」\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem Meteoric Engine 容器包装器 (Windows) —— 每次启动重写，请勿手工修改\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem app.pid：宿主 pid 在 Windows 上无意义（不挂起、不靠信号唤醒），占位写 0。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 只有 start /WAIT 未按预期阻塞（target 仍在跑）时才会查到 —— 那正是需要守卫的场景。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 守卫（孤儿容器 / 假退出信号）**不在这里**做，而是交给宿主：\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 容器: 	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 尽力反查目标 pid 写进 app.pid（宿主用它核对「进程是否真的退出」）。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 本就是 cmd 对 GUI 子进程的行为，退出码因此可用（Windows 没有 wait 内建）。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 正常路径下 target 此刻已退出 ⇒ 查不到 ⇒ app.pid 保持为空 = 宿主视为「未知」；\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 注意：本脚本依赖 cmd 的「父进程等待子进程退出」语义来捕获退出码。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 环境变量（清单 env + 默认注入）\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 目标 pid 在 start /WAIT 之后尽力反查（见下），查不到就保持这个 0 = 宿主视为「未知」。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 目标平台是 Windows 时 setlocal 不改变 cwd，直接 cd /d 到资源根；\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 若容器放在网络盘等特殊位置导致 cd 失败，下面再显式 pushd 一次兜底。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem 退出码兜底：为空 / 含非数字字符时统一记 -1，否则 echo 会把 exit.txt 写坏\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerLauncher.hx	rem （exitMode=kill 的引擎退出码经常是 -1，属正常现象，不当成错误）。\\r\\n	1	写到磁盘的 PowerShell/.bat 脚本正文，非界面文案
+source/backend/ContainerSession.hx	[Container] Windows：宿主不挂起，改为隐窗并每帧轮询退出信号	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] resetGame 失败，回退到软复位：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 前台化失败（pid 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 前台化脚本派发失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 前台化脚本生成失败（runtime 目录不可写）	2	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 宿主挂起失败（继续以让位模式运行）：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 已请求关闭 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 返回时临时关闭 autoPause，确保整机复位不被失焦冻结挡住	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 退出请求写入失败（runtime 目录不可写）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	[Container] 隐藏宿主窗口失败（继续以缩窗方式让位）：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	activator dispatched（宿主不再自行重试）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ContainerSession.hx	」…（	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/backend/ContainerSession.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/backend/CrashHandler.hx	\n#include <signal.h>\n#include <time.h>\n#include <unistd.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n#include <fcntl.h>\n#include <sys/stat.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdint.h>\n#include <dlfcn.h>\n#include <sys/ucontext.h>\n#if defined(__APPLE__)\n\t#include <sys/utsname.h>\n\t#include <sys/sysctl.h>\n#elif defined(__ANDROID__)\n\t#include <sys/system_properties.h>\n#elif defined(__linux__)\n\t#include <sys/utsname.h>\n#endif\n\n// 平台/系统信息（安卓版本+ABI / macOS 版本+架构 / Linux 发行信息）→ 静态字符串。\nstatic const char* meteoric_os_cstr() {\n\tstatic char buf[256];\n\t#if defined(__ANDROID__)\n\tchar rel[128] = {0}, abi[128] = {0};\n\t__system_property_get("ro.build.version.release", rel);\n\t__system_property_get("ro.product.cpu.abi", abi);\n\tsnprintf(buf, sizeof(buf), "Android %s (%s)", rel[0] ? rel : "?", abi[0] ? abi : "?");\n\t#else\n\tstruct utsname u;\n\tmemset(&u, 0, sizeof(u));\n\tuname(&u);\n\t#if defined(__APPLE__)\n\tchar ver[128] = {0};\n\tsize_t vsz = sizeof(ver);\n\tif (sysctlbyname("kern.osproductversion", ver, &vsz, NULL, 0) != 0 || !ver[0])\n\t\tsnprintf(ver, sizeof(ver), "%s", u.release);\n\tsnprintf(buf, sizeof(buf), "macOS %s (%s)", ver, u.machine);\n\t#elif defined(__linux__)\n\tsnprintf(buf, sizeof(buf), "Linux %s (%s)", u.release, u.machine);\n\t#else\n\tsnprintf(buf, sizeof(buf), "%s %s (%s)", u.sysname, u.release, u.machine);\n\t#endif\n\t#endif\n\treturn buf;\n}\n\n// 原生崩溃处理器：SIGSEGV/SIGABRT/SIGILL/SIGBUS → 写 native_stack.txt\n// （含 signal、PC/SP/FP 指针、fault 符号化、帧指针链回溯、平台/时间/最后阶段）。\nstatic void meteoric_native_sig_handler(int sig, siginfo_t* si, void* uctx) {\n\tuint64_t pc = 0, sp = 0, fp = 0;\n\tucontext_t* uc = (ucontext_t*)uctx;\n\tif (uc) {\n\t#if defined(__x86_64__) || defined(__amd64__)\n\t\t#if defined(__ANDROID__) || defined(__linux__)\n\t\t\tpc = uc->uc_mcontext.gregs[REG_RIP];\n\t\t\tsp = uc->uc_mcontext.gregs[REG_RSP];\n\t\t\tfp = uc->uc_mcontext.gregs[REG_RBP];\n\t\t#else\n\t\t\tpc = uc->uc_mcontext->__ss.__rip;\n\t\t\tsp = uc->uc_mcontext->__ss.__rsp;\n\t\t\tfp = uc->uc_mcontext->__ss.__rbp;\n\t\t#endif\n\t#elif defined(__aarch64__)\n\t\t#if defined(__ANDROID__) || defined(__linux__)\n\t\t\tpc = uc->uc_mcontext.pc;\n\t\t\tsp = uc->uc_mcontext.sp;\n\t\t\tfp = uc->uc_mcontext.regs[29];\n\t\t#else\n\t\t\tpc = uc->uc_mcontext->__ss.__pc;\n\t\t\tsp = uc->uc_mcontext->__ss.__sp;\n\t\t\tfp = uc->uc_mcontext->__ss.__fp;\n\t\t#endif\n\t#elif defined(__arm__)\n\t\t#if defined(__ANDROID__)\n\t\t\tpc = uc->uc_mcontext.arm_pc;\n\t\t\tsp = uc->uc_mcontext.arm_sp;\n\t\t\tfp = uc->uc_mcontext.arm_fp;\n\t\t#else\n\t\t\tpc = uc->uc_mcontext->__ss.__pc;\n\t\t\tsp = uc->uc_mcontext->__ss.__sp;\n\t\t\tfp = uc->uc_mcontext->__ss.__fp;\n\t\t#endif\n\t#endif\n\t}\n\n\tconst char* dirm = getenv("METEORIC_CRASH_DIR");\n\tconst char* stage = getenv("METEORIC_LAST_STAGE");\n\tchar p[700];\n\tconst char* dirs[3];\n\tint nd = 0;\n\tif (dirm && dirm[0]) dirs[nd++] = dirm;\n\tdirs[nd++] = "./crash";\n\n\t// 时间戳：每次崩溃独立文件 native_crash_YYYYMMDD_HHMMSS.txt（保留全部历史）\n\tstruct tm tmv;\n\ttime_t now = time(NULL);\n\tlocaltime_r(&now, &tmv);\n\tchar tbuf[64], ts[64];\n\tstrftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", &tmv);\n\tstrftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", &tmv);\n\n\tconst char* sigName = (sig == SIGSEGV) ? "SEGV" : (sig == SIGABRT) ? "ABRT" : (sig == SIGILL) ? "ILL" : "BUS";\n\n\tchar body[4096];\n\tint bl = 0;\n\tbl += snprintf(body + bl, sizeof(body) - bl, "============================================================\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "  Meteoric Engine - Native Crash Report\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "============================================================\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "时间       : %s\\\\n", tbuf);\n\tbl += snprintf(body + bl, sizeof(body) - bl, "平台/系统   : %s\\\\n", meteoric_os_cstr());\n\tbl += snprintf(body + bl, sizeof(body) - bl, "信号       : %d (%s)\\\\n", sig, sigName);\n\tbl += snprintf(body + bl, sizeof(body) - bl, "PC/SP/FP   : 0x%llx / 0x%llx / 0x%llx\\\\n",\n\t\t(unsigned long long)pc, (unsigned long long)sp, (unsigned long long)fp);\n\tif (stage && stage[0])\n\t\tbl += snprintf(body + bl, sizeof(body) - bl, "最后阶段   : %.300s\\\\n", stage);\n\telse\n\t\tbl += snprintf(body + bl, sizeof(body) - bl, "最后阶段   : (无)\\\\n");\n\tDl_info di2;\n\tif (dladdr((void*)pc, &di2) && di2.dli_sname)\n\t\tbl += snprintf(body + bl, sizeof(body) - bl, "故障点     : %s + 0x%lx\\\\n", di2.dli_sname, (long)((char*)pc - (char*)di2.dli_saddr));\n\telse\n\t\tbl += snprintf(body + bl, sizeof(body) - bl, "故障点     : 0x%llx (no symbol)\\\\n", (unsigned long long)pc);\n\tbl += snprintf(body + bl, sizeof(body) - bl, "------------------------------------------------------------\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "回溯 (帧指针链):\\\\n");\n\tuint64_t cur = fp;\n\tfor (int k = 0; k < 24 && cur && bl < (int)sizeof(body) - 200; k++) {\n\t\tuint64_t ret = 0, next = 0;\n\t\tmemcpy(&ret, (void*)(cur + 8), sizeof(ret));\n\t\tif (ret < 0x100000ULL) break;\n\t\tif (dladdr((void*)ret, &di2) && di2.dli_sname)\n\t\t\tbl += snprintf(body + bl, sizeof(body) - bl, "#%02d %s + 0x%lx\\\\n", k, di2.dli_sname, (long)((char*)ret - (char*)di2.dli_saddr));\n\t\telse\n\t\t\tbl += snprintf(body + bl, sizeof(body) - bl, "#%02d 0x%llx\\\\n", k, (unsigned long long)ret);\n\t\tmemcpy(&next, (void*)cur, sizeof(next));\n\t\tif (next <= cur) break;\n\t\tcur = next;\n\t}\n\tbl += snprintf(body + bl, sizeof(body) - bl, "------------------------------------------------------------\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "提示: 若回溯以地址为主（无符号），请用 atos 配合带符号构建文件解析；\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "      请将本文件与 last_stage.txt 一起发送给开发者。\\\\n");\n\tbl += snprintf(body + bl, sizeof(body) - bl, "============================================================\\\\n");\n\n\tfor (int di = 0; di < nd; di++) {\n\t\tint ok = 0;\n\t\tif (bl > 0 && bl < (int)sizeof(body)) {\n\t\t\t// 1) 时间戳独立文件（每次崩溃都保留）\n\t\t\tsnprintf(p, sizeof(p), "%s/native_crash_%s.txt", dirs[di], ts);\n\t\t\tint fdd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0644);\n\t\t\tif (fdd >= 0) {\n\t\t\t\tssize_t wr = write(fdd, body, bl);\n\t\t\t\t(void)wr;\n\t\t\t\tclose(fdd);\n\t\t\t\tok = 1;\n\t\t\t}\n\t\t\t// 2) 「最新一次」快捷副本（与旧行为兼容）\n\t\t\tsnprintf(p, sizeof(p), "%s/native_stack.txt", dirs[di]);\n\t\t\tfdd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0644);\n\t\t\tif (fdd >= 0) {\n\t\t\t\tssize_t wr = write(fdd, body, bl);\n\t\t\t\t(void)wr;\n\t\t\t\tclose(fdd);\n\t\t\t\tok = 1;\n\t\t\t}\n\t\t}\n\t\tif (ok) break;\n\t}\n\t// 目录全部不可写：兜底打到 stderr（Android logcat / 桌面终端可见）\n\tif (bl > 0) {\n\t\tssize_t wr = write(2, body, bl);\n\t\t(void)wr;\n\t}\n\t_exit(128 + sig);\n}\n\nstatic void meteoric_install_native_handlers() {\n\tstruct sigaction sa;\n\tmemset(&sa, 0, sizeof(sa));\n\tsa.sa_sigaction = meteoric_native_sig_handler;\n\tsa.sa_flags = SA_SIGINFO;\n\tsigaction(SIGSEGV, &sa, NULL);\n\tsigaction(SIGABRT, &sa, NULL);\n\tsigaction(SIGILL, &sa, NULL);\n\tsigaction(SIGBUS, &sa, NULL);\n}\n	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 (Psych 0.7.1h 基座)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 (共 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 (驱动支持)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 ... (共 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 [游玩]	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 [编谱]	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 个)	2	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 条） ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 条，已限流（其余丢弃）	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	 项 | tracked=	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(无 crash 目录)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(无 native_crash_*.txt)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(无)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(无日志记录)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(未知)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(空)	2	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	(读取原生崩溃日志失败: 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 原生崩溃日志（crash/native_crash_*.txt，最多 5 份） ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 崩溃目录文件（	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 引擎 ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 最新 GL 错误（运行期轮询快照） ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 最近游戏日志（结构化日志环，最后 60 条 / 共 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 渲染器 / GPU ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 窗口 / 显示 ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 系统 / 设备 ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	--- 运行态 ---	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	===== 系统报告 =====	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	FPS(实际)   : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	FPS(设定)   : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	GL 厂商     : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	GL 扩展     : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	GL 渲染器   : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	GL 版本     : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	GPU 内存    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	\\n... (截断)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	不支持（驱动未暴露）	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	事件时间线（黑匣子，最近 120 条）：\\n	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	原生栈提示  : 若是原生崩溃，请一并发送 crash/native_stack.txt 与 crash/native_crash_*.txt（含 PC/SP/FP 指针与符号化回溯）	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	图形缓存    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	平台/系统   : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	平台=	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	平台名      : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	引擎        : Meteoric Engine v	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	当前 State  : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	当前 State  : (null)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	指针宽度    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	日志超过每秒 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	时间       : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	显示器      : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	显示模式    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	曲目        : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	构建特性    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	渲染上下文  : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	窗口        : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	调用堆栈：\\n	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	进程内存    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	逻辑 CPU    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	阶段标记    : 	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	阶段标记    : (无)	1	崩溃报告文件正文（写进 crash/*.txt，给开发者看）
+source/backend/CrashHandler.hx	）---	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/backend/CustomFadeTransition.hx	星辉	1	MODE_* 是 static inline var 存档值
+source/backend/CustomFadeTransition.hx	移动	1	MODE_* 是 static inline var 存档值
+source/backend/CustomFadeTransition.hx	陨星	1	MODE_* 是 static inline var 存档值
+source/backend/DesignTokens.hx	品红	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	橙	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	粉	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	紫	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	红	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	绿	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	蓝	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	金	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	青绿	1	主题名：显示走 themeNameAt()
+source/backend/DesignTokens.hx	青（默认）	1	主题名：显示走 themeNameAt()
+source/backend/HostDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/HostDomain.hx	[Audio] songLength 按谱面末尾兜底：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	[角色自愈] boyfriend 重建失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	[角色自愈] dad 重建失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	[角色自愈] gf 重建失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	ms（music.length=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	ms）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/HostDomain.hx	已过时间	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/HostDomain.hx	歌曲名称	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/InputDomain.hx	KE 判定	4	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/ModInstallUI.hx	…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/backend/ModInstallUI.hx	下载完成	1	m.title == '安装完成' 状态比较
+source/backend/ModInstallUI.hx	安装完成	1	m.title == '安装完成' 状态比较
+source/backend/ModInstaller.hx	、	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/backend/NoteChartDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/NoteChartDomain.hx	[Memory] 谱面恢复失败（缓存/文件缺失）：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/NoteChartDomain.hx	[Memory] 谱面恢复异常：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/Paths.hx	[Audio] 流式加载不可用，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/Paths.hx	[Audio] 流式加载失败，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/ReplayDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/Song.hx	converted CNE chart → psych_v1: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/cne/CneModCompat.hx	 → 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/cne/CneModCompat.hx	 → Psych JSON (	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/cne/CneModCompat.hx	 → StageFile (zoom=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/cne/CneZipStore.hx	" → 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	"（中间对象缺失）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	"（目标值非数值）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	"（目标或值为 null）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	"（起始值缺失/非数值）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	[VarTween] 跳过无效属性 "	3	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/flixel/tweens/misc/VarTween.hx	[VarTween] 跳过无效属性路径 "	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/luagraph/LuaBlockDefs.hx	(补间标签, 目标对象, 目标值, 时长, 缓动)。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	0 = 无限	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	0 = 自适应	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	1 = 原始大小	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	FlxAnimate 角色/图集精灵。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	Lua 表达式或字面量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	Lua 表达式，如 keyJustPressed(\\'space\\') 或 getProperty(\\'boyfriend.x\\') > 500	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	addAnimationByPrefix。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	addHealth。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	addLuaSprite(tag, front)。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	addLuaText。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	addScore。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cameraFade。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cameraFlash。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cameraSetTarget。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cameraShake。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cancelTimer。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	cancelTween。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	currentSongPos，单位毫秒。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	debugPrint。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	doTweenColor(tag, obj, 颜色, 时长, 缓动)。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	images/ 下的图片名（不含扩展名）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	makeAnimatedLuaSprite(tag, image, x, y)。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	makeLuaSprite(tag, image, x, y)。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	makeLuaText。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	musicFadeIn。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	musicFadeOut。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	pauseSound。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	playAnim。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	playMusic。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	playSound（标签留空时生成两参形式）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	precacheImage（避免运行中卡顿）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	precacheSound。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	removeLuaSprite。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	removeLuaText。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	resumeSound。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	runTimer（配合自定义区里的 onTimerCompleted 使用；本编辑器"等待"积木也用它）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	scaleObject（会同步更新命中框）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	screenCenter。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setBlendMode。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setGraphicSize。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setHealth。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setObjectCamera。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setObjectOrder。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setProperty（最通用的对象改动入口）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setScrollFactor（0 = 不随镜头滚动）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setSoundVolume。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextAlignment。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextBorder。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextColor。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextFont。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextSize。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextString。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	setTextWidth。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	soundFadeIn。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	soundFadeOut。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	sounds/ 下的名字	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	sparrow 图集名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	startTween（可补间任意属性）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	stopSound。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	triggerEvent（可直接驱动谱面事件）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	x 坐标	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	y 坐标	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	上限 2	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	与创建时的标签一致	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	与谱面事件同名即可触发	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	事件	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	事件名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	代码	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	位置	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	值	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	停止本栈	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	停止音效	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	兜底	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	全局名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	其它脚本可用 getVar 读取	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	内容	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	函数名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	分数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	创建 FlxAnimate 精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	创建动画精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	创建文本	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	创建精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	创建纯色色块精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	动画名	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	十六进制	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	十六进制，可带透明度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	参数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	参数 1	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	参数 2	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	参数 key 是被按下的按键名（如 space、left）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	参数：音符下标、轨道(0-3)、音符类型、是否长按尾。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	双分支条件。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	取消补间	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	取消计时器	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	变量	5	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	变量需先在左侧"＋ 新建变量"里声明	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	可中文	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	可为负	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	可为负数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	可写 boyfriend / dad / camGame 等	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	同上；内部与"否则"分支各有一块放置区	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	同时销毁	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	后续播放动画用这个名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	后续积木用它引用该精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	启动计时器	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	唯一	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	唯一标签	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	唯一标签；同一脚本内不要重复	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	唯一；取消补间时用同一个标签	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	图片	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	图集	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	图集内帧名前缀	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	图集目录	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	增加分数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	增加血量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	增量	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	如 WHITE / RED / 0xFF00FF	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	如 angle / alpha / scale.x	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	如 x / y / angle / alpha / scale.x	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	如果 … 那么	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	如果 … 那么 / 否则	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	字体	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	字号	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	完全自由的逃生舱；复杂逻辑仍建议写进底部自定义区。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	宽	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	宽度	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应 Lua 回调 onCreate()，脚本加载时执行一次。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应 onBeatHit()，按当前 BPM 触发。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应 onCreatePost()，此时舞台对象已就绪。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应 onStepHit()，每拍 4 步。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应 setVar（跨脚本共享）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对应引擎的 getRandomInt。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对象	8	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	对齐	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	屏幕居中	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	属性	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	帧前缀	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	帧率	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	引擎注册的 203 个函数任意一个；写错会在游戏内报 nil 调用	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	强制	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	强制重播	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	强度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当 … 时重复	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当命中音符时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当按键时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当歌曲开始时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当每帧结束时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当每拍时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当每步时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当脚本创建完成后	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当脚本创建时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	当脚本销毁时	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	循环	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	循环条件；注意务必让条件最终为假，否则会卡住游戏	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	循环次数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	打印调试信息	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把变量增加	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把变量设为	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把变量设为歌曲位置	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把变量设为随机整数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把对象放到相机	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把文本加进舞台	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	把精灵加进舞台	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	按原样填入括号，字符串记得自己加引号	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	描边粗细	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	播放动画	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	播放音乐	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	播放音效	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	数值越大越靠前	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	整数；生成 for _i = 1, N 循环	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	文字内容	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	文本	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	新内容	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	方向	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	无需图片即可生成色块（两行代码）。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	时长（秒）	10	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	显示在屏幕左上角的调试区	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	暂停音效	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	最大	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	最小	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	杂项	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	条件	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	条件为真时循环执行。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	条件为真时执行内部积木。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	标签	27	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	模式	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	横向	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	横向倍数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	次数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	歌曲正式开始（倒计时结束后）触发一次。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	歌曲淡入	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	歌曲淡出	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	每个补间标签必须唯一，取消补间时用同一个标签	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	每帧执行（elapsed = 本帧秒数）；放置高频逻辑请自行控制开销。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	注释	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	注释内容	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	流程	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	淡到音量	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	添加动画	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	生成一行 Lua 注释，便于阅读。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	用 runTimer + 续接函数实现真正的"等待后继续"，不会卡住主线程。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	留空 = 不可控的一次性播放；填标签后可用停止/暂停/淡出积木	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	目标	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	目标值	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	目标对象	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	目标音量	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	目标颜色	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	直接写一行 Lua	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	直接设置镜头缩放	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	相机	6	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	相机名（camGame 等）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	秒数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	移除文本	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	移除精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	等待 N 秒后继续	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	等待时长（秒）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	精灵	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	精灵标签或角色名	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	纵向	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	纵向倍数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	结束当前回调（或等待后的续接段），后面的积木不再执行。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	继续音效	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	缓动	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	缩放	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	缩放倍数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	缩放对象（倍数）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	置于前景	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	自增/自减。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	血量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间 X 坐标	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间 Y 坐标	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间旋转角度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间标签	4	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间透明度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间镜头缩放	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	补间颜色	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	覆盖全部引擎 API 的通用出口。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	角度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	触发事件	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	计时器标签	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置图层顺序	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置宽高（像素）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置对象属性	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本内容	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本字体	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本字号	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本宽度	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本对齐	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本描边	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置文本颜色	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置混合模式	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置滚动系数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置血量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置跨脚本全局变量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	设置音效音量	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	说明	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	调用任意 Lua 函数	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	调试输出	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	赋值给脚本级变量。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	起始音量	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	退出歌曲/销毁脚本时执行，适合清理计时器与补间。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	透明度 0-1	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	通用属性补间	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	重复 N 次	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	重复执行内部积木 N 次。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	镜头切到角色	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	镜头淡色	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	镜头闪光	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	镜头震动	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	间隔（秒）	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	需含 Animation.json / spritemap	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	需已在 assets/fonts 内	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	需要平滑过渡请用"补间镜头缩放"。	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音乐	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音效	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音效淡入	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音效淡出	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音量	3	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	音频	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	预载图片	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	预载音效	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	颜色	6	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	高	2	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaBlockDefs.hx	高级用法：原样输出到生成的脚本里	1	积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel
+source/luagraph/LuaCodeGen.hx	-- ===== Meteoric LuaGraph 受管区（自动生成，手改会在下次保存时被覆盖）=====	1	CUSTOM_BEGIN/MANAGED_BEGIN 是 .lua 往返标记
+source/luagraph/LuaCodeGen.hx	-- ===== 自定义代码区（重新生成不会覆盖，可在此手写）=====	1	CUSTOM_BEGIN/MANAGED_BEGIN 是 .lua 往返标记
+source/luagraph/LuaGraphTemplates.hx	按下空格：生成特效	1	misc_print 默认文本会写进用户生成的 .lua
+source/luagraph/LuaGraphTemplates.hx	脚本已销毁，补间已清理	1	misc_print 默认文本会写进用户生成的 .lua
+source/luagraph/LuaGraphTemplates.hx	镜头缩放模板已启动	1	misc_print 默认文本会写进用户生成的 .lua
+source/objects/Note.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/openfl/display/FPS.hx	彩虹	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	红色	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	绿色	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	自动	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	蓝色	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	青色	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	黄色	1	存档值比较（FPS 配色档位）
+source/options/ControlsPane.hx	恢复默认按键	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	Discord在线状态	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	关闭后，Discord 的“正在游玩”状态将不再显示本应用，避免意外泄露	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	关闭后，将不再显示过场动画的引擎版本与事件指示器	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	关闭后，检测到新版本时不再弹出更新界面（仍会继续检查更新）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	关闭后，游戏将不会出现频闪效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	关闭后，镜头将不会随节拍缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	平滑 0.8s	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	开启后，主菜单/故事模式/自由游玩等播放背景音乐的界面会随节拍轻微跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	开启后，自动检查引擎是否有新版本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	换段或事件切换时镜头移动的平滑程度：迅捷=0.3 秒到位（最接近原版切换手感）；标准=0.5 秒；平滑=0.8 秒（滑行感最明显）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	效果设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	无	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	暂停界面音乐:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	更新提示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	标准 0.5s	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	检查更新	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	界面节拍跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	自定义过场动画	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	迅捷 0.3s	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	过场动画文字	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	选择过场动画的样式（三种）：移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光效淡入淡出。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	选择进入暂停界面时播放的音乐：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	镜头缓动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	镜头缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	频闪效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	KE引擎图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	SB引擎图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	中间滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	关闭后，对手的箭头将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	向下滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	对手音符	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	平滑血量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	幽灵点击	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，使用旧版血量条样式（填充裁剪为血条内部形状、背景由血量条自行绘制），用于兼容 0.6.3 及以下版本的旧模组脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，双方箭头都会居中显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，启用 Kade Engine 风格的小图标跳动（每拍放大后弹性缩回）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，启用 SB Engine 风格的小图标跳动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，在没有可击打的箭头时乱按，也不会被判为 Miss	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，按下重置键不会触发任何效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，游戏窗口失去焦点（切到后台）时会自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，界面会上下翻转，音符从上方往下落	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，血量条上会覆盖一层阴影	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，血量条不再依赖贴图而是自己绘制（白边框 + 内部填充），并自动融合 0.6.3 兼容模式（无阴影）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，血量条的变化会更平滑流畅	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，重新开始时不再重新加载谱面（不读盘、不重建场景，重开更流畅）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	开启后，隐藏血量条图标与阴影，血量条移到 Score 栏位置，Score 栏文字嵌入血量条中	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	快速重开回溯箭头	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	快速重开时，屏幕上的箭头会像时间倒流一样飞回起点，然后再重新开始	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	快速重新开始	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	新版血量条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	旧版血量条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	极简血条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	玩法	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	玩法设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	禁用重置键	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	血条覆盖	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	2x 清晰渲染（Retina 下画面锐利；大规模谱面约 700~1400 帧）。关闭 = 1x 高性能（画面略糊，帧率约 3 倍，轻松 2200+）。修改后需重启游戏生效	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	GPU缓存	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	Seiun 式音符快速路径：音符去 RGB 着色器、改用 ColorTransform 上色并直连 quad 合批（消除 shader 绑定开销，大规模谱面帧率大幅提升；音符颜色由三色渐变改为单色平涂）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	低画质	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	光影效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭动画样式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭动画的播放速度倍率：1.0 为默认速度，数值越大播放越快（0.25x ~ 5.0x）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭动画的窗口变换方式：压扁=先压扁高度再压扁宽度；缩放=向中心缩小；坠落=一边缩小一边下落；滑出=一边缩小一边向左滑出	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭动画速度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭后，禁用光影特效。光影用于部分视觉效果，但对配置较弱的电脑比较吃 CPU	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	关闭后，禁用抗锯齿，画面边缘更锐利，同时提升性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	压扁	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	命中长条时在判定线上显示按压覆盖动画（QT 模组 NoteHoldCover 原生移植，可关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	图像设置	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	图像设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	坠落	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	帧率上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	开启后，使用 GPU 缓存纹理，可减少内存占用（显卡性能较差时建议关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	开启后，在加载曲目时预先渲染所有音符贴图，大幅优化高密度音符堆叠场景（会牺牲加载速度）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	开启后，禁用部分背景细节，缩短加载时间并提升性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	引擎关闭动画	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	性能模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	把 ≤160px 的小贴图打包进运行时共享图集（减少纹理数量与绘制批次；实验性，若出现贴图错乱请关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	抗锯齿	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	提前渲染	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	无上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	滑出	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	点击窗口关闭按钮（X）或按 Alt+F4 时，在窗口真正关闭前播放一段关闭动画；动画结束后才退出。手机端不适用	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	独立大背景图（舞台/菜单背景等）的缩放比例，0.5 = 50%（大幅省内存，背景略降清晰度）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	背景图分辨率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	运行时贴图密排列	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	长条按压覆盖	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	高清渲染	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	Combo堆叠	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	FPS引擎版本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	FPS显示到窗口标题	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	FPS显示颜色: 	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	FPS计数器	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	Score栏格式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	\\n改动即时生效：本页当前观感马上更新，其余界面在下次进入时应用新配色。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	\\n青·蓝·紫·品红·橙·金·绿·青绿·红·粉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	两种时间条样式均受此开关控制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	主题色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	关闭后，帧数计数器下方的引擎版本将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	关闭后，帧数计数器（FPS）将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	关闭后，评级与 Combo 数字将不再堆叠，节省系统内存，读谱也更清晰	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	判定计数侧边栏	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	剩余时间	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	可用变量：\\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\\n{nps} 每秒音符 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	否则用主题色（颜色过暗时自动兜底）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	已过时间	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，FPS 计数器下方显示当前音符滚动速度，颜色随速度变化（慢速绿色、中速黄色、快速红色）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，FPS/内存/峰值内存/CPU 显示在窗口标题栏，屏幕上的计数器隐藏	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，任意堆叠命中（≥2 连打簇，即使没顶破 100%）都会触发：血量显示按该堆叠提供的血量%爆发	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，屏幕右上角显示总命中数、连击数、Marvelous/Sick/Good/Bad/Shit/Misses 数量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，左下角的水印将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，时间条变为黑色圆角样式。已走过部分的填充色：开启「时间条颜色跟随对方」时用对手图标颜色，	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，时间条填充色跟随对方角色血量条颜色（过暗/过亮时自动兜底）；关闭时使用当前主题色。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，血量条等界面元素将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	彩虹	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	新时间条样式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	时间条:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	时间条颜色跟随对方	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	显示NPS	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	显示滚动速度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	歌曲名称	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	点击查看	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	界面	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	界面设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	白色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	禁用	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	红色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	绿色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	自动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {fc} {combo} {health}。按确认键打开输入框	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	自定义 Score 栏格式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	蓝色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	血条上限仍为 100%，仅显示与飞行节奏发生变化	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	血条溢出图标飞出	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	血条透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	计分文字字体: 	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	调整血量条的透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	选择 FPS 计数器显示的颜色；"自动"模式会随帧率变色（高帧绿色、中帧黄色、低帧红色），"彩虹"模式为 KE 引擎风格的循环彩虹色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	选择时间条的显示样式：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	选择界面主题色（固定 10 色，作用于系统界面与部分强调元素的 主/次/点缀 三个令牌）：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	选择计分文字使用的字体：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	隐藏HUD	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	隐藏水印	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	青色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	黄色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	默认	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	（堆叠越大越高，最多 1000%），小图标按比例冲出条外再被慢速拉回；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Bad 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Bad判定窗口	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Good 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Good判定窗口	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	KE 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Marvelous 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	PE 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Sick! 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Sick!判定窗口	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	允许提前或延迟按下的安全帧数，数值越大判定越宽松	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	判定设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	安全帧数	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	开启后，最高判定（Sick/45ms）显示为 Marvelous 贴图（KE 1.8 风格）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	打击音音量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	按下音符时，会发出“叮！”的打击音	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	评级偏移	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	调整打出“Sick!”所需的提前/延迟范围；数值越大，要求按得越晚	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	选择音符判定方式：PE 判定为引擎原有判定；KE 判定为 Kade Engine 判定（提前窗口更短，45/90/135ms 评级窗口随安全帧缩放）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	音符判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/LanguageSettingsSubState.hx	选择界面显示语言。中文与英文为引擎内置；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	打击特效透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	调整音符打击粒子的透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	选择你的箭头样式：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	选择音符打击粒子的样式：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	音符打击特效:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/NoteSettingsSubState.hx	音符皮肤:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/OptionsState.hx	注意：启动容器会让 Meteoric 整机重启，所以它不适合嵌进设置界面里当子页。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/OptionsState.hx	点左侧分区栏即直接打开（选中后按 A 同样直达）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/OptionsState.hx	点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/OptionsState.hx	点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）；退出后自动回到暂停菜单（曲目内进入时）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	0 = 关闭。开启后可显著降低极端堆叠谱的渲染开销	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	15 万级堆叠谱面的解析与渲染开销大幅下降；正常谱面没有重复箭头，不受影响	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	依赖舞台视觉或舞台脚本的模组请保持关闭	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	依赖这些回调的模组（如计分/特效脚本）请保持开启	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	关闭可消除 GC 尖峰（内存可能上升）；默认开启与旧版一致	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	关闭后生成音符不再触发 Lua/Hscript 的 onSpawnNote（15 万级堆叠谱可省去海量回调开销）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	关闭命中回调	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	只显示 HUD	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	可见音符快速排序	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	合并窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	合并计数模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	同一轨道上间距小于该值的后一个音符会被隐藏（渲染裁剪，不参与判定），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	同轨时间差不超过该值的箭头视为堆叠。15 建议值；调大可合并更多，调小更保守	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	启用 GC	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	命中时是否创建评级弹窗（Sick/Good…）；关闭后仍正常计分，只少视觉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	命中时是否创建连击数字与 Combo 词；关闭后仍正常计连击	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	命中音符不再触发 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	场上音符上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	堆叠音符合并	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	对手命中时 strum 是否高亮 confirm；关闭省一点绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	对手箭头点亮	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	已过音符不再生成	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后仅渲染音符与 HUD（角色/舞台/雨效等全场景不渲染，舞台脚本也跳过），帧率大幅提升；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后每帧只对可见音符排序（绘制顺序），大谱面下排序开销降为 O(可见数)。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后，同一轨道在 ±合并窗口 内的重复箭头会合并为一个音符（用 density 计数），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后，自动游玩命中走"生成即排期、到点入队"架构（大谱面 100% 覆盖的核心）。\n关闭则回退逐帧入队（旧行为，密集谱覆盖下降）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后，跳转时间/快速重开时已过出生窗口的音符被静默消费（不判 Miss、不溅射），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后，跳转时间时用二分查找整段跳过已过音符，替代逐条移除（15 万级谱面跳转不再卡顿）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启：合并后按箭头数量计分/计数（分数、连击、Miss 与真实箭头一致）；\\n关闭：重复箭头直接丢弃（H-Slice 幽灵模式）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	弹出窗 = 帧步长 + 余量。必须 ≥ 回收窗，否则先杀后弹造成漏命中；\n帧率越低建议越大 = 可测帧步长（1000/FPS）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	快速跳谱（二分）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	性能设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	手动命中/按下时玩家 strum 是否高亮；关闭省绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	排期弹出余量（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	未命中箭头在判定线后的存活时间（越小柱子越贴线；< 弹出余量会竞态漏命中）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	玩家箭头点亮	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	生成回调 onSpawnNote	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩命中时玩家 strum 是否高亮 confirm；关闭省绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩回收窗（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩排期命中	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩时只计分/评级，不创建评分连击弹窗（少精灵创建与 GC 压力）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩省资源	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	自动游玩箭头点亮	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	若模组脚本依赖该回调请保持开启	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	评分弹窗	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	达到上限时后来的音符会被丢弃（不判判定）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	连击弹窗	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	配合快速跳谱使用；普通游玩逐帧生成不受影响	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	重叠隐藏间距	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	限制同时存在的音符对象数量（0 = 不限）。堆叠谱面防爆内存时使用；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	默认关闭以保持与旧版完全一致的绘制顺序	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	CNE 式 HScript 编程层	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	CNE 模组兼容	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	Lua 0.6.3 兼容	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	ModState/ModSubState、界面重定向与脚本热重载。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	Psych 0.6.3 兼容模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	· mods/ 下的 .zip 包（首次使用时自动解到 mods/_cnestage/，可在 Mod 列表里识别）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	· 人物 data/characters/<名字>.xml（自动转成 Psych 人物 JSON）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	· 周目 data/weeks/weeks/<周目>.xml（出现在 Story/Freeplay）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	· 谱面 songs/<song>/charts/<难度>.json（自动转成 psych_v1）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	· 音频 songs/<song>/song/Inst|Voices[-难度]；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	⚠ 未覆盖：CNE 舞台 data/stages/*.xml、人物 .hx 扩展、data/notes/*.hx 自定义音符行为。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	⚠ 脚本可访问 Sys/File 等引擎能力，只对你信任的 mod 开启；关闭时零行为变化。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	允许 HScript 在脚本里定义 class 并继承引擎类（SScript EX 模式）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	允许 mod 用 flags.ini 的 [StateRedirects] / [StateRedirects.force] 把引擎界面\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	允许常驻 HScript：data/global/LIB_<mod>.hx。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	允许每个引擎界面加载自己的 HScript：data/states/<界面类名>/LIB_<mod>.hx。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	允许用 HScript 写完整界面：new ModState("MyState") / new ModSubState("MySubState")。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	全局脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	全局脚本跨界面运行，可用于全局 UI、事件总线和整局游戏逻辑（需先开启编程层）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	关闭可降低脚本误用引擎内部结构的风险。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	开启后在控制台打印脚本加载/销毁/重载记录，便于调试（默认关闭，避免刷屏）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨兵按 Psych Engine 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	开启后：F5 重载当前界面脚本；Shift+F5 重建全局脚本。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	总开关。开启后 Meteoric 会加载 CNE 风格的 HScript 编程层：\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	替换成自己的 HScript 界面。会改写状态切换请求，风险较高，默认关闭。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	状态脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	状态脚本（data/states/<界面类名>/LIB_<mod>.hx）、全局脚本（data/global/LIB_<mod>.hx）、\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	界面重定向	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	第一版走 CNE 忠实语义（F5 会重进当前界面/关卡），不重启游戏。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	编程设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	脚本加载日志	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	脚本可挂 create/update/stepHit/beatHit/destroy 等钩子（需先开启编程层）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	脚本定义/继承类	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	脚本放在 data/states/MyState/LIB_<mod>.hx；这是“不编译引擎也能做独立游戏”的核心入口。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	脚本热重载	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	让 Codename Engine 格式的 mod 在 Meteoric 里加载（默认关闭）：\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/psychlua/LuaClass.hx	    -- Enemy.isInstanceOf(instance) 与 instance:isInstanceOf(Enemy) 均可用\\n	1	生成进用户 Lua 类的注释文本
+source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类部分），否则创建新实例。\\n	1	生成进用户 Lua 类的注释文本
+source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本
+source/psychlua/LuaClass.hx	    -- 会触发 __newindex 存到 __constructor，不会覆盖包装器。\\n	1	生成进用户 Lua 类的注释文本
+source/psychlua/LuaClass.hx	    -- 包装器不存进类表，用户写 function Enemy:new(...) 时\\n	1	生成进用户 Lua 类的注释文本
+source/states/ContainersMenuState.hx	  ·  	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/ContainersMenuState.hx	」…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/CreditsState.hx	FNF的主程序员	1	署名与角色描述（内容）
+source/states/CreditsState.hx	FNF的动画制作者	1	署名与角色描述（内容）
+source/states/CreditsState.hx	FNF的曲师	1	署名与角色描述（内容）
+source/states/CreditsState.hx	FNF的画师	1	署名与角色描述（内容）
+source/states/CreditsState.hx	Meteoric Engine的主创作者，\\n是个12岁的初中生awa	1	署名与角色描述（内容）
+source/states/CreditsState.hx	Rs-Drfeaoer\\n早期版本Meteoric Engine测试成员	1	署名与角色描述（内容）
+source/states/CreditsState.hx	…	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/CreditsState.hx	。	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/CreditsState.hx	是我，复合肥！\\n早期版本Meteoric Engine测试成员	1	署名与角色描述（内容）
+source/states/CreditsState.hx	！	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/CreditsState.hx	？	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/MainMenuState.hx	[CRASH-TEST] 触发 Haxe 级报错	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/MainMenuState.hx	[CRASH-TEST] 触发原生段错误	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/MainMenuState.hx	[CRASH-TEST] 输入 crash，弹出崩溃模式选择	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/ModsMenuState.hx	…	4	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/OutdatedState.hx	→	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/PlayState.hx	 触发超密集谱面自动合并（skipGhostNotes 被强制开启）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/PlayState.hx	[Audio] song 名与谱面目录不一致，已改用目录音频：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	[Audio] 歌曲音频加载失败，降级静音继续：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	[NoteHoldCover] 原生覆盖层已启用	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	[NoteHoldCover] 检测到模组自带 NoteHoldCover.lua，跳过原生覆盖层（避免重复）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	[Replay] 谱面指纹不匹配，回放取消	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/PlayState.hx	剩余时间	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/PlayState.hx	无	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/PlayState.hx	歌曲名称	4	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/PlayState.hx	禁用	2	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/PlayState.hx	默认	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/states/TitleState.hx	 墙钟补丁探测=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/TitleState.hx	 无上限档取值=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/TitleState.hx	[FRAMERATE] 档位=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/TitleState.hx	无	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/TitleState.hx	有	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/states/editors/LuaGraphEditorState.hx	…	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/editors/LuaGraphEditorState.hx	「	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/editors/LuaGraphEditorState.hx	」	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/PauseSubState.hx	 | 安全上限=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	 | 菜单项=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	[PAUSE] 信息文本最右缘=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	[PAUSE] 新暂停界面已加载 | 画布=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	[PAUSE] 暂停音乐加载失败，跳过：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	错误！$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/substates/PauseSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ReplaySubState.hx	   ·   	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ReplaySubState.hx	%   ·   	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ResultsSubState.hx	：	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）

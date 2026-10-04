@@ -1968,9 +1968,9 @@ class LuaGraphEditorState extends MusicBeatState
 	// ==================================================================
 	function newScript():Void
 	{
-		openPopup(Lang.tOr('lg.newPickTemplate', '新建：选择模板'), LuaGraphTemplates.NAMES, function(pick)
+		openPopup(Lang.tOr('lg.newPickTemplate', '新建：选择模板'), LuaGraphTemplates.names(), function(pick)
 		{
-			var idx:Int = LuaGraphTemplates.NAMES.indexOf(pick);
+			var idx:Int = LuaGraphTemplates.names().indexOf(pick);
 			if (idx < 0) idx = 0;
 			doc = LuaGraphTemplates.make(idx, doc.name);
 			undoStack = [];
