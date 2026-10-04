@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import flixel.addons.ui.FlxUI;
 import flixel.addons.ui.FlxUICheckBox;
@@ -27,21 +28,20 @@ class DialogueCharacterEditorState extends MusicBeatState
 	var box:FlxSprite;
 	var daText:TypedAlphabet = null;
 
-	private static var TIP_TEXT_MAIN:String =
-	'JKLI - 移动镜头（按住 Shift 加速 4 倍）
+	// 刻意用函数而不是 static var：静态字段只求值一次，运行时切换语言后译文会被缓存住不更新。
+	private static function tipTextMain():String return Lang.tOr('dlgChar.tipMain', 'JKLI - 移动镜头（按住 Shift 加速 4 倍）
 	\nQ/E - 缩小/放大
 	\nR - 重置镜头
 	\nH - 切换对话气泡
-	\n空格 - 重置文本';
+	\n空格 - 重置文本');
 
-	private static var TIP_TEXT_OFFSET:String =
-	'JKLI - 移动镜头（按住 Shift 加速 4 倍）
+	private static function tipTextOffset():String return Lang.tOr('dlgChar.tipOffset', 'JKLI - 移动镜头（按住 Shift 加速 4 倍）
 	\nQ/E - 缩小/放大
 	\nR - 重置镜头
 	\nH - 切换幽灵预览
 	\nWASD - 移动循环动画偏移（红色）
 	\n方向键 - 移动待机/结束动画偏移（蓝色）
-	\n按住 Shift 加速偏移 10 倍';
+	\n按住 Shift 加速偏移 10 倍');
 
 	var tipText:FlxText;
 	var offsetLoopText:FlxText;
@@ -112,7 +112,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		box.updateHitbox();
 		hudGroup.add(box);
 
-		tipText = new FlxText(10, 10, FlxG.width - 20, TIP_TEXT_MAIN, 8);
+		tipText = new FlxText(10, 10, FlxG.width - 20, tipTextMain(), 8);
 		tipText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, RIGHT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tipText.cameras = [camHUD];
 		tipText.scrollFactor.set();
@@ -163,7 +163,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Character Type', label: '角色类型'},
+			{name: 'Character Type', label: Lang.tOr('dlgChar.charType', '角色类型')},
 		];
 		UI_typebox = new FlxUITabMenu(null, tabs, true);
 		UI_typebox.resize(120, 180);
@@ -175,8 +175,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 		add(UI_typebox);
 
 		var tabs = [
-			{name: 'Animations', label: '动画'},
-			{name: 'Character', label: '角色'},
+			{name: 'Animations', label: Lang.tOr('dlgChar.tab.anim', '动画')},
+			{name: 'Character', label: Lang.tOr('dlgChar.tab.char', '角色')},
 		];
 		UI_mainbox = new FlxUITabMenu(null, tabs, true);
 		UI_mainbox.resize(200, 250);
@@ -198,7 +198,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_typebox);
 		tab_group.name = "Character Type";
 
-		leftCheckbox = new FlxUICheckBox(10, 20, null, null, "左侧", 100);
+		leftCheckbox = new FlxUICheckBox(10, 20, null, null, Lang.tOr('dlgChar.left', "左侧"), 100);
 		uiFont(leftCheckbox.button.label);
 		leftCheckbox.callback = function()
 		{
@@ -206,7 +206,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 			updateCharTypeBox();
 		};
 
-		centerCheckbox = new FlxUICheckBox(leftCheckbox.x, leftCheckbox.y + 40, null, null, "居中", 100);
+		centerCheckbox = new FlxUICheckBox(leftCheckbox.x, leftCheckbox.y + 40, null, null, Lang.tOr('dlgChar.center', "居中"), 100);
 		uiFont(centerCheckbox.button.label);
 		centerCheckbox.callback = function()
 		{
@@ -214,7 +214,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 			updateCharTypeBox();
 		};
 
-		rightCheckbox = new FlxUICheckBox(centerCheckbox.x, centerCheckbox.y + 40, null, null, "右侧", 100);
+		rightCheckbox = new FlxUICheckBox(centerCheckbox.x, centerCheckbox.y + 40, null, null, Lang.tOr('dlgChar.right', "右侧"), 100);
 		uiFont(rightCheckbox.button.label);
 		rightCheckbox.callback = function()
 		{
@@ -246,8 +246,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 				curSelectedAnim = anim;
 				var animShit:DialogueAnimArray = character.dialogueAnimations.get(curSelectedAnim);
-				offsetLoopText.text = '循环: ' + animShit.loop_offsets;
-				offsetIdleText.text = '待机: ' + animShit.idle_offsets;
+				offsetLoopText.text = Lang.tOr('dlgChar.loop', '循环: ') + animShit.loop_offsets;
+				offsetIdleText.text = Lang.tOr('dlgChar.idle', '待机: ') + animShit.idle_offsets;
 
 				animationInputText.text = animShit.anim;
 				loopInputText.text = animShit.loop_name;
@@ -266,7 +266,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		uiFont(idleInputText);
 		blockPressWhileTypingOn.push(idleInputText);
 		
-		var addUpdateButton:FlxButton = new FlxButton(10, idleInputText.y + 30, "添加/更新", function() {
+		var addUpdateButton:FlxButton = new FlxButton(10, idleInputText.y + 30, Lang.tOr('char.addUpdate', "添加/更新"), function() {
 			var theAnim:String = animationInputText.text.trim();
 			if(character.dialogueAnimations.exists(theAnim)) //Update
 			{
@@ -308,7 +308,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		});
 		uiFont(addUpdateButton.label);
 		
-		var removeUpdateButton:FlxButton = new FlxButton(100, addUpdateButton.y, "删除", function() {
+		var removeUpdateButton:FlxButton = new FlxButton(100, addUpdateButton.y, Lang.tOr('char.delete', "删除"), function() {
 			for (i in 0...character.jsonFile.animations.length) {
 				var animArray:DialogueAnimArray = character.jsonFile.animations[i];
 				if(animArray != null && animArray.anim.trim() == animationInputText.text.trim()) {
@@ -333,10 +333,10 @@ class DialogueCharacterEditorState extends MusicBeatState
 		});
 		uiFont(removeUpdateButton.label);
 		
-		var animsTxt:FlxText = new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, '动画：');
-		var animNameTxt:FlxText = new FlxText(animationInputText.x, animationInputText.y - 18, 0, '动画名称：');
-		var loopNameTxt:FlxText = new FlxText(loopInputText.x, loopInputText.y - 18, 0, 'XML 中的循环动画名：');
-		var idleNameTxt:FlxText = new FlxText(idleInputText.x, idleInputText.y - 18, 0, 'XML 中的待机/结束动画名：');
+		var animsTxt:FlxText = new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, Lang.tOr('char.anim', '动画：'));
+		var animNameTxt:FlxText = new FlxText(animationInputText.x, animationInputText.y - 18, 0, Lang.tOr('char.animName', '动画名称：'));
+		var loopNameTxt:FlxText = new FlxText(loopInputText.x, loopInputText.y - 18, 0, Lang.tOr('dlgChar.xmlLoopAnim', 'XML 中的循环动画名：'));
+		var idleNameTxt:FlxText = new FlxText(idleInputText.x, idleInputText.y - 18, 0, Lang.tOr('dlgChar.xmlIdleAnim', 'XML 中的待机/结束动画名：'));
 		uiFont(animsTxt);
 		uiFont(animNameTxt);
 		uiFont(loopNameTxt);
@@ -387,7 +387,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(scaleStepper.text_field);
 
-		var noAntialiasingCheckbox:FlxUICheckBox = new FlxUICheckBox(scaleStepper.x + 80, scaleStepper.y, null, null, "关闭抗锯齿", 100);
+		var noAntialiasingCheckbox:FlxUICheckBox = new FlxUICheckBox(scaleStepper.x + 80, scaleStepper.y, null, null, Lang.tOr('char.noAntialiasing', "关闭抗锯齿"), 100);
 		uiFont(noAntialiasingCheckbox.button.label);
 		noAntialiasingCheckbox.checked = (character.jsonFile.no_antialiasing == true);
 		noAntialiasingCheckbox.callback = function()
@@ -396,9 +396,9 @@ class DialogueCharacterEditorState extends MusicBeatState
 			character.antialiasing = !character.jsonFile.no_antialiasing;
 		};
 		
-		var imageTxt:FlxText = new FlxText(10, imageInputText.y - 18, 0, '图片文件名：');
-		var posTxt:FlxText = new FlxText(10, xStepper.y - 18, 0, '位置偏移：');
-		var scaleTxt:FlxText = new FlxText(10, scaleStepper.y - 18, 0, '缩放：');
+		var imageTxt:FlxText = new FlxText(10, imageInputText.y - 18, 0, Lang.tOr('char.imageFile', '图片文件名：'));
+		var posTxt:FlxText = new FlxText(10, xStepper.y - 18, 0, Lang.tOr('dlgChar.posOffset', '位置偏移：'));
+		var scaleTxt:FlxText = new FlxText(10, scaleStepper.y - 18, 0, Lang.tOr('char.scale', '缩放：'));
 		uiFont(imageTxt);
 		uiFont(posTxt);
 		uiFont(scaleTxt);
@@ -411,16 +411,16 @@ class DialogueCharacterEditorState extends MusicBeatState
 		tab_group.add(scaleStepper);
 		tab_group.add(noAntialiasingCheckbox);
 
-		var reloadImageButton:FlxButton = new FlxButton(10, scaleStepper.y + 60, "重新加载图片", function() {
+		var reloadImageButton:FlxButton = new FlxButton(10, scaleStepper.y + 60, Lang.tOr('char.reloadImage', "重新加载图片"), function() {
 			reloadCharacter();
 		});
 		uiFont(reloadImageButton.label);
 		
-		var loadButton:FlxButton = new FlxButton(reloadImageButton.x + 100, reloadImageButton.y, "加载角色", function() {
+		var loadButton:FlxButton = new FlxButton(reloadImageButton.x + 100, reloadImageButton.y, Lang.tOr('menuChar.loadChar', "加载角色"), function() {
 			loadCharacter();
 		});
 		uiFont(loadButton.label);
-		var saveButton:FlxButton = new FlxButton(loadButton.x, reloadImageButton.y - 25, "保存角色", function() {
+		var saveButton:FlxButton = new FlxButton(loadButton.x, reloadImageButton.y - 25, Lang.tOr('char.saveChar', "保存角色"), function() {
 			saveCharacter();
 		});
 		uiFont(saveButton.label);
@@ -477,12 +477,12 @@ class DialogueCharacterEditorState extends MusicBeatState
 			var animShit:DialogueAnimArray = character.dialogueAnimations.get(curSelectedAnim);
 			ghostLoop.playAnim(animShit.anim);
 			ghostIdle.playAnim(animShit.anim, true);
-			offsetLoopText.text = '循环: ' + animShit.loop_offsets;
-			offsetIdleText.text = '待机: ' + animShit.idle_offsets;
+			offsetLoopText.text = Lang.tOr('dlgChar.loop', '循环: ') + animShit.loop_offsets;
+			offsetIdleText.text = Lang.tOr('dlgChar.idle', '待机: ') + animShit.idle_offsets;
 		}
 
 		curAnim = 0;
-		animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+		animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 
 		#if desktop
 		// Updating Discord Rich Presence
@@ -606,8 +606,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 				}
 
 				if(moved) {
-					offsetLoopText.text = '循环: ' + animShit.loop_offsets;
-					offsetIdleText.text = '待机: ' + animShit.idle_offsets;
+					offsetLoopText.text = Lang.tOr('dlgChar.loop', '循环: ') + animShit.loop_offsets;
+					offsetIdleText.text = Lang.tOr('dlgChar.idle', '待机: ') + animShit.idle_offsets;
 					ghostLoop.offset.set(animShit.loop_offsets[0], animShit.loop_offsets[1]);
 					ghostIdle.offset.set(animShit.idle_offsets[0], animShit.idle_offsets[1]);
 				}
@@ -646,7 +646,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 					mainGroup.alpha = 0;
 					ghostLoop.alpha = 0.6;
 					ghostIdle.alpha = 0.6;
-					tipText.text = TIP_TEXT_OFFSET;
+					tipText.text = tipTextOffset();
 					offsetLoopText.visible = true;
 					offsetIdleText.visible = true;
 					animText.visible = false;
@@ -656,7 +656,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 					mainGroup.alpha = 1;
 					ghostLoop.alpha = 0;
 					ghostIdle.alpha = 0;
-					tipText.text = TIP_TEXT_MAIN;
+					tipText.text = tipTextMain();
 					offsetLoopText.visible = false;
 					offsetIdleText.visible = false;
 					animText.visible = true;
@@ -667,7 +667,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 					else if(curAnim >= character.jsonFile.animations.length) curAnim = 0;
 					
 					character.playAnim(character.jsonFile.animations[curAnim].anim);
-					animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+					animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 				}
 				lastTab = UI_mainbox.selected_tab_id;
 				currentGhosts = 0;
@@ -692,7 +692,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 							}
 						}
 					}
-					animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+					animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 				}
 			}
 

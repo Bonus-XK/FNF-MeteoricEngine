@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import backend.WeekData;
 
@@ -126,8 +127,8 @@ class WeekEditorState extends MusicBeatState
 
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Week', label: '周目'},
-			{name: 'Other', label: '其他'},
+			{name: 'Week', label: Lang.tOr('week.tab.week', '周目')},
+			{name: 'Other', label: Lang.tOr('week.tab.other', '其他')},
 		];
 		UI_box = new FlxUITabMenu(null, tabs, true);
 		UI_box.resize(250, 375);
@@ -140,7 +141,7 @@ class WeekEditorState extends MusicBeatState
 		UI_box.selected_tab_id = 'Week';
 		add(UI_box);
 
-		var loadWeekButton:FlxButton = new FlxButton(0, 650, "加载周目", function() {
+		var loadWeekButton:FlxButton = new FlxButton(0, 650, Lang.tOr('week.load', "加载周目"), function() {
 			loadWeek();
 		});
 		uiFont(loadWeekButton.label);
@@ -148,7 +149,7 @@ class WeekEditorState extends MusicBeatState
 		loadWeekButton.x -= 120;
 		add(loadWeekButton);
 		
-		var freeplayButton:FlxButton = new FlxButton(0, 650, "自由游玩", function() {
+		var freeplayButton:FlxButton = new FlxButton(0, 650, Lang.tOr('week.freeplay', "自由游玩"), function() {
 			MusicBeatState.switchState(new WeekEditorFreeplayState(weekFile));
 			
 		});
@@ -156,7 +157,7 @@ class WeekEditorState extends MusicBeatState
 		freeplayButton.screenCenter(X);
 		add(freeplayButton);
 	
-		var saveWeekButton:FlxButton = new FlxButton(0, 650, "保存周目", function() {
+		var saveWeekButton:FlxButton = new FlxButton(0, 650, Lang.tOr('week.save', "保存周目"), function() {
 			saveWeek(weekFile);
 		});
 		uiFont(saveWeekButton.label);
@@ -215,19 +216,19 @@ class WeekEditorState extends MusicBeatState
 		blockPressWhileTypingOn.push(weekFileInputText);
 		reloadWeekThing();
 
-		hideCheckbox = new FlxUICheckBox(10, weekFileInputText.y + 40, null, null, "在故事模式中隐藏此周目？", 100);
+		hideCheckbox = new FlxUICheckBox(10, weekFileInputText.y + 40, null, null, Lang.tOr('week.hideInStory', "在故事模式中隐藏此周目？"), 100);
 		uiFont(hideCheckbox.button.label);
 		hideCheckbox.callback = function()
 		{
 			weekFile.hideStoryMode = hideCheckbox.checked;
 		};
 
-		var songsTxt:FlxText = new FlxText(songsInputText.x, songsInputText.y - 18, 0, '歌曲：');
-		var charsTxt:FlxText = new FlxText(opponentInputText.x, opponentInputText.y - 18, 0, '角色：');
-		var bgTxt:FlxText = new FlxText(backgroundInputText.x, backgroundInputText.y - 18, 0, '背景资源：');
-		var displayTxt:FlxText = new FlxText(displayNameInputText.x, displayNameInputText.y - 18, 0, '显示名称：');
-		var weekNameTxt:FlxText = new FlxText(weekNameInputText.x, weekNameInputText.y - 18, 0, '周目名称（用于重置成绩菜单）：');
-		var weekFileTxt:FlxText = new FlxText(weekFileInputText.x, weekFileInputText.y - 18, 0, '周目文件：');
+		var songsTxt:FlxText = new FlxText(songsInputText.x, songsInputText.y - 18, 0, Lang.tOr('week.song', '歌曲：'));
+		var charsTxt:FlxText = new FlxText(opponentInputText.x, opponentInputText.y - 18, 0, Lang.tOr('week.character', '角色：'));
+		var bgTxt:FlxText = new FlxText(backgroundInputText.x, backgroundInputText.y - 18, 0, Lang.tOr('week.bgAsset', '背景资源：'));
+		var displayTxt:FlxText = new FlxText(displayNameInputText.x, displayNameInputText.y - 18, 0, Lang.tOr('week.displayName', '显示名称：'));
+		var weekNameTxt:FlxText = new FlxText(weekNameInputText.x, weekNameInputText.y - 18, 0, Lang.tOr('week.weekNameForScoreReset', '周目名称（用于重置成绩菜单）：'));
+		var weekFileTxt:FlxText = new FlxText(weekFileInputText.x, weekFileInputText.y - 18, 0, Lang.tOr('week.weekFile', '周目文件：'));
 		uiFont(songsTxt);
 		uiFont(charsTxt);
 		uiFont(bgTxt);
@@ -263,7 +264,7 @@ class WeekEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_box);
 		tab_group.name = "Other";
 
-		lockedCheckbox = new FlxUICheckBox(10, 30, null, null, "周目初始锁定", 100);
+		lockedCheckbox = new FlxUICheckBox(10, 30, null, null, Lang.tOr('week.initiallyLocked', "周目初始锁定"), 100);
 		uiFont(lockedCheckbox.button.label);
 		lockedCheckbox.callback = function()
 		{
@@ -272,7 +273,7 @@ class WeekEditorState extends MusicBeatState
 			hiddenUntilUnlockCheckbox.alpha = 0.4 + 0.6 * (lockedCheckbox.checked ? 1 : 0);
 		};
 
-		hiddenUntilUnlockCheckbox = new FlxUICheckBox(10, lockedCheckbox.y + 25, null, null, "解锁前隐藏", 110);
+		hiddenUntilUnlockCheckbox = new FlxUICheckBox(10, lockedCheckbox.y + 25, null, null, Lang.tOr('week.hideUntilUnlocked', "解锁前隐藏"), 110);
 		uiFont(hiddenUntilUnlockCheckbox.button.label);
 		hiddenUntilUnlockCheckbox.callback = function()
 		{
@@ -288,9 +289,9 @@ class WeekEditorState extends MusicBeatState
 		uiFont(difficultiesInputText);
 		blockPressWhileTypingOn.push(difficultiesInputText);
 		
-		var weekBeforeTxt:FlxText = new FlxText(weekBeforeInputText.x, weekBeforeInputText.y - 28, 0, '需通关以解锁的周目文件名：');
-		var difficultiesTxt:FlxText = new FlxText(difficultiesInputText.x, difficultiesInputText.y - 20, 0, '难度：');
-		var defaultDiffTxt:FlxText = new FlxText(difficultiesInputText.x, difficultiesInputText.y + 20, 0, '默认难度为 "Easy, Normal, Hard"\n不带引号。');
+		var weekBeforeTxt:FlxText = new FlxText(weekBeforeInputText.x, weekBeforeInputText.y - 28, 0, Lang.tOr('week.lockWeekFile', '需通关以解锁的周目文件名：'));
+		var difficultiesTxt:FlxText = new FlxText(difficultiesInputText.x, difficultiesInputText.y - 20, 0, Lang.tOr('week.difficulty', '难度：'));
+		var defaultDiffTxt:FlxText = new FlxText(difficultiesInputText.x, difficultiesInputText.y + 20, 0, Lang.tOr('char.difficultyHint', '默认难度为 "Easy, Normal, Hard"\n不带引号。'));
 		uiFont(weekBeforeTxt);
 		uiFont(difficultiesTxt);
 		uiFont(defaultDiffTxt);
@@ -676,7 +677,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Freeplay', label: '自由游玩'},
+			{name: 'Freeplay', label: Lang.tOr('week.freeplay', '自由游玩')},
 		];
 		UI_box = new FlxUITabMenu(null, tabs, true);
 		UI_box.resize(250, 200);
@@ -692,7 +693,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		blackBlack.alpha = 0.6;
 		add(blackBlack);
 
-		var loadWeekButton:FlxButton = new FlxButton(0, 685, "加载周目", function() {
+		var loadWeekButton:FlxButton = new FlxButton(0, 685, Lang.tOr('week.load', "加载周目"), function() {
 			WeekEditorState.loadWeek();
 		});
 		uiFont(loadWeekButton.label);
@@ -700,7 +701,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		loadWeekButton.x -= 120;
 		add(loadWeekButton);
 		
-		var storyModeButton:FlxButton = new FlxButton(0, 685, "故事模式", function() {
+		var storyModeButton:FlxButton = new FlxButton(0, 685, Lang.tOr('week.storyMode', "故事模式"), function() {
 			MusicBeatState.switchState(new WeekEditorState(weekFile));
 			
 		});
@@ -708,7 +709,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		storyModeButton.screenCenter(X);
 		add(storyModeButton);
 	
-		var saveWeekButton:FlxButton = new FlxButton(0, 685, "保存周目", function() {
+		var saveWeekButton:FlxButton = new FlxButton(0, 685, Lang.tOr('week.save', "保存周目"), function() {
 			WeekEditorState.saveWeek(weekFile);
 		});
 		uiFont(saveWeekButton.label);
@@ -746,11 +747,11 @@ class WeekEditorFreeplayState extends MusicBeatState
 		@:privateAccess
 		uiFont(bgColorStepperB.text_field);
 
-		var copyColor:FlxButton = new FlxButton(10, bgColorStepperR.y + 25, "复制颜色", function() {
+		var copyColor:FlxButton = new FlxButton(10, bgColorStepperR.y + 25, Lang.tOr('char.copyColor', "复制颜色"), function() {
 			Clipboard.text = bg.color.red + ',' + bg.color.green + ',' + bg.color.blue;
 		});
 		uiFont(copyColor.label);
-		var pasteColor:FlxButton = new FlxButton(140, copyColor.y, "粘贴颜色", function() {
+		var pasteColor:FlxButton = new FlxButton(140, copyColor.y, Lang.tOr('char.pasteColor', "粘贴颜色"), function() {
 			if(Clipboard.text != null) {
 				var leColor:Array<Int> = [];
 				var splitted:Array<String> = Clipboard.text.trim().split(',');
@@ -776,7 +777,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		iconInputText = new FlxUIInputText(10, bgColorStepperR.y + 70, 100, '', 8);
 		uiFont(iconInputText);
 
-		var hideFreeplayCheckbox:FlxUICheckBox = new FlxUICheckBox(10, iconInputText.y + 30, null, null, "在自由游玩中隐藏此周目？", 100);
+		var hideFreeplayCheckbox:FlxUICheckBox = new FlxUICheckBox(10, iconInputText.y + 30, null, null, Lang.tOr('week.hideInFreeplay', "在自由游玩中隐藏此周目？"), 100);
 		uiFont(hideFreeplayCheckbox.button.label);
 		hideFreeplayCheckbox.checked = weekFile.hideFreeplay;
 		hideFreeplayCheckbox.callback = function()
@@ -784,8 +785,8 @@ class WeekEditorFreeplayState extends MusicBeatState
 			weekFile.hideFreeplay = hideFreeplayCheckbox.checked;
 		};
 		
-		var bgColorTxt:FlxText = new FlxText(10, bgColorStepperR.y - 18, 0, '选中歌曲的背景颜色 R/G/B：');
-		var iconTxt:FlxText = new FlxText(10, iconInputText.y - 18, 0, '选中的图标：');
+		var bgColorTxt:FlxText = new FlxText(10, bgColorStepperR.y - 18, 0, Lang.tOr('week.songBgColor', '选中歌曲的背景颜色 R/G/B：'));
+		var iconTxt:FlxText = new FlxText(10, iconInputText.y - 18, 0, Lang.tOr('week.selectedIcon', '选中的图标：'));
 		uiFont(bgColorTxt);
 		uiFont(iconTxt);
 		tab_group.add(bgColorTxt);

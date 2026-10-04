@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import backend.WeekData;
 
@@ -48,14 +49,14 @@ class MasterEditorMenu extends MusicBeatState
 
 	// 菜单项：ID / 名称 / 英文名 / 描述 / 背景色
 	var optionShit:Array<Array<Dynamic>> = [
-		['chart', '编谱器', 'Chart Editor', '创建并编辑谱面：音符、长条、事件、变速与角色设置。', 0xFF66DDFF],
-		['character', '角色编辑器', 'Character Editor', '编辑角色的贴图、动画帧、镜头跟随与各类属性。', 0xFFDD88FF],
-		['week', '周目编辑器', 'Week Editor', '编辑自由游玩中的周目结构与歌曲顺序。', 0xFF88E58A],
-		['menuChar', '菜单角色编辑器', 'Menu Character Editor', '编辑主菜单与自由游玩界面展示的角色。', 0xFFFFD166],
-		['dialogue', '对话编辑器', 'Dialogue Editor', '编辑游戏内对话脚本、演出与表情切换。', 0xFFFF8A8A],
-		['dialogueChar', '对话立绘编辑器', 'Dialogue Portrait Editor', '编辑对话角色的立绘资源与动画。', 0xFFFF9E5E],
-		['noteSplash', '音符溅射调试', 'Note Splash Debug', '调试音符打击特效的贴图与帧动画。', 0xFFB0B6FF],
-		['luagraph', 'Lua 图形化编程', 'Lua Visual Script', '用积木块拼出 Lua 脚本：多事件栈、参数槽直接编辑、生成 .lua 与 .luagraph.json（桌面端）。', 0xFF9CE8FF]
+		['chart', Lang.tOr('editor.charting', '编谱器'), 'Chart Editor', Lang.tOr('editor.charting.desc', '创建并编辑谱面：音符、长条、事件、变速与角色设置。'), 0xFF66DDFF],
+		['character', Lang.tOr('editor.character', '角色编辑器'), 'Character Editor', Lang.tOr('editor.character.desc', '编辑角色的贴图、动画帧、镜头跟随与各类属性。'), 0xFFDD88FF],
+		['week', Lang.tOr('editor.week', '周目编辑器'), 'Week Editor', Lang.tOr('editor.week.desc', '编辑自由游玩中的周目结构与歌曲顺序。'), 0xFF88E58A],
+		['menuChar', Lang.tOr('editor.menuCharacter', '菜单角色编辑器'), 'Menu Character Editor', Lang.tOr('editor.menuCharacter.desc', '编辑主菜单与自由游玩界面展示的角色。'), 0xFFFFD166],
+		['dialogue', Lang.tOr('editor.dialogue', '对话编辑器'), 'Dialogue Editor', Lang.tOr('editor.dialogue.desc', '编辑游戏内对话脚本、演出与表情切换。'), 0xFFFF8A8A],
+		['dialogueChar', Lang.tOr('editor.dialogueChar', '对话立绘编辑器'), 'Dialogue Portrait Editor', Lang.tOr('editor.dialogueChar.desc', '编辑对话角色的立绘资源与动画。'), 0xFFFF9E5E],
+		['noteSplash', Lang.tOr('editor.splashDebug', '音符溅射调试'), 'Note Splash Debug', Lang.tOr('editor.splashDebug.desc', '调试音符打击特效的贴图与帧动画。'), 0xFFB0B6FF],
+		['luagraph', Lang.tOr('editor.luagraph', 'Lua 图形化编程'), 'Lua Visual Script', Lang.tOr('editor.luagraph.desc', '用积木块拼出 Lua 脚本：多事件栈、参数槽直接编辑、生成 .lua 与 .luagraph.json（桌面端）。'), 0xFF9CE8FF]
 	];
 
 	var rows:Array<MenuText> = [];
@@ -117,10 +118,10 @@ class MasterEditorMenu extends MusicBeatState
 		add(makePanel(40, 662, 1160, 48, 14));
 
 		// ---- 标题 ----
-		var leftTitle:FlxText = makeText(LIST_X, 100, 0, '编辑器菜单', 26);
+		var leftTitle:FlxText = makeText(LIST_X, 100, 0, Lang.tOr('editor.menu.title', '编辑器菜单'), 26);
 		add(leftTitle);
 
-		var rightTitle:FlxText = makeText(INFO_X, 100, 0, '选项说明', 26);
+		var rightTitle:FlxText = makeText(INFO_X, 100, 0, Lang.tOr('editor.optionDesc', '选项说明'), 26);
 		add(rightTitle);
 
 		// ---- 菜单行（静态行：切换时只移动高亮条） ----
@@ -161,7 +162,7 @@ class MasterEditorMenu extends MusicBeatState
 		#end
 
 		// ---- 底部提示 ----
-		var hint:FlxText = makeText(40, 672, 1160, '触控/滚轮 选择 · A / Enter 确认 · ←/→ 切换模组 · Esc 返回主菜单', 16, 0xFFFFFFFF);
+		var hint:FlxText = makeText(40, 672, 1160, Lang.tOr('editor.hint.navigate', '触控/滚轮 选择 · A / Enter 确认 · ←/→ 切换模组 · Esc 返回主菜单'), 16, 0xFFFFFFFF);
 		hint.alignment = CENTER;
 		add(hint);
 
@@ -300,7 +301,7 @@ class MasterEditorMenu extends MusicBeatState
 		var leItem:Array<Dynamic> = optionShit[curSelected];
 		var nameStr:String = leItem[1];
 		var descStr:String = leItem[2] + '\n\n' + leItem[3];
-		var actionStr:String = '按 A / Enter 进入';
+		var actionStr:String = Lang.tOr('editor.hint.confirm', '按 A / Enter 进入');
 
 		// 防文字跳舞：内容未变化时不重绘
 		if (lastItemName != nameStr) { lastItemName = nameStr; itemNameText.text = nameStr; itemNameText.updateHitbox(); }
@@ -342,11 +343,11 @@ class MasterEditorMenu extends MusicBeatState
 
 		WeekData.setDirectoryFromWeek();
 		if (directories[curDirectory] == null || directories[curDirectory].length < 1)
-			directoryTxt.text = '模组：未选择（使用原版资源）';
+			directoryTxt.text = Lang.tOr('editor.modNone', '模组：未选择（使用原版资源）');
 		else
 		{
 			Mods.currentModDirectory = directories[curDirectory];
-			directoryTxt.text = '模组：' + Mods.currentModDirectory;
+			directoryTxt.text = Lang.tOr('editor.modLabel', '模组：') + Mods.currentModDirectory;
 		}
 	}
 	#end

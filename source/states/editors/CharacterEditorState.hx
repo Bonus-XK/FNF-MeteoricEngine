@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import animateatlas.AtlasFrameMaker;
 
@@ -134,14 +135,14 @@ class CharacterEditorState extends MusicBeatState
 		camFollow.screenCenter();
 		add(camFollow);
 
-		var tipTextArray:Array<String> = "E/Q - Camera Zoom In/Out
+		var tipTextArray:Array<String> = Lang.tOr('char.cameraTip', "E/Q - Camera Zoom In/Out
 		\nR - 重置镜头缩放
 		\nJKLI - 移动镜头
 		\nW/S - 上一个/下一个动画
 		\n空格 - 播放动画
 		\n方向键 - 移动角色偏移
 		\nT - 重置当前偏移
-		\n按住 Shift 加速移动 10 倍\n".split('\n');
+		\n按住 Shift 加速移动 10 倍\n").split('\n');
 
 		for (i in 0...tipTextArray.length-1)
 		{
@@ -157,7 +158,7 @@ class CharacterEditorState extends MusicBeatState
 
 		var tabs = [
 			//{name: 'Offsets', label: 'Offsets'},
-			{name: 'Settings', label: '设置'},
+			{name: 'Settings', label: Lang.tOr('settings.title', '设置')},
 		];
 
 		UI_box = new FlxUITabMenu(null, tabs, true);
@@ -169,8 +170,8 @@ class CharacterEditorState extends MusicBeatState
 		UI_box.scrollFactor.set();
 
 		var tabs = [
-			{name: 'Character', label: '角色'},
-			{name: 'Animations', label: '动画'},
+			{name: 'Character', label: Lang.tOr('char.tab.character', '角色')},
+			{name: 'Animations', label: Lang.tOr('char.tab.anim', '动画')},
 		];
 		UI_characterbox = new FlxUITabMenu(null, tabs, true);
 		UI_characterbox.cameras = [camMenu];
@@ -246,7 +247,7 @@ class CharacterEditorState extends MusicBeatState
 			bgSchool.updateHitbox();
 			bgStreet.updateHitbox();
 			bgTrees.updateHitbox();
-			changeBGbutton.text = "普通背景";
+			changeBGbutton.text = Lang.tOr('char.normalBG', "普通背景");
 		} else {
 			Paths.setCurrentLevel('week1');
 			var bg:BGSprite = new BGSprite('stageback', -600 + OFFSET_X - playerXDifference, -300, 0.9, 0.9);
@@ -256,7 +257,7 @@ class CharacterEditorState extends MusicBeatState
 			stageFront.setGraphicSize(Std.int(stageFront.width * 1.1));
 			stageFront.updateHitbox();
 			bgLayer.add(stageFront);
-			changeBGbutton.text = "像素背景";
+			changeBGbutton.text = Lang.tOr('char.pixelBG', "像素背景");
 		}
 		Paths.setCurrentLevel(lastLevel);
 	}
@@ -410,7 +411,7 @@ class CharacterEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_box);
 		tab_group.name = "Settings";
 
-		var check_player = new FlxUICheckBox(10, 60, null, null, "可玩角色", 100);
+		var check_player = new FlxUICheckBox(10, 60, null, null, Lang.tOr('char.playable', "可玩角色"), 100);
 		uiFont(check_player.button.label);
 		check_player.checked = daAnim.startsWith('bf');
 		check_player.callback = function()
@@ -434,14 +435,14 @@ class CharacterEditorState extends MusicBeatState
 		charDropDown.selectedLabel = daAnim;
 		reloadCharacterDropDown();
 
-		var reloadCharacter:FlxButton = new FlxButton(140, 20, "重新加载", function()
+		var reloadCharacter:FlxButton = new FlxButton(140, 20, Lang.tOr('menuChar.reload', "重新加载"), function()
 		{
 			loadChar(!check_player.checked);
 			reloadCharacterDropDown();
 		});
 		uiFont(reloadCharacter.label);
 
-		var templateCharacter:FlxButton = new FlxButton(140, 50, "加载模板", function()
+		var templateCharacter:FlxButton = new FlxButton(140, 50, Lang.tOr('char.loadTemplate', "加载模板"), function()
 		{
 			var parsedJson:CharacterFile = cast Json.parse(TemplateCharacter);
 			var characters:Array<Character> = [char, ghostChar];
@@ -481,7 +482,7 @@ class CharacterEditorState extends MusicBeatState
 		templateCharacter.label.color = FlxColor.WHITE;
 		uiFont(templateCharacter.label);
 
-		var charTxt:FlxText = new FlxText(charDropDown.x, charDropDown.y - 18, 0, '角色：');
+		var charTxt:FlxText = new FlxText(charDropDown.x, charDropDown.y - 18, 0, Lang.tOr('char.characterLabel', '角色：'));
 		uiFont(charTxt);
 		tab_group.add(charTxt);
 		tab_group.add(check_player);
@@ -515,7 +516,7 @@ class CharacterEditorState extends MusicBeatState
 
 		imageInputText = new FlxUIInputText(15, 30, 200, 'characters/BOYFRIEND', 8);
 		uiFont(imageInputText);
-		var reloadImage:FlxButton = new FlxButton(imageInputText.x + 210, imageInputText.y - 3, "重新加载图片", function()
+		var reloadImage:FlxButton = new FlxButton(imageInputText.x + 210, imageInputText.y - 3, Lang.tOr('char.reloadImage', "重新加载图片"), function()
 		{
 			char.imageFile = imageInputText.text;
 			reloadCharacterImage();
@@ -525,7 +526,7 @@ class CharacterEditorState extends MusicBeatState
 		});
 		uiFont(reloadImage.label);
 
-		var decideIconColor:FlxButton = new FlxButton(reloadImage.x, reloadImage.y + 30, "获取图标颜色", function()
+		var decideIconColor:FlxButton = new FlxButton(reloadImage.x, reloadImage.y + 30, Lang.tOr('char.getIconColor', "获取图标颜色"), function()
 			{
 				var coolColor = FlxColor.fromInt(CoolUtil.dominantColor(leHealthIcon));
 				healthColorStepperR.value = coolColor.red;
@@ -548,7 +549,7 @@ class CharacterEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(scaleStepper.text_field);
 
-		flipXCheckBox = new FlxUICheckBox(singDurationStepper.x + 80, singDurationStepper.y, null, null, "水平翻转", 50);
+		flipXCheckBox = new FlxUICheckBox(singDurationStepper.x + 80, singDurationStepper.y, null, null, Lang.tOr('char.flipX', "水平翻转"), 50);
 		uiFont(flipXCheckBox.button.label);
 		flipXCheckBox.checked = char.flipX;
 		if(char.isPlayer) flipXCheckBox.checked = !flipXCheckBox.checked;
@@ -560,7 +561,7 @@ class CharacterEditorState extends MusicBeatState
 			ghostChar.flipX = char.flipX;
 		};
 
-		noAntialiasingCheckBox = new FlxUICheckBox(flipXCheckBox.x, flipXCheckBox.y + 40, null, null, "关闭抗锯齿", 80);
+		noAntialiasingCheckBox = new FlxUICheckBox(flipXCheckBox.x, flipXCheckBox.y + 40, null, null, Lang.tOr('char.noAntialiasing', "关闭抗锯齿"), 80);
 		uiFont(noAntialiasingCheckBox.button.label);
 		noAntialiasingCheckBox.checked = char.noAntialiasing;
 		noAntialiasingCheckBox.callback = function() {
@@ -586,7 +587,7 @@ class CharacterEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(positionCameraYStepper.text_field);
 
-		var saveCharacterButton:FlxButton = new FlxButton(reloadImage.x, noAntialiasingCheckBox.y + 40, "保存角色", function() {
+		var saveCharacterButton:FlxButton = new FlxButton(reloadImage.x, noAntialiasingCheckBox.y + 40, Lang.tOr('char.saveChar', "保存角色"), function() {
 			saveCharacter();
 		});
 		uiFont(saveCharacterButton.label);
@@ -601,13 +602,13 @@ class CharacterEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(healthColorStepperB.text_field);
 
-		var imageTxt:FlxText = new FlxText(15, imageInputText.y - 18, 0, '图片文件名：');
-		var healthIconTxt:FlxText = new FlxText(15, healthIconInputText.y - 18, 0, '血条图标名：');
-		var singTxt:FlxText = new FlxText(15, singDurationStepper.y - 18, 0, '歌唱动画时长：');
-		var scaleTxt:FlxText = new FlxText(15, scaleStepper.y - 18, 0, '缩放：');
-		var posTxt:FlxText = new FlxText(positionXStepper.x, positionXStepper.y - 18, 0, '角色 X/Y：');
-		var camTxt:FlxText = new FlxText(positionCameraXStepper.x, positionCameraXStepper.y - 18, 0, '镜头 X/Y：');
-		var healthTxt:FlxText = new FlxText(healthColorStepperR.x, healthColorStepperR.y - 18, 0, '血条颜色 R/G/B：');
+		var imageTxt:FlxText = new FlxText(15, imageInputText.y - 18, 0, Lang.tOr('char.imageFile', '图片文件名：'));
+		var healthIconTxt:FlxText = new FlxText(15, healthIconInputText.y - 18, 0, Lang.tOr('char.iconName', '血条图标名：'));
+		var singTxt:FlxText = new FlxText(15, singDurationStepper.y - 18, 0, Lang.tOr('char.singDuration', '歌唱动画时长：'));
+		var scaleTxt:FlxText = new FlxText(15, scaleStepper.y - 18, 0, Lang.tOr('char.scale', '缩放：'));
+		var posTxt:FlxText = new FlxText(positionXStepper.x, positionXStepper.y - 18, 0, Lang.tOr('char.charXY', '角色 X/Y：'));
+		var camTxt:FlxText = new FlxText(positionCameraXStepper.x, positionCameraXStepper.y - 18, 0, Lang.tOr('char.camXY', '镜头 X/Y：'));
+		var healthTxt:FlxText = new FlxText(healthColorStepperR.x, healthColorStepperR.y - 18, 0, Lang.tOr('char.healthColor', '血条颜色 R/G/B：'));
 		uiFont(imageTxt);
 		uiFont(healthIconTxt);
 		uiFont(singTxt);
@@ -661,7 +662,7 @@ class CharacterEditorState extends MusicBeatState
 		animationNameFramerate = new FlxUINumericStepper(animationInputText.x + 170, animationInputText.y, 1, 24, 0, 240, 0);
 		@:privateAccess
 		uiFont(animationNameFramerate.text_field);
-		animationLoopCheckBox = new FlxUICheckBox(animationNameInputText.x + 170, animationNameInputText.y - 1, null, null, "循环播放？", 100);
+		animationLoopCheckBox = new FlxUICheckBox(animationNameInputText.x + 170, animationNameInputText.y - 1, null, null, Lang.tOr('char.loopPlay', "循环播放？"), 100);
 		uiFont(animationLoopCheckBox.button.label);
 
 		animationDropDown = new FlxUIDropDownMenu(15, animationInputText.y - 55, FlxUIDropDownMenu.makeStrIdLabelArray([''], true), function(pressed:String) {
@@ -689,7 +690,7 @@ class CharacterEditorState extends MusicBeatState
 		});
 		uiFont(ghostDropDown.header.text);
 
-		var addUpdateButton:FlxButton = new FlxButton(70, animationIndicesInputText.y + 30, "添加/更新", function() {
+		var addUpdateButton:FlxButton = new FlxButton(70, animationIndicesInputText.y + 30, Lang.tOr('char.addUpdate', "添加/更新"), function() {
 			var indices:Array<Int> = [];
 			var indicesStr:Array<String> = animationIndicesInputText.text.trim().split(',');
 			if(indicesStr.length > 1) {
@@ -760,7 +761,7 @@ class CharacterEditorState extends MusicBeatState
 		});
 		uiFont(addUpdateButton.label);
 
-		var removeButton:FlxButton = new FlxButton(180, animationIndicesInputText.y + 30, "删除", function() {
+		var removeButton:FlxButton = new FlxButton(180, animationIndicesInputText.y + 30, Lang.tOr('char.delete', "删除"), function() {
 			for (anim in char.animationsArray) {
 				if(animationInputText.text == anim.anim) {
 					var resetAnim:Bool = false;
@@ -786,12 +787,12 @@ class CharacterEditorState extends MusicBeatState
 		});
 		uiFont(removeButton.label);
 
-		var animsTxt:FlxText = new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, '动画：');
-		var ghostTxt:FlxText = new FlxText(ghostDropDown.x, ghostDropDown.y - 18, 0, '动画幽灵：');
-		var animNameTxt:FlxText = new FlxText(animationInputText.x, animationInputText.y - 18, 0, '动画名称：');
-		var fpsTxt:FlxText = new FlxText(animationNameFramerate.x, animationNameFramerate.y - 18, 0, '帧率：');
-		var xmlTxt:FlxText = new FlxText(animationNameInputText.x, animationNameInputText.y - 18, 0, 'XML/TXT 中的动画名：');
-		var indicesTxt:FlxText = new FlxText(animationIndicesInputText.x, animationIndicesInputText.y - 18, 0, '高级 - 动画索引：');
+		var animsTxt:FlxText = new FlxText(animationDropDown.x, animationDropDown.y - 18, 0, Lang.tOr('char.anim', '动画：'));
+		var ghostTxt:FlxText = new FlxText(ghostDropDown.x, ghostDropDown.y - 18, 0, Lang.tOr('char.animGhost', '动画幽灵：'));
+		var animNameTxt:FlxText = new FlxText(animationInputText.x, animationInputText.y - 18, 0, Lang.tOr('char.animName', '动画名称：'));
+		var fpsTxt:FlxText = new FlxText(animationNameFramerate.x, animationNameFramerate.y - 18, 0, Lang.tOr('char.fps', '帧率：'));
+		var xmlTxt:FlxText = new FlxText(animationNameInputText.x, animationNameInputText.y - 18, 0, Lang.tOr('char.xmlAnimName', 'XML/TXT 中的动画名：'));
+		var indicesTxt:FlxText = new FlxText(animationIndicesInputText.x, animationIndicesInputText.y - 18, 0, Lang.tOr('char.advAnimIndex', '高级 - 动画索引：'));
 		uiFont(animsTxt);
 		uiFont(ghostTxt);
 		uiFont(animNameTxt);
@@ -959,7 +960,7 @@ class CharacterEditorState extends MusicBeatState
 
 		textAnim.visible = true;
 		if(dumbTexts.length < 1) {
-			var text:FlxText = new FlxText(10, 38, 0, "错误！未找到任何动画。", 15);
+			var text:FlxText = new FlxText(10, 38, 0, Lang.tOr('char.noAnimFound', "错误！未找到任何动画。"), 15);
 			text.setFormat(Paths.font('future.ttf'), 15);
 			text.scrollFactor.set();
 			text.borderSize = 1;
@@ -1151,7 +1152,7 @@ class CharacterEditorState extends MusicBeatState
 
 			var curAnim:FlxAnimation = char.animation.getByName(char.animationsArray[curAnim].anim);
 			if(curAnim == null || curAnim.frames.length < 1) {
-				textAnim.text += ' (错误!)';
+				textAnim.text += Lang.tOr('char.animError', ' (错误!)');
 			}
 		} else {
 			textAnim.text = '';

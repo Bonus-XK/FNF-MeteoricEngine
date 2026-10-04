@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import flixel.addons.ui.FlxUI;
 import flixel.addons.ui.FlxUICheckBox;
@@ -74,7 +75,7 @@ class DialogueEditorState extends MusicBeatState
 		addEditorBox();
 		FlxG.mouse.visible = true;
 
-		var addLineText:FlxText = new FlxText(10, 10, FlxG.width - 20, '按 O 删除当前对话行，按 P 在当前行后新增一行。', 8);
+		var addLineText:FlxText = new FlxText(10, 10, FlxG.width - 20, Lang.tOr('dlg.hint', '按 O 删除当前对话行，按 P 在当前行后新增一行。'), 8);
 		addLineText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		addLineText.scrollFactor.set();
 		add(addLineText);
@@ -105,7 +106,7 @@ class DialogueEditorState extends MusicBeatState
 
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Dialogue Line', label: '对话行'},
+			{name: 'Dialogue Line', label: Lang.tOr('dlg.line', '对话行')},
 		];
 		UI_box = new FlxUITabMenu(null, tabs, true);
 		UI_box.resize(250, 210);
@@ -134,7 +135,7 @@ class DialogueEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(speedStepper.text_field);
 
-		angryCheckbox = new FlxUICheckBox(speedStepper.x + 120, speedStepper.y, null, null, "愤怒文本框", 200);
+		angryCheckbox = new FlxUICheckBox(speedStepper.x + 120, speedStepper.y, null, null, Lang.tOr('dlg.angerTextbox', "愤怒文本框"), 200);
 		uiFont(angryCheckbox.button.label);
 		angryCheckbox.callback = function()
 		{
@@ -150,19 +151,19 @@ class DialogueEditorState extends MusicBeatState
 		uiFont(lineInputText);
 		blockPressWhileTypingOn.push(lineInputText);
 
-		var loadButton:FlxButton = new FlxButton(20, lineInputText.y + 25, "加载对话", function() {
+		var loadButton:FlxButton = new FlxButton(20, lineInputText.y + 25, Lang.tOr('dlg.load', "加载对话"), function() {
 			loadDialogue();
 		});
 		uiFont(loadButton.label);
-		var saveButton:FlxButton = new FlxButton(loadButton.x + 120, loadButton.y, "保存对话", function() {
+		var saveButton:FlxButton = new FlxButton(loadButton.x + 120, loadButton.y, Lang.tOr('dlg.save', "保存对话"), function() {
 			saveDialogue();
 		});
 		uiFont(saveButton.label);
 
-		var intervalTxt:FlxText = new FlxText(10, speedStepper.y - 18, 0, '间隔/速度 (毫秒)：');
-		var characterTxt:FlxText = new FlxText(10, characterInputText.y - 18, 0, '角色：');
-		var soundTxt:FlxText = new FlxText(10, soundInputText.y - 18, 0, '声音文件名：');
-		var textTxt:FlxText = new FlxText(10, lineInputText.y - 18, 0, '文本：');
+		var intervalTxt:FlxText = new FlxText(10, speedStepper.y - 18, 0, Lang.tOr('dlg.gapSpeed', '间隔/速度 (毫秒)：'));
+		var characterTxt:FlxText = new FlxText(10, characterInputText.y - 18, 0, Lang.tOr('dlg.character', '角色：'));
+		var soundTxt:FlxText = new FlxText(10, soundInputText.y - 18, 0, Lang.tOr('dlg.voiceFile', '声音文件名：'));
+		var textTxt:FlxText = new FlxText(10, lineInputText.y - 18, 0, Lang.tOr('dlg.text', '文本：'));
 		uiFont(intervalTxt);
 		uiFont(characterTxt);
 		uiFont(soundTxt);
@@ -235,9 +236,9 @@ class DialogueEditorState extends MusicBeatState
 		characterAnimSpeed();
 
 		if(character.animation.curAnim != null && character.jsonFile.animations != null) {
-			animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+			animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 		} else {
-			animText.text = '错误！未找到任何动画';
+			animText.text = Lang.tOr('dlg.noAnimFound', '错误！未找到任何动画');
 		}
 	}
 
@@ -282,9 +283,9 @@ class DialogueEditorState extends MusicBeatState
 					curAnim = 0;
 					if(character.jsonFile.animations.length > curAnim && character.jsonFile.animations[curAnim] != null) {
 						character.playAnim(character.jsonFile.animations[curAnim].anim, daText.finishedText);
-						animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+						animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 					} else {
-						animText.text = '错误！未找到任何动画';
+						animText.text = Lang.tOr('dlg.noAnimFound', '错误！未找到任何动画');
 					}
 					characterAnimSpeed();
 				}
@@ -379,7 +380,7 @@ class DialogueEditorState extends MusicBeatState
 						character.playAnim(animToPlay, daText.finishedText);
 						dialogueFile.dialogue[curSelected].expression = animToPlay;
 					}
-					animText.text = '动画: ' + animToPlay + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + ') - 按 W/S 切换';
+					animText.text = Lang.tOr('dlg.animLabel', '动画: ') + animToPlay + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 				}
 				if(controlText[i]) {
 					changeText(negaMult[i]);
@@ -437,13 +438,13 @@ class DialogueEditorState extends MusicBeatState
 				}
 			}
 			character.playAnim(character.jsonFile.animations[curAnim].anim, daText.finishedText);
-			animText.text = '动画: ' + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + leLength + ') - 按 W/S 切换';
+			animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + leLength + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 		} else {
-			animText.text = '错误！未找到任何动画';
+			animText.text = Lang.tOr('dlg.noAnimFound', '错误！未找到任何动画');
 		}
 		characterAnimSpeed();
 
-		selectedText.text = '行: (' + (curSelected + 1) + ' / ' + dialogueFile.dialogue.length + ') - 按 A/D 切换';
+		selectedText.text = Lang.tOr('dlg.lineLabel', '行: (') + (curSelected + 1) + ' / ' + dialogueFile.dialogue.length + Lang.tOr('dlg.lineSwitch', ') - 按 A/D 切换');
 	}
 
 	function characterAnimSpeed() {

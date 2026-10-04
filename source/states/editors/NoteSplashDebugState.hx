@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import objects.Note;
 import objects.StrumNote;
@@ -63,7 +64,7 @@ class NoteSplashDebugState extends MusicBeatState
 		//
 		var txtx = 60;
 		var txty = 640;
-		var animName:FlxText = new FlxText(txtx, txty, '动画名称：', 16);
+		var animName:FlxText = new FlxText(txtx, txty, Lang.tOr('splash.animName', '动画名称：'), 16);
 		animName.setFormat(Paths.font('future.ttf'), 16);
 		add(animName);
 
@@ -86,7 +87,7 @@ class NoteSplashDebugState extends MusicBeatState
 		};
 		add(nameInputText);
 		
-		var fpsTxt:FlxText = new FlxText(txtx, txty - 84, 0, '最小/最大帧率：', 16);
+		var fpsTxt:FlxText = new FlxText(txtx, txty - 84, 0, Lang.tOr('splash.minMaxFps', '最小/最大帧率：'), 16);
 		fpsTxt.setFormat(Paths.font('future.ttf'), 16);
 		add(fpsTxt);
 		stepperMinFps = new FlxUINumericStepper(txtx, txty - 60, 1, 22, 1, 60, 0);
@@ -119,10 +120,10 @@ class NoteSplashDebugState extends MusicBeatState
 		add(curAnimText);
 
 		var text:FlxText = new FlxText(0, 520, FlxG.width,
-			"按 空格 重置动画\n
+			Lang.tOr('splash.tip', "按 空格 重置动画\n
 			按两次 Enter 保存到已加载音符溅射 PNG 的文件夹\n
 			A/D 切换音符 - 方向键调整偏移（按住 Shift 加速 10 倍）\n
-			Ctrl + C/V - 复制与粘贴", 16);
+			Ctrl + C/V - 复制与粘贴"), 16);
 		text.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		text.scrollFactor.set();
 		add(text);
@@ -218,7 +219,7 @@ class NoteSplashDebugState extends MusicBeatState
 
 		if(FlxG.keys.justPressed.ENTER)
 		{
-			savedText.text = '再次按 Enter 保存。';
+			savedText.text = Lang.tOr('splash.pressEnterAgain', '再次按 Enter 保存。');
 			if(pressEnterToSave > 0) //save
 			{
 				saveFile();
@@ -251,7 +252,7 @@ class NoteSplashDebugState extends MusicBeatState
 			else if(forceFrame >= maxFrame) forceFrame = maxFrame - 1;
 			//trace('curFrame: $forceFrame');
 			
-			curFrameText.text = '强制帧: ${forceFrame+1} / $maxFrame\n(按 Q/E 切换)';
+			curFrameText.text = Lang.tOr('splash.forcedFrame', '强制帧: ') + '${forceFrame+1}' + ' / ' + '$maxFrame' + Lang.tOr('splash.keyHintQE', '\n(按 Q/E 切换)');
 			splashes.forEachAlive(function(spr:FlxSprite) {
 				spr.animation.curAnim.paused = true;
 				spr.animation.curAnim.curFrame = forceFrame;
@@ -303,12 +304,12 @@ class NoteSplashDebugState extends MusicBeatState
 
 		var pathSplit:Array<String> = (Paths.getPath('images/$texturePath.png', IMAGE, true).split('.png')[0] + '.txt').split(':');
 		var path:String = pathSplit[pathSplit.length-1].trim();
-		savedText.text = '已保存到: $path';
+		savedText.text = Lang.tOr('splash.savedTo', '已保存到: ') + path;
 		sys.io.File.saveContent(path, strToSave);
 
 		//trace(strToSave);
 		#else
-		savedText.text = '无法在此平台保存。';
+		savedText.text = Lang.tOr('splash.cantSave', '无法在此平台保存。');
 		#end
 	}
 	
@@ -373,8 +374,8 @@ class NoteSplashDebugState extends MusicBeatState
 			if(curAnim > maxAnims) curAnim = 1;
 			else if(curAnim < 1) curAnim = maxAnims;
 
-			curAnimText.text = '当前动画: $curAnim / $maxAnims\n(按 W/S 切换)';
-			curFrameText.text = '强制帧已关闭\n(按 Q/E 切换)';
+			curAnimText.text = Lang.tOr('splash.curAnim', '当前动画: ') + '$curAnim' + ' / ' + '$maxAnims' + Lang.tOr('splash.keyHintWS', '\n(按 W/S 切换)');
+			curFrameText.text = Lang.tOr('splash.forcedFrameOff', '强制帧已关闭') + Lang.tOr('splash.keyHintQE', '\n(按 Q/E 切换)');
 
 			for (i in 0...maxNotes)
 			{
@@ -391,7 +392,7 @@ class NoteSplashDebugState extends MusicBeatState
 		}
 		else
 		{
-			curAnimText.text = '无效的动画名称';
+			curAnimText.text = Lang.tOr('splash.invalidAnim', '无效的动画名称');
 			curFrameText.text = '';
 		}
 		updateOffsetText();

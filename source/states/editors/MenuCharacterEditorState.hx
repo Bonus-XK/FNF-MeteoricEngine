@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import flixel.addons.ui.FlxUI;
 import flixel.addons.ui.FlxUICheckBox;
@@ -59,8 +60,9 @@ class MenuCharacterEditorState extends MusicBeatState
 		add(txtOffsets);
 
 		var tipText:FlxText = new FlxText(0, 540, FlxG.width,
+			Lang.tOr('menuChar.tip',
 			"方向键 - 调整偏移（按住 Shift 加速 10 倍）
-			\n空格 - 播放 \"按下\" 动画（男友角色类型）", 16);
+			\n空格 - 播放 \"按下\" 动画（男友角色类型）"), 16);
 		tipText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER);
 		tipText.scrollFactor.set();
 		add(tipText);
@@ -83,7 +85,7 @@ class MenuCharacterEditorState extends MusicBeatState
 
 	function addEditorBox() {
 		var tabs = [
-			{name: 'Character Type', label: '角色类型'},
+			{name: 'Character Type', label: Lang.tOr('menuChar.charType', '角色类型')},
 		];
 		UI_typebox = new FlxUITabMenu(null, tabs, true);
 		UI_typebox.resize(120, 180);
@@ -94,7 +96,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		add(UI_typebox);
 
 		var tabs = [
-			{name: 'Character', label: '角色'},
+			{name: 'Character', label: Lang.tOr('menuChar.character', '角色')},
 		];
 		UI_mainbox = new FlxUITabMenu(null, tabs, true);
 		UI_mainbox.resize(240, 180);
@@ -104,7 +106,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		addCharacterUI();
 		add(UI_mainbox);
 
-		var loadButton:FlxButton = new FlxButton(0, 480, "加载角色", function() {
+		var loadButton:FlxButton = new FlxButton(0, 480, Lang.tOr('menuChar.loadChar', "加载角色"), function() {
 			loadCharacter();
 		});
 		uiFont(loadButton.label);
@@ -112,7 +114,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		loadButton.x -= 60;
 		add(loadButton);
 	
-		var saveButton:FlxButton = new FlxButton(0, 480, "保存角色", function() {
+		var saveButton:FlxButton = new FlxButton(0, 480, Lang.tOr('menuChar.saveChar', "保存角色"), function() {
 			saveCharacter();
 		});
 		uiFont(saveButton.label);
@@ -129,7 +131,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		var tab_group = new FlxUI(null, UI_typebox);
 		tab_group.name = "Character Type";
 
-		opponentCheckbox = new FlxUICheckBox(10, 20, null, null, "对手", 100);
+		opponentCheckbox = new FlxUICheckBox(10, 20, null, null, Lang.tOr('menuChar.opponent', "对手"), 100);
 		uiFont(opponentCheckbox.button.label);
 		opponentCheckbox.callback = function()
 		{
@@ -137,7 +139,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			updateCharTypeBox();
 		};
 
-		boyfriendCheckbox = new FlxUICheckBox(opponentCheckbox.x, opponentCheckbox.y + 40, null, null, "男友", 100);
+		boyfriendCheckbox = new FlxUICheckBox(opponentCheckbox.x, opponentCheckbox.y + 40, null, null, Lang.tOr('menuChar.boyfriend', "男友"), 100);
 		uiFont(boyfriendCheckbox.button.label);
 		boyfriendCheckbox.callback = function()
 		{
@@ -145,7 +147,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			updateCharTypeBox();
 		};
 
-		girlfriendCheckbox = new FlxUICheckBox(boyfriendCheckbox.x, boyfriendCheckbox.y + 40, null, null, "女友", 100);
+		girlfriendCheckbox = new FlxUICheckBox(boyfriendCheckbox.x, boyfriendCheckbox.y + 40, null, null, Lang.tOr('menuChar.girlfriend', "女友"), 100);
 		uiFont(girlfriendCheckbox.button.label);
 		girlfriendCheckbox.callback = function()
 		{
@@ -166,7 +168,7 @@ class MenuCharacterEditorState extends MusicBeatState
 	var flipXCheckbox:FlxUICheckBox;
 	function addCharacterUI() {
 		var tab_group = new FlxUI(null, UI_mainbox);
-		tab_group.name = "角色";
+		tab_group.name = Lang.tOr('menuChar.character', "角色");
 		
 		imageInputText = new FlxUIInputText(10, 20, 80, characterFile.image, 8);
 		uiFont(imageInputText);
@@ -178,7 +180,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		uiFont(confirmInputText);
 		blockPressWhileTypingOn.push(confirmInputText);
 
-		flipXCheckbox = new FlxUICheckBox(10, confirmInputText.y + 30, null, null, "水平翻转", 100);
+		flipXCheckbox = new FlxUICheckBox(10, confirmInputText.y + 30, null, null, Lang.tOr('menuChar.flipX', "水平翻转"), 100);
 		uiFont(flipXCheckbox.button.label);
 		flipXCheckbox.callback = function()
 		{
@@ -186,7 +188,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			characterFile.flipX = flipXCheckbox.checked;
 		};
 
-		var reloadImageButton:FlxButton = new FlxButton(140, confirmInputText.y + 30, "重新加载", function() {
+		var reloadImageButton:FlxButton = new FlxButton(140, confirmInputText.y + 30, Lang.tOr('menuChar.reload', "重新加载"), function() {
 			reloadSelectedCharacter();
 		});
 		uiFont(reloadImageButton.label);
@@ -195,10 +197,10 @@ class MenuCharacterEditorState extends MusicBeatState
 		@:privateAccess
 		uiFont(scaleStepper.text_field);
 
-		var confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, 'XML 中的按下动画：');
-		var imageDescText = new FlxText(10, imageInputText.y - 18, 0, '图片文件名：');
-		var idleDescText = new FlxText(10, idleInputText.y - 18, 0, 'XML 中的待机动画：');
-		var scaleDescText = new FlxText(scaleStepper.x, scaleStepper.y - 18, 0, '缩放：');
+		var confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, Lang.tOr('menuChar.xmlPressAnim', 'XML 中的按下动画：'));
+		var imageDescText = new FlxText(10, imageInputText.y - 18, 0, Lang.tOr('menuChar.imageFile', '图片文件名：'));
+		var idleDescText = new FlxText(10, idleInputText.y - 18, 0, Lang.tOr('menuChar.xmlIdleAnim', 'XML 中的待机动画：'));
+		var scaleDescText = new FlxText(scaleStepper.x, scaleStepper.y - 18, 0, Lang.tOr('menuChar.scale', '缩放：'));
 		uiFont(confirmDescText);
 		uiFont(imageDescText);
 		uiFont(idleDescText);

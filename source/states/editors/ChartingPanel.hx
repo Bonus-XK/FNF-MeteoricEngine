@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import states.editors.ChartWidgets.EditorButton;
 import states.editors.ChartWidgets.EditorDropdown;
@@ -50,7 +51,7 @@ class ChartingPanel extends FlxSpriteGroup
 
 	var tabBtns:Array<{bg:FlxSprite, txt:FlxText}> = [];
 	var lastHoveredTab:Int = -2;
-	static final TAB_LABELS:Array<String> = ['歌曲', '小节', '音符', '事件', '编曲', '数据'];
+	static final TAB_LABELS:Array<String> = [Lang.tOr('chart.panel.song', '歌曲'), Lang.tOr('chart.panel.section', '小节'), Lang.tOr('chart.panel.notes', '音符'), Lang.tOr('chart.panel.events', '事件'), Lang.tOr('chart.panel.arrangement', '编曲'), Lang.tOr('chart.panel.data', '数据')];
 
 	public function new()
 	{
@@ -60,7 +61,7 @@ class ChartingPanel extends FlxSpriteGroup
 	public function build():Void
 	{
 		add(makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22));
-		add(makeText(CONTENT_X, PANEL_Y + 14, CONTENT_W, '编谱设置', 22, 0xFFFFFFFF));
+		add(makeText(CONTENT_X, PANEL_Y + 14, CONTENT_W, Lang.tOr('chart.panel.settings', '编谱设置'), 22, 0xFFFFFFFF));
 
 		for (i in 0...TAB_LABELS.length)
 		{
