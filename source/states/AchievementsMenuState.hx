@@ -68,7 +68,7 @@ class AchievementsMenuState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - Achievements";
+		Lib.application.window.title = Lang.tOr('win.achievements', "FNF':Meteoric Engine - Achievements");
 
 		#if desktop
 		DiscordClient.changePresence("Achievements Menu", null);
@@ -392,7 +392,7 @@ class AchievementsMenuState extends MusicBeatState
 		bigIcon.x = ICON_X;
 		bigIcon.y = ICON_Y;
 
-		nameText.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(curSelected)][0] : '？？？';
+		nameText.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(curSelected)][0] : Lang.tOr('achievements.unknown', '？？？');
 		nameText.updateHitbox();
 
 		if (unlocked)
@@ -419,7 +419,7 @@ class AchievementsMenuState extends MusicBeatState
 
 		triggerText.text = (unlocked || !hidden)
 			? Achievements.achievementsStuff[getAchievementIdx(curSelected)][4]
-			: '？？？';
+			: Lang.tOr('achievements.unknown', '？？？');
 		triggerText.updateHitbox();
 
 		progressText.text = Lang.tOr('achievements.unlockedPrefix', '已解锁 ') + unlockedCount + ' / ' + achievementList.length;
@@ -454,7 +454,7 @@ class AchievementsMenuState extends MusicBeatState
 			var isSel:Bool = (idx == curSelected);
 
 			row.visible = true;
-			row.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(idx)][0] : '？？？';
+			row.text = (unlocked || !hidden) ? Achievements.achievementsStuff[getAchievementIdx(idx)][0] : Lang.tOr('achievements.unknown', '？？？');
 			row.alpha = isSel ? 1 : 0.55;
 			row.color = unlocked ? (isSel ? FlxColor.WHITE : 0xFFD7D7E0) : 0xFF8A93A5;
 			row.updateHitbox();

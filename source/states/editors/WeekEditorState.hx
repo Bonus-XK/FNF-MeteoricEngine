@@ -400,7 +400,7 @@ class WeekEditorState extends MusicBeatState
 		if(isMissing) {
 			weekThing.visible = false;
 			missingFileText.visible = true;
-			missingFileText.text = 'MISSING FILE: images/storymenu/' + assetName + '.png';
+			missingFileText.text = Lang.tOr('week.missingFilePrefix', 'MISSING FILE: images/storymenu/') + assetName + '.png';
 		}
 		recalculateStuffPosition();
 

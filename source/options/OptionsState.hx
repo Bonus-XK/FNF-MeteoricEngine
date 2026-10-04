@@ -1,6 +1,6 @@
 package options;
-import backend.WheelScroll;
 import backend.Lang;
+import backend.WheelScroll;
 
 import objects.BackButton;
 import states.MainMenuState;

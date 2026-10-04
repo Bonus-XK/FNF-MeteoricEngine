@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 #if sys
 import sys.io.File;

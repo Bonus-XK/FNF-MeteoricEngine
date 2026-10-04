@@ -1,7 +1,7 @@
 package options;
+import backend.Lang;
 
 import backend.ClientPrefs;
-import backend.Lang;
 
 /**
  * 界面语言设置分区（设置 → 语言）。

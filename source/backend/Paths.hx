@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import animateatlas.AtlasFrameMaker;
 

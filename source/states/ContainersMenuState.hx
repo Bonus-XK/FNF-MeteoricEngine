@@ -125,7 +125,7 @@ class ContainersMenuState extends MusicBeatState
 		DiscordClient.changePresence("In the Menus", null);
 		#end
 
-		Lib.application.window.title = "FNF':Meteoric Engine - Containers";
+		Lib.application.window.title = Lang.tOr('win.containers', "FNF':Meteoric Engine - Containers");
 
 		// 背景 = menuDesat 染**当前主题色**（令牌 menuTint，取值 = 本主题 primary，
 		// 见 DesignTokens.MENU_TINTS）。本行缺失时菜单贴图保持原始品红，

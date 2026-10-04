@@ -80,7 +80,7 @@ class StoryMenuState extends MusicBeatState
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 
-		Lib.application.window.title = "FNF':Meteoric Engine - Select Week:";
+		Lib.application.window.title = Lang.tOr('win.selectWeek', "FNF':Meteoric Engine - Select Week:");
 
 		PlayState.isStoryMode = true;
 		WeekData.reloadWeekFiles(true);
@@ -93,7 +93,7 @@ class StoryMenuState extends MusicBeatState
 		// 否则打完 BPM 不同的歌回到本界面，整屏节拍跳动的频率会跟着那首歌变。
 		resetMenuBeat();
 
-		scoreText = new FlxText(10, 10, 0, "SCORE: 49324858", 36);
+		scoreText = new FlxText(10, 10, 0, Lang.tOr('story.scorePlaceholder', "SCORE: 49324858"), 36);
 		scoreText.setFormat(Paths.font("future.ttf"), 32);
 
 		txtWeekTitle = new FlxText(FlxG.width * 0.7, 10, 0, "", 32);

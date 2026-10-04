@@ -1,8 +1,8 @@
 package luagraph;
+import backend.Lang;
 
 import flixel.util.FlxColor;
 import backend.DesignTokens;
-import backend.Lang;
 
 /**
  * 一块积木的定义。

@@ -1,7 +1,7 @@
 package options;
+import backend.Lang;
 
 import objects.MenuText;
-import backend.Lang;
 
 
 class Option

@@ -1,5 +1,4 @@
 package backend;
-import backend.Lang;
 
 import flixel.FlxG;
 import flixel.tweens.FlxEase;

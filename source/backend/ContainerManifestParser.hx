@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 /**
  * 容器清单解析（`container.json`）。

@@ -1,4 +1,5 @@
 package states.editors;
+import backend.Lang;
 
 import backend.Song;
 import backend.Section;
@@ -120,13 +121,13 @@ class EditorPlayState extends MusicBeatSubstate
 		scoreTxt.visible = !ClientPrefs.data.hideHud;
 		add(scoreTxt);
 		
-		dataTxt = new FlxText(10, 580, FlxG.width - 20, "Section: 0", 20);
+		dataTxt = new FlxText(10, 580, FlxG.width - 20, Lang.tOr('editorPlay.sectionDefault', "Section: 0"), 20);
 		dataTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		dataTxt.scrollFactor.set();
 		dataTxt.borderSize = 1.25;
 		add(dataTxt);
 
-		var tipText:FlxText = new FlxText(10, FlxG.height - 24, 0, 'Press ESC to Go Back to Chart Editor', 16);
+		var tipText:FlxText = new FlxText(10, FlxG.height - 24, 0, Lang.tOr('editorPlay.backTip', 'Press ESC to Go Back to Chart Editor'), 16);
 		tipText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tipText.borderSize = 2;
 		tipText.scrollFactor.set();
@@ -213,7 +214,10 @@ class EditorPlayState extends MusicBeatSubstate
 		}
 		
 		var time:Float = CoolUtil.floorDecimal((Conductor.songPosition - ClientPrefs.data.noteOffset) / 1000, 1);
-		dataTxt.text = 'Time: $time / ${songLength/1000}\nSection: $curSection\nBeat: $curBeat\nStep: $curStep';
+		dataTxt.text = Lang.tOr('editorPlay.timeLabel', 'Time: ') + time + ' / ' + songLength/1000
+			+ Lang.tOr('editorPlay.sectionLabel', '\nSection: ') + curSection
+			+ Lang.tOr('editorPlay.beatLabel', '\nBeat: ') + curBeat
+			+ Lang.tOr('editorPlay.stepLabel', '\nStep: ') + curStep;
 		super.update(elapsed);
 	}
 	
@@ -887,7 +891,7 @@ class EditorPlayState extends MusicBeatSubstate
 			var percent:Float = CoolUtil.floorDecimal(ratingPercent * 100, 2);
 			str = '$percent% - $ratingFC';
 		}
-		scoreTxt.text = 'Hits: $songHits | Misses: $songMisses | Rating: $str';
+		scoreTxt.text = Lang.tOr('editorPlay.hits', 'Hits: ') + songHits + Lang.tOr('editorPlay.misses', ' | Misses: ') + songMisses + Lang.tOr('editorPlay.rating', ' | Rating: ') + str;
 	}
 	
 	function fullComboUpdate()

@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 class Achievements {
 	public static var achievementsStuff:Array<Dynamic> = [ //Name, Description, Achievement save tag, Hidden achievement, 触发方式

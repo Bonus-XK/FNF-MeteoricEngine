@@ -429,7 +429,7 @@ class PauseSubState extends MusicBeatSubstate
 				{
 					mouseActive = true;
 					close();
-					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+					Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
 					tp.put();
 					return;
 				}
@@ -494,7 +494,7 @@ class PauseSubState extends MusicBeatSubstate
 			{
 				mouseActive = true;
 				close();
-				Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+				Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
 				return;
 			}
 			mousePos.put();
@@ -608,7 +608,7 @@ class PauseSubState extends MusicBeatSubstate
 			{
 				case ID_RESUME:
 					close();
-					Lib.application.window.title = "FNF':Meteoric Engine - Playing: " + PlayState.SONG.song;
+					Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
 					#if METEORIC_PROFILE
 					trace('[TITLE] resume set lib="' + Lib.application.window.title + '" limeSame=' + (lime.app.Application.current.window == Lib.application.window));
 					#end

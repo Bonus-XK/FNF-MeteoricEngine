@@ -47,16 +47,16 @@ class MasterEditorMenu extends MusicBeatState
 	static final INFO_X:Float = 772;
 	static final INFO_W:Float = 400;
 
-	// 菜单项：ID / 名称 / 英文名 / 描述 / 背景色
+	// 菜单项：ID / 名称 / 英文名（走 editor.<id>.enName，可按语言替换或留空）/ 描述 / 背景色
 	var optionShit:Array<Array<Dynamic>> = [
-		['chart', Lang.tOr('editor.charting', '编谱器'), 'Chart Editor', Lang.tOr('editor.charting.desc', '创建并编辑谱面：音符、长条、事件、变速与角色设置。'), 0xFF66DDFF],
-		['character', Lang.tOr('editor.character', '角色编辑器'), 'Character Editor', Lang.tOr('editor.character.desc', '编辑角色的贴图、动画帧、镜头跟随与各类属性。'), 0xFFDD88FF],
-		['week', Lang.tOr('editor.week', '周目编辑器'), 'Week Editor', Lang.tOr('editor.week.desc', '编辑自由游玩中的周目结构与歌曲顺序。'), 0xFF88E58A],
-		['menuChar', Lang.tOr('editor.menuCharacter', '菜单角色编辑器'), 'Menu Character Editor', Lang.tOr('editor.menuCharacter.desc', '编辑主菜单与自由游玩界面展示的角色。'), 0xFFFFD166],
-		['dialogue', Lang.tOr('editor.dialogue', '对话编辑器'), 'Dialogue Editor', Lang.tOr('editor.dialogue.desc', '编辑游戏内对话脚本、演出与表情切换。'), 0xFFFF8A8A],
-		['dialogueChar', Lang.tOr('editor.dialogueChar', '对话立绘编辑器'), 'Dialogue Portrait Editor', Lang.tOr('editor.dialogueChar.desc', '编辑对话角色的立绘资源与动画。'), 0xFFFF9E5E],
-		['noteSplash', Lang.tOr('editor.splashDebug', '音符溅射调试'), 'Note Splash Debug', Lang.tOr('editor.splashDebug.desc', '调试音符打击特效的贴图与帧动画。'), 0xFFB0B6FF],
-		['luagraph', Lang.tOr('editor.luagraph', 'Lua 图形化编程'), 'Lua Visual Script', Lang.tOr('editor.luagraph.desc', '用积木块拼出 Lua 脚本：多事件栈、参数槽直接编辑、生成 .lua 与 .luagraph.json（桌面端）。'), 0xFF9CE8FF]
+		['chart', Lang.tOr('editor.charting', '编谱器'), Lang.tOr('editor.chart.enName', 'Chart Editor'), Lang.tOr('editor.charting.desc', '创建并编辑谱面：音符、长条、事件、变速与角色设置。'), 0xFF66DDFF],
+		['character', Lang.tOr('editor.character', '角色编辑器'), Lang.tOr('editor.character.enName', 'Character Editor'), Lang.tOr('editor.character.desc', '编辑角色的贴图、动画帧、镜头跟随与各类属性。'), 0xFFDD88FF],
+		['week', Lang.tOr('editor.week', '周目编辑器'), Lang.tOr('editor.week.enName', 'Week Editor'), Lang.tOr('editor.week.desc', '编辑自由游玩中的周目结构与歌曲顺序。'), 0xFF88E58A],
+		['menuChar', Lang.tOr('editor.menuCharacter', '菜单角色编辑器'), Lang.tOr('editor.menuChar.enName', 'Menu Character Editor'), Lang.tOr('editor.menuCharacter.desc', '编辑主菜单与自由游玩界面展示的角色。'), 0xFFFFD166],
+		['dialogue', Lang.tOr('editor.dialogue', '对话编辑器'), Lang.tOr('editor.dialogue.enName', 'Dialogue Editor'), Lang.tOr('editor.dialogue.desc', '编辑游戏内对话脚本、演出与表情切换。'), 0xFFFF8A8A],
+		['dialogueChar', Lang.tOr('editor.dialogueChar', '对话立绘编辑器'), Lang.tOr('editor.dialogueChar.enName', 'Dialogue Portrait Editor'), Lang.tOr('editor.dialogueChar.desc', '编辑对话角色的立绘资源与动画。'), 0xFFFF9E5E],
+		['noteSplash', Lang.tOr('editor.splashDebug', '音符溅射调试'), Lang.tOr('editor.noteSplash.enName', 'Note Splash Debug'), Lang.tOr('editor.splashDebug.desc', '调试音符打击特效的贴图与帧动画。'), 0xFFB0B6FF],
+		['luagraph', Lang.tOr('editor.luagraph', 'Lua 图形化编程'), Lang.tOr('editor.luagraph.enName', 'Lua Visual Script'), Lang.tOr('editor.luagraph.desc', '用积木块拼出 Lua 脚本：多事件栈、参数槽直接编辑、生成 .lua 与 .luagraph.json（桌面端）。'), 0xFF9CE8FF]
 	];
 
 	var rows:Array<MenuText> = [];
@@ -89,7 +89,7 @@ class MasterEditorMenu extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - Editors Menu";
+		Lib.application.window.title = Lang.tOr('win.editorsMenu', "FNF':Meteoric Engine - Editors Menu");
 
 		#if desktop
 		DiscordClient.changePresence("Editors Main Menu", null);

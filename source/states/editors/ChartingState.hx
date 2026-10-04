@@ -403,7 +403,7 @@ class ChartingState extends MusicBeatState
 		}
 		lastSong = currentSongName;
 
-		zoomTxt = new FlxText(370, 10, 0, "Zoom: 1 / 1", 14);
+		zoomTxt = new FlxText(370, 10, 0, Lang.tOr('chart.zoomDefault', "Zoom: 1 / 1"), 14);
 		zoomTxt.setFormat(Paths.font('future.ttf'), 14, 0xFFB8B8C8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		zoomTxt.scrollFactor.set();
 		add(zoomTxt);
@@ -1956,7 +1956,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		var daZoom:Float = zoomList[curZoom];
 		var zoomThing:String = '1 / ' + daZoom;
 		if(daZoom < 1) zoomThing = Math.round(1 / daZoom) + ' / 1';
-		zoomTxt.text = 'Zoom: ' + zoomThing;
+		zoomTxt.text = Lang.tOr('chart.zoomLabel', 'Zoom: ') + zoomThing;
 		reloadGridLayer();
 	}
 
@@ -2429,7 +2429,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 			if (_song.notes[curSec].gfSection)
 			{
 				leftIcon.changeIcon('gf');
-				leftNameTxt.text = 'GF (' + _song.gfVersion + ')';
+				leftNameTxt.text = Lang.tOr('chart.gfVersionPrefix', 'GF (') + _song.gfVersion + ')';
 			}
 		}
 		else
@@ -2441,7 +2441,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 			if (_song.notes[curSec].gfSection)
 			{
 				leftIcon.changeIcon('gf');
-				leftNameTxt.text = 'GF (' + _song.gfVersion + ')';
+				leftNameTxt.text = Lang.tOr('chart.gfVersionPrefix', 'GF (') + _song.gfVersion + ')';
 			}
 		}
 	}
@@ -2927,7 +2927,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 			}
 			else missingTextTimer.cancel();
 
-			missingText.text = 'ERROR WHILE LOADING CHART:\n$errorStr';
+			missingText.text = Lang.tOr('chart.loadFailPrefix', 'ERROR WHILE LOADING CHART:\n') + errorStr;
 			missingText.screenCenter(Y);
 
 			missingTextTimer = new FlxTimer().start(5, function(tmr:FlxTimer) {

@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import flixel.text.FlxText;
 import flixel.tweens.FlxTween;
@@ -138,7 +139,7 @@ class CustomFadeTransition extends FlxSubState
 		makeTexts();
 		if (isTransIn)
 		{
-			EventText.text = 'COMPLETED !';
+			EventText.text = Lang.tOr('fade.completed', 'COMPLETED !');
 		}
 		else if (!ClientPrefs.data.CustomFadeText)
 		{
@@ -211,7 +212,7 @@ class CustomFadeTransition extends FlxSubState
 
 		if (isTransIn)
 		{
-			EventText.text = 'COMPLETED !';
+			EventText.text = Lang.tOr('fade.completed', 'COMPLETED !');
 			meteorTail.alpha = 0;
 			meteorHead.alpha = 0;
 			meteorGlow.alpha = 0;
@@ -284,7 +285,7 @@ class CustomFadeTransition extends FlxSubState
 		makeTexts();
 		if (isTransIn)
 		{
-			EventText.text = 'COMPLETED !';
+			EventText.text = Lang.tOr('fade.completed', 'COMPLETED !');
 			paintBloom(1.0);
 		}
 		else
@@ -495,7 +496,7 @@ class CustomFadeTransition extends FlxSubState
 		WaterMark.antialiasing = ClientPrefs.data.antialiasing;
 		add(WaterMark);
 
-		EventText = new FlxText(isTransIn ? 50 : -900, 720 - 50 - 50, 0, 'LOADING . . . . . . ', 50);
+		EventText = new FlxText(isTransIn ? 50 : -900, 720 - 50 - 50, 0, Lang.tOr('fade.loading', 'LOADING . . . . . . '), 50);
 		EventText.scrollFactor.set();
 		EventText.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		EventText.antialiasing = ClientPrefs.data.antialiasing;

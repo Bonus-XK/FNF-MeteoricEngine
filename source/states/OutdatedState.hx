@@ -77,7 +77,7 @@ class OutdatedState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		super.create();
 
-		Lib.application.window.title = "FNF':Meteoric Engine - Outdated Version";
+		Lib.application.window.title = Lang.tOr('win.outdated', "FNF':Meteoric Engine - Outdated Version");
 		leftState = false;
 
 		// ---- 背景：系统域（menuDesat 染主题色 + 压暗遮罩）----

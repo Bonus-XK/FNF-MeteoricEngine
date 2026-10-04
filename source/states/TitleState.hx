@@ -105,7 +105,7 @@ class TitleState extends MusicBeatState
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 		
-        Lib.application.window.title = "FNF':Meteoric Engine - Intro";
+        Lib.application.window.title = Lang.tOr('win.intro', "FNF':Meteoric Engine - Intro");
 
 		#if LUA_ALLOWED
 		Mods.pushGlobalMods();

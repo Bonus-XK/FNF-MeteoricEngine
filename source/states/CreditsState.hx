@@ -93,7 +93,7 @@ class CreditsState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - Credits";
+		Lib.application.window.title = Lang.tOr('win.credits', "FNF':Meteoric Engine - Credits");
 
 		#if desktop
 		// Updating Discord Rich Presence

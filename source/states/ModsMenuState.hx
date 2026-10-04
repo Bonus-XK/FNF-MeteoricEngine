@@ -129,7 +129,7 @@ class ModsMenuState extends MusicBeatState
 	override function create()
 	{
 		trace('ModsMenuState: create');
-		Lib.application.window.title = "FNF':Meteoric Engine - Mods List";
+		Lib.application.window.title = Lang.tOr('win.modsList', "FNF':Meteoric Engine - Mods List");
 
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();

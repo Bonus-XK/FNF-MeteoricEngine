@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 
 import objects.Character;
 
@@ -95,10 +96,14 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		#if (mac || windows)
 		frameRateOptions.push('无上限');
 		#end
+		// 说明含平台分支，故按段翻译：单一 key 无法让中文侧在移动端隐藏「/ 无上限」。
+		var framerateDesc = Lang.tOr('optionDesc.framerateMode', '游戏更新/绘制帧率档位：120 / 240 / 480');
+		#if (mac || windows)
+		framerateDesc += Lang.tOr('optionDesc.framerateModeUncapped', ' / 无上限（帧率只受 CPU/GPU 限制，发热/耗电更高）');
+		#end
+		framerateDesc += Lang.tOr('optionDesc.framerateModeTail', '。移动端默认 120 防过热；切换立即生效');
 		var option:Option = new Option('帧率上限',
-			'游戏更新/绘制帧率档位：120 / 240 / 480'
-			+ #if (mac || windows) ' / 无上限（帧率只受 CPU/GPU 限制，发热/耗电更高）' #else '' #end
-			+ '。移动端默认 120 防过热；切换立即生效',
+			framerateDesc,
 			'framerateMode',
 			'string',
 			frameRateOptions);
