@@ -53,7 +53,7 @@ class CrashTestPrompt extends FlxSubState
 		title.scrollFactor.set();
 		add(title);
 
-		var labels:Array<String> = ['Haxe 级报错（游戏内报错界面 + 日志）', '原生/底层报错（native_stack.txt）'];
+		var labels:Array<String> = [Lang.tOr('debug.haxeError', 'Haxe 级报错（游戏内报错界面 + 日志）'), Lang.tOr('debug.nativeError', '原生/底层报错（native_stack.txt）')];
 		var btnW:Float = w - 48;
 		for (i in 0...labels.length)
 		{

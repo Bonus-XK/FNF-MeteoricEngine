@@ -194,8 +194,8 @@ class ControlsPane extends SettingsCanvas
 
 		// ---- 模式切换标签（键盘/手柄）：贴面板右缘（整屏 = 820/1030，与原实现一致；内容区按同一右侧偏移换算）----
 		var linksRight:Float = PANEL_X + PANEL_W;
-		addModeLink(linksRight - 340, 106, '> 键盘模式');
-		addModeLink(linksRight - 130, 106, '> 手柄模式');
+		addModeLink(linksRight - 340, 106, Lang.tOr('controls.modeKeyboard', '> 键盘模式'));
+		addModeLink(linksRight - 130, 106, Lang.tOr('controls.modeGamepad', '> 手柄模式'));
 		refreshModeLabels();
 
 		// ---- 列表行 ----

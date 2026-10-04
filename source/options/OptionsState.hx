@@ -191,7 +191,7 @@ class OptionsState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = "FNF':Meteoric Engine - 设置菜单";
+		Lib.application.window.title = Lang.tOr('settings.windowTitleFull', "FNF':Meteoric Engine - 设置菜单");
 
 		#if desktop
 		DiscordClient.changePresence(Lang.tOr('settings.discordTitle', "设置菜单"), null);
@@ -229,9 +229,9 @@ class OptionsState extends MusicBeatState
 		// ---- 底部提示条 ----
 		hintPanel = OptionsUi.makePanel(40, 662, 1200, 48, 14);
 		add(hintPanel);
-		var hintText:String = 'Tab 切换分区/选项 · ↑↓ 选择 · ←→ 调整 · Enter 切换 · R 重置 · 点击左侧分区切换 · Esc 返回';
+		var hintText:String = Lang.tOr('options.hint.bottomBar', 'Tab 切换分区/选项 · ↑↓ 选择 · ←→ 调整 · Enter 切换 · R 重置 · 点击左侧分区切换 · Esc 返回');
 		#if mobile
-		hintText = '点左侧分区切换 · 拖动选择 · ◀▶ 调整 · A 切换 · 点 < 返回';
+		hintText = Lang.tOr('options.hint.contentBar', '点左侧分区切换 · 拖动选择 · ◀▶ 调整 · A 切换 · 点 < 返回');
 		#end
 		var hint:FlxText = new FlxText(64, 674, 1152, hintText, 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
@@ -334,7 +334,7 @@ class OptionsState extends MusicBeatState
 		else
 		{
 			var sec:BaseOptionsMenu = sectionInstance(e);
-			if (sec == null) pane.setExternal(e.title, '（该分区不可用）');
+			if (sec == null) pane.setExternal(e.title, Lang.tOr('options.sectionUnavailable', '（该分区不可用）'));
 			else if (sec.previewRows > 0) pane.setSection(sec, e.title, e.previewHost, sec.previewRows);
 			else pane.setSection(sec, e.title);
 		}

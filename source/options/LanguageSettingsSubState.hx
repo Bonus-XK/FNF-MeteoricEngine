@@ -29,7 +29,7 @@ class LanguageSettingsSubState extends BaseOptionsMenu
 		langOption = new Option(
 			Lang.t('settings.language'),
 			'选择界面显示语言。中文与英文为引擎内置；\n'
-			+ '社区语言包（.json）放入 Resources/languages/ 或作为 mod 的 languages/ 即可自动出现在此列表',
+			+ Lang.tOr('settings.languagePackHint', '社区语言包（.json）放入 Resources/languages/ 或作为 mod 的 languages/ 即可自动出现在此列表'),
 			'language',
 			'string',
 			codes);

@@ -237,7 +237,7 @@ class HUDCustomizeState extends MusicBeatState
 		add(scoreTxt);
 
 		// 左下角水印
-		songTxt = new FlxText(0, 0, 0, 'Test Song (Hard) | 流星引擎', 12);
+		songTxt = new FlxText(0, 0, 0, Lang.tOr('hudCustomize.demoSong', 'Test Song (Hard) | 流星引擎'), 12);
 		songTxt.setFormat(Paths.font('future.ttf'), 15, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		songTxt.scrollFactor.set();
 		songTxt.cameras = [camHUD];

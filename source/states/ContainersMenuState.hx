@@ -408,9 +408,9 @@ class ContainersMenuState extends MusicBeatState
 	function hotkeyHowto():String
 	{
 		#if windows
-		return '（单键，直接按；目标引擎在前台时按键进它，此时请关窗口退出）';
+		return Lang.tOr('container.hintSingleKey', '（单键，直接按；目标引擎在前台时按键进它，此时请关窗口退出）');
 		#else
-		return '（组合键：先按住 CONTROL 再按 C；目标引擎在前台时按键进它，此时请关窗口退出）';
+		return Lang.tOr('container.hintComboKey', '（组合键：先按住 CONTROL 再按 C；目标引擎在前台时按键进它，此时请关窗口退出）');
 		#end
 	}
 
@@ -457,7 +457,7 @@ class ContainersMenuState extends MusicBeatState
 			if (rescanBtn.over(mx, my))
 			{
 				refresh(true);
-				setInfo('已重新扫描：' + containers.length + ' 个容器');
+				setInfo(Lang.tOr('container.rescanned', '已重新扫描：') + containers.length + Lang.tOr('container.containerCount', ' 个容器'));
 				return;
 			}
 			if (folderBtn.over(mx, my))
@@ -580,7 +580,7 @@ class ContainersMenuState extends MusicBeatState
 	function updateToggleLabel():Void
 	{
 		var on:Bool = ClientPrefs.data.containersEnabled;
-		toggleBtn.label.text = on ? '容器功能：已启用' : '容器功能：已关闭';
+		toggleBtn.label.text = on ? Lang.tOr('container.featureOn', '容器功能：已启用') : Lang.tOr('container.featureOff', '容器功能：已关闭');
 		toggleBtn.label.color = on ? ACCENT() : TEXT_DIM;
 	}
 
@@ -610,7 +610,7 @@ class ContainersMenuState extends MusicBeatState
 			return;
 		}
 		statusText.text = Lang.tOr('containers.featureStatus', '容器功能：') + (ClientPrefs.data.containersEnabled ? '已启用' : '已在设置中关闭')
-			+ '   ·   选中容器后按 Enter 或点「切换到此容器」';
+			+ Lang.tOr('container.selectThenSwitch', '   ·   选中容器后按 Enter 或点「切换到此容器」');
 	}
 
 	function setError(msg:String):Void
@@ -641,13 +641,13 @@ class ContainersMenuState extends MusicBeatState
 		{
 			// 会话进行中：Enter 语义改为“请求当前容器退出”
 			ContainerSession.requestQuit();
-			setInfo('已请求退出「' + (ContainerSession.current != null ? ContainerSession.current.displayName : '?') + '」…');
+			setInfo(Lang.tOr('container.exitRequested', '已请求退出「') + (ContainerSession.current != null ? ContainerSession.current.displayName : '?') + '」…');
 			return;
 		}
 
 		if (!ClientPrefs.data.containersEnabled)
 		{
-			setError('容器功能未启用：点左下「容器功能：已关闭」按钮打开');
+			setError(Lang.tOr('container.featureOffHint', '容器功能未启用：点左下「容器功能：已关闭」按钮打开'));
 			return;
 		}
 
@@ -684,7 +684,7 @@ class ContainersMenuState extends MusicBeatState
 		#else
 		Sys.command('xdg-open', [target]);
 		#end
-		setInfo('已打开：' + target);
+		setInfo(Lang.tOr('container.opened', '已打开：') + target);
 	}
 
 	/**

@@ -114,7 +114,7 @@ class ModInstaller
 				trace('[ModInstaller] extraction finished in ' + Std.int((haxe.Timer.stamp() - extractionStartedAt) * 1000) + 'ms' + (ext.error != null ? ', error=' + ext.error : ''));
 				if (ext.error != null)
 				{
-					abortTask('解压失败：' + ext.error);
+					abortTask(Lang.tOr('install.extractFailed', '解压失败：') + ext.error);
 				}
 				else if (ext.pendingPrompt)
 				{
@@ -147,9 +147,9 @@ class ModInstaller
 			{
 				var now:Float = haxe.Timer.stamp();
 				if (extractor.total > 0 && now - lastExtractProgressAt > 90)
-					abortTask('解压超时（90 秒无进展），压缩包可能已损坏，已取消。');
+					abortTask(Lang.tOr('install.extractTimeout90', '解压超时（90 秒无进展），压缩包可能已损坏，已取消。'));
 				else if (extractor.total <= 0 && now - extractionStartedAt > 120)
-					abortTask('解压超时（120 秒未完成），压缩包可能已损坏，已取消。');
+					abortTask(Lang.tOr('install.extractTimeout120', '解压超时（120 秒未完成），压缩包可能已损坏，已取消。'));
 			}
 		}
 
@@ -173,7 +173,7 @@ class ModInstaller
 				copier = null;
 				if (c.error != null)
 				{
-					abortTask('复制失败：' + c.error);
+					abortTask(Lang.tOr('install.copyFailed', '复制失败：') + c.error);
 				}
 				else
 				{
@@ -181,14 +181,14 @@ class ModInstaller
 					addToModsList(folderInstallName);
 					busy = false;
 					lastInstallTime = haxe.Timer.stamp();
-					showMessage('安装完成', '已安装：' + folderInstallName + '\n\n去 Mods 菜单里选中就能用啦！');
+					showMessage(Lang.tOr('install.done', '安装完成'), Lang.tOr('install.installedPrefix', '已安装：') + folderInstallName + '\n\n去 Mods 菜单里选中就能用啦！');
 				}
 			}
 			else if (copier.total > 0)
 			{
 				progress = copier.done / copier.total;
 				detailText = copier.currentFile + '  (' + copier.done + '/' + copier.total + ')';
-				status = '正在复制文件夹… (' + copier.done + '/' + copier.total + ')';
+				status = Lang.tOr('install.copyingFolder', '正在复制文件夹… (') + copier.done + '/' + copier.total + ')';
 				indeterminate = false;
 				if (copier.done != lastCopierDone)
 				{
@@ -203,9 +203,9 @@ class ModInstaller
 			{
 				var now:Float = haxe.Timer.stamp();
 				if (copier.total > 0 && now - lastCopierProgressAt > 90)
-					abortTask('复制超时（90 秒无进展），已取消。');
+					abortTask(Lang.tOr('install.copyTimeout90', '复制超时（90 秒无进展），已取消。'));
 				else if (copier.total <= 0 && now - copierStartedAt > copier.timeoutMs)
-					abortTask('复制超时（' + Std.int(copier.timeoutMs / 1000) + ' 秒未完成），已取消。');
+					abortTask(Lang.tOr('install.copyTimeoutPart', '复制超时（') + Std.int(copier.timeoutMs / 1000) + Lang.tOr('install.copyTimeoutPart2', ' 秒未完成），已取消。'));
 			}
 		}
 	}
@@ -226,7 +226,7 @@ class ModInstaller
 
 			if (!isAllowedContext())
 			{
-				showMessage('这里不能安装', '请在主菜单或 Mods 菜单里拖入 zip / 文件夹喵～');
+				showMessage(Lang.tOr('install.cantInstallHere', '这里不能安装'), Lang.tOr('install.cantInstallHereHint', '请在主菜单或 Mods 菜单里拖入 zip / 文件夹喵～'));
 				return;
 			}
 
@@ -246,13 +246,13 @@ class ModInstaller
 				return;
 			}
 
-			showMessage('不支持的文件', '把 .zip 压缩包或 mod 文件夹拖进来才能自动安装。');
+			showMessage(Lang.tOr('install.unsupportedFile', '不支持的文件'), Lang.tOr('install.unsupportedFileHint', '把 .zip 压缩包或 mod 文件夹拖进来才能自动安装。'));
 		}
 		catch (e:Dynamic)
 		{
 			// 兜底：拖入路径上的任何异常都不允许逃进 C++ 事件分发（避免无弹窗闪退）
 			trace('[ModInstaller] onDropFile error: ' + Std.string(e));
-			try { showMessage('安装失败', '处理拖入文件时出错：\n' + Std.string(e)); } catch (e2:Dynamic) {}
+			try { showMessage(Lang.tOr('install.failed', '安装失败'), '处理拖入文件时出错：\n' + Std.string(e)); } catch (e2:Dynamic) {}
 		}
 	}
 
@@ -281,7 +281,7 @@ class ModInstaller
 	{
 		if (!ZipReader.isZipFile(zipPath))
 		{
-			showMessage('不是有效的压缩包', '这个文件看起来不是 ZIP：\n' + Path.withoutDirectory(zipPath));
+			showMessage(Lang.tOr('install.notValidArchive', '不是有效的压缩包'), '这个文件看起来不是 ZIP：\n' + Path.withoutDirectory(zipPath));
 			return;
 		}
 
@@ -297,7 +297,7 @@ class ModInstaller
 		catch (e:Dynamic)
 		{
 			busy = false;
-			showMessage('解析失败', '无法读取这个压缩包：\n' + Std.string(e));
+			showMessage(Lang.tOr('install.parseFailed', '解析失败'), '无法读取这个压缩包：\n' + Std.string(e));
 			return;
 		}
 		trace('[ModInstaller] readEntries: ' + Std.int((haxe.Timer.stamp() - t0) * 1000) + 'ms, entries=' + entries.length);
@@ -305,7 +305,7 @@ class ModInstaller
 		if (entries.length == 0)
 		{
 			busy = false;
-			showMessage('空压缩包', '这个压缩包里什么都没有。');
+			showMessage(Lang.tOr('install.emptyArchive', '空压缩包'), Lang.tOr('install.emptyArchiveHint', '这个压缩包里什么都没有。'));
 			return;
 		}
 
@@ -319,14 +319,14 @@ class ModInstaller
 		catch (e:Dynamic)
 		{
 			busy = false;
-			showMessage('无法安装', '分析压缩包时出错：\n' + Std.string(e));
+			showMessage(Lang.tOr('install.cannotInstall', '无法安装'), '分析压缩包时出错：\n' + Std.string(e));
 			return;
 		}
 		trace('[ModInstaller] analyze: ' + Std.int((haxe.Timer.stamp() - t1) * 1000) + 'ms');
 		if (plan == null)
 		{
 			busy = false;
-			showMessage('无法安装', '压缩包里没有看起来像 mod 的内容。');
+			showMessage(Lang.tOr('install.cannotInstall', '无法安装'), Lang.tOr('install.noModLikeContent', '压缩包里没有看起来像 mod 的内容。'));
 			return;
 		}
 
@@ -345,7 +345,7 @@ class ModInstaller
 			pendingJobs = plan.jobs;
 			promptJobIndex = plan.promptIndex;
 			promptDefault = plan.promptDefault;
-			promptMessage = '压缩包里有一层叫 "mods" 的文件夹，请给它起个名字：';
+			promptMessage = Lang.tOr('install.modsFolderAskName', '压缩包里有一层叫 "mods" 的文件夹，请给它起个名字：');
 			beginExtraction(zipPath, true);
 		}
 		else
@@ -362,8 +362,8 @@ class ModInstaller
 		showPrompt = false;
 		showResult = false;
 		canCancel = true;
-		title = '安装 Mod';
-		status = '正在解压…';
+		title = Lang.tOr('install.title', '安装 Mod');
+		status = Lang.tOr('install.extracting', '正在解压…');
 		indeterminate = true;
 		progress = 0;
 		extractionStartedAt = haxe.Timer.stamp();
@@ -380,7 +380,7 @@ class ModInstaller
 		}
 		catch (e:Dynamic)
 		{
-			abortTask('解压失败：' + Std.string(e));
+			abortTask(Lang.tOr('install.extractFailed', '解压失败：') + Std.string(e));
 		}
 	}
 
@@ -390,7 +390,7 @@ class ModInstaller
 		{
 			showPrompt = true;
 			canCancel = true;
-			title = '给 mod 起个名字';
+			title = Lang.tOr('install.namePrompt', '给 mod 起个名字');
 			status = '';
 			indeterminate = false;
 			if (ui != null) ui.focusInput();
@@ -407,7 +407,7 @@ class ModInstaller
 		var name:String = ModZipPlanner.sanitizeName(rawName);
 		if (name.length == 0)
 		{
-			if (ui != null) ui.showPromptError('名字不能为空或包含非法字符，再试一次');
+			if (ui != null) ui.showPromptError(Lang.tOr('install.nameInvalid', '名字不能为空或包含非法字符，再试一次'));
 			return;
 		}
 
@@ -420,13 +420,13 @@ class ModInstaller
 	/** 由 ModInstallUI 在玩家取消起名时调用 */
 	public function cancelPrompt():Void
 	{
-		abortTask('已取消安装。');
+		abortTask(Lang.tOr('install.cancelled', '已取消安装。'));
 	}
 
 	/** 由 ModInstallUI 的取消按钮 / ESC 调用 */
 	public function cancelTask():Void
 	{
-		abortTask('已取消安装。');
+		abortTask(Lang.tOr('install.cancelled', '已取消安装。'));
 	}
 
 	// ------------------------------------------------------------------
@@ -438,15 +438,15 @@ class ModInstaller
 		var tStart:Float = haxe.Timer.stamp();
 		if (pendingJobs == null || pendingJobs.length == 0)
 		{
-			abortTask('没有可安装的内容。');
+			abortTask(Lang.tOr('install.nothingToInstall', '没有可安装的内容。'));
 			return;
 		}
 
 		var modsDir:String = Sys.getCwd() + 'mods';
 		if (!FileSystem.exists(modsDir)) FileSystem.createDirectory(modsDir);
 
-		title = '安装 Mod';
-		status = '正在安装…';
+		title = Lang.tOr('install.title', '安装 Mod');
+		status = Lang.tOr('install.installing', '正在安装…');
 		indeterminate = true;
 		showPrompt = false;
 		canCancel = false;
@@ -488,7 +488,7 @@ class ModInstaller
 
 			done++;
 			progress = done / total;
-			status = '正在安装… (' + done + '/' + total + ')';
+			status = Lang.tOr('install.installingProgress', '正在安装… (') + done + '/' + total + ')';
 		}
 
 		cleanupTemp();
@@ -497,13 +497,13 @@ class ModInstaller
 
 		var msg:String = '';
 		if (installedNames.length > 0)
-			msg += '已安装：' + installedNames.join('、') + '\n';
+			msg += Lang.tOr('install.installedPrefix', '已安装：') + installedNames.join('、') + '\n';
 		if (failed.length > 0)
-			msg += '以下内容安装失败：' + failed.join('、') + '\n';
+			msg += Lang.tOr('install.failedItems', '以下内容安装失败：') + failed.join('、') + '\n';
 		msg += '\n去 Mods 菜单里选中就能用啦！';
 		if (installedNames.length > 0)
 			lastInstallTime = haxe.Timer.stamp(); // 通知打开中的 Mods 菜单刷新
-		showMessage('安装完成', msg);
+		showMessage(Lang.tOr('install.done', '安装完成'), msg);
 		trace('[ModInstaller] install jobs done in ' + Std.int((haxe.Timer.stamp() - tStart) * 1000) + 'ms');
 	}
 
@@ -656,14 +656,14 @@ class ModInstaller
 		var absMods:String = haxe.io.Path.normalize(modsDir);
 		if (absSrc == absMods || absSrc.indexOf(absMods + '/') == 0 || absSrc.indexOf(absMods + '\\') == 0)
 		{
-			showMessage('不需要', '这就是 mods 文件夹本身，拖别的来～');
+			showMessage(Lang.tOr('install.notNeeded', '不需要'), Lang.tOr('install.isModsFolder', '这就是 mods 文件夹本身，拖别的来～'));
 			return;
 		}
 
 		busy = true;
 		openUI();
-		title = '安装 Mod';
-		status = '正在复制文件夹…';
+		title = Lang.tOr('install.title', '安装 Mod');
+		status = Lang.tOr('install.copyingFolder2', '正在复制文件夹…');
 		indeterminate = true;
 		canCancel = true;
 		showPrompt = false;
@@ -690,7 +690,7 @@ class ModInstaller
 		}
 		catch (e:Dynamic)
 		{
-			abortTask('复制失败：' + Std.string(e));
+			abortTask(Lang.tOr('install.copyFailed', '复制失败：') + Std.string(e));
 		}
 	}
 
@@ -740,6 +740,6 @@ class ModInstaller
 		pendingJobs = null;
 		busy = false;
 		showPrompt = false;
-		showMessage('已取消', message);
+		showMessage(Lang.tOr('install.cancelledShort', '已取消'), message);
 	}
 }

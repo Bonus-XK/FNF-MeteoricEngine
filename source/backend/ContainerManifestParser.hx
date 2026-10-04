@@ -25,7 +25,7 @@ class ContainerManifestParser
 		var out:ContainerManifest = {exists: false, raw: null, problem: null};
 		if (containerDir == null || containerDir.length < 1)
 		{
-			out.problem = '容器目录为空';
+			out.problem = Lang.tOr('container.dirEmpty', '容器目录为空');
 			return out;
 		}
 
@@ -35,7 +35,7 @@ class ContainerManifestParser
 
 		if (!ContainerStore.fileExists(path))
 		{
-			out.problem = '缺少清单文件 ' + FILE_NAME + '（容器未完成配置）';
+			out.problem = Lang.tOr('container.manifestMissing', '缺少清单文件 ') + FILE_NAME + Lang.tOr('container.notConfigured', '（容器未完成配置）');
 			return out;
 		}
 		out.exists = true;
@@ -45,7 +45,7 @@ class ContainerManifestParser
 			text = sys.io.File.getContent(path)
 		catch (e:Dynamic)
 		{
-			out.problem = '清单读取失败：' + Std.string(e);
+			out.problem = Lang.tOr('container.manifestReadFail', '清单读取失败：') + Std.string(e);
 			return out;
 		}
 
@@ -54,13 +54,13 @@ class ContainerManifestParser
 			parsed = haxe.Json.parse(text)
 		catch (e:Dynamic)
 		{
-			out.problem = '清单 JSON 解析失败：' + Std.string(e);
+			out.problem = Lang.tOr('container.manifestParseFail', '清单 JSON 解析失败：') + Std.string(e);
 			return out;
 		}
 
 		if (parsed == null || Reflect.fields(parsed).length < 1)
 		{
-			out.problem = '清单内容为空';
+			out.problem = Lang.tOr('container.manifestEmpty', '清单内容为空');
 			return out;
 		}
 

@@ -128,7 +128,7 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 			lastClickedRow = idx;
 			return; // 第一次点击：仅选中
 		}
-		lastClickedRow = -1; // 子页打开前复位，返回后需要重新"点两次"
+		lastClickedRow = -1; // 子页打开前复位，返回后需要重新Lang.tOr('settings.clickTwice', "点两次")
 		openSelectedSubstate();
 	}
 

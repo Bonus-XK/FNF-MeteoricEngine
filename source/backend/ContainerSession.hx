@@ -122,14 +122,14 @@ class ContainerSession
 	 */
 	public static function launch(info:ContainerInfo):String
 	{
-		if (info == null) return '容器为空';
-		if (active) return '已有容器正在运行';
-		if (!ClientPrefs.data.containersEnabled) return '容器功能已在设置中关闭';
+		if (info == null) return Lang.tOr('container.empty', '容器为空');
+		if (active) return Lang.tOr('container.alreadyRunning', '已有容器正在运行');
+		if (!ClientPrefs.data.containersEnabled) return Lang.tOr('container.featureDisabled', '容器功能已在设置中关闭');
 		if (info.problem != null) return info.problem;
-		if (info.appPath == null) return '目标引擎主程序未就绪';
+		if (info.appPath == null) return Lang.tOr('container.engineNotReady', '目标引擎主程序未就绪');
 
 		#if !sys
-		return '当前平台不支持容器启动';
+		return Lang.tOr('container.unsupportedPlatform', '当前平台不支持容器启动');
 		#else
 		// 1) 资源 staging（唯一会写目标引擎目录的动作，只增不改）
 		var staged:Int = 0;
@@ -153,7 +153,7 @@ class ContainerSession
 			sysTmpDir()
 		]);
 		if (hostPid <= 0)
-			return '无法取得宿主进程 PID（容器无法安全唤醒，已中止）'
+			return Lang.tOr('container.noHostPid', '无法取得宿主进程 PID（容器无法安全唤醒，已中止）')
 				+ (lastPidError != null ? '：' + lastPidError : '');
 		#end
 
@@ -161,7 +161,7 @@ class ContainerSession
 		//      先拒绝启动，避免同一个容器出两个实例抢窗口与资源。
 		var stalePid:Int = ContainerLauncher.readAppPid(info);
 		if (stalePid > 0 && isProcessAlive(stalePid))
-			return '该容器的上一次进程仍在运行（pid ' + stalePid + '），请先退出它再切换';
+			return Lang.tOr('container.stillRunning', '该容器的上一次进程仍在运行（pid ') + stalePid + Lang.tOr('container.stillRunningTail', '），请先退出它再切换');
 
 		// 3) 生成 wrapper
 		var wrapperPath:String = null;
@@ -169,7 +169,7 @@ class ContainerSession
 			wrapperPath = ContainerLauncher.buildWrapper(info, hostPid)
 		catch (e:Dynamic)
 			wrapperPath = null;
-		if (wrapperPath == null) return '包装器生成失败（容器 runtime 目录不可写）';
+		if (wrapperPath == null) return Lang.tOr('container.wrapperFailed', '包装器生成失败（容器 runtime 目录不可写）');
 
 		// 4) 清掉上一次的退出/命令标记；日志改为“追加 + 启动时轮转”，
 		//    这样本次启动参数不会被 wrapper 的日志重定向截掉（旧实现 `>` 覆盖导致 launch 记录丢失）。
@@ -217,10 +217,10 @@ class ContainerSession
 			active = false;
 			phase = Phase.Idle;
 			current = null;
-			return '目标引擎启动失败（wrapper 无法执行）';
+			return Lang.tOr('container.engineLaunchFailed', '目标引擎启动失败（wrapper 无法执行）');
 		}
 
-		FlxG.log.add('[Container] ' + info.displayName + ' 启动中…');
+		FlxG.log.add('[Container] ' + info.displayName + Lang.tOr('container.starting', ' 启动中…'));
 		return null;
 		#end
 	}
@@ -387,14 +387,14 @@ class ContainerSession
 		catch (e:Dynamic)
 			keyName = Std.string(hotkeyMainKey);
 		#if windows
-		ContainerLauncher.log(current, 'hotkey hit: ' + keyName + '（Windows 单键热键）');
+		ContainerLauncher.log(current, 'hotkey hit: ' + keyName + Lang.tOr('container.winSingleKey', '（Windows 单键热键）'));
 		#else
 		var modName:String = null;
 		try
 			modName = backend.InputFormatter.getKeyName(hotkeyModifier)
 		catch (e:Dynamic)
 			modName = Std.string(hotkeyModifier);
-		ContainerLauncher.log(current, 'hotkey hit: ' + modName + '+' + keyName + '（组合键，修饰键需按住）');
+		ContainerLauncher.log(current, 'hotkey hit: ' + modName + '+' + keyName + Lang.tOr('container.comboKey', '（组合键，修饰键需按住）'));
 		#end
 	}
 
@@ -422,13 +422,13 @@ class ContainerSession
 		var name:String = (info != null) ? info.displayName : '容器';
 		var code:Null<Int> = (codeTxt == null) ? null : Std.parseInt(codeTxt);
 		if (quitRequested)
-			notice = '已从「' + name + '」返回，正在重启 Meteoric…';
+			notice = '已从「' + name + Lang.tOr('container.returning', '」返回，正在重启 Meteoric…');
 		else if (code != null && code != 0)
 			// 非 0 退出码 = 目标引擎自己崩了/起不来。这条必须说清楚，否则玩家只会觉得“点了没反应”。
-			notice = '「' + name + '」异常退出（退出码 ' + code + '）—— 目标引擎可能无法在本机启动；'
-				+ '点「打开日志/容器目录」看 runtime/container.log，并先单独双击运行该引擎确认它能启动';
+			notice = '「' + name + Lang.tOr('container.crashed', '」异常退出（退出码 ') + code + '）—— 目标引擎可能无法在本机启动；'
+				+ Lang.tOr('container.crashedHint', '点「打开日志/容器目录」看 runtime/container.log，并先单独双击运行该引擎确认它能启动');
 		else
-			notice = '「' + name + '」已退出（退出码 ' + (codeTxt == null ? '?' : codeTxt) + '），正在重启 Meteoric…';
+			notice = '「' + name + Lang.tOr('container.exited', '」已退出（退出码 ') + (codeTxt == null ? '?' : codeTxt) + '），正在重启 Meteoric…';
 		FlxG.log.add('[Container] ' + notice);
 
 		active = false;
@@ -674,10 +674,10 @@ class ContainerSession
 			{
 				var v:Null<Int> = Std.parseInt(txt);
 				if (v != null && v > 0) return v;
-				lastPidError = '临时文件内容不是数字: ' + txt;
+				lastPidError = Lang.tOr('container.tmpNotNumber', '临时文件内容不是数字: ') + txt;
 			}
 			else
-				lastPidError = '临时文件读取为空: ' + tmp;
+				lastPidError = Lang.tOr('container.tmpEmpty', '临时文件读取为空: ') + tmp;
 		}
 		catch (e:Dynamic)
 		{
@@ -743,7 +743,7 @@ class ContainerSession
 		try
 		{
 			var ok:Bool = ContainerLauncher.runFrontmostScript(pid);
-			if (!ok) FlxG.log.add('[Container] 前台化失败（pid ' + pid + '）：检查 系统设置 → 隐私与安全性 → 自动化');
+			if (!ok) FlxG.log.add('[Container] 前台化失败（pid ' + pid + Lang.tOr('container.privacyHint', '）：检查 系统设置 → 隐私与安全性 → 自动化'));
 			return ok;
 		}
 		catch (e:Dynamic)
@@ -829,7 +829,7 @@ class ContainerSession
 			forceKilled = true;
 			var ok:Bool = ContainerLauncher.forceKill(current);
 			ContainerLauncher.log(current, 'target still alive (pid ' + pid + ') after exit.txt; forceKill='
-				+ ok + '（可能是 start /WAIT 未阻塞或退出码提前落盘）');
+				+ ok + Lang.tOr('container.waitHint', '（可能是 start /WAIT 未阻塞或退出码提前落盘）'));
 		}
 
 		// 强杀后再给两帧收尸；否则本帧就把状态机带进收尾，界面会先回来、目标残影还在前台
@@ -855,16 +855,16 @@ class ContainerSession
 	/** 供界面显示的一行状态。 */
 	public static function statusLine():String
 	{
-		if (!active) return '空闲';
+		if (!active) return Lang.tOr('container.idle', '空闲');
 		var name:String = (current != null) ? current.displayName : '?';
 		return switch (phase)
 		{
-			case Phase.Launching: '正在启动「' + name + '」…（' + waitSeconds + 's 后让位）';
-			case Phase.Hiding: '正在为「' + name + '」让位（隐藏宿主窗口）…';
-			case Phase.Stopping: '正在挂起 Meteoric（' + name + ' 即将独占窗口）…';
-			case Phase.Running: '「' + name + '」运行中' + (quitRequested ? '（正在退出…）' : '');
-			case Phase.Returning: '正在返回 Meteoric…';
-			case Phase.Idle: '空闲';
+			case Phase.Launching: Lang.tOr('container.startingNamed', '正在启动「') + name + '」…（' + waitSeconds + Lang.tOr('container.afterSecs', 's 后让位）');
+			case Phase.Hiding: Lang.tOr('container.yielding', '正在为「') + name + Lang.tOr('container.yieldingTail', '」让位（隐藏宿主窗口）…');
+			case Phase.Stopping: Lang.tOr('container.suspending', '正在挂起 Meteoric（') + name + Lang.tOr('container.suspendingTail', ' 即将独占窗口）…');
+			case Phase.Running: '「' + name + Lang.tOr('container.running', '」运行中') + (quitRequested ? Lang.tOr('container.exiting', '（正在退出…）') : '');
+			case Phase.Returning: Lang.tOr('container.returningToMeteoric', '正在返回 Meteoric…');
+			case Phase.Idle: Lang.tOr('container.idle', '空闲');
 		}
 	}
 }

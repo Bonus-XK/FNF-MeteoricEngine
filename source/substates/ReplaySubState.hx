@@ -149,7 +149,7 @@ class ReplaySubState extends MusicBeatSubstate
 		var hh:String = d.getHours() < 10 ? '0' + d.getHours() : Std.string(d.getHours());
 		var mi:String = d.getMinutes() < 10 ? '0' + d.getMinutes() : Std.string(d.getMinutes());
 		var p:Float = Math.floor((replay.percent * 10000)) / 100;
-		return mm + '-' + dd + ' ' + hh + ':' + mi + '   ·   ' + replay.score + ' 分   ·   ' + p + '%   ·   ' + replay.misses + ' Miss';
+		return mm + '-' + dd + ' ' + hh + ':' + mi + '   ·   ' + replay.score + Lang.tOr('replay.pointsSeparator', ' 分   ·   ') + p + '%   ·   ' + replay.misses + ' Miss';
 	}
 
 	function reloadList():Void

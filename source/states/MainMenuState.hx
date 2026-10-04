@@ -409,7 +409,7 @@ class MainMenuState extends MusicBeatState
 							case 0:
 								// Haxe 级报错：同步抛出未捕获异常（处于 update 链内 → uncaughtErrorEvents → 报错界面 + MeteoricEngine_*.txt）
 								trace('[CRASH-TEST] 触发 Haxe 级报错');
-								throw '手动 Haxe 崩溃测试（主菜单输入 crash 触发）';
+								throw Lang.tOr('debug.crashTestHint', '手动 Haxe 崩溃测试（主菜单输入 crash 触发）');
 							case 1:
 								// 原生/底层报错：真实段错误（走信号处理器 → native_stack.txt）
 								trace('[CRASH-TEST] 触发原生段错误');

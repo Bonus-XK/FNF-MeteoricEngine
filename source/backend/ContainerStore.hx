@@ -188,7 +188,7 @@ class ContainerStore
 
 		if (!hasManifest)
 		{
-			info.problem = '缺少 ' + ContainerManifestParser.FILE_NAME + '：无法确定目标引擎与启动方式';
+			info.problem = Lang.tOr('container.missingField', '缺少 ') + ContainerManifestParser.FILE_NAME + Lang.tOr('container.cannotDetermine', '：无法确定目标引擎与启动方式');
 			return info;
 		}
 
@@ -210,7 +210,7 @@ class ContainerStore
 		info.appPath = resolveApp(dir, data);
 
 		if (info.appPath == null)
-			info.problem = '找不到目标引擎主程序（container.json 的 app 字段或 bundle 内的可执行文件）';
+			info.problem = Lang.tOr('container.engineMainMissing', '找不到目标引擎主程序（container.json 的 app 字段或 bundle 内的可执行文件）');
 
 		return info;
 	}
@@ -359,7 +359,7 @@ class ContainerStore
 		var dest:String = resourcesDest(info);
 		if (dest == null)
 		{
-			info.problem = '无法定位目标引擎资源目录（app 字段指向的路径无效）';
+			info.problem = Lang.tOr('container.engineAssetsMissing', '无法定位目标引擎资源目录（app 字段指向的路径无效）');
 			return 0;
 		}
 		ensureDir(dest);
