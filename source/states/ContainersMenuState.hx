@@ -157,7 +157,7 @@ class ContainersMenuState extends MusicBeatState
 		rightTitle.scrollFactor.set();
 		add(rightTitle);
 
-		var subTitle:FlxText = new FlxText(LIST_X, 142, 0, Lang.tOr('containers.dropHint', '放入 ') + ContainerStore.CONTAINERS_DIR + '/<名称>/ 后点「重新扫描」', 15);
+		var subTitle:FlxText = new FlxText(LIST_X, 142, 0, Lang.tOr('containers.dropHint', '放入 ') + ContainerStore.CONTAINERS_DIR + Lang.tOr('container.dropSuffix', '/<名称>/ 后点「重新扫描」'), 15);
 		subTitle.setFormat(Paths.font('future.ttf'), 15, TEXT_DIM, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		subTitle.scrollFactor.set();
 		add(subTitle);
@@ -182,7 +182,7 @@ class ContainersMenuState extends MusicBeatState
 		}
 
 		emptyText = new FlxText(LIST_X, LIST_Y + 40, Std.int(PANEL_L_W - 90),
-			'（还没有容器）\n\n把目标引擎放进：\n' + ContainerStore.containersRoot() + '/<名称>/\n'
+			Lang.tOr('container.emptyList', '（还没有容器）\n\n把目标引擎放进：\n') + ContainerStore.containersRoot() + Lang.tOr('container.emptyListDir', '/<名称>/\n')
 			+ Lang.tOr('containers.addMore', '再补一个 ') + ContainerManifestParser.FILE_NAME + Lang.tOr('containers.addMoreHint', '（见 CONTAINERS.md 示例）'), 17);
 		emptyText.setFormat(Paths.font('future.ttf'), 17, TEXT_DIM, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		emptyText.borderSize = 1.5;
@@ -351,7 +351,7 @@ class ContainersMenuState extends MusicBeatState
 			detDesc.text = '';
 			detPath.text = '';
 			detProblem.text = '';
-			detHint.text = '提示：先点左下「容器功能」开关打开功能，再把目标引擎放进容器文件夹，\n然后点「重新扫描」。容器与本体 mod 完全隔离。';
+			detHint.text = Lang.tOr('containers.howTo', '提示：先点左下「容器功能」开关打开功能，再把目标引擎放进容器文件夹，\n然后点「重新扫描」。容器与本体 mod 完全隔离。');
 			switchBtn.visible = false;
 			return;
 		}
@@ -367,7 +367,7 @@ class ContainersMenuState extends MusicBeatState
 
 		detDesc.text = (info.description != null && info.description.length > 0) ? info.description : Lang.tOr('containers.noDescription', '（无描述）');
 
-		var pathTxt:String = Lang.tOr('containers.folder', '目录：') + info.path + '\n主程序：' + (info.appPath == null ? Lang.tOr('containers.notFound', '未找到') : info.appPath);
+		var pathTxt:String = Lang.tOr('containers.folder', '目录：') + info.path + Lang.tOr('container.mainProgram', '\n主程序：') + (info.appPath == null ? Lang.tOr('containers.notFound', '未找到') : info.appPath);
 		detPath.text = pathTxt;
 
 		detProblem.text = (info.problem != null) ? ('⚠ ' + info.problem) : '';
@@ -376,10 +376,10 @@ class ContainersMenuState extends MusicBeatState
 		var exitMode:String = ContainerManifestParser.str(data, 'exitMode', 'terminate');
 		var wait:Float = ContainerManifestParser.num(data, 'waitSeconds', ContainerLauncher.DEFAULT_WAIT);
 		var hotkeyTxt:String = describeHotkey();
-		detHint.text = Lang.tOr('containers.exitMode', '退出方式 ') + exitMode + '   ·   等待窗口 ' + wait + 's\n'
-			+ '退出容器：直接关掉目标引擎窗口，Meteoric 会自动唤醒并重启\n'
+		detHint.text = Lang.tOr('containers.exitMode', '退出方式 ') + exitMode + Lang.tOr('container.waitingWindow', '   ·   等待窗口 ') + wait + 's\n'
+			+ Lang.tOr('container.exitHint', '退出容器：直接关掉目标引擎窗口，Meteoric 会自动唤醒并重启\n')
 			+ Lang.tOr('containers.backHotkey', '返回热键 ') + hotkeyTxt + hotkeyHowto()
-			+ '\n退出后 Meteoric 会自动重启（本体整机复位）';
+			+ Lang.tOr('container.restartNote', '\n退出后 Meteoric 会自动重启（本体整机复位）');
 
 		switchBtn.visible = true;
 		switchBtn.setEnabled(ContainerSession.isReady(info) && !ContainerSession.active);
@@ -609,7 +609,7 @@ class ContainersMenuState extends MusicBeatState
 			statusText.text = statusInfo;
 			return;
 		}
-		statusText.text = Lang.tOr('containers.featureStatus', '容器功能：') + (ClientPrefs.data.containersEnabled ? '已启用' : '已在设置中关闭')
+		statusText.text = Lang.tOr('containers.featureStatus', '容器功能：') + (ClientPrefs.data.containersEnabled ? Lang.tOr('containers.enabled', '已启用') : Lang.tOr('containers.disabledInSettings', '已在设置中关闭'))
 			+ Lang.tOr('container.selectThenSwitch', '   ·   选中容器后按 Enter 或点「切换到此容器」');
 	}
 

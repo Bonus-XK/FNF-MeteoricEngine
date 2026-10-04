@@ -212,7 +212,7 @@ class Main extends Sprite
 		_storageLabel.multiline = true;
 		_storageLabel.selectable = false;
 		_storageLabel.defaultTextFormat = new openfl.text.TextFormat('', 26, 0xFFFFFF, true);
-		_storageLabel.text = '正在准备 ' + backend.AndroidStorage.root() + ' ...';
+		_storageLabel.text = Lang.tOr('start.preparing', '正在准备 ') + backend.AndroidStorage.root() + ' ...';
 		addChild(_storageLabel);
 
 		var st = backend.AndroidStorage;
@@ -236,7 +236,7 @@ class Main extends Sprite
 			else
 			{
 				_storageError = true;
-				_storageLabel.text = '无法访问存储（' + err + '）';
+				_storageLabel.text = Lang.tOr('start.noStorage', '无法访问存储（') + err + '）';
 			}
 		}
 		else
@@ -246,16 +246,16 @@ class Main extends Sprite
 			_storageWaitFrames = 600; // 10 秒等待授权
 			if (st.isAndroid11Plus())
 			{
-				_storageLabel.text = '需要"所有文件访问"权限\n'
-					+ '授权后即可把 Mod 直接放进手机根目录的 .meteoric/mods 文件夹\n'
-					+ '正在打开系统设置...\n\n'
-					+ '若未自动跳转，请手动：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n'
-					+ '（部分机型在"特殊应用权限"里，请在应用详情页开启）';
+				_storageLabel.text = Lang.tOr('start.needAllFiles', '需要"所有文件访问"权限\n')
+					+ Lang.tOr('start.afterGrant', '授权后即可把 Mod 直接放进手机根目录的 .meteoric/mods 文件夹\n')
+					+ Lang.tOr('start.openingSettings', '正在打开系统设置...\n\n')
+					+ Lang.tOr('start.manualGrant', '若未自动跳转，请手动：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n')
+					+ Lang.tOr('start.specialPerms', '（部分机型在"特殊应用权限"里，请在应用详情页开启）');
 				st.openStorageSettings();
 			}
 			else
 			{
-				_storageLabel.text = '请在弹窗中允许存储权限...';
+				_storageLabel.text = Lang.tOr('start.allowInDialog', '请在弹窗中允许存储权限...');
 				st.requestLegacyPermissions();
 			}
 		}
@@ -279,9 +279,9 @@ class Main extends Sprite
 			}
 
 			var pct = Math.round(st.copyPercent() * 100);
-			_storageLabel.text = '正在复制游戏资源到 ' + st.root() + '/assets ...\n'
+			_storageLabel.text = Lang.tOr('start.copyingAssets', '正在复制游戏资源到 ') + st.root() + '/assets ...\n'
 				+ pct + '%（' + st.copyDoneCount() + '/' + st.copyTotal() + '）\n\n'
-				+ '首次启动需要复制资源，完成后会直接读取外部目录，方便替换/添加素材。';
+				+ Lang.tOr('start.copyWhy', '首次启动需要复制资源，完成后会直接读取外部目录，方便替换/添加素材。');
 			return;
 		}
 
@@ -305,11 +305,11 @@ class Main extends Sprite
 		{
 			_storageWaitFrames--;
 			if (st.isAndroid11Plus())
-				_storageLabel.text = '等待"所有文件访问"授权...\n'
-					+ '完成后把 Mod 放进手机根目录 .meteoric/mods 即可\n'
-					+ '（返回游戏自动继续）';
+				_storageLabel.text = Lang.tOr('start.waitingGrant', '等待"所有文件访问"授权...\n')
+					+ Lang.tOr('start.thenDropMods', '完成后把 Mod 放进手机根目录 .meteoric/mods 即可\n')
+					+ Lang.tOr('start.autoResume', '（返回游戏自动继续）');
 			else
-				_storageLabel.text = '请在弹窗中允许存储权限...';
+				_storageLabel.text = Lang.tOr('start.allowInDialog', '请在弹窗中允许存储权限...');
 			return;
 		}
 
@@ -321,16 +321,16 @@ class Main extends Sprite
 			if (err == null)
 			{
 				_storageError = false;
-				_storageLabel.text = '未获得"所有文件访问"权限，已改用应用专用目录：\n' + st.root()
-					+ '\n\n授权方法：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n'
-					+ '（部分机型在"特殊应用权限"里）\n'
-					+ '授权后重启游戏，会自动把 Mod 与资源迁移到根目录 .meteoric。';
-				try { extension.androidtools.widget.Toast.makeText('未获权限，使用应用专用目录', 0); } catch (e:Dynamic) {}
+				_storageLabel.text = Lang.tOr('start.fallbackDir', '未获得"所有文件访问"权限，已改用应用专用目录：\n') + st.root()
+					+ Lang.tOr('start.howToGrant', '\n\n授权方法：系统设置 → 应用 → 本应用 → 权限 → 所有文件访问\n')
+					+ Lang.tOr('start.specialPermsShort', '（部分机型在"特殊应用权限"里）\n')
+					+ Lang.tOr('start.migrateNote', '授权后重启游戏，会自动把 Mod 与资源迁移到根目录 .meteoric。');
+				try { extension.androidtools.widget.Toast.makeText(Lang.tOr('start.usingPrivate', '未获权限，使用应用专用目录'), 0); } catch (e:Dynamic) {}
 				st.startCopyAssets();
 				return;
 			}
 		}
-		_storageLabel.text = '无法访问存储目录\n请在系统设置中为本应用授予"所有文件访问"权限（Android 11+），\n授权后回到游戏会自动继续。';
+		_storageLabel.text = Lang.tOr('start.noStorageDir', '无法访问存储目录\n请在系统设置中为本应用授予"所有文件访问"权限（Android 11+），\n授权后回到游戏会自动继续。');
 		if (!_storageGuideShown)
 		{
 			_storageGuideShown = true;

@@ -414,7 +414,7 @@ class AchievementsMenuState extends MusicBeatState
 
 		descText.text = (unlocked || !hidden)
 			? Achievements.achievementsStuff[getAchievementIdx(curSelected)][1]
-			: '这是一个隐藏成就\n完成特定条件后解锁';
+			: Lang.tOr('achievements.hiddenHint', '这是一个隐藏成就\n完成特定条件后解锁');
 		descText.updateHitbox();
 
 		triggerText.text = (unlocked || !hidden)
@@ -422,7 +422,7 @@ class AchievementsMenuState extends MusicBeatState
 			: '？？？';
 		triggerText.updateHitbox();
 
-		progressText.text = '已解锁 ' + unlockedCount + ' / ' + achievementList.length;
+		progressText.text = Lang.tOr('achievements.unlockedPrefix', '已解锁 ') + unlockedCount + ' / ' + achievementList.length;
 		progressText.updateHitbox();
 
 		var ratio:Float = achievementList.length > 0 ? unlockedCount / achievementList.length : 0;

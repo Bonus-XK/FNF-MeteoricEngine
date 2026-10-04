@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import haxe.io.Path;
 import sys.FileSystem;
@@ -181,7 +182,7 @@ class ModInstaller
 					addToModsList(folderInstallName);
 					busy = false;
 					lastInstallTime = haxe.Timer.stamp();
-					showMessage(Lang.tOr('install.done', '安装完成'), Lang.tOr('install.installedPrefix', '已安装：') + folderInstallName + '\n\n去 Mods 菜单里选中就能用啦！');
+					showMessage(Lang.tOr('install.done', '安装完成'), Lang.tOr('install.installedPrefix', '已安装：') + folderInstallName + Lang.tOr('install.doneThenSelect', '\n\n去 Mods 菜单里选中就能用啦！'));
 				}
 			}
 			else if (copier.total > 0)
@@ -252,7 +253,7 @@ class ModInstaller
 		{
 			// 兜底：拖入路径上的任何异常都不允许逃进 C++ 事件分发（避免无弹窗闪退）
 			trace('[ModInstaller] onDropFile error: ' + Std.string(e));
-			try { showMessage(Lang.tOr('install.failed', '安装失败'), '处理拖入文件时出错：\n' + Std.string(e)); } catch (e2:Dynamic) {}
+			try { showMessage(Lang.tOr('install.failed', '安装失败'), Lang.tOr('install.dropFailedDetail', '处理拖入文件时出错：\n') + Std.string(e)); } catch (e2:Dynamic) {}
 		}
 	}
 
@@ -281,7 +282,7 @@ class ModInstaller
 	{
 		if (!ZipReader.isZipFile(zipPath))
 		{
-			showMessage(Lang.tOr('install.notValidArchive', '不是有效的压缩包'), '这个文件看起来不是 ZIP：\n' + Path.withoutDirectory(zipPath));
+			showMessage(Lang.tOr('install.notValidArchive', '不是有效的压缩包'), Lang.tOr('install.notZipDetail', '这个文件看起来不是 ZIP：\n') + Path.withoutDirectory(zipPath));
 			return;
 		}
 
@@ -297,7 +298,7 @@ class ModInstaller
 		catch (e:Dynamic)
 		{
 			busy = false;
-			showMessage(Lang.tOr('install.parseFailed', '解析失败'), '无法读取这个压缩包：\n' + Std.string(e));
+			showMessage(Lang.tOr('install.parseFailed', '解析失败'), Lang.tOr('install.readFailDetail', '无法读取这个压缩包：\n') + Std.string(e));
 			return;
 		}
 		trace('[ModInstaller] readEntries: ' + Std.int((haxe.Timer.stamp() - t0) * 1000) + 'ms, entries=' + entries.length);
@@ -319,7 +320,7 @@ class ModInstaller
 		catch (e:Dynamic)
 		{
 			busy = false;
-			showMessage(Lang.tOr('install.cannotInstall', '无法安装'), '分析压缩包时出错：\n' + Std.string(e));
+			showMessage(Lang.tOr('install.cannotInstall', '无法安装'), Lang.tOr('install.analyzeFailDetail', '分析压缩包时出错：\n') + Std.string(e));
 			return;
 		}
 		trace('[ModInstaller] analyze: ' + Std.int((haxe.Timer.stamp() - t1) * 1000) + 'ms');
@@ -500,7 +501,7 @@ class ModInstaller
 			msg += Lang.tOr('install.installedPrefix', '已安装：') + installedNames.join('、') + '\n';
 		if (failed.length > 0)
 			msg += Lang.tOr('install.failedItems', '以下内容安装失败：') + failed.join('、') + '\n';
-		msg += '\n去 Mods 菜单里选中就能用啦！';
+		msg += Lang.tOr('install.doneThenSelectShort', '\n去 Mods 菜单里选中就能用啦！');
 		if (installedNames.length > 0)
 			lastInstallTime = haxe.Timer.stamp(); // 通知打开中的 Mods 菜单刷新
 		showMessage(Lang.tOr('install.done', '安装完成'), msg);

@@ -56,7 +56,7 @@ class ModsDeleteConfirmSubstate extends MusicBeatSubstate
 		add(title);
 
 		// 提示
-		var msg:FlxText = new FlxText(px + 40, py + 84, pw - 80, Lang.tOr('mods.deleteConfirm', '确定要删除 Mod「') + modName + '」吗？\n删除后无法恢复！', 19);
+		var msg:FlxText = new FlxText(px + 40, py + 84, pw - 80, Lang.tOr('mods.deleteConfirm', '确定要删除 Mod「') + modName + Lang.tOr('mods.deleteConfirmTail', '」吗？\n删除后无法恢复！'), 19);
 		msg.setFormat(Paths.font('future.ttf'), 19, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		msg.textField.height = 84;
 		msg.scrollFactor.set(0, 0);

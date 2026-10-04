@@ -680,7 +680,7 @@ class FreeplayState extends MusicBeatState
 
 			if(!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
 			{
-				missingText.text = '在加载铺面文件时出错：\n缺失的文件：data/' + songLowercase + '/' + poop;
+				missingText.text = Lang.tOr('freeplay.missingChart', '在加载铺面文件时出错：\n缺失的文件：data/') + songLowercase + '/' + poop;
 				missingText.screenCenter(Y);
 				missingText.visible = true;
 				missingTextBG.visible = true;

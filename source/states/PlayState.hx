@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 // If you want to add your stage to the game, copy states/stages/Template.hx,
 // and put your stage code there, then, on PlayState, search for
@@ -1504,7 +1505,7 @@ class PlayState extends MusicBeatState
 				try { inst = new FlxSound().loadEmbedded(new openfl.media.Sound()); } catch (e2:Dynamic) {}
 			silentChartAudio = true;
 			#if android
-			try { extension.androidtools.widget.Toast.makeText('音频加载失败，本局静音', 0); } catch (e2:Dynamic) {}
+			try { extension.androidtools.widget.Toast.makeText(Lang.tOr('play.audioLoadFailedToast', '音频加载失败，本局静音'), 0); } catch (e2:Dynamic) {}
 			#end
 		}
 		FlxG.sound.list.add(vocals);

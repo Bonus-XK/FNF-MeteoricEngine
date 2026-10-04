@@ -702,7 +702,7 @@ class LoadingState extends MusicBeatState
 	{
 		clearPendingChart();
 		loadFailed = true;
-		errorText.text = '谱面加载失败：\n$chartError';
+		errorText.text = Lang.tOr('loading.chartFailedPrefix', '谱面加载失败：\n') + chartError;
 		errorText.screenCenter();
 		errorText.visible = true;
 		statusText.text = '';

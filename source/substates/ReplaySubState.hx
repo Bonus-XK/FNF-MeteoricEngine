@@ -75,7 +75,7 @@ class ReplaySubState extends MusicBeatSubstate
 		selectorBar = makePanel(PANEL_X + 24, LIST_Y - 3, PANEL_W - 48, 46, 14, DesignTokens.rowHighlight, null);
 		add(selectorBar);
 
-		emptyText = new FlxText(TITLE_X, 300, PANEL_W - 100, '该歌曲/难度还没有回放\n完成一次手动游玩后会自动保存', 24);
+		emptyText = new FlxText(TITLE_X, 300, PANEL_W - 100, Lang.tOr('replay.noneYet', '该歌曲/难度还没有回放\n完成一次手动游玩后会自动保存'), 24);
 		emptyText.setFormat(Paths.font('future.ttf'), 24, 0xFFA9A9B8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		emptyText.scrollFactor.set();
 		emptyText.visible = false;
@@ -202,7 +202,7 @@ class ReplaySubState extends MusicBeatSubstate
 		if (!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
 		{
 			PlayState.queuedReplay = null;
-			missingText.text = '在加载铺面文件时出错：\n缺失的文件：data/' + songLowercase + '/' + poop;
+			missingText.text = Lang.tOr('replay.missingChart', '在加载铺面文件时出错：\n缺失的文件：data/') + songLowercase + '/' + poop;
 			missingText.screenCenter(Y);
 			missingText.visible = true;
 			missingTextBG.visible = true;

@@ -45,12 +45,12 @@ class ErrorState extends FlxState
 		errTxt.setFormat(Paths.font('future.ttf'), 20, 0xFFFFDDDD, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(errTxt);
 
-		stackText = new FlxText(24, 170, FlxG.width - 48, '调用堆栈：\n' + CrashHandler.errorStack, 16);
+		stackText = new FlxText(24, 170, FlxG.width - 48, Lang.tOr('error.stack', '调用堆栈：\n') + CrashHandler.errorStack, 16);
 		stackText.setFormat(Paths.font('future.ttf'), 16, 0xFFAAAAAA, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(stackText);
 
 		var hintTxt:FlxText = new FlxText(24, FlxG.height - 46, FlxG.width - 48,
-			'完整错误信息已保存到 crash 目录下的日志文件\n[Enter] 返回主菜单    [Esc] 退出游戏', 18);
+			Lang.tOr('error.savedHint', '完整错误信息已保存到 crash 目录下的日志文件\n[Enter] 返回主菜单    [Esc] 退出游戏'), 18);
 		hintTxt.setFormat(Paths.font('future.ttf'), 18, 0xFFDDDDDD, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(hintTxt);
 

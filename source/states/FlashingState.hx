@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import flixel.FlxSubState;
 
@@ -25,12 +26,12 @@ class FlashingState extends MusicBeatState
 		Lib.application.window.title = "FNF':Meteoric Engine - <!>Warning";
 		
 		warnText = new FlxText(0, 0, FlxG.width,
-			"<!>警告\n
+			Lang.tOr('flashing.warning', "<!>警告\n
 			本游戏包含少数频闪内容\n
 			这可能会导致光敏性患者病情复发\n
 			> Enter  我已知晓\n
 			> ESC  关闭闪光灯\n
-			你已被警告！",
+			你已被警告！"),
 			32);
 		warnText.setFormat(Paths.font("future.ttf"), 32, FlxColor.RED, CENTER);
 		warnText.screenCenter(Y);

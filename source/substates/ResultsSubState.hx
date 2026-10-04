@@ -242,7 +242,7 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(newRecordText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 		}
 
-		var statDefs:Array<String> = [Lang.tOr('results.currentScore', '当前分数'), Lang.tOr('results.bestScore', '最佳分数'), '最高连击', '失误数', '命中 / 总音符', '准确度'];
+		var statDefs:Array<String> = [Lang.tOr('results.currentScore', '当前分数'), Lang.tOr('results.bestScore', '最佳分数'), Lang.tOr('results.statMaxCombo', '最高连击'), Lang.tOr('results.statMisses', '失误数'), Lang.tOr('results.statHitTotal', '命中 / 总音符'), Lang.tOr('results.statAccuracy', '准确度')];
 		var statVals:Array<String> = [
 			FlxStringUtil.formatMoney(st.songScore),
 			FlxStringUtil.formatMoney(bestScore),
@@ -308,7 +308,7 @@ class ResultsSubState extends MusicBeatSubstate
 			var cnt:Int = 0;
 			for (e in entries)
 				if (e.r != 'miss') { sum += e.d; cnt++; }
-			var meanStr:String = (cnt > 0) ? (Lang.tOr('results.meanOffset', '平均偏移 Mean ') + CoolUtil.floorDecimal(sum / cnt, 2) + ' ms') : '平均偏移 Mean -';
+			var meanStr:String = (cnt > 0) ? (Lang.tOr('results.meanOffset', '平均偏移 Mean ') + CoolUtil.floorDecimal(sum / cnt, 2) + ' ms') : Lang.tOr('results.meanOffsetNone', '平均偏移 Mean -');
 			var winStr:String = 'SICK ' + ClientPrefs.data.sickWindow + ' / GOOD ' + ClientPrefs.data.goodWindow
 				+ ' / BAD ' + ClientPrefs.data.badWindow + ' / SHIT 166';
 			var meanText:FlxText = new FlxText(innerX, GRAPH_Y + GRAPH_H - 22, innerW, meanStr + '　' + winStr, 13);

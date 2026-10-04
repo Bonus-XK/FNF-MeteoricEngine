@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import openfl.events.UncaughtErrorEvent;
 import haxe.CallStack;
@@ -286,7 +287,7 @@ class CrashHandler
 		try {
 			return untyped __cpp__("meteoric_os_cstr()");
 		} catch (e:Dynamic) {
-			return '未知平台';
+			return Lang.tOr('crash.unknownPlatform', '未知平台');
 		}
 	}
 	#else
@@ -312,7 +313,7 @@ class CrashHandler
 	static function onUncaughtError(e:UncaughtErrorEvent):Void
 	{
 		e.preventDefault();
-		handleError('未捕获异常', Std.string(e.error), CallStack.exceptionStack(true));
+		handleError(Lang.tOr('crash.uncaught', '未捕获异常'), Std.string(e.error), CallStack.exceptionStack(true));
 	}
 
 	public static function handleError(source:String, error:String, stack:Array<StackItem>):Void
@@ -366,7 +367,7 @@ class CrashHandler
 		try { Sys.sleep(0.05); } catch (e:Dynamic) {}
 		untyped __cpp__("*(volatile int*)(intptr_t)0 = 1");
 		#else
-		throw '原生崩溃触发仅支持 cpp 平台';
+		throw Lang.tOr('crash.cppOnly', '原生崩溃触发仅支持 cpp 平台');
 		#end
 	}
 
@@ -377,7 +378,7 @@ class CrashHandler
 		#end
 		#if android
 		// 安卓：lime 的 window.alert 未实现（调了会抛异常 → 静默扇退），改用系统 Toast
-		try { extension.androidtools.widget.Toast.makeText('Meteoric Engine 发生错误，崩溃日志已保存：' + error, 1); } catch (e:Dynamic) {}
+		try { extension.androidtools.widget.Toast.makeText(Lang.tOr('crash.toastPrefix', 'Meteoric Engine 发生错误，崩溃日志已保存：') + error, 1); } catch (e:Dynamic) {}
 		#else
 		try { openfl.Lib.application.window.alert(buildMessage(source, error), 'Meteoric Engine - Error'); } catch (e:Dynamic) {}
 		#end
@@ -386,14 +387,14 @@ class CrashHandler
 
 	static function buildMessage(source:String, error:String):String
 	{
-		var logHint:String = #if android '\n\n崩溃日志已保存到：手机存储的 .meteoric/crash 目录' #else '\n\n请将 crash 目录下的日志文件发送给开发者，感谢反馈！' #end;
-		return '错误来源：' + source + '\n错误信息：' + error + logHint;
+		var logHint:String = #if android Lang.tOr('crash.androidHint', '\n\n崩溃日志已保存到：手机存储的 .meteoric/crash 目录') #else Lang.tOr('crash.desktopHint', '\n\n请将 crash 目录下的日志文件发送给开发者，感谢反馈！') #end;
+		return Lang.tOr('crash.sourceLabel', '错误来源：') + source + Lang.tOr('crash.messageLabel', '\n错误信息：') + error + logHint;
 	}
 
 	static function formatStack(stack:Array<StackItem>):String
 	{
 		if (stack == null || stack.length == 0)
-			return '(无堆栈信息)';
+			return Lang.tOr('crash.noStack', '(无堆栈信息)');
 
 		var lines:Array<String> = [];
 		for (item in stack)

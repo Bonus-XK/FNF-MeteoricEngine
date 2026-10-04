@@ -589,7 +589,7 @@ class PauseSubState extends MusicBeatSubstate
 
 					var errorStr:String = e.toString();
 					if(errorStr.startsWith('[file_contents,assets/data/')) errorStr = Lang.tOr('pause.missingFiles', '丢失的文件：') + errorStr.substring(27, errorStr.length-1); //Missing chart
-					missingText.text = '加载铺面文件时出错！\n$errorStr';
+					missingText.text = Lang.tOr('pause.loadChartFailedPrefix', '加载铺面文件时出错！\n') + errorStr;
 					missingText.screenCenter(Y);
 					missingText.visible = true;
 					missingTextBG.visible = true;

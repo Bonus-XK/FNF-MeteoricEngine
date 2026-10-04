@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import haxe.io.Path;
 import sys.FileSystem;
@@ -120,7 +121,7 @@ class FolderCopier
 			if (ok)
 				safeSend({t: 'done'});
 			else
-				safeSend({t: 'err', msg: '系统复制失败（exit ' + code + '）'});
+				safeSend({t: 'err', msg: Lang.tOr('copy.systemFail', '系统复制失败（exit ') + code + '）'});
 		}
 		catch (e:Dynamic)
 		{

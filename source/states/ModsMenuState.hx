@@ -299,7 +299,7 @@ class ModsMenuState extends MusicBeatState
 		}
 
 		// ---- 无 Mod 提示 ----
-		noModsTxt = new FlxText(60, 250, PANEL_L_W - 40, '没有安装任何 Mod\n\n把 Mod 文件夹放进 mods/ 目录后重新打开本界面\n\n按 Enter 打开 Mod 下载站', 28);
+		noModsTxt = new FlxText(60, 250, PANEL_L_W - 40, Lang.tOr('mods.emptyList', '没有安装任何 Mod\n\n把 Mod 文件夹放进 mods/ 目录后重新打开本界面\n\n按 Enter 打开 Mod 下载站'), 28);
 		noModsTxt.setFormat(Paths.font("future.ttf"), 26, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		noModsTxt.textField.height = 140;
 		noModsTxt.borderSize = 2;
@@ -797,7 +797,7 @@ class ModsMenuState extends MusicBeatState
 		cardName.updateHitbox();
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
-		cardStatus.text = isOn ? '已启用' : Lang.tOr('mods.disabledHint', '已停用（按 Enter 或点击启用）');
+		cardStatus.text = isOn ? Lang.tOr('mods.enabledShort', '已启用') : Lang.tOr('mods.disabledHint', '已停用（按 Enter 或点击启用）');
 		#if (MODS_ALLOWED && sys)
 		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
 		if (bridge.CneBridge.isCneMod(mod.folder))
@@ -886,7 +886,7 @@ class ModsMenuState extends MusicBeatState
 
 		var enabledCount:Int = 0;
 		for (values in modsList) if (values[1] == true) enabledCount++;
-		countText.text = '已启用 ' + enabledCount + Lang.tOr('mods.countSeparator', ' / 共 ') + mods.length;
+		countText.text = Lang.tOr('mods.enabledCountPrefix', '已启用 ') + enabledCount + Lang.tOr('mods.countSeparator', ' / 共 ') + mods.length;
 		countText.updateHitbox();
 
 		descText.wordWrap = true;

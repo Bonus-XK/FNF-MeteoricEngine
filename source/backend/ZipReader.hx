@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import haxe.io.Bytes;
 import sys.FileSystem;
@@ -350,7 +351,7 @@ class ZipExtractor
 			#end
 			var code:Int = Sys.command(cmd);
 			if (code != 0)
-				safeSend({t: 'err', msg: '系统解压失败（exit ' + code + '）'});
+				safeSend({t: 'err', msg: Lang.tOr('zip.systemFail', '系统解压失败（exit ') + code + '）'});
 			else
 				safeSend({t: 'done'});
 		}
@@ -474,7 +475,7 @@ class ZipExtractor
 				workersDone++;
 				if (workersDone >= workerCount)
 				{
-					if (hadError && error == null) error = '解压失败（worker 异常）';
+					if (hadError && error == null) error = Lang.tOr('zip.workerFail', '解压失败（worker 异常）');
 					finished = true;
 				}
 
