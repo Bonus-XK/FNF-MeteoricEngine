@@ -147,6 +147,21 @@ class FlxText extends FlxSprite
 	var _regen:Bool = true;
 
 	/**
+	 * Meteoric 追加：强制下一帧重绘文本位图。
+	 *
+	 * 为什么需要：FlxText 是把文本**画进缓存 BitmapData**（drawTextFieldTo），
+	 * 不是每帧拿 TextField 直接渲染。因此外部改了 `textField.scrollH`
+	 * （跑马灯横向滚动）之后位图不会自动更新，视觉上完全无变化 —— 必须显式置脏。
+	 *
+	 * 用法：改完 textField 的可见属性（scrollH/scrollV）后调一次；
+	 * **不要**每帧无脑调（那是重画位图的开销）。设置页侧栏跑马灯按 ~20fps 节流调用。
+	 */
+	public function forceRegen():Void
+	{
+		_regen = true;
+	}
+
+	/**
 	 * Helper vars to draw border styles with transparency.
 	 */
 	var _borderPixels:BitmapData;

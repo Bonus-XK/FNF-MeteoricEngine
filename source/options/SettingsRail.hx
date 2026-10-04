@@ -74,6 +74,35 @@ class SettingsRail extends FlxGroup
 	var lastPageTime:Float = -9999; // 上次翻页时间（毫秒）
 	var rows:Array<FlxText> = [];
 	var lastText:Array<String> = [];
+	// ===== 跑马灯（超宽行文本横向滚动）=====
+	// 为什么需要：侧栏行宽固定 TEXT_W=166px 且 wordWrap=false（禁止折行压下一行），
+	// 多语言后英文分区名（如 "Customize HUD"、"Touch Controls"）会超出该宽度被硬裁掉。
+	// 为什么只滚**选中行**：整栏一起滚视觉噪声大且违反"低频动效"纪律；
+	// 未选中行只是静态截断（用户没聚焦它，看全名没有价值）。
+	/** 每行文本实际宽度（px），-1 = 该行不需要滚动 */
+	var rowTextW:Array<Float> = [];
+	/** 当前 scrollX（px） */
+	var rowScroll:Float = 0;
+	/** 距离下一次推进的剩余秒数（用于「停留 → 滚动 → 停留」的循环） */
+	var rowScrollWait:Float = 0;
+	/** 上次滚动所对应的行索引；换行/换文案时重置 */
+	var rowScrollIdx:Int = -1;
+	/** 上一次看到的选中行文本，用于检测换文案并复位 */
+	var rowScrollText:String = null;
+	/** 上次写入 textField 的 scrollH（相同则跳过重复写入；-1 = 尚未写过） */
+	var rowScrollDrawn:Int = -1;
+	/** 距上次重绘累积的秒数（节流用） */
+	var rowScrollAccum:Float = 0;
+
+	/** 跑马灯参数（px/秒 与 停留秒数） */
+	static final SCROLL_SPEED:Float = 26;
+	static final SCROLL_HOLD_START:Float = 1.1; // 起手先停多久
+	static final SCROLL_HOLD_END:Float = 1.6; // 滚到尾再停多久
+	/** 判定「超宽」的余量（px）：抗字体渲染误差，避免刚好齐边就抖动 */
+	static final OVERFLOW_EPS:Float = 1.0;
+	/** 位图重绘节流间隔（秒）≈20fps：FlxText 是缓存位图，改 scrollH 必须重绘才可见 */
+	static final SCROLL_REDRAW_INTERVAL:Float = 0.05;
+
 	var bar:FlxSprite;
 	/** 侧栏底板（主题色变更时要原地重绘，故留引用） */
 	var panel:FlxSprite;
@@ -101,12 +130,13 @@ class SettingsRail extends FlxGroup
 			row.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			row.borderSize = 2;
 			row.antialiasing = ClientPrefs.data.antialiasing;
-			row.wordWrap = false; // 固定 166px 宽：长名靠截断，禁止折行压到下一行
+			row.wordWrap = false; // 固定 166px 宽：长名靠跑马灯（仅选中行）看全，禁止折行压到下一行
 			row.scrollFactor.set();
 			row.visible = false;
 			add(row);
 			rows.push(row);
 			lastText.push('');
+			rowTextW.push(-1);
 		}
 	}
 
@@ -124,6 +154,9 @@ class SettingsRail extends FlxGroup
 	{
 		labels = list;
 		if (curSelected >= labels.length) curSelected = Std.int(Math.max(0, labels.length - 1));
+		// 文案整体换了（首次构建 / 语言切换）→ 强制每行重测宽度并复位跑马灯，
+		// 否则会沿用旧语言的缓存宽度判定（英文比中文宽，判定结果完全不同）。
+		resetRowScroll();
 		snapScroll();
 	}
 
@@ -215,6 +248,10 @@ class SettingsRail extends FlxGroup
 			if (Math.abs(scrollAnim - target) < 0.002) scrollAnim = target;
 		}
 
+		// 跑马灯步长：写进实例字段供 renderRows → applyRowScroll 读取
+		// （切到后台/暂停时 elapsed 可能异常，钳到上限避免恢复瞬间跳一大截）
+		tickDt = Math.min(elapsed, 0.1);
+
 		renderRows();
 	}
 
@@ -272,12 +309,28 @@ class SettingsRail extends FlxGroup
 				lastText[r] = txt;
 				row.text = txt;
 				row.updateHitbox();
+				// FlxText 每次 set_text 都会复位内部 TextField 的 scrollX：
+				// 换文案必须重测宽度并把跑马灯状态清零，否则会带着旧偏移/旧宽度继续滚。
+				rowTextW[r] = -1;
+				row.textField.scrollH = 0;
 			}
 			row.y = LIST_Y + rel * ROW_GAP;
 
 			var isSel:Bool = (idx == curSelected);
 			row.alpha = isSel ? 1 : 0.78;
 			row.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+
+			// 跑马灯：只有选中行滚动；其余行一律停在起点（scrollH=0）
+			if (isSel) applyRowScroll(row, r, idx, txt);
+			else if (rowScrollDrawn != 0)
+			{
+				// 该行刚被取消选中、可能停在滚动中途 → 必须归零**并重绘**，
+				// 只改 scrollH 不重绘的话位图仍是滚动后的画面（视觉残留）。
+				rowScrollDrawn = 0;
+				rowScrollAccum = 0;
+				row.textField.scrollH = 0;
+				row.forceRegen();
+			}
 		}
 
 		// 高亮条：跟随选中项，按同一插值位移（滑动期间与文字同步，不会"框先到、字后到"）
@@ -293,9 +346,106 @@ class SettingsRail extends FlxGroup
 
 	function set_curSelected(v:Int):Int
 	{
+		if (curSelected != v) resetRowScroll();
 		curSelected = v;
 		return curSelected;
 	}
+
+	/** 跑马灯状态复位（换行 / 换文案 / 语言切换后调用） */
+	function resetRowScroll():Void
+	{
+		rowScroll = 0;
+		rowScrollWait = 0;
+		rowScrollIdx = -1;
+		rowScrollText = null;
+		rowScrollDrawn = -1;
+		rowScrollAccum = 0;
+		for (r in 0...rows.length)
+		{
+			rowTextW[r] = -1;
+			if (rows[r] != null && rows[r].textField != null) rows[r].textField.scrollH = 0;
+		}
+	}
+
+	/**
+	 * 推进选中行的跑马灯（仅在文本超出 TEXT_W 时生效）。
+	 *
+	 * 循环：起手停留 → 匀速滚到末尾 → 末尾停留 → 瞬间归零 → 再停 → 再滚。
+	 * 用 `textField.scrollH` 而不是移动 FlxText.x：后者需要额外裁剪遮罩，
+	 * 会与「高亮条必须先 add」这条层级契约打架（遮罩要么裁掉高亮条、要么被行文字盖住）。
+	 */
+	function applyRowScroll(row:FlxText, r:Int, idx:Int, txt:String):Void
+	{
+		if (row == null || row.textField == null) return;
+
+		// 换行或换文案 → 复位（否则带着上一行的偏移/宽度继续滚）
+		if (idx != rowScrollIdx || txt != rowScrollText)
+		{
+			rowScrollIdx = idx;
+			rowScrollText = txt;
+			rowScroll = 0;
+			rowScrollWait = SCROLL_HOLD_START;
+			rowScrollDrawn = -1;
+			rowScrollAccum = 0;
+			row.textField.scrollH = 0;
+			row.forceRegen();
+		}
+
+		// 量宽（懒测：只在成为选中行时测一次，缓存进 rowTextW）
+		if (rowTextW[r] < 0) rowTextW[r] = row.textField.textWidth;
+
+		var overflow:Float = rowTextW[r] - TEXT_W;
+		if (overflow <= OVERFLOW_EPS)
+		{
+			if (rowScrollDrawn != 0)
+			{
+				rowScrollDrawn = 0;
+				row.textField.scrollH = 0;
+				row.forceRegen();
+			}
+			rowScroll = 0;
+			return;
+		}
+
+		if (rowScrollWait > 0)
+		{
+			rowScrollWait -= tickDt;
+			return;
+		}
+
+		rowScroll += SCROLL_SPEED * tickDt;
+		if (rowScroll >= overflow)
+		{
+			rowScroll = 0;
+			rowScrollWait = SCROLL_HOLD_END;
+		}
+		applyScrollH(row);
+	}
+
+	/**
+	 * 写入 scrollH 并按节流重绘位图。
+	 *
+	 * FlxText 把文本画进缓存 BitmapData，所以改 scrollH 后必须 forceRegen 才可见。
+	 * 但每帧重画一张 166×32 的位图属于"逐帧绘制"（违反 meteoric-system 绘制纪律），
+	 * 故节流到 ~20fps：位移按真实 elapsed 累积，只在攒够 ~0.05s 才画一次，
+	 * 视觉上是平滑滚动（26px/s × 0.05s ≈ 1.3px/步），开销可忽略。
+	 */
+	function applyScrollH(row:FlxText):Void
+	{
+		var v:Int = Std.int(rowScroll);
+		if (v == rowScrollDrawn) return; // 位图已是这一位置，不必重画
+		rowScrollDrawn = v;
+		row.textField.scrollH = v; // scrollH 是 Int（openfl TextField 的类型）
+		rowScrollAccum += tickDt;
+		if (rowScrollAccum >= SCROLL_REDRAW_INTERVAL)
+		{
+			rowScrollAccum = 0;
+			row.forceRegen();
+		}
+	}
+
+	/** 本帧步长（秒）。由 update 写入，跑马灯在 renderRows 里读取，避免逐层传参。 */
+	var tickDt:Float = 0;
 
 	function set_focused(v:Bool):Bool
 	{

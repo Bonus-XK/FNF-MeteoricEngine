@@ -266,6 +266,23 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   只替换「展示位」，跳过 ① 注释行 ② `new Option(...)` 实参（已是 `tOr` 的原文兜底）
   ③ 任何「中文当选择器/比较值」的位置（`case '中文'` / `== '中文'` / `.remove('中文')`）。
   注意 `case 'Scroll Type': return '滚动方式';` 这种**是展示位**，不要误跳。
+- **超宽文本一律用跑马灯，禁止硬裁**（多语言后英文比中文宽，必踩）：
+  设置侧栏 `SettingsRail` 行宽固定 `TEXT_W = PANEL_W - 64 = 166px` 且 `wordWrap = false`
+  （禁止折行压下一行），英文分区名（"Customize HUD" / "Touch Controls"）会超出被裁掉。
+  实现见 `SettingsRail.applyRowScroll()`：**只有选中行滚动**，其余行停在起点；
+  循环 = 起手停 1.1s → 26px/s 匀速 → 尾部停 1.6s → 归零。
+  - ⚠ **`FlxText` 是把文本画进缓存 BitmapData**（`drawTextFieldTo`），不是每帧直渲 TextField。
+    所以改 `textField.scrollH` 后**必须调 `FlxText.forceRegen()`** 才可见 ——
+    本仓库为此在 `FlxText` 上加了 `forceRegen()`（原本 `_regen` 是私有的）。
+    **只改 scrollH 不重绘 = 视觉完全无变化**，极易误判成「API 没生效」。
+  - 位图重绘必须**节流**（`SCROLL_REDRAW_INTERVAL = 0.05s` ≈20fps）：
+    每帧重画一张 166×32 位图属于逐帧绘制，违反本 skill 的绘制纪律。
+  - `scrollH` 是 **Int**（不是 Float），要 `Std.int()`；API 名是 `scrollH`（**没有 `scrollX`**）。
+  - 取消选中 / 换行 / 换文案 / 语言切换（`setLabels`）都必须复位 `scrollH` **并 forceRegen**，
+    否则该行会永久停在滚动中途的画面。
+  - 内容区标题（`OptionsPane.titleText`，`TITLE_W = 892`）与右侧说明（`extHint`，自动折行）
+    宽度充裕，**不需要**跑马灯；只有侧栏这 166px 一处需要。
+
 - **仍待接入**（不要以为已完成）：各**编辑器**页（Charting / LuaGraph / 角色 / 周目 / 对话）、
   `luagraph` 代码生成标签 —— 按需求方决定**跳过**。`Achievements.hx` 的成就名/说明已接入
   （key 用存档 tag，如 `achievement.week1_nomiss.name`；成就解锁存档用的是 tag 不是名字，
