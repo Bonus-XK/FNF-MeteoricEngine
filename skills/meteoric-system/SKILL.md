@@ -270,7 +270,13 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   设置侧栏 `SettingsRail` 行宽固定 `TEXT_W = PANEL_W - 64 = 166px` 且 `wordWrap = false`
   （禁止折行压下一行），英文分区名（"Customize HUD" / "Touch Controls"）会超出被裁掉。
   实现见 `SettingsRail.applyRowScroll()`：**只有选中行滚动**，其余行停在起点；
-  循环 = 起手停 1.1s → 26px/s 匀速 → 尾部停 1.6s → 归零。
+  循环 = 乒乓往返：起手停 1.1s → 26px/s 向后滚到末尾 → 停 1.6s → **原路滚回开头**
+  → 停 1.1s → 再来。
+  - ⚠ 往返**必须用方向位 `rowScrollDir`（±1）做 ping-pong**，端点精确夹取后换向；
+    **禁止**写成 `if (rowScroll >= overflow) rowScroll = 0` ——
+    那是「滑到底 → 瞬移回起点」，观感是闪一下（2026-10-04 用户反馈「滚过去再滚回来就瞬移了」）。
+    `rowScrollDir` 必须在**所有**复位点（换行 / 换文案 / 放得下 / 缩字号兜底 /
+    `resetRowScroll`）一并复位，否则换向后第一次滚动方向是错的。
   - ⚠⚠ **不要用 `textField.scrollH` 做跑马灯 —— 它在这个 FlxText 配置下是死的。**
     OpenFL `set_scrollH` 首行就是 `if (value > __textEngine.maxScrollH) value = maxScrollH`，
     而 `autoSize = NONE` + `scrollBars = NONE` 的 TextField 的 `maxScrollH` **恒为 0**

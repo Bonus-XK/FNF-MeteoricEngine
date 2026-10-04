@@ -91,6 +91,8 @@ class SettingsRail extends FlxGroup
 	var rowScrollText:String = null;
 	/** 当前行是否已把位图扩到全宽（跑马灯期间为 true） */
 	var rowFullW:Bool = false;
+	/** 滚动方向：1 = 往后滚（文本左移，看尾部）；-1 = 往回滚（文本右移，回开头） */
+	var rowScrollDir:Int = 1;
 	/** 每行当前实际字号；0 = 未缩放过（即ROW_FONT_SIZE） */
 	var rowRowSize:Array<Int> = [];
 
@@ -359,6 +361,7 @@ class SettingsRail extends FlxGroup
 		rowScrollIdx = -1;
 		rowScrollText = null;
 		rowFullW = false;
+		rowScrollDir = 1;
 		for (r in 0...rows.length)
 		{
 			rowTextW[r] = -1;
@@ -389,6 +392,7 @@ class SettingsRail extends FlxGroup
 			rowScrollIdx = idx;
 			rowScrollText = txt;
 			rowScroll = 0;
+			rowScrollDir = 1;
 			rowScrollWait = SCROLL_HOLD_START;
 			restoreRow(row, r);
 		}
@@ -402,6 +406,7 @@ class SettingsRail extends FlxGroup
 			// 放得下 → 定宽 + 归位
 			if (rowFullW) restoreRow(row, r);
 			rowScroll = 0;
+			rowScrollDir = 1;
 			row.x = TEXT_X;
 			return;
 		}
@@ -411,6 +416,7 @@ class SettingsRail extends FlxGroup
 		{
 			shrinkRow(row, r);
 			rowScroll = 0;
+			rowScrollDir = 1;
 			return;
 		}
 
@@ -423,11 +429,21 @@ class SettingsRail extends FlxGroup
 			return;
 		}
 
-		rowScroll += SCROLL_SPEED * tickDt;
+		// 乒乓往返：到末尾反向滚回开头，**不要**归零瞬移。
+		// 旧实现是 `rowScroll >= overflow → rowScroll = 0`，那会让文本"滑到底 → 瞬移回起点"，
+		// 观感就是闪一下（用户反馈「滚过去再滚回来就瞬移了」）。
+		rowScroll += SCROLL_SPEED * tickDt * rowScrollDir;
 		if (rowScroll >= overflow)
 		{
-			rowScroll = 0;
+			rowScroll = overflow; // 精确停末尾（钳住，避免越过一帧造成末端抖动）
+			rowScrollDir = -1; // 换向：往回滚
 			rowScrollWait = SCROLL_HOLD_END;
+		}
+		else if (rowScroll <= 0)
+		{
+			rowScroll = 0; // 精确停开头
+			rowScrollDir = 1; // 换向：继续往后滚
+			rowScrollWait = SCROLL_HOLD_START;
 		}
 		row.x = TEXT_X - rowScroll;
 	}
