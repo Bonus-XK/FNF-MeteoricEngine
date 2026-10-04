@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 import backend.WheelScroll;
 
 import backend.WeekData;
@@ -149,13 +150,13 @@ class ModsMenuState extends MusicBeatState
 		add(makePanel(40, 662, 1160, 48, 14));
 
 		// ---- 标题 ----
-		var leftTitle:FlxText = new FlxText(LIST_X, 100, 0, 'Mod 列表', 26);
+		var leftTitle:FlxText = new FlxText(LIST_X, 100, 0, Lang.tOr('mods.listTitle', 'Mod 列表'), 26);
 		leftTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		leftTitle.borderSize = 2;
 		leftTitle.scrollFactor.set();
 		add(leftTitle);
 
-		var rightTitle:FlxText = new FlxText(INFO_X, 100, 0, 'Mod 信息', 26);
+		var rightTitle:FlxText = new FlxText(INFO_X, 100, 0, Lang.tOr('mods.infoTitle', 'Mod 信息'), 26);
 		rightTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		rightTitle.borderSize = 2;
 		rightTitle.scrollFactor.set();
@@ -271,7 +272,7 @@ class ModsMenuState extends MusicBeatState
 		add(descText);
 		hasModsUI.push(descText);
 
-		restartText = new FlxText(INFO_X, 505, INFO_W, '注意：启用 / 停用此 Mod 需要重启游戏', 18);
+		restartText = new FlxText(INFO_X, 505, INFO_W, Lang.tOr('mods.restartWarning', '注意：启用 / 停用此 Mod 需要重启游戏'), 18);
 		restartText.setFormat(Paths.font('future.ttf'), 18, 0xFFFF6B6B, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		restartText.textField.height = 24;
 		restartText.borderSize = 2;
@@ -310,7 +311,7 @@ class ModsMenuState extends MusicBeatState
 		rebuildModsList();
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter / 左右 启用停用 · 点击 < 返回', 16);
+		var hint:FlxText = new FlxText(40, 672, 1160, Lang.tOr('mods.hint', '滚轮 / 方向键 选择 · Enter / 左右 启用停用 · 点击 < 返回'), 16);
 		hint.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hint.textField.height = 24;
 		hint.borderSize = 2;

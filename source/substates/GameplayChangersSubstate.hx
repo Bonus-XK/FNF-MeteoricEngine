@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 import backend.WheelScroll;
 
 import objects.BackButton;
@@ -133,7 +134,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		add(bg);
 
 		// ---- 标题 ----
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '游玩设置', 48);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('pause.gameplaySettings', '游玩设置'), 48);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 48, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -184,7 +185,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		add(backBtn.spr);
 		add(backBtn.label);
 
-		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, '← → 调整数值 · 回车 开关 · R 重置 · ESC 返回', 18);
+		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, Lang.tOr('pause.hint.gameplaySettings', '← → 调整数值 · 回车 开关 · R 重置 · ESC 返回'), 18);
 		hintText.scrollFactor.set();
 		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hintText.borderSize = 1.5;

@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 import backend.WheelScroll;
 
 import objects.BackButton;
@@ -149,7 +150,7 @@ class AchievementsMenuState extends MusicBeatState
 		add(descText);
 
 		// ---- 右侧：触发方式 ----
-		triggerLabel = new FlxText(PANEL_R_X + 30, 456, PANEL_R_W - 60, '触发方式', 16);
+		triggerLabel = new FlxText(PANEL_R_X + 30, 456, PANEL_R_W - 60, Lang.tOr('achievements.trigger', '触发方式'), 16);
 		triggerLabel.setFormat(Paths.font('future.ttf'), 16, 0xFF33E0FF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		triggerLabel.borderSize = 2;
 		triggerLabel.scrollFactor.set();
@@ -176,7 +177,7 @@ class AchievementsMenuState extends MusicBeatState
 		add(progressFill);
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · ESC 返回', 16);
+		var hint:FlxText = new FlxText(40, 672, 1160, Lang.tOr('achievements.hint', '滚轮 / 方向键 选择 · ESC 返回'), 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 		hint.scrollFactor.set();
 		add(hint);
@@ -396,7 +397,7 @@ class AchievementsMenuState extends MusicBeatState
 
 		if (unlocked)
 		{
-			statusText.text = '已解锁';
+			statusText.text = Lang.tOr('achievements.unlocked', '已解锁');
 			statusText.color = 0xFF33E0FF;
 		}
 		else if (hidden)
@@ -406,7 +407,7 @@ class AchievementsMenuState extends MusicBeatState
 		}
 		else
 		{
-			statusText.text = '未解锁';
+			statusText.text = Lang.tOr('achievements.locked', '未解锁');
 			statusText.color = 0xFF8A93A5;
 		}
 		statusText.updateHitbox();

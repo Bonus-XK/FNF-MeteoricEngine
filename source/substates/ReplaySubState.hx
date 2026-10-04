@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 import backend.WheelScroll;
 
 import backend.Highscore;
@@ -65,7 +66,7 @@ class ReplaySubState extends MusicBeatSubstate
 		var panel:FlxSprite = makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22);
 		add(panel);
 
-		var title:FlxText = new FlxText(TITLE_X, TITLE_Y, 0, '回放列表 - ' + song + ' (' + Difficulty.getString(diff) + ')', 26);
+		var title:FlxText = new FlxText(TITLE_X, TITLE_Y, 0, Lang.tOr('replay.title', '回放列表 - ') + song + ' (' + Difficulty.getString(diff) + ')', 26);
 		title.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.scrollFactor.set();
 		title.antialiasing = ClientPrefs.data.antialiasing;

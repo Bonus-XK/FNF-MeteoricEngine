@@ -534,11 +534,14 @@ class OptionsPane extends FlxGroup
 		swatches.registerThemeListener();
 	}
 
-	/** 定位当前分区里的「主题色」选项（按选项名前缀；与 BaseOptionsMenu 同一约定） */
+	/** 定位当前分区里的「主题色」选项。
+	 *  按**存档变量名** themeIndex 定位，不按选项名 —— 多语言下选项名会随语言变
+	 *  （旧实现的中文字符串嗅探在英文界面必然失效，导致色板静默不挂载）。
+	 *  variable 与语言无关，是唯一稳定标识；与 BaseOptionsMenu 同一约定。 */
 	function findThemeOption():Option
 	{
 		for (o in options)
-			if (o != null && Std.string(o.name).indexOf('主题色') == 0) return o;
+			if (o != null && o.variable == 'themeIndex') return o;
 		return null;
 	}
 

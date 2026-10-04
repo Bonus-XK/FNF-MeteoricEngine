@@ -205,6 +205,17 @@ class HScript extends SScript
 		set('MainMenuState', states.MainMenuState);
 		set('HScript', HScript);
 		set('CoolUtil', backend.CoolUtil);
+		// 多语言（Meteoric 多语言功能）：Lang.t 取译文 / Lang.tOr 带原文兜底；Lang.current 读当前语言码
+		set('Lang', backend.Lang);
+		set('tr', function(key:String, ?args:Array<Dynamic>) {
+			return backend.Lang.t(key, args);
+		});
+		set('trOr', function(key:String, fallback:String) {
+			return backend.Lang.tOr(key, fallback);
+		});
+		set('getLanguage', function() {
+			return backend.Lang.current;
+		});
 		// 主题色令牌中心（Meteoric 主题色功能）：HScript 可直接读 DesignTokens.primary/secondary/tertiary
 		set('DesignTokens', backend.DesignTokens);
 		// 主题色脚本 API：默认临时覆盖（不写存档），persist=true 才持久化

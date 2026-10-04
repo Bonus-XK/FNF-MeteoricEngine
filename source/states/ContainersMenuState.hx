@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.ClientPrefs;
 import backend.ContainerInfo;
@@ -144,13 +145,13 @@ class ContainersMenuState extends MusicBeatState
 		add(makePanel(40, 636, 1200, 56, 14));
 
 		// ---- 标题 ----
-		var leftTitle:FlxText = new FlxText(LIST_X, 112, 0, '容器列表', 26);
+		var leftTitle:FlxText = new FlxText(LIST_X, 112, 0, Lang.tOr('containers.listTitle', '容器列表'), 26);
 		leftTitle.setFormat(Paths.font('future.ttf'), 26, TEXT_PRIMARY, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		leftTitle.borderSize = 2;
 		leftTitle.scrollFactor.set();
 		add(leftTitle);
 
-		var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 112, 0, '容器详情', 26);
+		var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 112, 0, Lang.tOr('containers.detailTitle', '容器详情'), 26);
 		rightTitle.setFormat(Paths.font('future.ttf'), 26, TEXT_PRIMARY, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		rightTitle.borderSize = 2;
 		rightTitle.scrollFactor.set();
@@ -375,7 +376,7 @@ class ContainersMenuState extends MusicBeatState
 		var exitMode:String = ContainerManifestParser.str(data, 'exitMode', 'terminate');
 		var wait:Float = ContainerManifestParser.num(data, 'waitSeconds', ContainerLauncher.DEFAULT_WAIT);
 		var hotkeyTxt:String = describeHotkey();
-		detHint.text = '退出方式 ' + exitMode + '   ·   等待窗口 ' + wait + 's\n'
+		detHint.text = Lang.tOr('containers.exitMode', '退出方式 ') + exitMode + '   ·   等待窗口 ' + wait + 's\n'
 			+ '退出容器：直接关掉目标引擎窗口，Meteoric 会自动唤醒并重启\n'
 			+ '返回热键 ' + hotkeyTxt + hotkeyHowto()
 			+ '\n退出后 Meteoric 会自动重启（本体整机复位）';
@@ -608,7 +609,7 @@ class ContainersMenuState extends MusicBeatState
 			statusText.text = statusInfo;
 			return;
 		}
-		statusText.text = '容器功能：' + (ClientPrefs.data.containersEnabled ? '已启用' : '已在设置中关闭')
+		statusText.text = Lang.tOr('containers.featureStatus', '容器功能：') + (ClientPrefs.data.containersEnabled ? '已启用' : '已在设置中关闭')
 			+ '   ·   选中容器后按 Enter 或点「切换到此容器」';
 	}
 

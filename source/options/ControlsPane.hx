@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 import backend.WheelScroll;
 
 import objects.BackButton;
@@ -156,7 +157,7 @@ class ControlsPane extends SettingsCanvas
 			add(makePanel(120, 662, 1040, 48, 14));
 
 			// ---- 标题 ----
-			var title:FlxText = new FlxText(LIST_X, 100, 0, '按键设置', 30);
+			var title:FlxText = new FlxText(LIST_X, 100, 0, Lang.tOr('options.controls.title', '按键设置'), 30);
 			title.setFormat(Paths.font('future.ttf'), 30, 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			title.borderSize = 2;
 			title.scrollFactor.set();
@@ -220,7 +221,7 @@ class ControlsPane extends SettingsCanvas
 			add(backBtn.label);
 
 			// ---- 底部提示 ----
-			var hint:FlxText = new FlxText(120, 672, 1040, '滚轮 / 方向键 选择 · 左/右 切换主备键 · Enter / 点击 绑定 · Ctrl 切换模式 · 点击 < 返回', 16);
+			var hint:FlxText = new FlxText(120, 672, 1040, Lang.tOr('options.hint.controls', '滚轮 / 方向键 选择 · 左/右 切换主备键 · Enter / 点击 绑定 · Ctrl 切换模式 · 点击 < 返回'), 16);
 			hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 			hint.scrollFactor.set();
 			add(hint);
@@ -613,7 +614,7 @@ class ControlsPane extends SettingsCanvas
 		var py:Float = hosted ? (PANEL_Y + (PANEL_H - ph) / 2) : (FlxG.height - ph) / 2;
 		bindingGroup.add(makePanel(px, py, pw, ph, 22));
 
-		var title:FlxText = new FlxText(px, py + 60, pw, '正在绑定：' + option[3], 36);
+		var title:FlxText = new FlxText(px, py + 60, pw, Lang.tOr('options.controls.binding', '正在绑定：') + option[3], 36);
 		title.setFormat(Paths.font('future.ttf'), 36, 0xFFFFFFFF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 2;
 		bindingGroup.add(title);

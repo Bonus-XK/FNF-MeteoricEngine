@@ -1,4 +1,5 @@
 package backend;
+import backend.Lang;
 
 import flixel.FlxG;
 import flixel.tweens.FlxEase;
@@ -432,11 +433,11 @@ class CameraHudDomain
 	{
 		if (ps.onlineOppTexts == null || ps.onlineOppTexts.length < 5) return;
 		ps.onlineOppTexts[0].text = PlayState.onlineOppNick;
-		ps.onlineOppTexts[1].text = '连击: ' + ps.onlineOppCombo;
-		ps.onlineOppTexts[2].text = '分数: ' + ps.onlineOppScore;
+		ps.onlineOppTexts[1].text = Lang.tOr('hud.combo', '连击: ') + ps.onlineOppCombo;
+		ps.onlineOppTexts[2].text = Lang.tOr('hud.score', '分数: ') + ps.onlineOppScore;
 		var oppAcc:Float = ps.onlineOppTotalPlayed > 0 ? ps.onlineOppTotalNotesHit / ps.onlineOppTotalPlayed : 0;
-		ps.onlineOppTexts[3].text = '准确率: ' + Math.round(oppAcc * 1000) / 10 + '%';
-		ps.onlineOppTexts[4].text = '判定: ' + ps.buildOppCountsLine();
+		ps.onlineOppTexts[3].text = Lang.tOr('hud.accuracy', '准确率: ') + Math.round(oppAcc * 1000) / 10 + '%';
+		ps.onlineOppTexts[4].text = Lang.tOr('hud.judgement', '判定: ') + ps.buildOppCountsLine();
 		ps.refreshOppHealthFill();
 	}
 

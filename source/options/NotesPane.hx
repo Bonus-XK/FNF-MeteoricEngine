@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 import backend.WheelScroll;
 
 import objects.MenuText;
@@ -175,13 +176,13 @@ class NotesPane extends SettingsCanvas
 			add(makePanel(120, 662, 1040, 48, 14));
 
 			// ---- 标题 ----
-			var titleText:FlxText = new FlxText(108, 96, 0, '箭头配色', 30);
+			var titleText:FlxText = new FlxText(108, 96, 0, Lang.tOr('options.noteColors.title', '箭头配色'), 30);
 			titleText.setFormat(Paths.font('future.ttf'), 30, 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			titleText.borderSize = 2;
 			titleText.scrollFactor.set();
 			add(titleText);
 
-			var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 96, 0, '颜色编辑', 26);
+			var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 96, 0, Lang.tOr('options.noteColors.editor', '颜色编辑'), 26);
 			rightTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			rightTitle.borderSize = 2;
 			rightTitle.scrollFactor.set();
@@ -298,7 +299,7 @@ class NotesPane extends SettingsCanvas
 		if (!hosted)
 		{
 			// ---- 底部提示 ----
-			var hint:FlxText = new FlxText(120, 674, 1040, '滚轮 / 左右 选择箭头 · R 重置当前 · SHIFT+R 重置全部 · CTRL 切换像素 · 点击 < 返回', 16);
+			var hint:FlxText = new FlxText(120, 674, 1040, Lang.tOr('options.hint.noteColors', '滚轮 / 左右 选择箭头 · R 重置当前 · SHIFT+R 重置全部 · CTRL 切换像素 · 点击 < 返回'), 16);
 			hint.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			hint.borderSize = 2;
 			hint.scrollFactor.set();

@@ -43,6 +43,9 @@ mods/<mod>/data/states/<界面类名>.hx                  # 状态脚本简写�
   - `CNE.reloadCurrentStateScripts()`：原地重建当前界面脚本组。
   - `CNE.reloadGlobalScripts()`：重建全局脚本组。
 - 其余变量/类沿用 `psychlua.HScript.preset()` 的 184 项 API（`FlxG`、`Paths`、`ClientPrefs`、`Character`、`Note`、`Mods`、`DesignTokens`、`setThemeColor`、`runTimer` …）。
+- 多语言（Meteoric 多语言功能）：`Lang`（整个类）、`tr(key[, args])`、`trOr(key, fallback)`、`getLanguage()`。
+  Lua 侧同款 `tr` / `trOr` / `getLanguage`。模组脚本里**推荐 `trOr(key, '自带的原文')`**：
+  玩家装的语言包没有这个 key 时自动显示原文，不会露出裸 key。
 
 生命周期回调（在脚本顶层定义同名函数即可）：
 

@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.WeekData;
 import backend.Highscore;
@@ -422,8 +423,8 @@ class FreeplayState extends MusicBeatState
 			ratingSplit[1] += '0';
 		}
 
-		scoreText.text = '历史最高分：' + lerpScore;
-		ratingText.text = '准确率：' + ratingSplit.join('.') + '%';
+		scoreText.text = Lang.tOr('freeplay.bestScore', '历史最高分：') + lerpScore;
+		ratingText.text = Lang.tOr('freeplay.accuracy', '准确率：') + ratingSplit.join('.') + '%';
 
 		updateTexts(elapsed);
 

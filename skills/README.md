@@ -36,6 +36,10 @@ meteoric-mobile   # Android 触控 / 性能 / 系统界面适配
 | `meteoric-system` | 系统域 | `source/options/*`、`source/substates/PauseSubState.hx`、`ResultsSubState.hx`、`GameOverSubstate.hx`、`source/states/ModsMenuState.hx` |
 | `meteoric-mobile` | Android | `source/objects/MobileControls.hx`、`source/objects/MobileControlsSubState.hx` |
 
+跨域约定：**玩家可见文案走 `backend/Lang.hx`**（语言包 = `assets/languages/*.json`，
+社区包放 `Resources/languages/` 或 mod 的 `languages/`）。规则见 meteoric-system「多语言」一节：
+一律 `Lang.tOr(key, 原文)`、**禁止按选项名做字符串嗅探**（用 `o.variable`）。
+
 ## 维护约定
 
 1. **改任何界面代码 → 同步更新对应 SKILL.md**；规则与实现脱节的 skill 会被标记失效。

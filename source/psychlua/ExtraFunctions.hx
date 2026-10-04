@@ -261,6 +261,18 @@ class ExtraFunctions
 			return str.trim();
 		});
 
+		// ===== 多语言（Meteoric 多语言功能；运行时见 backend/Lang.hx）=====
+		// tr(key) 取译文；trOr(key, 原文) 缺 key 时回落到原文（模组自带文案的安全写法）。
+		Lua_helper.add_callback(lua, "tr", function(key:String, ?args:Array<Dynamic>) {
+			return backend.Lang.t(key, args);
+		});
+		Lua_helper.add_callback(lua, "trOr", function(key:String, fallback:String) {
+			return backend.Lang.tOr(key, fallback);
+		});
+		Lua_helper.add_callback(lua, "getLanguage", function() {
+			return backend.Lang.current;
+		});
+
 		// ===== 主题色（Meteoric 主题色功能；令牌定义见 backend/DesignTokens.hx）=====
 		// 语义（已与需求方确认）：默认**临时覆盖**（只影响本次运行，不写玩家存档）；
 		// 只有显式传 persist=true 才写入 ClientPrefs 并落盘。

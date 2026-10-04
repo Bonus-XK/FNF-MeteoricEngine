@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -49,13 +50,13 @@ class ModsDeleteConfirmSubstate extends MusicBeatSubstate
 		add(panel);
 
 		// 标题
-		var title:FlxText = new FlxText(px, py + 28, pw, '删除 Mod', 26);
+		var title:FlxText = new FlxText(px, py + 28, pw, Lang.tOr('mods.deleteTitle', '删除 Mod'), 26);
 		title.setFormat(Paths.font('future.ttf'), 26, 0xFFFF6B6B, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.scrollFactor.set(0, 0);
 		add(title);
 
 		// 提示
-		var msg:FlxText = new FlxText(px + 40, py + 84, pw - 80, '确定要删除 Mod「' + modName + '」吗？\n删除后无法恢复！', 19);
+		var msg:FlxText = new FlxText(px + 40, py + 84, pw - 80, Lang.tOr('mods.deleteConfirm', '确定要删除 Mod「') + modName + '」吗？\n删除后无法恢复！', 19);
 		msg.setFormat(Paths.font('future.ttf'), 19, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		msg.textField.height = 84;
 		msg.scrollFactor.set(0, 0);

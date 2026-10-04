@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 import backend.WheelScroll;
 
 import backend.Highscore;
@@ -127,7 +128,7 @@ class ResultsSubState extends MusicBeatSubstate
 		FlxTween.tween(bg, {alpha: 0.6}, 0.25, {ease: FlxEase.quadOut});
 
 		// ---- 标题 ----
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '本局结算 Song Results', 54);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('results.title', '本局结算 Song Results'), 54);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -171,7 +172,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(judgePanel);
 		FlxTween.tween(judgePanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
-		var judgeTitle:FlxText = new FlxText(PANEL_X + TEXT_PAD, JUDGE_TITLE_Y, 0, '判定统计 Judgements', 26);
+		var judgeTitle:FlxText = new FlxText(PANEL_X + TEXT_PAD, JUDGE_TITLE_Y, 0, Lang.tOr('results.judgements', '判定统计 Judgements'), 26);
 		judgeTitle.scrollFactor.set();
 		judgeTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		judgeTitle.borderSize = 2;
@@ -228,7 +229,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(statPanel);
 		FlxTween.tween(statPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
-		var statTitle:FlxText = new FlxText(STATS_LABEL_X, STATS_TITLE_Y, 0, '本局数据 Stats', 26);
+		var statTitle:FlxText = new FlxText(STATS_LABEL_X, STATS_TITLE_Y, 0, Lang.tOr('results.stats', '本局数据 Stats'), 26);
 		statTitle.scrollFactor.set();
 		statTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		statTitle.borderSize = 2;
@@ -240,7 +241,7 @@ class ResultsSubState extends MusicBeatSubstate
 		var bestScore:Int = Highscore.getScore(PlayState.SONG.song, PlayState.storyDifficulty);
 		if (!invalidResult && st.songScore >= bestScore && st.songScore > 0)
 		{
-			var newRecordText:FlxText = new FlxText(STATS_LABEL_X + 230, STATS_TITLE_Y + 4, 0, '新纪录！ New Record', 22);
+			var newRecordText:FlxText = new FlxText(STATS_LABEL_X + 230, STATS_TITLE_Y + 4, 0, Lang.tOr('results.newRecord', '新纪录！ New Record'), 22);
 			newRecordText.scrollFactor.set();
 			newRecordText.setFormat(Paths.font('future.ttf'), 22, DesignTokens.secondary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			newRecordText.borderSize = 1.5;
@@ -292,7 +293,7 @@ class ResultsSubState extends MusicBeatSubstate
 		var innerX:Float = GRAPH_X + 14;
 		var innerW:Int = Std.int(GRAPH_W - 28);
 
-		var graphHead:FlxText = new FlxText(innerX, GRAPH_Y + 8, innerW, '命中分布 Hit Distribution（横轴=时间 · 纵轴=偏移：+早到 / −晚到 · 点色=判定）', 14);
+		var graphHead:FlxText = new FlxText(innerX, GRAPH_Y + 8, innerW, Lang.tOr('results.hitDistribution', '命中分布 Hit Distribution（横轴=时间 · 纵轴=偏移：+早到 / −晚到 · 点色=判定）'), 14);
 		graphHead.scrollFactor.set();
 		graphHead.setFormat(Paths.font('future.ttf'), 14, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		graphHead.borderSize = 1.2;
@@ -330,7 +331,7 @@ class ResultsSubState extends MusicBeatSubstate
 		}
 		else
 		{
-			var noDataText:FlxText = new FlxText(innerX, GRAPH_Y + 44, innerW, '（本局无判定数据）', 16);
+			var noDataText:FlxText = new FlxText(innerX, GRAPH_Y + 44, innerW, Lang.tOr('results.noJudgementData', '（本局无判定数据）'), 16);
 			noDataText.scrollFactor.set();
 			noDataText.setFormat(Paths.font('future.ttf'), 16, 0xFFCFCFDC, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			noDataText.borderSize = 1.2;
@@ -412,7 +413,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(bg);
 		FlxTween.tween(bg, {alpha: 0.6}, 0.25, {ease: FlxEase.quadOut});
 
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '本局结算 Song Results', 54);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('results.title', '本局结算 Song Results'), 54);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -562,14 +563,14 @@ class ResultsSubState extends MusicBeatSubstate
 			var stats:Array<Dynamic> = ps.onlineOppStats;
 			var acc:Float = Std.parseFloat(Std.string(stats[6]));
 			if (Math.isNaN(acc)) acc = 0;
-			oppScoreText.text = '分数：' + FlxStringUtil.formatMoney(Std.int(stats[0]));
-			oppComboText.text = '最高连击：' + Std.int(stats[5]);
-			oppAccText.text = '准确率：' + Math.round(acc * 1000) / 10 + '%';
+			oppScoreText.text = Lang.tOr('results.score', '分数：') + FlxStringUtil.formatMoney(Std.int(stats[0]));
+			oppComboText.text = Lang.tOr('results.maxCombo', '最高连击：') + Std.int(stats[5]);
+			oppAccText.text = Lang.tOr('results.accuracy', '准确率：') + Math.round(acc * 1000) / 10 + '%';
 			oppJudgeText.text = formatJudgeLines(Std.string(stats[7]));
 		}
 		else
 		{
-			oppScoreText.text = '对方成绩：等待对方完成...';
+			oppScoreText.text = Lang.tOr('results.opponentWaiting', '对方成绩：等待对方完成...');
 			oppComboText.text = '';
 			oppAccText.text = '';
 			oppJudgeText.text = '';

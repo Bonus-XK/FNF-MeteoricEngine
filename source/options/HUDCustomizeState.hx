@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 
 import flixel.FlxCamera;
 import flixel.FlxG;
@@ -136,7 +137,7 @@ class HUDCustomizeState extends MusicBeatState
 		blackBox.cameras = [camOther];
 		add(blackBox);
 
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '自定义界面 —— 拖动 HUD 元素调整位置（方向键微调 · Shift 加速 10px · R 重置全部 · ESC 完成）', 22);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('hudCustomize.hint', '自定义界面 —— 拖动 HUD 元素调整位置（方向键微调 · Shift 加速 10px · R 重置全部 · ESC 完成）'), 22);
 		titleText.scrollFactor.set();
 		titleText.cameras = [camOther];
 		titleText.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -161,7 +162,7 @@ class HUDCustomizeState extends MusicBeatState
 		doneBtn.cameras = [camOther];
 		add(doneBtn);
 
-		doneLabel = new FlxText(doneBtn.x, doneBtn.y + 9, doneBtn.width, '完成', 24);
+		doneLabel = new FlxText(doneBtn.x, doneBtn.y + 9, doneBtn.width, Lang.tOr('common.done', '完成'), 24);
 		doneLabel.scrollFactor.set();
 		doneLabel.cameras = [camOther];
 		doneLabel.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);

@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.WheelScroll;
 import backend.CrashHandler;
@@ -241,13 +242,13 @@ class MainMenuState extends MusicBeatState
 		// ---- 版本信息（左下角；完整保留新版显示：版本号 + 可点击 GitHub 新版本链接） ----
 		if (TitleState.mainUpdateCheck)
 		{
-			verText = new FlxText(40, 560, 0, 'Meteoric Engine v' + Main.meVersion + '（旧版本）', 16);
+			verText = new FlxText(40, 560, 0, 'Meteoric Engine v' + Main.meVersion + Lang.tOr('menu.oldVersion', '（旧版本）'), 16);
 			verText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			verText.borderSize = 2;
 			verText.scrollFactor.set();
 			add(verText);
 
-			updateLinkText = new FlxText(40, 582, 0, '新版本：' + TitleState.updateVersion + '（点击查看）', 16);
+			updateLinkText = new FlxText(40, 582, 0, Lang.tOr('menu.newVersionPrefix', '新版本：') + TitleState.updateVersion + Lang.tOr('menu.newVersionHint', '（点击查看）'), 16);
 			updateLinkText.setFormat(Paths.font('future.ttf'), 16, 0xFFFFD166, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			updateLinkText.borderSize = 2;
 			updateLinkText.scrollFactor.set();
@@ -280,7 +281,7 @@ class MainMenuState extends MusicBeatState
 		}
 
 		// ---- 底部提示（左对齐；宽度收窄到 960，给右下角联机入口让位，不再横跨全屏） ----
-		var hint:FlxText = new FlxText(40, INFO_ROW_Y, 960, '触控/滚轮 选择 · A / Enter 确认 · Esc 返回', 16);
+		var hint:FlxText = new FlxText(40, INFO_ROW_Y, 960, Lang.tOr('menu.touchWheelHint', '触控/滚轮 选择 · A / Enter 确认 · Esc 返回'), 16);
 		hint.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hint.borderSize = 2;
 		hint.scrollFactor.set();

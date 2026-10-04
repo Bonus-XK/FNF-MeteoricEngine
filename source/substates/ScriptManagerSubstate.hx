@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 import backend.WheelScroll;
 
 import backend.Mods;
@@ -69,7 +70,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		add(bg);
 
 		// ---- 标题 ----
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, '脚本管理', 48);
+		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('scriptManager.title', '脚本管理'), 48);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 48, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -114,7 +115,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		}
 
 		// ---- 空列表提示 ----
-		emptyText = new FlxText(0, PANEL_Y + PANEL_H / 2 - 20, FlxG.width, '没有找到可管理的脚本', 26);
+		emptyText = new FlxText(0, PANEL_Y + PANEL_H / 2 - 20, FlxG.width, Lang.tOr('scriptManager.empty', '没有找到可管理的脚本'), 26);
 		emptyText.scrollFactor.set();
 		emptyText.setFormat(Paths.font('future.ttf'), 26, 0xFF9A9AA8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		emptyText.borderSize = 1.5;
@@ -128,7 +129,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		add(backBtn.spr);
 		add(backBtn.label);
 
-		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, '↑ ↓ 选择 · 回车 开关脚本（含当前谱面脚本，关闭后加 .disabled 后缀，重启歌曲生效）· ESC 返回', 18);
+		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, Lang.tOr('scriptManager.hint', '↑ ↓ 选择 · 回车 开关脚本（含当前谱面脚本，关闭后加 .disabled 后缀，重启歌曲生效）· ESC 返回'), 18);
 		hintText.scrollFactor.set();
 		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hintText.borderSize = 1.5;

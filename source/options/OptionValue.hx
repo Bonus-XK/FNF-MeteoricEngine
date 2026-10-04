@@ -19,7 +19,10 @@ class OptionValue
 	{
 		if (option == null) return '';
 		var text:String = option.displayFormat;
-		if (option.valueHint != null) return option.valueHint;
+		// valueHint 是调用点在构造后才赋的，无法在 Option 构造期本地化 —— 在显示点按
+		// optionValueHint.<存档变量名> 取译文，缺失则回落到原文（与 Option 构造期同一套 tOr 规则）。
+		if (option.valueHint != null)
+			return backend.Lang.tOr('optionValueHint.' + option.variable, option.valueHint);
 
 		var val:Dynamic = option.getValue();
 		if (option.displayFormatter != null)

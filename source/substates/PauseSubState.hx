@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 import backend.WheelScroll;
 import backend.Multiplayer;
 
@@ -169,7 +170,7 @@ class PauseSubState extends MusicBeatSubstate
 		FlxTween.tween(bg, {alpha: 0.6}, 0.25, {ease: FlxEase.quadOut});
 
 		// ---- 标题（水平居中，不贴任何边缘） ----
-		var titleText:FlxText = new FlxText(0, 22, FlxG.width, '已暂停', 54);
+		var titleText:FlxText = new FlxText(0, 22, FlxG.width, Lang.tOr('pause.paused', '已暂停'), 54);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
@@ -184,7 +185,7 @@ class PauseSubState extends MusicBeatSubstate
 		chartingPanel.visible = PlayState.chartingMode;
 		add(chartingPanel);
 
-		var chartingText:FlxText = new FlxText(40, 20, 130, '编铺模式', 18);
+		var chartingText:FlxText = new FlxText(40, 20, 130, Lang.tOr('pause.chartingMode', '编铺模式'), 18);
 		chartingText.scrollFactor.set();
 		chartingText.setFormat(Paths.font('future.ttf'), 18, DesignTokens.secondary, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		chartingText.borderSize = 2;
@@ -230,7 +231,7 @@ class PauseSubState extends MusicBeatSubstate
 		add(statPanel);
 		FlxTween.tween(statPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
-		var statTitle:FlxText = new FlxText(STATS_TEXT_X, STATS_TITLE_Y, 0, '本局数据', 26);
+		var statTitle:FlxText = new FlxText(STATS_TEXT_X, STATS_TITLE_Y, 0, Lang.tOr('pause.sessionData', '本局数据'), 26);
 		statTitle.scrollFactor.set();
 		statTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		statTitle.borderSize = 2;

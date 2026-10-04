@@ -1,4 +1,5 @@
 package objects;
+import backend.Lang;
 
 import backend.MusicBeatSubstate;
 import backend.Paths;
@@ -54,7 +55,7 @@ class MobileControlsSubState extends MusicBeatSubstate
 		add(bg);
 
 		// 标题
-		var title:FlxText = new FlxText(0, 28, FlxG.width, '触控板设置', 30);
+		var title:FlxText = new FlxText(0, 28, FlxG.width, Lang.tOr('mobile.touchpadSettings', '触控板设置'), 30);
 		title.setFormat(Paths.font('future.ttf'), 30, 0xFFFFFFFF, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 2;
 		title.scrollFactor.set();

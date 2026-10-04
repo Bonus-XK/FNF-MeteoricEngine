@@ -1,4 +1,5 @@
 package substates;
+import backend.Lang;
 
 import backend.WheelScroll;
 import flixel.FlxBasic;
@@ -184,7 +185,7 @@ class PauseSettingsSubstate extends MusicBeatSubstate
 		add(panel);
 		FlxTween.tween(panel, {alpha: 0.96}, 0.25, {ease: FlxEase.quartInOut});
 
-		var title:FlxText = new FlxText(PANEL_X, PANEL_Y - 46, PANEL_W, '设置', 30);
+		var title:FlxText = new FlxText(PANEL_X, PANEL_Y - 46, PANEL_W, Lang.tOr('pause.options', '设置'), 30);
 		title.scrollFactor.set();
 		title.setFormat(Paths.font('future.ttf'), 30, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 2;

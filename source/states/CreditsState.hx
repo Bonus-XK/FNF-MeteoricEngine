@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 import backend.WheelScroll;
 
 #if MODS_ALLOWED
@@ -235,7 +236,7 @@ class CreditsState extends MusicBeatState
 		}
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(40, 672, 1160, '滚轮 / 方向键 选择 · Enter / 点击 打开主页 · 点击 < 返回', 16);
+		var hint:FlxText = new FlxText(40, 672, 1160, Lang.tOr('credits.hint', '滚轮 / 方向键 选择 · Enter / 点击 打开主页 · 点击 < 返回'), 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 		hint.scrollFactor.set();
 		add(hint);

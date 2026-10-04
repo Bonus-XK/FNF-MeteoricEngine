@@ -199,6 +199,53 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   Lua 走 `ExtraFunctions.implement()`，界面脚本走 `MenuScript.addLocalCallback`，HScript 走 `HScript.preset()`。
   注意：界面脚本改色后**已创建**的元素不会自动重绘，需重开界面或等下次进入。
 
+### 多语言（Lang，已落地 2026-10-04）
+
+系统域与手绘域的**全部玩家可见文案**统一走 `backend/Lang.hx`，语言包 = JSON。
+
+- **key = 稳定英文标识**，与文案解耦；改中文措辞不会让社区翻译失效。
+  命名空间：`menu.*` / `pause.*` / `results.*` / `options.category.*` / `options.title.*` /
+  `option.<存档字段名>` / `optionDesc.<存档字段名>` / `optionValue.<字段名>.<档位下标>` /
+  `optionValueHint.<字段名>` / `common.*` / `settings.*` / `difficulty.*`。
+- **回退链**：当前语言 → `en` → `zh` → key 本身。社区语言漏翻显示英文（通用可读），
+  key 全缺失才显示 key（可搜索、可定位），**绝不静默空白**。
+- **一律用 `Lang.tOr(key, 原文)`**（不是 `t`）：语言包里没这个 key 时显示代码里的原文，
+  与本功能上线前**逐字一致** → 零视觉回归；补进语言包后自动切换，不需要再改代码。
+- **选项文案一处接入**：`Option` 构造期用「存档字段名」派生 key 自动本地化
+  `name` / `description` / `displayOptions`，所以 10 个设置子页几百条文案
+  **不用逐个子页改代码**。`string` 档位的**存储值一个字都不改**（改了破坏旧存档），
+  本地化只发生在显示表上。
+- ⚠ **禁止按选项名做字符串嗅探**：`o.name.indexOf('主题色')` 这类写法在多语言下必然失效
+  （英文界面 name = "Theme Color"），会导致色板静默不挂载。
+  定位选项一律用 `o.variable == 'themeIndex'`（与语言无关）。已修两处：
+  `BaseOptionsMenu.findThemeColorOption` / `OptionsPane.findThemeOption`。
+- **语言切换的生效边界**：与主题色同规则 —— 宿主（`OptionsState`）通过
+  `Lang.addLangListener` **即时**刷新本页（侧栏分区名 + 已构造分区的选项文案，
+  走 `Option.relocalize()`），其余界面在**下次 create()** 时读到新语言。
+  监听器**必须在 `destroy()` 摘除**（`Lang.removeLangListener`），否则离页后回调到已销毁精灵。
+- 语言分区：设置 → 语言（`LanguageSettingsSubState`），字符串选项，
+  显示名走 `displayOptions`（存语言代码、显示 `nativeName`），切换即 `Lang.load()`。
+- **已接入的界面**（zh/en 各 368 key，逐项对齐）：
+  设置全部子页（100 个选项的名称/说明/档位显示名，经 `Option` 一处接入）、
+  设置外壳与提示行、暂停内嵌设置、游玩设置、脚本管理、回放、Mod 列表/删除、
+  容器列表、成就、主菜单版本提示、结算页、错误页、Freeplay/Story 分数行、
+  HUD 自定义、偏移校准、制作人员、触屏设置、崩溃测试。
+- ⚠ **改这类文案时的两个坑**：
+  ① 带尾随空格的串（`'连击: '`、`'回放列表 - '`）—— 本地化后**必须保留尾随空格**，
+     否则与后面的字符串拼接会粘在一起；
+  ② 同一行里有多个中文字面量时，逐个替换要**从右往左**做（插入文本会改变左侧偏移量，
+     从左往右会串位把代码写坏）。`MainMenuState` 的 `新版本：…（点击查看）` 就是这种行。
+- **仍待接入**（不要以为已完成）：联机菜单（`OnlineMenuState`）、角色选择
+  （`CharacterSelectState`）—— 这两处有**联机协议字符串**与大量动态拼接中段，
+  必须逐处判断"是显示文案还是协议字段"，不能机械替换；
+  暂停菜单主项（`PauseSubState.menuItemsOG`，中文串被当 `case` 选择器，需先抽内部英文 ID）。
+- **语言包投放顺序**（唯一入口 `Paths.langFile()`）：
+  ① mod 的 `languages/<code>.json` → ② `Resources/languages/<code>.json`
+  （安卓为 `<外部根>/languages/`）→ ③ 内置 `assets/languages/<code>.json`（zh/en）。
+  macOS **不要**往 `.app` 包内写文件（破坏代码签名），新增语言一律走 ②。
+- 官方内容**不汉化**：歌曲名 / 艺术家名 / 角色名 / Week 名来自数据文件，不经过 Lang。
+- 字体：CJK 由内置 `future.ttf` 覆盖，无需额外字体配置。
+
 ### Pause（PauseSubState）
 
 - 左面板：信息面板（40,70,600,200）+ 菜单面板（y 290）；右统计面板（680,70,560）。

@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.CrashHandler;
 
@@ -32,15 +33,15 @@ class ErrorState extends FlxState
 		var topBar:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, 6, 0xFFFF4444);
 		add(topBar);
 
-		var title:FlxText = new FlxText(24, 24, FlxG.width - 48, '游戏发生错误', 40);
+		var title:FlxText = new FlxText(24, 24, FlxG.width - 48, Lang.tOr('error.title', '游戏发生错误'), 40);
 		title.setFormat(Paths.font('future.ttf'), 40, 0xFFFF5555, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(title);
 
-		var sourceTxt:FlxText = new FlxText(24, 84, FlxG.width - 48, '错误来源：' + CrashHandler.errorSource, 20);
+		var sourceTxt:FlxText = new FlxText(24, 84, FlxG.width - 48, Lang.tOr('error.source', '错误来源：') + CrashHandler.errorSource, 20);
 		sourceTxt.setFormat(Paths.font('future.ttf'), 20, 0xFFFFCCCC, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(sourceTxt);
 
-		var errTxt:FlxText = new FlxText(24, 114, FlxG.width - 48, '错误信息：' + CrashHandler.errorMessage, 20);
+		var errTxt:FlxText = new FlxText(24, 114, FlxG.width - 48, Lang.tOr('error.message', '错误信息：') + CrashHandler.errorMessage, 20);
 		errTxt.setFormat(Paths.font('future.ttf'), 20, 0xFFFFDDDD, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(errTxt);
 
@@ -62,11 +63,11 @@ class ErrorState extends FlxState
 		add(btnA);
 		add(btnB);
 
-		btnAText = new FlxText(btnA.x, btnA.y, btnW, 'A = 返回主菜单', 22);
+		btnAText = new FlxText(btnA.x, btnA.y, btnW, Lang.tOr('error.keyA', 'A = 返回主菜单'), 22);
 		btnAText.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(btnAText);
 
-		btnBText = new FlxText(btnB.x, btnB.y, btnW, 'B = 退出游戏', 22);
+		btnBText = new FlxText(btnB.x, btnB.y, btnW, Lang.tOr('error.keyB', 'B = 退出游戏'), 22);
 		btnBText.setFormat(Paths.font('future.ttf'), 22, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(btnBText);
 	}

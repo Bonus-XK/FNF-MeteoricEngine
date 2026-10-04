@@ -157,6 +157,11 @@ class SaveVariables {
 	// 主题色（Meteoric 主题色功能）：固定 10 色色板的索引，0=青（默认）。
 	// 令牌派生见 backend/DesignTokens.hx；越界索引在 applyTheme 内夹取回 0，不会崩。
 	@:keep public var themeIndex:Int = 0;
+	// 界面语言（Meteoric 多语言功能）：语言包代码，文件名即代码（zh / en / pt-BR …）。
+	// 运行时见 backend/Lang.hx，路径见 Paths.langFile()。
+	// 旧存档无此字段 → 保留默认 'zh'，即多语言上线前的中文行为（零视觉回归）。
+	// 无效代码在 Lang.load() 里回落到 DEFAULT_LANG，不会让引擎起不来。
+	@:keep public var language:String = 'zh';
 	public var gameplaySettings:Map<String, Dynamic> = [
 		'scrollspeed' => 1.0,
 		'scrolltype' => 'multiplicative', 
@@ -734,6 +739,10 @@ class ClientPrefs {
 
 		// 主题色：存档数据就绪后应用一次（旧存档无 themeIndex 字段 → 保留默认 0=青）
 		DesignTokens.initFromPrefs();
+
+		// 界面语言：同样在存档就绪后应用一次（旧存档无 language 字段 → 保留默认 zh）。
+		// 必须在 DesignTokens 之后：语言包扫描会读盘，放在最后避免拖慢前面几步。
+		Lang.init(data.language);
 	}
 
 	inline public static function getGameplaySetting(name:String, defaultValue:Dynamic = null, ?customDefaultValue:Bool = false):Dynamic {

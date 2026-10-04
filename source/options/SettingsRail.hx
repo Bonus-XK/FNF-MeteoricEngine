@@ -85,7 +85,7 @@ class SettingsRail extends FlxGroup
 		panel = OptionsUi.makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 22);
 		add(panel);
 
-		var title:FlxText = new FlxText(TITLE_X, TITLE_Y, TEXT_W, '设置', 30);
+		var title:FlxText = new FlxText(TITLE_X, TITLE_Y, TEXT_W, backend.Lang.t('settings.title'), 30);
 		title.setFormat(Paths.font('future.ttf'), 30, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 2;
 		title.scrollFactor.set();

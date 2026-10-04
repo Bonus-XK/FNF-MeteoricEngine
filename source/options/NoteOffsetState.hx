@@ -1,4 +1,5 @@
 package options;
+import backend.Lang;
 
 import flixel.math.FlxPoint;
 
@@ -552,9 +553,9 @@ class NoteOffsetState extends MusicBeatState
 		{
 			switch(i)
 			{
-				case 0: dumbTexts.members[i].text = 'Rank偏移：';
+				case 0: dumbTexts.members[i].text = Lang.tOr('noteOffset.rankOffset', 'Rank偏移：');
 				case 1: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[0] + ', ' + ClientPrefs.data.comboOffset[1] + ']';
-				case 2: dumbTexts.members[i].text = 'Combo数字偏移：';
+				case 2: dumbTexts.members[i].text = Lang.tOr('noteOffset.comboOffset', 'Combo数字偏移：');
 				case 3: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[2] + ', ' + ClientPrefs.data.comboOffset[3] + ']';
 			}
 		}
@@ -563,7 +564,7 @@ class NoteOffsetState extends MusicBeatState
 	function updateNoteDelay()
 	{
 		ClientPrefs.data.noteOffset = Math.round(barPercent);
-		timeTxt.text = '当前偏移量：' + Math.floor(barPercent) + ' ms';
+		timeTxt.text = Lang.tOr('noteOffset.currentOffset', '当前偏移量：') + Math.floor(barPercent) + ' ms';
 	}
 
 	function updateMode()

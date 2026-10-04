@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 import backend.WheelScroll;
 
 import backend.WeekData;
@@ -269,7 +270,7 @@ class StoryMenuState extends MusicBeatState
 
 		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, FlxMath.bound(elapsed * 30, 0, 1)));
 		if (Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
-		scoreText.text = "本周分数：" + lerpScore;
+		scoreText.text = Lang.tOr('story.weekScore', "本周分数：") + lerpScore;
 
 		if (!movedBack && !selectedWeek)
 		{

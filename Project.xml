@@ -92,6 +92,8 @@
 	<define name="NO_PRELOAD_ALL" unless="PRELOAD_ALL"/>
 
 	<assets path="assets/fonts" />
+	<!-- 多语言语言包（backend/Lang.hx）。内置 zh / en；社区包放 Resources/languages/ 或 mod 里。 -->
+	<assets path="assets/languages" />
 	<assets path="assets/preload" rename="assets" exclude="*.ogg" if="web"/>
 	<assets path="assets/preload" rename="assets" exclude="*.mp3"  unless="web"/>
 	<assets path="assets/preload/flixel" rename="flixel" exclude="*.ogg" if="web"/>

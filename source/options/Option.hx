@@ -1,6 +1,7 @@
 package options;
 
 import objects.MenuText;
+import backend.Lang;
 
 
 class Option
@@ -14,7 +15,10 @@ class Option
 	// Everything else will use a text
 
 	public var scrollSpeed:Float = 50; //Only works on int/float, defines how fast it scrolls per second while holding left/right
-	private var variable:String = null; //Variable from ClientPrefs.hx
+	/** 存档变量名（ClientPrefs 字段）。
+	 *  对外**只读**：这是与语言无关的稳定标识，多语言 key 也以它为准
+	 *  （见 Lang：key = `option.` + variable），因此不能允许外部改写。 */
+	public var variable(default, null):String = null; //Variable from ClientPrefs.hx
 	public var defaultValue:Dynamic = null;
 
 	public var curOption:Int = 0; //Don't change this
@@ -42,14 +46,39 @@ class Option
 	public var description:String = '';
 	public var name:String = 'Unknown';
 
+	/** 构造时传入的**原文**（未本地化）。语言切换后 relocalize() 靠它重新取译文 ——
+	 *  否则已构造的选项会一直显示切语言之前的那一份文本。 */
+	private var originName:String = null;
+	private var originDesc:String = null;
+
 	public function new(name:String, description:String = '', variable:String, type:String = 'bool', ?options:Array<String> = null)
 	{
-		this.name = name;
-		this.description = description;
 		this.variable = variable;
+		// ===== 多语言：选项名/说明按「存档变量名」派生 key（option.<variable>）=====
+		// 用 tOr 而非 t：语言包里还没有这个 key 时，显示这里传进来的中文原文，
+		// 与多语言功能上线前**逐字一致**（零视觉回归）；补进语言包后自动切换。
+		// 这样做的收益：10 个设置子页几百条选项文案**一处接入**全部生效，
+		// 不用逐个子页改代码 —— key 天然稳定（存档字段名，与语言无关）。
+		this.originName = name;
+		this.originDesc = description;
+		this.name = Lang.tOr('option.' + variable, name);
+		this.description = Lang.tOr('optionDesc.' + variable, description);
 		this.type = type;
 		this.defaultValue = Reflect.getProperty(ClientPrefs.defaultData, variable);
 		this.options = options;
+
+		// string 档位的显示名表：自动按「存档变量名 + 档位下标」派生 key
+		// （optionValue.<variable>.<i>）。
+		// 关键：**options 仍是存档值，一个字都不改**（改了就破坏旧存档兼容性）；
+		// 本地化只发生在 displayOptions 这张显示表上，由 OptionValue.display() 消费。
+		// 例：timeBarType 存 '剩余时间'，英文界面显示 'Remaining'，存档不受影响。
+		// 调用方若显式给了 displayOptions（见 LanguageSettingsSubState）则以那份为准。
+		if (type == 'string' && options != null && displayOptions == null)
+		{
+			displayOptions = [];
+			for (i in 0...options.length)
+				displayOptions.push(Lang.tOr('optionValue.' + variable + '.' + i, options[i]));
+		}
 
 		if(defaultValue == 'null variable value')
 		{
@@ -96,6 +125,27 @@ class Option
 		//nothing lol
 		if(onChange != null) {
 			onChange();
+		}
+	}
+
+	/**
+	 * 语言切换后**就地重取译文**（由 Option 宿主在 Lang 监听回调里对所有已构造选项调用）。
+	 *
+	 * 为什么需要：选项名/说明是在**构造期**用 Lang.tOr 解析的，而分区实例（含 headless
+	 * 构造的那些）会长期存活 —— 不重取的话，用户在设置里切了语言，当前界面还是旧语言。
+	 *
+	 * 用构造时存下的 originName/originDesc 重新解析，因此**不会丢原文**：
+	 * 语言包里没有该 key 时依旧显示原文（零回归）。
+	 */
+	public function relocalize():Void
+	{
+		if (originName != null) name = Lang.tOr('option.' + variable, originName);
+		if (originDesc != null) description = Lang.tOr('optionDesc.' + variable, originDesc);
+		if (type == 'string' && options != null && displayOptions != null)
+		{
+			for (i in 0...options.length)
+				if (i < displayOptions.length)
+					displayOptions[i] = Lang.tOr('optionValue.' + variable + '.' + i, options[i]);
 		}
 	}
 

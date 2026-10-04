@@ -1,4 +1,5 @@
 package states;
+import backend.Lang;
 
 import backend.ClientPrefs;
 import backend.Paths;
@@ -46,7 +47,7 @@ class CrashTestPrompt extends FlxSubState
 		FlxSpriteUtil.drawRoundRect(panelBg, 0, 0, w, h, 18, 18, DesignTokens.panelFill, {color: 0x55FFFFFF, thickness: 1.5});
 		add(panelBg);
 
-		var title:FlxText = new FlxText(x + 24, y + 16, w - 48, '崩溃测试', 20);
+		var title:FlxText = new FlxText(x + 24, y + 16, w - 48, Lang.tOr('debug.crashTestTitle', '崩溃测试'), 20);
 		title.setFormat(Paths.font('future.ttf'), 20, 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 1.2;
 		title.scrollFactor.set();

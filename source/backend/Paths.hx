@@ -1026,6 +1026,39 @@ class Paths
 		return modFolders('fonts/' + key);
 	}
 
+	// ---------------- 多语言（Lang.hx 的路径唯一入口）----------------
+
+	/**
+	 * 语言包定位。优先级：
+	 *  ① mod 覆盖 —— `mods/<mod>/languages/<code>.json`（社区 mod 自带语言）
+	 *  ② 玩家投放 —— `Resources/languages/<code>.json`（安卓为 `<外部根>/languages/`）
+	 *  ③ 引擎内置 —— `assets/languages/<code>.json`（zh / en，打包在 Resources 内）
+	 *
+	 * macOS 注意：② ③ 同在 `Meteoric.app/Contents/Resources/` 下，往 **.app 包内**写文件
+	 * 会破坏代码签名，所以新增语言一律用 ②，mod 用 ①。
+	 */
+	static public function langFile(code:String):String {
+		#if MODS_ALLOWED
+		var modded:String = modFolders('languages/' + code + '.json');
+		if(FileSystem.exists(modded)) return modded;
+		#end
+		#if sys
+		var user:String = languagesRaw(code);
+		if(FileSystem.exists(user)) return user;
+		#end
+		return 'assets/languages/' + code + '.json';
+	}
+
+	/** 玩家投放目录（单文件路径；与 languagesDir() 同基址） */
+	static public function languagesRaw(code:String):String {
+		return #if android backend.AndroidStorage.root() + '/languages/' + code + '.json' #else 'languages/' + code + '.json' #end;
+	}
+
+	/** 玩家投放目录（供 Lang.refreshAvailable() 扫描 *.json） */
+	static public function languagesDir():String {
+		return #if android backend.AndroidStorage.root() + '/languages' #else 'languages' #end;
+	}
+
 	inline static public function modsJson(key:String) {
 		return modFolders('data/' + key + '.json');
 	}

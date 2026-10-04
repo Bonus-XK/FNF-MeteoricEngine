@@ -1,5 +1,6 @@
 package options;
 import backend.WheelScroll;
+import backend.Lang;
 
 import objects.BackButton;
 import states.MainMenuState;
@@ -58,6 +59,8 @@ class OptionsState extends MusicBeatState
 	var hintPanel:FlxSprite;
 	/** 主题变更监听者（必须在本状态 destroy 时摘除，否则静态监听表留下僵尸回调） */
 	var themeListener:Void->Void = null;
+	/** 语言变更监听（与 themeListener 同一套生命周期约束：destroy 必须摘除） */
+	var langListener:Void->Void = null;
 
 	var focus:Int = FOCUS_CONTENT;
 	var timeForMoving:Float = 0;
@@ -83,11 +86,11 @@ class OptionsState extends MusicBeatState
 	{
 		var list:Array<SectionEntry> = [];
 
-		var e:SectionEntry = new SectionEntry('音符', '音符');
+		var e:SectionEntry = new SectionEntry(Lang.tOr('options.category.notes', '音符'), Lang.tOr('options.title.notes', '音符'));
 		e.make = function() return new NoteSettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('箭头配色', '箭头配色');
+		e = new SectionEntry(Lang.tOr('options.category.noteColors', '箭头配色'), Lang.tOr('options.title.noteColors', '箭头配色'));
 		e.canvas = true;
 		e.makeCanvas = function() {
 			// 画布按内容区矩形构造：左右面板重排 + 色轮/渐变条换位（逻辑与整屏路径同一份代码，见 NotesPane）
@@ -98,35 +101,39 @@ class OptionsState extends MusicBeatState
 		};
 		list.push(e);
 
-		e = new SectionEntry('界面', '界面');
+		e = new SectionEntry(Lang.tOr('options.category.interface', '界面'), Lang.tOr('options.title.interface', '界面'));
 		e.make = function() return new InterfaceSettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('画面', '图像设置');
+		e = new SectionEntry(Lang.tOr('settings.language', '语言'), Lang.tOr('options.title.language', '界面'));
+		e.make = function() return new LanguageSettingsSubState();
+		list.push(e);
+
+		e = new SectionEntry(Lang.tOr('options.category.graphics', '画面'), Lang.tOr('options.title.graphics', '图像设置'));
 		e.make = function() return new GraphicsSettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('效果', '效果');
+		e = new SectionEntry(Lang.tOr('options.category.effects', '效果'), Lang.tOr('options.title.effects', '效果'));
 		e.make = function() return new EffectsSubState();
 		list.push(e);
 
-		e = new SectionEntry('玩法', '玩法');
+		e = new SectionEntry(Lang.tOr('options.category.gameplay', '玩法'), Lang.tOr('options.title.gameplay', '玩法'));
 		e.make = function() return new GameplaySettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('判定', '判定');
+		e = new SectionEntry(Lang.tOr('options.category.judgement', '判定'), Lang.tOr('options.title.judgement', '判定'));
 		e.make = function() return new JudgmentSettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('性能', '性能');
+		e = new SectionEntry(Lang.tOr('options.category.performance', '性能'), Lang.tOr('options.title.performance', '性能'));
 		e.make = function() return new PerformanceSubState();
 		list.push(e);
 
-		e = new SectionEntry('编程', '编程');
+		e = new SectionEntry(Lang.tOr('options.category.programming', '编程'), Lang.tOr('options.title.programming', '编程'));
 		e.make = function() return new ProgrammingSettingsSubState();
 		list.push(e);
 
-		e = new SectionEntry('按键设置', '按键设置');
+		e = new SectionEntry(Lang.tOr('options.category.controls', '按键设置'), Lang.tOr('options.title.controls', '按键设置'));
 		e.canvas = true;
 		e.makeCanvas = function() {
 			// 画布按内容区矩形构造：列表左缩进、键位列右贴（逻辑与整屏路径同一份代码，见 ControlsPane）
@@ -274,6 +281,10 @@ class OptionsState extends MusicBeatState
 		themeListener = function() rethemeNow();
 		DesignTokens.addThemeListener(themeListener);
 
+		// 语言变更监听：与主题色同构，destroy 里必须摘除
+		langListener = function() relocalizeNow();
+		Lang.addLangListener(langListener);
+
 		super.create();
 
 		loadUIscripts('options');
@@ -405,6 +416,44 @@ class OptionsState extends MusicBeatState
 	function onPaneValueChanged():Void
 	{
 		if (bg != null) bg.color = DesignTokens.menuTint;
+		if (pane != null) pane.refresh();
+	}
+
+	/**
+	 * 语言变更后的**本页即时换文案**（由 Lang 的监听者派发；低频事件）。
+	 *
+	 * 与 rethemeNow 同构（都是"宿主统一刷可见部分"），但刷的是**文本**不是颜色：
+	 *  ① 分区名 label/title 是 buildRoster() 时用 Lang.t() 求值的快照 → 重跑 buildRoster 取新的；
+	 *  ② 已构造的分区实例（含 headless 的）持有旧语言的 Option 文案 → 逐个 relocalize()；
+	 *  ③ 侧栏与内容区重刷。
+	 *
+	 * 不重建分区实例（重建会丢当前选中项与滚动位置），因此只做就地重取。
+	 */
+	function relocalizeNow():Void
+	{
+		// ① 分区名：重建 roster 拿到新语言的 label/title，再回填到侧栏
+		var fresh = buildRoster();
+		var labels:Array<String> = [];
+		for (i in 0...roster.length)
+		{
+			if (i < fresh.length)
+			{
+				roster[i].label = fresh[i].label;
+				roster[i].title = fresh[i].title;
+				roster[i].hint = fresh[i].hint;
+			}
+			labels.push(roster[i].label);
+		}
+		if (rail != null) rail.setLabels(labels);
+
+		// ② 已构造的分区：就地重取选项文案
+		for (e in roster)
+		{
+			if (e != null && e.instance != null) e.instance.relocalizeAll();
+		}
+
+		// ③ 可见部分重刷
+		if (rail != null) rail.refresh();
 		if (pane != null) pane.refresh();
 	}
 
@@ -669,6 +718,12 @@ class OptionsState extends MusicBeatState
 		{
 			DesignTokens.removeThemeListener(themeListener);
 			themeListener = null;
+		}
+		// 语言监听：同样是静态表，必须摘除（否则离页后每次切语言都会回调到已销毁的精灵）
+		if (langListener != null)
+		{
+			Lang.removeLangListener(langListener);
+			langListener = null;
 		}
 		// 落盘 → 再 loadPrefs：本类旧实现的 destroy 只有 loadPrefs（"应用存档值"），
 		// 分页时代靠各子页关闭时的 saveSettings 落盘；单界面没有那一步，必须在这里补（否则最后一次改动丢失）

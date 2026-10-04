@@ -1,5 +1,6 @@
 package options;
 import backend.WheelScroll;
+import backend.Lang;
 
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
@@ -198,7 +199,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		titleText.scrollFactor.set();
 		add(titleText);
 
-		var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 100, 0, '选项说明', 26);
+		var rightTitle:FlxText = new FlxText(PANEL_R_X + 32, 100, 0, Lang.tOr('options.descriptionPanel', '选项说明'), 26);
 		rightTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		rightTitle.borderSize = 2;
 		rightTitle.scrollFactor.set();
@@ -255,7 +256,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		add(backBtn.label);
 
 		// ---- 底部提示 ----
-		var hint:FlxText = new FlxText(300, 672, 680, '滚轮 / 方向键 选择 · 左/右 调整数值 · Enter 切换 · R 重置 · 点击 < 返回', 16);
+		var hint:FlxText = new FlxText(300, 672, 680, Lang.tOr('options.hint.navigate', '滚轮 / 方向键 选择 · 左/右 调整数值 · Enter 切换 · R 重置 · 点击 < 返回'), 16);
 		hint.setFormat(Paths.font("future.ttf"), 16, FlxColor.WHITE, CENTER);
 		hint.scrollFactor.set();
 		add(hint);
@@ -530,13 +531,35 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		return PANEL_R_Y + PANEL_R_H - SWATCH_BAR_H - SWATCH_BOTTOM_GAP;
 	}
 
-	/** 定位"主题色"选项行（按选项名；配色/名称改动只影响这一处） */
+	/**
+	 * 语言切换后就地重取本分区所有选项的译文（由宿主 OptionsState 在 Lang 监听回调里调用）。
+	 * headless 分区没有自己的 UI，但仍要重取 —— 它持有的 optionsArray 会喂给 OptionsPane 渲染。
+	 *
+	 * 不动 title：分区标题是各子类构造期自己写的（且整屏路径直接用它），
+	 * 由各子类负责本地化；这里只管选项表，避免"两处都能改标题"的歧义。
+	 */
+	public function relocalizeAll():Void
+	{
+		if (optionsArray == null) return;
+		for (o in optionsArray)
+		{
+			if (o != null) o.relocalize();
+		}
+		// 非 headless 时顺带把行文本与右栏说明刷成新语言
+		if (!builtHeadless) refreshRows();
+	}
+
+	/** 定位"主题色"选项行。
+	 *  按**存档变量名** themeIndex 定位，**不按选项名**。
+	 *  旧实现是 `o.name.indexOf('主题色')`（中文字符串嗅探）—— 多语言后选项名会随语言变
+	 *  （英文界面下 name = "Theme Color"），嗅探必然失效、色板静默不挂载。
+	 *  variable 是存档字段名，与语言无关，是唯一稳定标识。 */
 	function findThemeColorOption():Option
 	{
 		if (optionsArray == null) return null;
 		for (o in optionsArray)
 		{
-			if (o != null && Std.string(o.name).indexOf('主题色') == 0) return o;
+			if (o != null && o.variable == 'themeIndex') return o;
 		}
 		return null;
 	}
