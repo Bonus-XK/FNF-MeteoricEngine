@@ -616,7 +616,7 @@ class LuaGraphEditorState extends MusicBeatState
 			t.wordWrap = false;
 			add(t);
 			palRows.push(t);
-			if (idx < defs.length) t.text = (defs[idx].hat ? '▸ ' : '▪ ') + defs[idx].label;
+			if (idx < defs.length) t.text = (defs[idx].hat ? '▸ ' : '▪ ') + defs[idx].labelOf();
 		}
 		refreshPaletteHighlight();
 		palTitle.text = Lang.tOr('lg.blockPrefix', '积木 · ') + LuaBlockDefs.catLabel(LuaBlockDefs.CATEGORIES[catIndex][0]);
@@ -633,7 +633,7 @@ class LuaGraphEditorState extends MusicBeatState
 			palRows[i].alpha = (idx < defs.length) ? (sel ? 1 : 0.75) : 0;
 		}
 		if (palDesc != null)
-			palDesc.text = (palHighlight < defs.length) ? defs[palHighlight].desc : '';
+			palDesc.text = (palHighlight < defs.length) ? defs[palHighlight].descOf() : '';
 	}
 
 	/**
@@ -1037,7 +1037,7 @@ class LuaGraphEditorState extends MusicBeatState
 			FlxG.sound.play(Paths.sound('confirmMenu'), 0.5);
 			rebuildCanvas();
 			refreshStatus();
-			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.label + Lang.tOr('lg.dropHint1', '（拖积木到凹槽或插入线上松手即接入）'));
+			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.labelOf() + Lang.tOr('lg.dropHint1', '（拖积木到凹槽或插入线上松手即接入）'));
 			return;
 		}
 		var b:GBlock = new GBlock(def.id);
@@ -1064,7 +1064,7 @@ class LuaGraphEditorState extends MusicBeatState
 			var st:GStack = (bp[0] >= 0 && bp[0] < doc.stacks.length) ? doc.stacks[bp[0]] : null;
 			var hd:BlockDef = (st == null) ? null : LuaBlockDefs.byEvent(st.event);
 			refreshSelectionVisual();
-			setStatus(Lang.tOr('lg.stackSelected', '已选中事件栈：') + ((hd != null) ? hd.label : (st == null ? Lang.tOr('lg.unknown', '未知') : st.event)) + Lang.tOr('lg.stackDelHint', '（Del 删除整条栈）'));
+			setStatus(Lang.tOr('lg.stackSelected', '已选中事件栈：') + ((hd != null) ? hd.labelOf() : (st == null ? Lang.tOr('lg.unknown', '未知') : st.event)) + Lang.tOr('lg.stackDelHint', '（Del 删除整条栈）'));
 			return;
 		}
 		dragOriginIndex = bp[bp.length - 1];
@@ -1431,7 +1431,7 @@ class LuaGraphEditorState extends MusicBeatState
 				rebuildCanvas();
 				refreshStatus();
 			default:
-				setStatus(Lang.tOr('lg.paramOpen', '参数「') + p.label + Lang.tOr('lg.paramNeedEnter', '」需要按 Enter 输入'));
+				setStatus(Lang.tOr('lg.paramOpen', '参数「') + d.paramLabel(p) + Lang.tOr('lg.paramNeedEnter', '」需要按 Enter 输入'));
 		}
 	}
 
@@ -1469,7 +1469,7 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = true;
 			rebuildCanvas();
 			refreshStatus();
-			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.label + Lang.tOr('lg.dropHint2', '（拖积木到凹槽或按 Insert 接入）'));
+			setStatus(Lang.tOr('lg.stackAdded', '已新增事件栈：') + def.labelOf() + Lang.tOr('lg.dropHint2', '（拖积木到凹槽或按 Insert 接入）'));
 			return;
 		}
 		var b:GBlock = new GBlock(def.id);
@@ -1495,7 +1495,7 @@ class LuaGraphEditorState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
 		rebuildCanvas();
 		refreshStatus();
-		setStatus(Lang.tOr('lg.inserted', '已插入：') + def.label);
+		setStatus(Lang.tOr('lg.inserted', '已插入：') + def.labelOf());
 	}
 
 	function deleteSelected():Void
@@ -1521,7 +1521,7 @@ class LuaGraphEditorState extends MusicBeatState
 			}
 			var st:GStack = doc.stacks[si];
 			var hd:BlockDef = LuaBlockDefs.byEvent(st.event);
-			var lbl:String = (hd != null) ? hd.label : st.event;
+			var lbl:String = (hd != null) ? hd.labelOf() : st.event;
 			var inner:Int = st.blocks.length;
 			pushUndo();
 			doc.stacks.splice(si, 1);
@@ -2016,7 +2016,7 @@ class LuaGraphEditorState extends MusicBeatState
 			dirty = false;
 			rebuildCanvas();
 			refreshStatus();
-			setStatus(Lang.tOr('lg.opened', '已打开：') + name + '（积木 ' + doc.blockCount() + Lang.tOr('lg.blocksParen', ' 块）'));
+			setStatus(Lang.tOr('lg.opened', '已打开：') + name + Lang.tOr('lg.openedBlocksOpen', '（积木 ') + doc.blockCount() + Lang.tOr('lg.blocksParen', ' 块）'));
 		}
 		catch (e:Dynamic)
 		{

@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 /**
  * 新建模板：给用户一个"能跑起来"的起点，避免面对空画布无从下手。
@@ -7,7 +8,7 @@ package luagraph;
  */
 class LuaGraphTemplates
 {
-	public static var NAMES:Array<String> = ['空白脚本', '按键生成特效', '镜头缩放', '精灵补间'];
+	public static var NAMES:Array<String> = [Lang.tOr('lg.tpl.blank', '空白脚本'), Lang.tOr('lg.tpl.keysfx', '按键生成特效'), Lang.tOr('lg.tpl.camzoom', '镜头缩放'), Lang.tOr('lg.tpl.spritetween', '精灵补间')];
 
 	public static function make(index:Int, name:String):GDoc
 	{

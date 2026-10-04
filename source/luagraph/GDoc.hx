@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 import haxe.Json;
 
@@ -75,10 +76,10 @@ class GDoc
 
 	public static function fromJson(d:Dynamic):GDoc
 	{
-		if (d == null || !Reflect.isObject(d)) throw '图文件不是合法的 JSON 对象';
+		if (d == null || !Reflect.isObject(d)) throw Lang.tOr('lg.graph.notObject', '图文件不是合法的 JSON 对象');
 		var doc:GDoc = new GDoc();
 		var ver:Int = JsonModel.int(Reflect.field(d, 'version'), FORMAT_VERSION);
-		if (ver > FORMAT_VERSION) throw '图文件版本（' + ver + '）高于当前编辑器支持的版本（' + FORMAT_VERSION + '），请升级引擎后再打开';
+		if (ver > FORMAT_VERSION) throw Lang.tOr('lg.graph.verPrefix', '图文件版本（') + ver + Lang.tOr('lg.graph.verMid', '）高于当前编辑器支持的版本（') + FORMAT_VERSION + Lang.tOr('lg.graph.verSuffix', '），请升级引擎后再打开');
 		doc.version = ver;
 		doc.name = JsonModel.str(Reflect.field(d, 'name'), 'new_script');
 		doc.mod = JsonModel.str(Reflect.field(d, 'mod'), '');
@@ -98,7 +99,7 @@ class GDoc
 		}
 		catch (e:Dynamic)
 		{
-			throw '图文件不是合法 JSON：' + Std.string(e);
+			throw Lang.tOr('lg.graph.notJson', '图文件不是合法 JSON：') + Std.string(e);
 		}
 		return fromJson(d);
 	}

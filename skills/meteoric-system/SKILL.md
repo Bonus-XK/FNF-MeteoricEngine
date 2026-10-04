@@ -350,6 +350,29 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   运行时切换语言后仍显示旧语言。译文若挂在静态字段上，改成
   `static function x():String return Lang.tOr(...)`（每次重新求值）。
   （仓库约定是「一律 tOr 带兜底」，所以这条只能靠改成函数解决。）
+- ⚠ **`static inline var` 连兜底都包不了**：`inline var` 要求常量初始化，
+  `Lang.tOr(...)` 是函数调用 → 编译期直接报
+  `Inline variable initialization must be a constant value`。必须改成
+  `static function`（连 `static var` 也不行，见上一条）。
+- ⚠ **数据表别逐条包裹，走显示点取值**：积木目录 `LuaBlockDefs` 有 330 处中文，
+  逐条包会（1）噪声大、（2）`DEFS = build()` 是进程级 `static var`，
+  在构造函数里翻译会被缓存死。正确做法是**数据表保留中文原文（唯一真源）**，
+  在 `BlockDef` 上加 `labelOf()` / `descOf()` / `paramLabel()`，
+  key 由积木 id 运行时拼（`'lg.block.' + id`），显示点全部改走这三个方法。
+  语言包按 `lg.block.<id>` / `lg.blockDesc.<id>` / `lg.param.<id>.<param>` 组织。
+  ⚠ 参数 key **不可跨块共用前缀**：补间类积木 `tw_start.value`='目标值' 与
+  `tw_x.value`='x 坐标' 标签不同，共用 `lg.param.tw.*` 会变成「同 key 两个原文」。
+- ⚠ **写入磁盘的标记串不能翻**：`LuaCodeGen.CUSTOM_BEGIN` / `MANAGED_BEGIN` 是
+  `.luagraph.json` + `.lua` 的往返标记，`LuaGraphIO.extractCustom()` 靠它切分出
+  用户自定义代码区；翻了就读不回来（旧文件仍能被新版读到，反之亦然）。
+  同理，模板里 `misc_print` 的默认文本会作为 `print()` 实参写进用户脚本，
+  属「脚本内容」而非界面文案，保持中文。
+- ⚠ **白名单式批处理查不出「漏了」**：`apply.go` 只校验「表里每条都能在源码找到」，
+  **不会**告诉你「源码里还有哪些中文没进表」。批次跑完必须再扫一遍全仓库
+  残留（用 hxscan + `_is_wrapped`），否则会静默漏条。
+  （2026-10-04 实测漏过一条 `'（积木 '`。）
+- 校验派生 key（如 `lg.block.*`）时，静态扫 `Lang.tOr('` 抓不到 —— key 是运行时拼的。
+  要从积木表反推应需集合再比对，见批次脚本里的「按积木表应需 N 个 key」。
 
 - **仍待接入**（不要以为已完成）：各**编辑器**页（Charting / LuaGraph / 角色 / 周目 / 对话）、
   `luagraph` 代码生成标签 —— 按需求方决定**跳过**。`Achievements.hx` 的成就名/说明已接入

@@ -2,6 +2,7 @@ package luagraph;
 
 import flixel.util.FlxColor;
 import backend.DesignTokens;
+import backend.Lang;
 
 /** 积木目录：10 个分类 + 约 80 块，覆盖事件/流程/变量/精灵/补间/相机/音频/文本/杂项/兜底。 */
 class LuaBlockDefs
@@ -88,7 +89,7 @@ class LuaBlockDefs
 	public static function catLabel(cat:String):String
 	{
 		for (c in CATEGORIES)
-			if (c[0] == cat) return c[1];
+			if (c[0] == cat) return Lang.tOr('lg.cat.' + cat, c[1]);
 		return cat;
 	}
 

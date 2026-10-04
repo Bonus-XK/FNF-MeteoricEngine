@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 /**
  * 图 → Lua 代码生成器。
@@ -38,7 +39,7 @@ class LuaCodeGen
 			var def:BlockDef = LuaBlockDefs.byEvent(s.event);
 			if (def == null || !def.hat)
 			{
-				ctx.warnings.push('未知的事件类型：' + s.event);
+				ctx.warnings.push(Lang.tOr('lg.errUnknownEventType', '未知的事件类型：') + s.event);
 				continue;
 			}
 			// 帽块与普通积木共用同一套模板发射逻辑（$BODY$ / $ELSE$ 统一在此展开）
@@ -58,9 +59,9 @@ class LuaCodeGen
 
 		var head:Array<String> = [];
 		head.push('-- ============================================================');
-		head.push('--  Meteoric Engine · Lua 图形化编程（积木块 → Lua）');
-		head.push('--  脚本名称：' + (doc.name == null ? '' : doc.name));
-		head.push('--  说明：本区块由编辑器全量重写；需要手写代码请用文件底部的自定义代码区。');
+		head.push(Lang.tOr('lg.gen.by', '--  Meteoric Engine · Lua 图形化编程（积木块 → Lua）'));
+		head.push(Lang.tOr('lg.gen.scriptName', '--  脚本名称：') + (doc.name == null ? '' : doc.name));
+		head.push(Lang.tOr('lg.gen.notice', '--  说明：本区块由编辑器全量重写；需要手写代码请用文件底部的自定义代码区。'));
 		head.push(MANAGED_BEGIN);
 		head.push('-- ============================================================');
 		head.push('');
@@ -71,7 +72,7 @@ class LuaCodeGen
 		}
 		if (hasWait)
 		{
-			head.push('-- 「等待」积木的续接调度器（引擎在计时结束时回调 onTimerCompleted）');
+			head.push(Lang.tOr('lg.gen.waitDispatcher', '-- 「等待」积木的续接调度器（引擎在计时结束时回调 onTimerCompleted）'));
 			head.push('local me_waitCb = {}');
 			head.push('function onTimerCompleted(tag, loops, loopsLeft)');
 			head.push('\tlocal cb = me_waitCb[tag]');
@@ -97,22 +98,22 @@ class LuaCodeGen
 	{
 		var issues:Array<String> = [];
 		var ctx:Ctx = newCtx(doc);
-		if (doc.stacks.length == 0) issues.push('错误：没有任何事件栈（无法生成脚本）');
-		if (doc.isEmpty()) issues.push('错误：画布上还没有任何积木，请至少放一块到事件栈里');
+		if (doc.stacks.length == 0) issues.push(Lang.tOr('lg.errNoStacks', '错误：没有任何事件栈（无法生成脚本）'));
+		if (doc.isEmpty()) issues.push(Lang.tOr('lg.errEmptyCanvas', '错误：画布上还没有任何积木，请至少放一块到事件栈里'));
 
 		var tweenTags:Map<String, Int> = new Map();
 		var waitTags:Map<String, Int> = new Map();
 		for (s in doc.stacks)
 		{
 			var hdef:BlockDef = LuaBlockDefs.byEvent(s.event);
-			if (hdef == null) issues.push('错误：未知的事件栈类型 “' + s.event + '”（可用：onCreate/onCreatePost/onUpdatePost/onBeatHit/onStepHit/onKeyPress/goodNoteHit/onSongStart/onDestroy）');
-			else if (!hdef.hat) issues.push('错误：事件栈的帽子块不是事件积木（' + s.event + '）');
+			if (hdef == null) issues.push(Lang.tOr('lg.errUnknownStackType', '错误：未知的事件栈类型 “') + s.event + Lang.tOr('lg.errUnknownStackTypeTail', '”（可用：onCreate/onCreatePost/onUpdatePost/onBeatHit/onStepHit/onKeyPress/goodNoteHit/onSongStart/onDestroy）'));
+			else if (!hdef.hat) issues.push(Lang.tOr('lg.errHatNotEvent', '错误：事件栈的帽子块不是事件积木（') + s.event + '）');
 			checkChain(s.blocks, ctx, issues, tweenTags, waitTags);
 		}
 		if (containsWaitAny(doc))
 		{
 			if (doc.custom != null && doc.custom.indexOf('function onTimerCompleted') >= 0)
-				issues.push('警告：自定义代码区里也定义了 onTimerCompleted —— 会覆盖"等待"积木的调度器，等待将失效');
+				issues.push(Lang.tOr('lg.warnTimerOverride', '警告：自定义代码区里也定义了 onTimerCompleted —— 会覆盖"等待"积木的调度器，等待将失效'));
 		}
 		for (w in ctx.warnings) issues.push(w);
 		return issues;
@@ -155,7 +156,7 @@ class LuaCodeGen
 			var def:BlockDef = LuaBlockDefs.get(b.type);
 			if (def == null)
 			{
-				issues.push('错误：未知积木类型 ' + b.type + '（图文件可能来自更新版本的编辑器）');
+				issues.push(Lang.tOr('lg.errUnknownBlock', '错误：未知积木类型 ') + b.type + Lang.tOr('lg.errUnknownBlockTail', '（图文件可能来自更新版本的编辑器）'));
 				continue;
 			}
 			for (p in def.params)
@@ -165,19 +166,19 @@ class LuaCodeGen
 				{
 					case KNum:
 						var t:String = StringTools.trim(v);
-						if (t.length == 0) issues.push('错误：【' + def.label + '】的「' + p.label + '」不能为空');
-						else if (!isNumericExpr(t)) issues.push('错误：【' + def.label + '】的「' + p.label + '」必须是数字，当前是 “' + t + '”');
+						if (t.length == 0) issues.push(Lang.tOr('lg.errOpen', '错误：【') + def.labelOf() + Lang.tOr('lg.of', '】的「') + def.paramLabel(p) + Lang.tOr('lg.cantBeEmpty', '」不能为空'));
+						else if (!isNumericExpr(t)) issues.push(Lang.tOr('lg.errOpen', '错误：【') + def.labelOf() + Lang.tOr('lg.of', '】的「') + def.paramLabel(p) + Lang.tOr('lg.mustBeNumber', '」必须是数字，当前是 “') + t + Lang.tOr('lg.closeQuote', '”'));
 					case KExpr:
-						if (StringTools.trim(v).length == 0) issues.push('警告：【' + def.label + '】的「' + p.label + '」为空，可能会生成无效 Lua');
+						if (StringTools.trim(v).length == 0) issues.push(Lang.tOr('lg.warnOpen', '警告：【') + def.labelOf() + Lang.tOr('lg.of', '】的「') + def.paramLabel(p) + Lang.tOr('lg.warnEmptyExpr', '」为空，可能会生成无效 Lua'));
 					case KVar:
-						if (StringTools.trim(v).length == 0) issues.push('错误：【' + def.label + '】未选择变量');
+						if (StringTools.trim(v).length == 0) issues.push(Lang.tOr('lg.errOpen', '错误：【') + def.labelOf() + Lang.tOr('lg.errNoVar', '】未选择变量'));
 						else if (!ctx.declared.exists(v))
 						{
 							ctx.declared.set(v, true);
-							issues.push('警告：变量 “' + v + '” 未在左侧声明，已自动在文件顶部补 local ' + sanitizeIdent(v, ctx) + ' = 0');
+							issues.push(Lang.tOr('lg.warnVarPrefix', '警告：变量 “') + v + Lang.tOr('lg.warnVarSuffix', '” 未在左侧声明，已自动在文件顶部补 local ') + sanitizeIdent(v, ctx) + Lang.tOr('lg.equalsZero', ' = 0'));
 						}
 					case KTag:
-						if (StringTools.trim(v).length == 0) issues.push('错误：【' + def.label + '】的「' + p.label + '」不能为空');
+						if (StringTools.trim(v).length == 0) issues.push(Lang.tOr('lg.errOpen', '错误：【') + def.labelOf() + Lang.tOr('lg.of', '】的「') + def.paramLabel(p) + Lang.tOr('lg.cantBeEmpty', '」不能为空'));
 					case KText, KEnum(_):
 				}
 			}
@@ -190,17 +191,17 @@ class LuaCodeGen
 					var bag:Map<String, Int> = (b.type == 'flow_wait') ? waitTags : tweenTags;
 					var n:Int = bag.exists(tag) ? bag.get(tag) : 0;
 					bag.set(tag, n + 1);
-					if (n == 1) issues.push('警告：' + (b.type == 'flow_wait' ? '计时器' : '补间') + '标签 “' + tag + '” 被用了多次，后一个会覆盖前一个');
+					if (n == 1) issues.push(Lang.tOr('lg.warnPrefix', '警告：') + (b.type == 'flow_wait' ? Lang.tOr('lg.timer', '计时器') : Lang.tOr('lg.tween', '补间')) + Lang.tOr('lg.tagOpen', '标签 “') + tag + Lang.tOr('lg.tagDupSuffix', '” 被用了多次，后一个会覆盖前一个'));
 				}
 			}
 			if (b.type == 'adv_call')
 			{
 				var fn:String = StringTools.trim(b.get('fname', ''));
-				if (fn.length == 0) issues.push('错误：【调用任意 Lua 函数】缺少函数名');
-				else if (!isIdentifier(fn)) issues.push('错误：函数名 “' + fn + '” 不是合法 Lua 标识符');
+				if (fn.length == 0) issues.push(Lang.tOr('lg.errNoFuncName', '错误：【调用任意 Lua 函数】缺少函数名'));
+				else if (!isIdentifier(fn)) issues.push(Lang.tOr('lg.errFuncNamePrefix', '错误：函数名 “') + fn + Lang.tOr('lg.errFuncNameSuffix', '” 不是合法 Lua 标识符'));
 			}
-			if (def.body && b.body.length == 0) issues.push('警告：【' + def.label + '】的内部还是空的');
-			if (def.alt && b.elseBody.length == 0) issues.push('警告：【' + def.label + '】的「否则」分支是空的');
+			if (def.body && b.body.length == 0) issues.push(Lang.tOr('lg.warnOpen', '警告：【') + def.labelOf() + Lang.tOr('lg.warnEmptyBody', '】的内部还是空的'));
+			if (def.alt && b.elseBody.length == 0) issues.push(Lang.tOr('lg.warnOpen', '警告：【') + def.labelOf() + Lang.tOr('lg.warnEmptyElse', '】的「否则」分支是空的'));
 			checkChain(b.body, ctx, issues, tweenTags, waitTags);
 			checkChain(b.elseBody, ctx, issues, tweenTags, waitTags);
 		}
@@ -221,7 +222,7 @@ class LuaCodeGen
 			{
 				var tag:String = cleanTag(b.get('tag', 'myWait'), ctx);
 				var secs:String = num(b.get('secs', '1'));
-				out.push(ind + '-- 等待 ' + secs + ' 秒后继续本栈（由 onTimerCompleted 调度）');
+				out.push(ind + Lang.tOr('lg.gen.waitComment', '-- 等待 ') + secs + Lang.tOr('lg.gen.waitResume', ' 秒后继续本栈（由 onTimerCompleted 调度）'));
 				out.push(ind + 'me_waitCb[\'' + tag + '\'] = function()');
 				emitChain(blocks.slice(i + 1), depth + 1, ctx, out);
 				out.push(ind + 'end');
@@ -266,7 +267,7 @@ class LuaCodeGen
 			if (l == '$$BODY$$')
 			{
 				var kids:Array<GBlock> = (bodyOverride != null) ? bodyOverride : b.body;
-				if (kids.length == 0 && bodyOverride != null) out.push(tabs(depth + 1) + '-- （空栈：拖入积木以添加内容）');
+				if (kids.length == 0 && bodyOverride != null) out.push(tabs(depth + 1) + Lang.tOr('lg.gen.emptyStack', '-- （空栈：拖入积木以添加内容）'));
 				emitChain(kids, depth + 1, ctx, out);
 			}
 			else if (l == '$$ELSE$$')
@@ -364,7 +365,7 @@ class LuaCodeGen
 			else out += '_';
 		}
 		if (!isIdentStart(out.charCodeAt(0))) out = 'me_' + out;
-		if (ctx != null && out != s) ctx.warnings.push('警告：名称 “' + s + '” 含非法字符，已改为 “' + out + '”');
+		if (ctx != null && out != s) ctx.warnings.push(Lang.tOr('lg.gen.sanitizeName', '警告：名称 “') + s + Lang.tOr('lg.gen.sanitizeTo', '” 含非法字符，已改为 “') + out + Lang.tOr('lg.closeQuote', '”'));
 		return out;
 	}
 

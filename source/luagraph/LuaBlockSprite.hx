@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 import flixel.FlxSprite;
 import flixel.text.FlxText;
@@ -42,8 +43,9 @@ class LuaBlockSprite extends FlxSprite
 	/** 辅助/提示字号（meteoric-design 字体表：辅助提示 16） */
 	static inline var WELL_HINT_SIZE:Int = 16;
 	static inline var WELL_HINT_LINE_H:Float = 18;
-	static inline var WELL_HINT_BODY:String = '把积木拖进这个凹槽';
-	static inline var WELL_HINT_ELSE:String = '把积木拖进「否则」凹槽';
+	// 刻意用函数而非 static inline var：inline var 要求常量初始化（不能调 Lang.tOr）。
+	static function wellHintBody():String return Lang.tOr('lg.slot.hint', '把积木拖进这个凹槽');
+	static function wellHintElse():String return Lang.tOr('lg.slot.hintElse', '把积木拖进「否则」凹槽');
 
 	public var gblock:GBlock;
 	public var def:BlockDef;
@@ -98,33 +100,33 @@ class LuaBlockSprite extends FlxSprite
 			drawWell(INDENT, yCursor, w - INDENT - 8, m.bodyH);
 			var bodyIsEmpty:Bool = (bodyEmpty != null) ? bodyEmpty : (block.body.length == 0);
 			if (bodyIsEmpty)
-				addWellHint(x + INDENT + 12, y + yCursor + m.bodyH - WELL_HINT_LINE_H - 6, WELL_HINT_BODY);
+				addWellHint(x + INDENT + 12, y + yCursor + m.bodyH - WELL_HINT_LINE_H - 6, wellHintBody());
 			yCursor += m.bodyH;
 		}
 		if (def.alt)
 		{
 			yCursor += 2;
 			var elseLabelY:Float = yCursor;
-			addText(x + INDENT + 6, y + elseLabelY + 2, '否则', 16, 0xFFCFCFDC);
+			addText(x + INDENT + 6, y + elseLabelY + 2, Lang.tOr('lg.slot.elseLabel', '否则'), 16, 0xFFCFCFDC);
 			yCursor += ELSE_LABEL_H;
 			elseWell = {x: x + INDENT, y: y + yCursor, w: w - INDENT - 8, h: m.elseH};
 			drawWell(INDENT, yCursor, w - INDENT - 8, m.elseH);
 			var elseIsEmpty:Bool = (elseEmpty != null) ? elseEmpty : (block.elseBody.length == 0);
 			if (elseIsEmpty)
-				addWellHint(x + INDENT + 12, y + yCursor + m.elseH - WELL_HINT_LINE_H - 6, WELL_HINT_ELSE);
+				addWellHint(x + INDENT + 12, y + yCursor + m.elseH - WELL_HINT_LINE_H - 6, wellHintElse());
 		}
 
 		// 标题 + 参数槽
 		var tx:Float = PAD;
 		if (def.hat) tx += 2;
-		var labelTxt:FlxText = addText(x + tx, y + headerTop + 12, def.label, 18, FlxColor.WHITE);
-		tx += textWidth(def.label, 18) + 10;
+		var labelTxt:FlxText = addText(x + tx, y + headerTop + 12, def.labelOf(), 18, FlxColor.WHITE);
+		tx += textWidth(def.labelOf(), 18) + 10;
 
 		for (p in def.params)
 		{
 			var value:String = block.get(p.name, p.def);
 			var shown:String = value == null ? '' : value;
-			var label:String = (shown.length > 0) ? shown : ('{' + p.label + '}');
+			var label:String = (shown.length > 0) ? shown : ('{' + def.paramLabel(p) + '}');
 			var vw:Float = Math.max(58, textWidth(label, 16) + 20);
 			if (tx + vw > w - PAD) vw = Math.max(58, w - PAD - tx);
 			var kindTxt:FlxText = addText(x + tx + 10, y + headerTop + 13, label, 16,
@@ -141,7 +143,7 @@ class LuaBlockSprite extends FlxSprite
 			chip.scrollFactor.set();
 			chips.push(chip);
 
-			slots.push(new SlotHit(p.name, p.label, p.kind, x + tx + 2, slotY, chipW, SLOT_H));
+			slots.push(new SlotHit(p.name, def.paramLabel(p), p.kind, x + tx + 2, slotY, chipW, SLOT_H));
 			tx += chipW + SLOT_GAP;
 		}
 
@@ -210,11 +212,11 @@ class LuaBlockSprite extends FlxSprite
 	/** 两遍法的"量"：给出宽度/高度/两个容器高度（递归子块）。 */
 	public static function measure(def:BlockDef, b:GBlock, ?bodyOverride:Array<GBlock>):BlockMetrics
 	{
-		var headerW:Float = PAD + textWidth(def.label, 18) + 10 + PAD;
+		var headerW:Float = PAD + textWidth(def.labelOf(), 18) + 10 + PAD;
 		for (p in def.params)
 		{
 			var value:String = b.get(p.name, p.def);
-			var label:String = (value != null && value.length > 0) ? value : ('{' + p.label + '}');
+			var label:String = (value != null && value.length > 0) ? value : ('{' + def.paramLabel(p) + '}');
 			headerW += Math.max(58, textWidth(label, 16) + 20) + SLOT_GAP;
 		}
 

@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 import haxe.Json;
 
@@ -61,7 +62,7 @@ class GBlock
 	public static function fromJson(d:Dynamic):GBlock
 	{
 		var type:String = JsonModel.str(Reflect.field(d, 'type'), '');
-		if (type.length == 0) throw '积木数据缺少 type 字段';
+		if (type.length == 0) throw Lang.tOr('lg.graph.noType', '积木数据缺少 type 字段');
 		var b:GBlock = new GBlock(type);
 		var p:Dynamic = Reflect.field(d, 'params');
 		if (p != null && Reflect.isObject(p))

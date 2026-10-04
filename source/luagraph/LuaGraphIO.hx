@@ -1,4 +1,5 @@
 package luagraph;
+import backend.Lang;
 
 #if sys
 import sys.FileSystem;
@@ -94,8 +95,8 @@ class LuaGraphIO
 	public static function readGraph(name:String):GDoc
 	{
 		var p:String = jsonPath(name);
-		if (p == null) throw '未选择模组';
-		if (!FileSystem.exists(p)) throw '图文件不存在：' + p;
+		if (p == null) throw Lang.tOr('lg.io.noMod', '未选择模组');
+		if (!FileSystem.exists(p)) throw Lang.tOr('lg.io.noFile', '图文件不存在：') + p;
 		return GDoc.parse(File.getContent(p));
 	}
 
@@ -132,10 +133,10 @@ class LuaGraphIO
 	/** 写盘：.lua 与 .luagraph.json 双写。失败抛异常（由调用方提示）。 */
 	public static function saveAll(doc:GDoc, luaText:String):Void
 	{
-		if (!ensureDir()) throw '无法创建或访问脚本目录（是否已选择模组？）';
+		if (!ensureDir()) throw Lang.tOr('lg.io.noDir', '无法创建或访问脚本目录（是否已选择模组？）');
 		var lp:String = luaPath(doc.name);
 		var jp:String = jsonPath(doc.name);
-		if (lp == null || jp == null) throw '未选择模组';
+		if (lp == null || jp == null) throw Lang.tOr('lg.io.noMod', '未选择模组');
 		File.saveContent(lp, luaText);
 		File.saveContent(jp, doc.toJsonString());
 	}
