@@ -3,7 +3,6 @@ package backend;
 import states.PlayState;
 import backend.ClientPrefs;
 import backend.Conductor;
-import backend.Multiplayer;
 import objects.Note;
 import backend.Paths;
 import objects.StrumNote;
@@ -83,16 +82,6 @@ class InputDomain
 			for (i in 0...releaseArray.length)
 				if(releaseArray[i] || ps.strumsBlocked[i] == true)
 					ps.keyReleased(i);
-
-		// 联机：转发己方按键事件，驱动对方按键条
-		if (PlayState.isOnlineMode && ps.startedCountdown && !ps.paused && !ps.endingSong && !ps.cpuControlled && !ps.replayMode)
-		{
-			for (i in 0...4)
-			{
-				if (pressArray[i]) Multiplayer.send('PRESS|' + i);
-				if (releaseArray[i]) Multiplayer.send('RELEASE|' + i);
-			}
-		}
 	}
 
 	/** 原 PlayState.keyPressed（作用域分析：零遮蔽，38 处成员引用已限定）。 */

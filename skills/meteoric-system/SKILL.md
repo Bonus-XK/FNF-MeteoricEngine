@@ -199,6 +199,31 @@ description: Meteoric Engine 系统域（MD3 化）界面规范：Options、Paus
   Lua 走 `ExtraFunctions.implement()`，界面脚本走 `MenuScript.addLocalCallback`，HScript 走 `HScript.preset()`。
   注意：界面脚本改色后**已创建**的元素不会自动重绘，需重开界面或等下次进入。
 
+### 联机（Online）—— 已整体下线（2026-10-04）
+
+**现状：功能代码全部删除，但主菜单入口保留显示、不可点。**
+
+- **已删除的文件**（2698 行）：`states/OnlineMenuState.hx`、`states/CharacterSelectState.hx`、
+  `backend/OnlineDomain.hx`、`backend/Multiplayer.hx`、`backend/DiscoveredRoom.hx`。
+- **主菜单入口**：`MainMenuState.optionShit` 里的 `'online'` 项**保留**
+  （美术 `assets/preload/images/mainmenu/menu_online.*` 是 Sparrow 图集贴图，与文本无关），
+  但 `selectItem()` 在播放确认音/闪白/切状态**之前** `if (daChoice == 'online') return;`
+  —— 做到真正无响应（无音效、无闪烁、无转场）。
+- **一并清掉的死代码**：`PlayState` 的 `isOnlineMode`/`online*` 字段、`addOnlineHUD()` 对手面板、
+  10 个 `OnlineDomain` 转发桩；`NoteChartDomain` 的 6 个对手音符函数（`applyOppHit`/`applyOppMiss`/
+  `findOnlineOppNoteBySeq`/`onlineOppHitVisual`/`playOnlineOppMiss`/`flashOppStrums`）；
+  `CameraHudDomain` 的 `refreshOppHud`/`refreshOppHealthFill`；`HostDomain.buildOppCountsLine`；
+  `ResultsSubState.createSimplified`/`refreshOpponentBlock`。
+- ⚠ **两个必须小心的地方（已踩过）**：
+  ① `NoteChartDomain.onlineHealthDelta` **不是联机变量**，它承载核心扣血
+     （`ps.health += onlineHealthDelta`）。已重命名为 `hitHealthDelta` 保留 ——
+     若按名字盲删会静默破坏血量系统。同理 `PlayState.SONG.player1/2` 也不是联机专用。
+  ② `CameraHudDomain.moveCameraSection` 里的 `!= ps.onlineMirror` 是联机为「客户端镜像」
+     加的反转，已还原为联机引入前的 `(SONG.notes[sec].mustHitSection != true)`。
+- `Multiplayer.resolveSyncFile` 是**通用资源路径解析**（跨 mod → preload → 常规路径），
+  与联网无关，已迁到 `Paths.resolveAssetPath()`（路径唯一入口），**不要**连同联机一起删。
+- 语言包已剔除联机专属 key（`menu.online`、`pause.onlineQuitDisabled`、`hud.*` 对手面板 4 条）。
+
 ### 多语言（Lang，已落地 2026-10-04）
 
 系统域与手绘域的**全部玩家可见文案**统一走 `backend/Lang.hx`，语言包 = JSON。

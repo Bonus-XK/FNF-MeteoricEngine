@@ -157,6 +157,12 @@ MainMenuState = AnotherDemoState
 
 ## 10. 当前限制
 
+- **联机（Meteoric Online）已整体下线**：原 `isOnlineMode` 静态字段与
+  `backend.Multiplayer` / `backend.OnlineDomain` / `states.OnlineMenuState` /
+  `states.CharacterSelectState` / `backend.DiscoveredRoom` 均已删除。
+  **mod 脚本不要再引用 `game.isOnlineMode` 或 `Multiplayer.*`**，会编译失败。
+  主菜单「联机」入口保留显示但不可点击。
+
 - 不含 Lua：CNE 本身不支持 Lua；本编程层只作用于 HScript，Lua 仍走 Meteoric 原有管线。
 - `.pack` 合并脚本格式未移植。
 - zip mod 内脚本未验证（zip mod 的包层已支持，见第 8 节）。

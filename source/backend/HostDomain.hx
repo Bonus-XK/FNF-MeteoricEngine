@@ -27,7 +27,6 @@ import backend.Achievements;
 import backend.Difficulty;
 import backend.Discord.DiscordClient;
 import objects.MobileControls;
-import backend.Multiplayer;
 import substates.PauseSubState;
 import psychlua.HScript;
 import backend.TurboDensity;
@@ -184,13 +183,6 @@ class HostDomain
 			// 此处 _visualsTorn 已上锁，updateJudgementTxt 不再运行——必须在此一次隐藏，
 			// 结算关闭后 updateJudgementTxt 恢复运行会自动按设置重新显示）
 			if (ps.hud != null && ps.hud.judgementField != null) ps.hud.judgementField.visible = false;
-
-			// 联机：进入普通结算界面（精简版，关闭后返回联机大厅）
-			if (PlayState.isOnlineMode)
-			{
-				ps.onlineFinishAndShowResults(false);
-				return false;
-			}
 
 			var resultsSubState:ResultsSubState = new ResultsSubState(replayForResults != null);
 			resultsSubState.closeCallback = function() {
@@ -560,9 +552,6 @@ class HostDomain
 		ps.persistentUpdate = false;
 		ps.persistentDraw = true;
 		ps.paused = true;
-		// 联机：仅「主动暂停」广播 PAUSE；远程收到的 PAUSE 打开时不再回发，
-		// 否则对方点继续后会被这个回显 PAUSE 再次强制暂停（无法恢复游玩）
-		if (PlayState.isOnlineMode && !fromRemote) Multiplayer.send('PAUSE');
 		// 侧边栏（stage 级 TextField）不随 flixel 暂停，需手动隐藏，恢复后 updateJudgementTxt 自动显示
 		if (ps.hud != null && ps.hud.judgementField != null) ps.hud.judgementField.visible = false;
 
@@ -1280,17 +1269,6 @@ class HostDomain
 			ps.totalNotesHit = ps.totalNotes;
 	}
 
-	/** 原 PlayState.buildOppCountsLine（作用域分析：零遮蔽，5 处成员引用已限定）。 */
-	public static function buildOppCountsLine(ps:PlayState):String
-	{
-		var parts:Array<String> = [];
-		for (r in ps.ratingsData)
-			if (ps.onlineOppRatings.exists(r.name) && ps.onlineOppRatings.get(r.name) > 0)
-				parts.push(r.name + ':' + ps.onlineOppRatings.get(r.name));
-		parts.push('miss:' + ps.onlineOppMisses);
-		return parts.join(' ');
-	}
-
 	/** 原 PlayState.getLuaObject（作用域分析：零遮蔽，6 处成员引用已限定）。 */
 	public static function getLuaObject(ps:PlayState, tag:String, text:Bool=true):FlxSprite
 	{
@@ -1360,10 +1338,6 @@ class HostDomain
 		// 否则会访问已销毁的人物/判定线（Null Object Reference）
 		if (ps._visualsTorn)
 			return;
-
-		// 联机：网络收发 / 消息处理 / 时间同步 / 对手 HUD 刷新
-		if (PlayState.isOnlineMode)
-			ps.updateOnline(elapsed);
 
 		ps.callOnScripts('onUpdate', [elapsed]);
 
@@ -1571,8 +1545,8 @@ class HostDomain
 
 		// Watch calls removed for performance
 
-		// RESET = Quick Game Over Screen（联机对局禁用重开，见 addOnlineHUD）
-		if (!ClientPrefs.data.noReset && ps.controls.RESET && ps.canReset && !ps.inCutscene && ps.startedCountdown && !ps.endingSong && !PlayState.isOnlineMode)
+		// RESET = Quick Game Over Screen
+		if (!ClientPrefs.data.noReset && ps.controls.RESET && ps.canReset && !ps.inCutscene && ps.startedCountdown && !ps.endingSong)
 		{
 			ps.health = 0;
 			trace("RESET = True");
@@ -1706,9 +1680,8 @@ class HostDomain
 							}
 							// 对手箭头：到达判定线即触发命中（旧条件是 wasGoodHit——对手音符从未被置位，
 							// 导致对手箭头永远不会被 opponentNoteHit 回收，直接飞过判定线）
-							// 联机：跳过该自动化命中（装饰音符，不闪烁/不触发动画），见上方 visible 屏蔽
 							else if (!ps.rewinding && !daNote.hitByOpponent && !daNote.ignoreNote
-								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0 && !PlayState.isOnlineMode)
+								&& !daNote.isSustainNote && songPos - daNote.strumTime >= 0)
 							{
 								ps.opponentNoteHit(daNote);
 								// 对手簇视觉副本同步销毁（与玩家侧 processBotHits 一致）：
@@ -1835,9 +1808,6 @@ class HostDomain
 			for (tween in ps.modchartTweens) tween.active = true;
 			for (timer in ps.modchartTimers) timer.active = true;
 			#end
-
-			// 联机：仅「主动恢复」通知对方解除暂停；远程 RESUME 恢复时不再回发
-			if (PlayState.isOnlineMode && !ps.onlineRemoteResume) Multiplayer.send('RESUME');
 
 			ps.paused = false;
 			ps.callOnScripts('onResume');

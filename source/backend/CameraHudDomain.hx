@@ -177,8 +177,6 @@ class CameraHudDomain
 			{
 				if(!ClientPrefs.data.opponentStrums) targetAlpha = 0;
 				else if(ClientPrefs.data.middleScroll) targetAlpha = 0.35;
-				// 联机：对方箭头 = 单机同款对手段（左侧），强制可见（不受“显示对方箭头”设置影响）
-				if (PlayState.isOnlineMode) targetAlpha = 1;
 			}
 
 			var babyArrow:StrumNote = new StrumNote(strumLineX, strumLineY, i, player);
@@ -321,9 +319,7 @@ class CameraHudDomain
 			return;
 		}
 
-		// 联机真双人-客户端镜像：本端演唱半边与谱面 mustHitSection 相反（客户端唱 Dad 半边），
-		// 反转 isDad，保证相机跟随「本屏当前演唱的角色」（房主端不变）。
-		var isDad:Bool = (PlayState.SONG.notes[sec].mustHitSection != true) != ps.onlineMirror;
+		var isDad:Bool = (PlayState.SONG.notes[sec].mustHitSection != true);
 		ps.moveCamera(isDad);
 		ps.callOnScripts('onMoveCamera', [isDad ? 'dad' : 'boyfriend']);
 	}
@@ -413,33 +409,7 @@ class CameraHudDomain
 			Paths.image(uiPrefix + 'num' + i + uiSuffix);
 	}
 
-	/** 原 PlayState.refreshOppHealthFill（作用域分析：零遮蔽，7 处成员引用已限定）。 */
-	public static function refreshOppHealthFill(ps:PlayState):Void
-	{
-		if (ps.onlineOppHealthFill == null) return;
-		var pct:Float = FlxMath.bound(ps.onlineOppHealth, 0, 2) / 2;
-		var newW:Int = Std.int(ps.onlineOppBarW * pct);
-		if (newW <= 0)
-		{
-			ps.onlineOppHealthFill.visible = false;
-			return;
-		}
-		ps.onlineOppHealthFill.visible = true;
-		ps.onlineOppHealthFill.makeGraphic(newW, Std.int(ps.onlineOppBarH), pct >= 0.5 ? 0xFF7BE27B : 0xFFFF6B6B);
-	}
-
-	/** 原 PlayState.refreshOppHud（作用域分析：零遮蔽，15 处成员引用已限定）。 */
-	public static function refreshOppHud(ps:PlayState):Void
-	{
-		if (ps.onlineOppTexts == null || ps.onlineOppTexts.length < 5) return;
-		ps.onlineOppTexts[0].text = PlayState.onlineOppNick;
-		ps.onlineOppTexts[1].text = Lang.tOr('hud.combo', '连击: ') + ps.onlineOppCombo;
-		ps.onlineOppTexts[2].text = Lang.tOr('hud.score', '分数: ') + ps.onlineOppScore;
-		var oppAcc:Float = ps.onlineOppTotalPlayed > 0 ? ps.onlineOppTotalNotesHit / ps.onlineOppTotalPlayed : 0;
-		ps.onlineOppTexts[3].text = Lang.tOr('hud.accuracy', '准确率: ') + Math.round(oppAcc * 1000) / 10 + '%';
-		ps.onlineOppTexts[4].text = Lang.tOr('hud.judgement', '判定: ') + ps.buildOppCountsLine();
-		ps.refreshOppHealthFill();
-	}
+	// 对手 HUD（refreshOppHealthFill / refreshOppHud）已随联机整体移除。
 
 	/** 原 PlayState.updateHUDVisibility（作用域分析：零遮蔽，14 处成员引用已限定）。 */
 	public static function updateHUDVisibility(ps:PlayState)

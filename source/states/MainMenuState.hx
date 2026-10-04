@@ -264,7 +264,8 @@ class MainMenuState extends MusicBeatState
 			add(verText);
 		}
 
-		// 联机入口已改为列表项（optionShit 中的 'online'，美术取自 Psych Online），
+		// 联机入口已改为列表项（optionShit 中的 'online'，美术取自 Psych Online）。
+		// 注：联机功能已下线，该项**保留显示但不可点**（见 selectItem 的提前 return）。
 		// 原先右下角那个"临时文字链接"（等美术图用）随之下架，避免同一入口出现两处。
 
 		// ---- 彩蛋字母（输入 meforever 触发，逐字母乱飞变色） ----
@@ -583,8 +584,7 @@ class MainMenuState extends MusicBeatState
 			}
 		}
 
-		// 联机文字：悬停高亮，点击进入联机界面
-		// 联机入口已是列表项 'online'（见 optionShit），点击走 selectItem() 的统一分支
+		// 联机入口是列表项 'online'（见 optionShit）；联机已下线，点击在 selectItem 里被拦截为无响应。
 
 		// 菜单行点击：点击不同项只选中，点击已选中项进入
 		if (clickPressed)
@@ -827,6 +827,11 @@ class MainMenuState extends MusicBeatState
 			return;
 		}
 
+		// 联机已下线：主菜单保留「联机」入口的显示（美术与列表项不动），
+		// 但**不可点** —— 在播放确认音/闪白/切状态之前就返回，做到真正无响应。
+		// （联机代码整体移除，见 OnlineMenuState / Multiplayer / OnlineDomain 等）
+		if (daChoice == 'online') return;
+
 		selectedSomethin = true;
 		FlxG.sound.play(Paths.sound('confirmMenu'));
 
@@ -849,8 +854,6 @@ class MainMenuState extends MusicBeatState
 				case 'awards':
 					MusicBeatState.switchState(new AchievementsMenuState());
 				#end
-				case 'online':
-					MusicBeatState.switchState(new OnlineMenuState());
 				case 'credits':
 					MusicBeatState.switchState(new CreditsState());
 				case 'options':

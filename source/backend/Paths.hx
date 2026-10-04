@@ -1059,6 +1059,32 @@ class Paths
 		return #if android backend.AndroidStorage.root() + '/languages' #else 'languages' #end;
 	}
 
+	/**
+	 * 资源相对路径 → 绝对路径（找不到返回 null）。
+	 *
+	 * 查找顺序：当前/全局 mod → 遍历**全部**已安装 mod → preload → 常规路径。
+	 * 必须遍历全部 mod 的原因：角色可能来自某个「非当前、非全局」的模组
+	 * （例如根目录 characters/ 残留了 JSON，而图集只在模组目录里），
+	 * 只查 modFolders 会漏掉大图集 PNG。
+	 *
+	 * 归属说明：本函数原先寄居在 backend/Multiplayer.hx（联机移除时一并迁出），
+	 * 它是纯路径解析、与联网无关，故归到 Paths 这个「路径唯一入口」下。
+	 */
+	static public function resolveAssetPath(rel:String):String {
+		var p:String = modFolders(rel);
+		if (FileSystem.exists(p)) return p;
+		for (mod in Mods.getModDirectories())
+		{
+			p = mods(mod + '/' + rel);
+			if (FileSystem.exists(p)) return p;
+		}
+		p = getPreloadPath(rel);
+		if (FileSystem.exists(p)) return p;
+		p = getPath(rel);
+		if (FileSystem.exists(p)) return p;
+		return null;
+	}
+
 	inline static public function modsJson(key:String) {
 		return modFolders('data/' + key + '.json');
 	}

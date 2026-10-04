@@ -17,7 +17,6 @@ import backend.WeekData;
 import backend.CameraHudDomain;
 import backend.EventDomain;
 import backend.NoteChartDomain;
-import backend.OnlineDomain;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
@@ -56,7 +55,6 @@ import substates.PauseSubState;
 import substates.GameOverTheme;
 import substates.ResultsSubState;
 import substates.GameOverSubstate;
-import backend.Multiplayer;
 
 #if !flash 
 import flixel.addons.display.FlxRuntimeShader;
@@ -131,14 +129,9 @@ class PlayState extends MusicBeatState
 		['S', 1]
 	];
 
-	// ===== 联机模式（Meteoric Online，1v1 局域网）=====
-	public static var isOnlineMode:Bool = false;
-	public static var onlineIsHost:Bool = false;
-	public static var onlineMyNick:String = '玩家';
-	public static var onlineOppNick:String = '对手';
-	public static var onlineHoldCountdown:Bool = false;
-	public static var onlineHostChar:String = 'bf';   // 角色选择：房主角色（房主端 BF / 玩家端 Dad）
-	public static var onlineClientChar:String = 'dad'; // 角色选择：玩家角色（玩家端 BF / 房主端 Dad）
+	// 联机模式（Meteoric Online）已整体移除：原 isOnlineMode / onlineIsHost /
+	// onlineMyNick / onlineOppNick / onlineHoldCountdown / onlineHostChar / onlineClientChar
+	// 及其对手 HUD（addOnlineHUD）全部删除，主菜单「联机」入口保留显示但不可点。
 
 	//event variables
 	private var isCameraOnForcedPos:Bool = false;
@@ -404,30 +397,10 @@ class PlayState extends MusicBeatState
 	// KE 结算散点图：本局逐音符判定记录 {t=音符时间, d=命中偏移(+早/-晚), r=评级}（仅内存，不进回放文件）
 	public var judgementHistory:Array<NoteHitEntry> = [];
 
-	// ===== 联机对局运行时状态 =====
-	public var onlineOppStrums:FlxTypedGroup<StrumNote>;
-	public var onlineOppHealth:Float = 1;
-	public var onlineOppScore:Int = 0;
-	public var onlineOppHits:Int = 0;
-	public var onlineOppMisses:Int = 0;
-	public var onlineOppCombo:Int = 0;
-	public var onlineOppMaxCombo:Int = 0;
-	public var onlineOppTotalPlayed:Int = 0;
-	public var onlineOppTotalNotesHit:Float = 0;
-	public var onlineOppRatings:Map<String, Int> = new Map();
-	public var onlineOppBarW:Float = 180;
-	public var onlineOppBarH:Float = 14;
-	public var onlineOppHealthFill:FlxSprite;
-	public var onlineOppTexts:Array<FlxText> = [];
-	public var onlineMyStats:Array<Dynamic> = null;
-	public var onlineOppStats:Array<Dynamic> = null;
-	public var onlineFinished:Bool = false;
-	public var onlineOppFinished:Bool = false;
-	public var onlineTimeSyncTimer:Float = 0;
-	public var onlineWaitTimer:Float = 0;
+	// 联机对局运行时状态（onlineOpp* / onlineMyStats / onlineFinished /
+	// onlineTimeSyncTimer / onlineWaitTimer）已随联机整体移除。
 	public var onlineWaitingResults:Bool = false;
 	public var onlineRemoteResume:Bool = false; // 远程 RESUME 恢复时不再回发 RESUME
-	public var onlineMirror:Bool = false; // 联机真双人-客户端镜像：自己唱 player2（Dad）半边；双端屏幕仍为标准单机布局（自己=右侧 BF 位）
 
 	private var generatedMusic:Bool = false;
 	public var endingSong:Bool = false;
@@ -839,18 +812,6 @@ class PlayState extends MusicBeatState
 
 		// 联机角色选择：本端映射（我=BF，对方=Dad）——双端均为标准单机布局：
 		// 自己（右侧 BF 位）唱自己选的半边，对方（左侧 Dad 位）唱对方选的半边。
-		if (isOnlineMode)
-		{
-			SONG.player1 = onlineIsHost ? onlineHostChar : onlineClientChar;
-			SONG.player2 = onlineIsHost ? onlineClientChar : onlineHostChar;
-			// 我方角色可能来自任意模组（选曲后 currentMod 已被切走）：
-			// 把 currentMod 指向含我方角色的模组，保证 Character 的 JSON/图集能解析到；
-			// 对方角色已由 CHARSYNC 同步到 mods/ 根目录，走 modFolders 兜底路径照常解析。
-			var myCharMod:String = Multiplayer.findCharMod(onlineIsHost ? onlineHostChar : onlineClientChar);
-			if (myCharMod != null && myCharMod.length > 0)
-				Mods.currentModDirectory = myCharMod;
-		}
-
 		dad = new Character(0, 0, SONG.player2);
 		startCharacterPos(dad, true);
 		dadGroup.add(dad);
@@ -871,11 +832,6 @@ class PlayState extends MusicBeatState
 			dadGroup.visible = false;
 			boyfriendGroup.visible = false;
 		}
-
-		// 联机真双人：标记客户端镜像（自己唱 player2/Dad 半边；双端屏幕仍为标准单机布局——
-		// 自己=右侧 BF 位、对方=左侧 Dad 位，仅谱面内容按各自半边分配）。
-		if (isOnlineMode && !onlineIsHost)
-			onlineMirror = true;
 
 		// 暴露角色/摄像机引用给脚本（Psych 0.7.3 setSpecialObject 等价物；必须在 stage 脚本加载前设置）
 		setOnScripts('dad', dad);
@@ -942,33 +898,6 @@ class PlayState extends MusicBeatState
 		// 双端屏幕均为标准单机布局：自己（右侧 BF 位）= 自己选的半边，对方（左侧 Dad 位）= 对方选的半边。
 		// 客户端实际打的是谱面 player2（Dad）半边：翻转 mustPress 后它跟随自己的右侧判定条（playerStrums），
 		// player1（BF）半边则成为对侧、显示在左侧判定条（opponentStrums）——箭头位置不变，只有谱面内容互换。
-		if (isOnlineMode && !onlineIsHost)
-		{
-			// 1) 音符归属翻转：player2（Dad 谱面）成为我方 mustPress（跟随右侧玩家判定条），
-			//    player1（BF 谱面）成为对侧（跟随左侧对手段）
-			var newTotal:Int = 0;
-			for (i in 0...unspawnNotes.length)
-			{
-				#if false
-				var nd:Note = unspawnNotes[i];
-				nd.mustPress = !nd.mustPress;
-				if (nd.mustPress && !nd.isSustainNote) newTotal++;
-				#else
-				var nd:CastNote = unspawnNotes[i];
-				if ((nd.noteData & (1 << 8)) != 0) nd.noteData &= ~(1 << 8);
-				else
-				{
-					nd.noteData |= 1 << 8;
-					if ((nd.noteData & (1 << 9)) == 0) newTotal++;
-				}
-				#end
-			}
-			totalNotes = newTotal;
-			// 2) 人声交换：我方（唱 Dad 半边）命中响 opponentVocals，对方（BF 半边）命中响 vocals
-			var tmpV:FlxSound = vocals;
-			vocals = opponentVocals;
-			opponentVocals = tmpV;
-		}
 
 		camFollow = new FlxObject(0, 0, 1, 1);
 		camFollow.setPosition(camPos.x, camPos.y);
@@ -1005,7 +934,6 @@ class PlayState extends MusicBeatState
 		notes.cameras = [camHUD];
 
 		// 联机对局：追加右侧对手按键条 + 对手信息面板
-		if (isOnlineMode) addOnlineHUD();
 
 		// 原生长条按压覆盖（QT 模组 NoteHoldCover.lua 移植）：
 		// 模组自带同名全局脚本时跳过原生创建，避免双份覆盖层；
@@ -1078,13 +1006,6 @@ class PlayState extends MusicBeatState
 				}
 		}
 		#end
-
-		// 联机握手：客户端就绪后上报 ACK；双端在收到 GO 前挂起倒计时
-		if (isOnlineMode)
-		{
-			onlineHoldCountdown = true;
-			if (!onlineIsHost) Multiplayer.send('ACK');
-		}
 
 		startCallback();
 		RecalculateRating();
@@ -1302,9 +1223,6 @@ class PlayState extends MusicBeatState
 			callOnScripts('onStartCountdown');
 			return false;
 		}
-
-		// 联机双端同步：收到 GO（房主）或 GO（客户端）之前挂起，等待双方就绪
-		if (isOnlineMode && onlineHoldCountdown) return false;
 
 		seenCutscene = true;
 		inCutscene = false;
@@ -2196,12 +2114,6 @@ class PlayState extends MusicBeatState
 		if (((skipHealthCheck && instakillOnMiss) || health <= 0) && !practiceMode && !isDead)
 		{
 			// 联机：不死于 GameOver，直接进入双端成绩对比（先发送本方 FINISH）
-			if (isOnlineMode)
-			{
-				isDead = true;
-				onlineFinishAndShowResults(true);
-				return true;
-			}
 
 			var ret:Dynamic = callOnScripts('onGameOver', null, true);
 			if(ret != FunkinLua.Function_Stop) {
@@ -3156,121 +3068,8 @@ class PlayState extends MusicBeatState
 	public function initLuaShader(name:String, ?glslVersion:Int = 120):Bool return HostDomain.initLuaShader(this, name, glslVersion);
 	#end
 
-	// ==================== 联机（Meteoric Online）====================
+	// 联机（Meteoric Online）已整体移除：addOnlineHUD 对手面板 + 全部 OnlineDomain 转发桩函数均已删除。
 
-	/** 对方 Miss 时我方获得其血量损失的比例（攻防平衡参数，可调） */
-	static inline var ONLINE_OPP_MISS_GAIN:Float = 0.6;
-
-	/** 创建右侧对手按键条 + 对手信息面板；联机对局禁用 R 重开 */
-	function addOnlineHUD():Void
-	{
-		canReset = false; // 联机禁用 R 快速重开（重开会破坏双端同步）
-
-		// 对方箭头：直接复用单机标准对手段（opponentStrums，双端均在左侧）。
-		// 真双人下网络 PRESS/RELEASE 经 flashOppStrums 驱动；HIT/MISS 再按 chartSeq 消费对侧谱面音符并触发对方唱歌/Miss 动画。
-		onlineOppStrums = opponentStrums;
-
-		// 对手信息面板（右侧：按键条下方/上方，避开音符判定线）
-		var panelX:Float = FlxG.width - 252;
-		var panelY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 380) : 175;
-		var panelBg:FlxSprite = new FlxSprite(panelX, panelY).makeGraphic(240, 212, 0xCC161622);
-		panelBg.cameras = [camHUD];
-		add(panelBg);
-
-		var labelX:Float = panelX + 14;
-		var labelW:Float = 212;
-		onlineOppTexts = [];
-		var textYs:Array<Float> = [panelY + 12, panelY + 64, panelY + 92, panelY + 120, panelY + 148];
-		for (i in 0...5)
-		{
-			var t:FlxText = new FlxText(labelX, textYs[i], labelW, '', i == 0 ? 20 : 16);
-			t.setFormat(Paths.font('future.ttf'), i == 0 ? 20 : 16, (i == 0 ? 0xFFFF8A8A : 0xFFD7D7E0), LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			t.cameras = [camHUD];
-			add(t);
-			onlineOppTexts.push(t);
-		}
-
-		// 对手血条
-		var hbBg:FlxSprite = new FlxSprite(labelX, panelY + 42).makeGraphic(Std.int(onlineOppBarW), Std.int(onlineOppBarH), 0xFF2A2A38);
-		hbBg.cameras = [camHUD];
-		add(hbBg);
-		onlineOppHealthFill = new FlxSprite(labelX, panelY + 42).makeGraphic(Std.int(onlineOppBarW), Std.int(onlineOppBarH), 0xFF7BE27B);
-		onlineOppHealthFill.cameras = [camHUD];
-		add(onlineOppHealthFill);
-
-		onlineOppHealth = 1;
-		onlineOppTexts[0].text = onlineOppNick;
-		refreshOppHud();
-	}
-
-	/** 每帧联机驱动：网络收发、消息处理、房主时间同步、对手 HUD 刷新 */
-	function updateOnline(elapsed:Float):Void OnlineDomain.updateOnline(this, elapsed);
-
-	function processOnlineMessages():Void OnlineDomain.processOnlineMessages(this);
-
-	function applyOppHit(data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void NoteChartDomain.applyOppHit(this, data, rating, scoreDelta, healthDelta, mult, seq);
-
-	function applyOppMiss(data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void NoteChartDomain.applyOppMiss(this, data, scoreDelta, healthDelta, mult, seq);
-
-	// ==================== 联机真双人：对侧音符消费 / 对方演唱 ====================
-
-	/** 按 chartSeq 查对侧存活基准音符（seqNote 静态表 O(1)；已消费/已飞过返回 null） */
-	function findOnlineOppNoteBySeq(seq:Int):Note return NoteChartDomain.findOnlineOppNoteBySeq(this, seq);
-
-	/** 对方命中：消费对侧基准音符（含同 chartSeq 视觉副本）+ 对方角色唱歌 + 对方人声响起 */
-	function onlineOppHitVisual(data:Int, seq:Int):Void NoteChartDomain.onlineOppHitVisual(this, data, seq);
-
-	/** 对方角色唱歌动画（联机对侧命中触发；客户端镜像已交换角色引用，dad 恒为屏幕上“对方角色”） */
-	function playOnlineOppSing(data:Int, note:Note):Void OnlineDomain.playOnlineOppSing(this, data, note);
-
-	/** 对方 Miss 动画 + 对方人声静音（角色有 miss 动画才播） */
-	function playOnlineOppMiss(data:Int, note:Note):Void
-	{
-		NoteChartDomain.playOnlineOppMiss(this, data, note);
-	}
-
-	function flashOppStrums(data:Int, anim:String, confirm:Bool):Void NoteChartDomain.flashOppStrums(this, data, anim, confirm);
-
-	function refreshOppHud():Void
-	{
-		CameraHudDomain.refreshOppHud(this);
-	}
-
-	function buildOppCountsLine():String
-	{
-		return HostDomain.buildOppCountsLine(this);
-	}
-
-	function refreshOppHealthFill():Void CameraHudDomain.refreshOppHealthFill(this);
-
-	function getRatingModByName(name:String):Float return CameraHudDomain.getRatingModByName(this, name);
-
-	function buildRatingCountsCsv():String
-	{
-		return CameraHudDomain.buildRatingCountsCsv(this);
-	}
-
-	/** 单曲结束（含死亡）：上报本方 FINISH 并打开普通结算界面（联机精简版） */
-	function onlineFinishAndShowResults(died:Bool):Void OnlineDomain.onlineFinishAndShowResults(this, died);
-
-	function openOnlineResults():Void OnlineDomain.openOnlineResults(this);
-
-	function onlineGoBackToLobby(reason:String):Void OnlineDomain.onlineGoBackToLobby(this, reason);
-
-	/** 结算/主动退出对局：保持局域网连接，返回房间大厅（双方可再选曲再来一局），不切断 socket */
-	public function onlineBackToRoomLobby(reason:String):Void OnlineDomain.onlineBackToRoomLobby(this, reason);
-
-	/**
-	 * 暂停期间由 PauseSubState 每帧调用：PlayState.update 被冻结时仍处理
-	 * RESUME / QUIT / DISCONNECTED（普通游戏事件在暂停期间忽略，恢复后再消费）。
-	 */
-	public function onlinePauseNetworkTick():Void OnlineDomain.onlinePauseNetworkTick(this);
-
-	/**
-	 * 联机结算界面打开后由 ResultsSubState 每帧调用：
-	 * PlayState.update 已冻结，仍需实时接收对方 FINISH / QUIT / DISCONNECTED。
-	 */
-	public function onlineResultsNetworkTick():Void OnlineDomain.onlineResultsNetworkTick(this);
 }
 
 /**

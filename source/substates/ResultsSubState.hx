@@ -82,11 +82,6 @@ class ResultsSubState extends MusicBeatSubstate
 	var menuPanelY:Float = MENU_Y; // 实际菜单面板 Y（联机精简版与单机布局共用选中条定位）
 
 	// 联机双栏结算：对方成绩栏显示对象（createSimplified 创建，update 每帧刷新）
-	var onlineSimplified:Bool = false;
-	var oppHeaderText:FlxText = null;
-	var oppScoreText:FlxText = null;
-	var oppComboText:FlxText = null;
-	var oppAccText:FlxText = null;
 	var oppJudgeText:FlxText = null;
 
 	var mouseActive:Bool = true;  // 鼠标跟随是否激活（键盘操作时冻结，鼠标移动/点击时恢复）
@@ -111,14 +106,7 @@ class ResultsSubState extends MusicBeatSubstate
 
 		var st:PlayState = PlayState.instance;
 
-		// 联机模式：渲染普通结算的精简版（本局数据 + 判定统计 + 继续），关闭后回联机大厅
-		if (PlayState.isOnlineMode)
-		{
-			createSimplified(st);
-			return;
-		}
-
-		var invalidResult:Bool = (st.usedAutoplay || st.usedGodMode);
+			var invalidResult:Bool = (st.usedAutoplay || st.usedGodMode);
 
 		// ---- 背景 ----
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
@@ -397,116 +385,6 @@ class ResultsSubState extends MusicBeatSubstate
 		changeSelection();
 	}
 
-	/**
-	 * 联机双栏结算：左=我的成绩+判定统计；右=对方成绩+判定统计 +「继续」。
-	 * 对方未 FINISH 时右侧显示等待，FINISH 到达后由 refreshOpponentBlock 实时刷新。
-	 * 关闭后由 PlayState 的 closeCallback 保持连接返回房间大厅。
-	 */
-	function createSimplified(st:PlayState):Void
-	{
-		onlineSimplified = true;
-		menuItems = ['继续'];
-
-		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
-		bg.alpha = 0;
-		bg.scrollFactor.set();
-		add(bg);
-		FlxTween.tween(bg, {alpha: 0.6}, 0.25, {ease: FlxEase.quadOut});
-
-		var titleText:FlxText = new FlxText(0, TITLE_Y, FlxG.width, Lang.tOr('results.title', '本局结算 Song Results'), 54);
-		titleText.scrollFactor.set();
-		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		titleText.borderSize = 2.4;
-		titleText.antialiasing = ClientPrefs.data.antialiasing;
-		titleText.alpha = 0;
-		add(titleText);
-		FlxTween.tween(titleText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.05});
-
-		var scW:Float = 600;
-		var scX:Float = FlxG.width / 2 - scW / 2;
-		var scY:Float = 118;
-		var scH:Float = 330;
-
-		var scPanel:FlxSprite = makePanel(scX, scY, scW, scH, 20);
-		scPanel.alpha = 0;
-		add(scPanel);
-		FlxTween.tween(scPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		// ================= 左：我的成绩 =================
-		var myColX:Float = scX + 30;
-		var myValX:Float = myColX + 110;
-
-		var myHeader:FlxText = makeSimText(myColX, scY + 22, '我的成绩', 22, DesignTokens.primary);
-		myHeader.alpha = 0;
-		add(myHeader);
-		FlxTween.tween(myHeader, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		var myRows:Array<Array<String>> = [
-			['分数', FlxStringUtil.formatMoney(st.songScore)],
-			['最高连击', Std.string(st.maxCombo)],
-			['准确率', CoolUtil.floorDecimal(st.ratingPercent * 100, 2) + '%']
-		];
-		var rowY:Float = scY + 58;
-		for (i in 0...myRows.length)
-		{
-			makeSimRow(myColX, myValX, rowY, myRows[i][0], myRows[i][1], 0xFFD7D7E0, 0.08);
-			rowY += 34;
-		}
-
-		var myJudgeLabel:FlxText = makeSimText(myColX, scY + 172, '判定统计', 18, 0xFFD7D7E0);
-		myJudgeLabel.alpha = 0;
-		add(myJudgeLabel);
-		FlxTween.tween(myJudgeLabel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		var ownCsv:Array<String> = [];
-		for (r in st.ratingsData)
-			if (r.hits > 0) ownCsv.push(r.name + ':' + r.hits);
-		ownCsv.push('miss:' + st.songMisses);
-		var ownJudge:FlxText = makeSimText(myColX, scY + 202, formatJudgeLines(ownCsv.join(',')), 16, FlxColor.WHITE);
-		ownJudge.alpha = 0;
-		add(ownJudge);
-		FlxTween.tween(ownJudge, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		// ================= 右：对方成绩 =================
-		var oppColX:Float = scX + 330;
-
-		oppHeaderText = makeSimText(oppColX, scY + 22, '对方成绩 · ' + PlayState.onlineOppNick, 22, 0xFFFFA0A0);
-		oppHeaderText.alpha = 0;
-		add(oppHeaderText);
-		FlxTween.tween(oppHeaderText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		oppScoreText = makeSimText(oppColX, scY + 58, '', 20, 0xFFD7D7E0);
-		oppComboText = makeSimText(oppColX, scY + 92, '', 20, 0xFFD7D7E0);
-		oppAccText = makeSimText(oppColX, scY + 126, '', 20, 0xFFD7D7E0);
-		var oppRows:Array<FlxText> = [oppScoreText, oppComboText, oppAccText];
-		for (i in 0...oppRows.length)
-		{
-			var t:FlxText = oppRows[i];
-			t.alpha = 0;
-			add(t);
-			FlxTween.tween(t, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-		}
-
-		var oppJudgeLabel:FlxText = makeSimText(oppColX, scY + 172, '判定统计', 18, 0xFFD7D7E0);
-		oppJudgeLabel.alpha = 0;
-		add(oppJudgeLabel);
-		FlxTween.tween(oppJudgeLabel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		oppJudgeText = makeSimText(oppColX, scY + 202, '', 16, FlxColor.WHITE);
-		oppJudgeText.alpha = 0;
-		add(oppJudgeText);
-		FlxTween.tween(oppJudgeText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		refreshOpponentBlock();
-
-		buildMenu(scX, scY + scH + 14, scW);
-
-		FlxG.mouse.visible = true;
-		Lib.application.window.title = "FNF':Meteoric Engine - 结算";
-
-		loadUIscripts('results');
-	}
-
 	/** 联机结算小字（双栏共用：列宽 270，左对齐白描边） */
 	function makeSimText(x:Float, y:Float, text:String, size:Int, color:FlxColor):FlxText
 	{
@@ -553,30 +431,6 @@ class ResultsSubState extends MusicBeatSubstate
 		return lines.length == 0 ? '—' : lines.join('\n');
 	}
 
-	/** 对方 FINISH 后刷新右侧成绩栏（每帧调用；未完成显示等待） */
-	function refreshOpponentBlock():Void
-	{
-		var ps:PlayState = PlayState.instance;
-		if (ps == null || oppScoreText == null) return;
-		if (ps.onlineOppFinished && ps.onlineOppStats != null)
-		{
-			var stats:Array<Dynamic> = ps.onlineOppStats;
-			var acc:Float = Std.parseFloat(Std.string(stats[6]));
-			if (Math.isNaN(acc)) acc = 0;
-			oppScoreText.text = Lang.tOr('results.score', '分数：') + FlxStringUtil.formatMoney(Std.int(stats[0]));
-			oppComboText.text = Lang.tOr('results.maxCombo', '最高连击：') + Std.int(stats[5]);
-			oppAccText.text = Lang.tOr('results.accuracy', '准确率：') + Math.round(acc * 1000) / 10 + '%';
-			oppJudgeText.text = formatJudgeLines(Std.string(stats[7]));
-		}
-		else
-		{
-			oppScoreText.text = Lang.tOr('results.opponentWaiting', '对方成绩：等待对方完成...');
-			oppComboText.text = '';
-			oppAccText.text = '';
-			oppJudgeText.text = '';
-		}
-	}
-
 	function makeInfoText(content:String, yPos:Float, ?textColor:FlxColor = FlxColor.WHITE, ?size:Int = 26):FlxText
 	{
 		var txt:FlxText = new FlxText(PANEL_X + TEXT_PAD, yPos, 0, content, size);
@@ -611,13 +465,6 @@ class ResultsSubState extends MusicBeatSubstate
 			cameras[0].zoom = 1;
 			cameras[0].scroll.set(0, 0);
 		}
-		// 联机：结算期间 PlayState.update 冻结，由本界面继续泵网络（对方 FINISH/QUIT/DISCONNECTED）
-		if (PlayState.isOnlineMode && PlayState.instance != null)
-			PlayState.instance.onlineResultsNetworkTick();
-
-		// 对方 FINISH 到达后实时刷新右侧成绩栏
-		if (onlineSimplified)
-			refreshOpponentBlock();
 		super.update(elapsed);
 
 		var upP = controls.UI_UP_P;
@@ -716,7 +563,6 @@ class ResultsSubState extends MusicBeatSubstate
 
 	function getHintText():String
 	{
-		if (PlayState.isOnlineMode) return '回车确认 · ESC 返回联机大厅';
 		if (PlayState.isStoryMode)
 		{
 			if (PlayState.storyPlaylist.length > 1) return '回车确认 · ESC 继续（播放下一首）';

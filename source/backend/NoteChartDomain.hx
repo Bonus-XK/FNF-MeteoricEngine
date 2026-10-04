@@ -23,7 +23,6 @@ import objects.NoteGroup;
 import states.PlayState.PreGenResult;
 import backend.Section.SwagSection;
 import objects.Character;
-import backend.Multiplayer;
 import backend.Rating;
 import objects.NoteSplash;
 import psychlua.FunkinLua;
@@ -72,17 +71,6 @@ class NoteChartDomain
 			if(strum != null)
 				ps.spawnNoteSplash(strum.x, strum.y, note.noteData, note);
 		}
-	}
-
-	/** 联机对手箭头闪光（原 PlayState.flashOppStrums）。 */
-	public static function flashOppStrums(ps:PlayState, data:Int, anim:String, confirm:Bool):Void
-	{
-		if (ps.onlineOppStrums == null) return;
-		var s:StrumNote = ps.onlineOppStrums.members[data];
-		if (s == null) return;
-		s.playAnim(anim, true);
-		if (confirm)
-			s.resetAnim = Conductor.stepCrochet * 1.25 / 1000 / ps.playbackRate;
 	}
 
 	/** 空按（原 PlayState.noteMissPress）。 */
@@ -700,11 +688,6 @@ class NoteChartDomain
 		ps.totalPlayed += missMult;
 		ps.RecalculateRating(true);
 
-		// 联机：广播己方失误（分数增量/血量增量/密度 + 音符序号），对方据此扣对方血量并给自己回血，
-		// 并按 chartSeq 精确消费对侧音符/播放对方 Miss 动画
-		if (PlayState.isOnlineMode && !ps.cpuControlled)
-			Multiplayer.send('MISS|' + direction + '~' + (-10 * missMult) + '~' + (-(subtract * ps.healthLoss)) + '~' + missMult + '~' + (note != null ? note.chartSeq : -1));
-
 		// play character anims
 		var char:Character = ps.boyfriend;
 		if((note != null && note.gfNote) || (PlayState.SONG.notes[ps.curSection] != null && PlayState.SONG.notes[ps.curSection].gfSection)) char = ps.gf;
@@ -856,33 +839,6 @@ class NoteChartDomain
 		}
 	}
 
-	/** 原 PlayState.onlineOppHitVisual（作用域分析：零遮蔽，8 处成员引用已限定）。 */
-	public static function onlineOppHitVisual(ps:PlayState, data:Int, seq:Int):Void
-	{
-		var note:Note = ps.findOnlineOppNoteBySeq(seq);
-		if (note != null)
-		{
-			note.wasGoodHit = true;
-			note.active = false;
-			note.visible = false;
-			ps.notes.invalidateNote(note);
-			// 同簇视觉副本一并销毁（与玩家侧 processBotHits 一致，避免副本飞过判定线滞留）
-			if (note.chartSeq >= 0)
-			{
-				var i:Int = ps.notes.members.length - 1;
-				while (i >= 0)
-				{
-					var sib:Note = ps.notes.members[i];
-					if (sib != null && sib != note && sib.blockHit && sib.ignoreNote && sib.chartSeq == note.chartSeq)
-						ps.notes.invalidateNote(sib);
-					i--;
-				}
-			}
-		}
-		ps.playOnlineOppSing(data, note);
-		if (ps.opponentVocals != null) ps.opponentVocals.volume = 1;
-	}
-
 	/** 原 PlayState.checkEventNote（作用域分析：零遮蔽，10 处成员引用已限定）。 */
 	public static function checkEventNote(ps:PlayState)
 	{
@@ -924,23 +880,6 @@ class NoteChartDomain
 		#end
 	}
 
-	/** 原 PlayState.applyOppMiss（作用域分析：零遮蔽，12 处成员引用已限定）。 */
-	public static function applyOppMiss(ps:PlayState, data:Int, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
-	{
-		ps.onlineOppScore += scoreDelta;
-		ps.onlineOppMisses += mult;
-		ps.onlineOppTotalPlayed += mult;
-		ps.onlineOppCombo = 0;
-		ps.onlineOppHealth = FlxMath.bound(ps.onlineOppHealth + healthDelta, 0, 2);
-		// 攻防式：对方 Miss → 我方按比例回血
-		if (healthDelta < 0)
-			ps.health = FlxMath.bound(ps.health + (-healthDelta) * PlayState.ONLINE_OPP_MISS_GAIN, 0, 2);
-		ps.flashOppStrums(data, 'static', false);
-		// 真双人：对方 Miss —— 对侧音符不消费（自然飞过判定线，由回收窗清理），
-		// 仅播放对方角色 Miss 动画 + 对方人声静音
-		ps.playOnlineOppMiss(data, ps.findOnlineOppNoteBySeq(seq));
-	}
-
 	/** 原 PlayState.spawnNoteSplash（作用域分析：零遮蔽，7 处成员引用已限定）。 */
 	public static function spawnNoteSplash(ps:PlayState, x:Float, y:Float, data:Int, ?note:Note = null)
 	{
@@ -974,22 +913,6 @@ class NoteChartDomain
 		#end
 	}
 
-	/** 原 PlayState.applyOppHit（作用域分析：零遮蔽，17 处成员引用已限定）。 */
-	public static function applyOppHit(ps:PlayState, data:Int, rating:String, scoreDelta:Int, healthDelta:Float, mult:Int, seq:Int = -1):Void
-	{
-		ps.onlineOppScore += scoreDelta;
-		ps.onlineOppCombo += mult;
-		if (ps.onlineOppCombo > ps.onlineOppMaxCombo) ps.onlineOppMaxCombo = ps.onlineOppCombo;
-		ps.onlineOppHits += mult;
-		ps.onlineOppTotalPlayed += mult;
-		ps.onlineOppTotalNotesHit += ps.getRatingModByName(rating) * mult;
-		ps.onlineOppRatings.set(rating, (ps.onlineOppRatings.exists(rating) ? ps.onlineOppRatings.get(rating) : 0) + mult);
-		ps.onlineOppHealth = FlxMath.bound(ps.onlineOppHealth + healthDelta, 0, 2);
-		ps.flashOppStrums(data, 'confirm', true);
-		// 真双人：对侧谱面由对方按键打击——按 chartSeq 消费对侧音符 + 对方角色唱歌 + 对方人声响起
-		ps.onlineOppHitVisual(data, seq);
-	}
-
 	/** 原 PlayState.strumPlayAnim（作用域分析：零遮蔽，2 处成员引用已限定）。 */
 	public static function strumPlayAnim(ps:PlayState, isDad:Bool, id:Int, time:Float)
 	{
@@ -1004,21 +927,6 @@ class NoteChartDomain
 			spr.playAnim('confirm', true);
 			spr.resetAnim = time;
 		}
-	}
-
-	/** 原 PlayState.findOnlineOppNoteBySeq（作用域分析：零遮蔽，2 处成员引用已限定）。 */
-	public static function findOnlineOppNoteBySeq(ps:PlayState, seq:Int):Note
-	{
-		if (seq < 0 || seq >= Note.seqNote.length) return null;
-		var n:Note = Note.seqNote[seq];
-		if (n != null && n.alive && n.exists && !n.blockHit) return n;
-		// seqNote 可能被同 chartSeq 的视觉副本（blockHit）覆盖：回退扫描基准音符
-		var found:Note = null;
-		if (ps.notes != null)
-			ps.notes.forEachAlive(function(c:Note) {
-				if (found == null && c.chartSeq == seq && !c.blockHit) found = c;
-			});
-		return found;
 	}
 
 	/** 原 PlayState.KillNotes（作用域分析：零遮蔽，8 处成员引用已限定）。 */
@@ -1059,8 +967,7 @@ class NoteChartDomain
 		// 密集自动游玩/回放跳过场景命中回调（Weekend 1 等舞台点亮对自动游玩无意义），手动游玩不受影响。
 		if (!(PlayState.densePerfMode && (ps.cpuControlled || ps.replayMode)))
 			ps.stagesFunc(function(stage:BaseStage) stage.goodNoteHit(note)); //Psych 1.0.4：场景命中回调（Weekend 1）
-		var onlineScoreDelta:Int = 0;
-		var onlineHealthDelta:Float = 0;
+		var hitHealthDelta:Float = 0;
 		if (!note.wasGoodHit)
 		{
 			var hitMult:Int = Std.int(note.density); // H-Slice 移植：堆叠合并按 density 计分/加血
@@ -1117,15 +1024,13 @@ class NoteChartDomain
 			{
 				ps.combo += hitMult;
 				if (ps.combo > ps.maxCombo) ps.maxCombo = ps.combo; // 最高连击追踪
-				var onlinePrevScore:Int = ps.songScore;
 				ps.popUpScore(note, hitMult); // 传入已封顶的 density：计分/评级/命中同源封顶
-				onlineScoreDelta = ps.songScore - onlinePrevScore;
 				// 回放录制：主音符命中（评分取本局真实判定结果）
 				if (ps.recordingReplay && !ps.cpuControlled && ps.currentReplay != null)
 					ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
 			}
-			onlineHealthDelta = note.hitHealth * ps.healthGain * hitMult;
-			ps.health += onlineHealthDelta;
+			hitHealthDelta = note.hitHealth * ps.healthGain * hitMult;
+			ps.health += hitHealthDelta;
 			// 血条溢出图标飞出：堆叠命中（density≥2）即上报——小型堆叠也飞，幅度 = 该堆叠提供的血量%
 			// （堆叠越大飞得越远、显示越高，封顶 1000%）；由 GameHUD 在当帧统一结算
 			if (ClientPrefs.data.iconFlyOverflow && hitMult > 1 && !note.isSustainNote)
@@ -1136,14 +1041,9 @@ class NoteChartDomain
 			// Bad 及以下评分扣一点点血
 			if (!note.isSustainNote && (note.rating == 'bad' || note.rating == 'shit'))
 			{
-				onlineHealthDelta -= 0.02 * ps.healthLoss * hitMult;
+				hitHealthDelta -= 0.02 * ps.healthLoss * hitMult;
 				ps.health -= 0.02 * ps.healthLoss * hitMult;
 			}
-			// 联机：广播己方命中（分数增量/血量增量/密度 + 音符序号），对方据此重建对手面板与血量，
-			// 并按 chartSeq 精确消费对侧音符（真双人：对侧谱面由对方按键打击）
-			if (PlayState.isOnlineMode && !ps.cpuControlled && !note.isSustainNote)
-				Multiplayer.send('HIT|' + note.noteData + '~' + note.rating + '~' + onlineScoreDelta + '~' + onlineHealthDelta + '~' + hitMult + '~' + note.chartSeq);
-
 			if(!ClientPrefs.data.hudOnly && !note.noAnimation && !(ps.botHitBatch && ps.botBatchAnimDone[note.noteData])) {
 				var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, note.noteData)))];
 
@@ -1286,19 +1186,6 @@ class NoteChartDomain
 				ps.noteMissCommon(daNote.noteData, daNote);
 				var result:Dynamic = ps.callOnLuas('noteMiss', [ps.notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
 				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('noteMiss', [daNote]);
-	}
-
-	/** 原 PlayState.playOnlineOppMiss（作用域分析：零遮蔽，6 处成员引用已限定）。 */
-	public static function playOnlineOppMiss(ps:PlayState, data:Int, note:Note):Void
-	{
-		var char:Character = ps.dad;
-		if (note != null && note.gfNote) char = ps.gf;
-		if (char != null && char.hasMissAnimations)
-		{
-			var suffix:String = note != null ? note.animSuffix : '';
-			char.playAnim(ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length - 1, data)))] + 'miss' + suffix, true);
-		}
-		if (ps.opponentVocals != null) ps.opponentVocals.volume = 0;
 	}
 
 	/** 原 PlayState.beatHit（作用域分析：零遮蔽，57 处成员引用已限定）。 */
