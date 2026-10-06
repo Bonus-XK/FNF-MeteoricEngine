@@ -544,9 +544,6 @@ class ModsMenuState extends MusicBeatState
 
 		mods = [];
 		modsList = [];
-		#if (MODS_ALLOWED && sys)
-		bridge.CneBridge.clearCaches(); // mod 列表变化 → CNE songs/ 目录名缓存作废
-		#end
 		var list:ModsList = Mods.parseList();
 		for (mod in list.all) modsList.push([mod, list.enabled.contains(mod)]);
 
@@ -798,11 +795,9 @@ class ModsMenuState extends MusicBeatState
 
 		var isOn:Bool = (modsList[curSelected][1] == true);
 		cardStatus.text = isOn ? Lang.tOr('mods.enabledShort', '已启用') : Lang.tOr('mods.disabledHint', '已停用（按 Enter 或点击启用）');
-		#if (MODS_ALLOWED && sys)
-		// CNE 格式 mod 标识（廉价探测；判定见 cne/CneModCompat.isCneMod）
-		if (bridge.CneBridge.isCneMod(mod.folder))
-			cardStatus.text += (bridge.CneBridge.isEnabled() ? Lang.tOr('mods.cneBadge', '   ·   CNE 格式') : Lang.tOr('mods.cneBadgeLocked', '   ·   CNE 格式（需在设置→编程开启「CNE 模组兼容」）'));
-		#end
+		// CNE 格式 mod：只做识别提示（Meteoric 已移除 CNE 兼容层，识别逻辑见 backend/CneModProbe）
+		if (backend.CneModProbe.isCneMod(mod.folder))
+			cardStatus.text += Lang.tOr('mods.cneBadge', '   ·   CNE 格式（不兼容）');
 		cardStatus.updateHitbox();
 
 		// 首次出现做一次克制的淡入（skill：低频、150ms quadOut、可被打断）；之后即时重建
@@ -877,11 +872,8 @@ class ModsMenuState extends MusicBeatState
 		var mod:ModMetadata = mods[curSelected];
 		clipText(nameText, mod.name, INFO_W - 20);
 		var folderLabel:String = Lang.tOr('mods.folder', '文件夹：') + mod.folder;
-		#if (MODS_ALLOWED && sys)
-		// 右侧信息：CNE 格式 mod 且兼容开关未开时给出可操作的提示（开关位置写在提示里）
-		if (bridge.CneBridge.isCneMod(mod.folder) && !bridge.CneBridge.isEnabled())
-			folderLabel += Lang.tOr('mods.cneBadgeHint', '   ·   CNE 格式，需开启「设置 → 编程 → CNE 模组兼容」');
-		#end
+		if (backend.CneModProbe.isCneMod(mod.folder))
+			folderLabel += Lang.tOr('mods.cneBadgeHint', '   ·   CNE 格式，Meteoric 不支持加载');
 		clipText(folderText, folderLabel, INFO_W - 20);
 
 		var enabledCount:Int = 0;

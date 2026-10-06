@@ -124,15 +124,6 @@ class TitleState extends MusicBeatState
 
 		ClientPrefs.loadPrefs();
 
-		// 编程层启动：注册全局脚本/热重载信号，并为 TitleState 本体装一次状态脚本。
-		// 必须放在 ClientPrefs.loadPrefs() 之后：总开关与子开关都从存档读取。
-		#if (HSCRIPT_ALLOWED && SScript >= "3.0.3" && sys)
-		#if meteoric_debug
-		Sys.println('[CNE] TitleState integration reached; force=' + Sys.getEnv('METEORIC_CNE_FORCE'));
-		#end
-		bridge.CneBridge.programmingInit();
-		bridge.CneBridge.programmingOnStateCreate(this);
-		#end
 
 		// 【帧率档位启动诊断】仅调试构建启用（编译脚本加 -debug / METEORIC_DEBUG=1 时定义
 		// `meteoric_debug`；正式发布构建不编译这段，零开销、也不刷屏）。

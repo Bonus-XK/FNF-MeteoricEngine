@@ -52,7 +52,6 @@ import openfl.utils.Assets as OpenFlAssets;
 import backend.Song;
 import backend.Section;
 import states.editors.ChartExportPrompt;
-import states.editors.content.CneExport;
 import backend.StageData;
 import backend.Paths;
 import backend.Mods;
@@ -3009,7 +3008,6 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 			{
 				case 0: exportChartV1();
 				case 1: exportChartOld();
-				case 2: exportChartCne();
 			}
 		}));
 	}
@@ -3033,12 +3031,6 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 	{
 		// Psych 0.6.3 旧版兼容格式（移植自 Seiun convertToOldFormat）
 		saveFileDialog(Paths.formatToSongPath(_song.song) + '.json', haxe.Json.stringify({song: convertToOldFormat(_song)}, "\t"));
-	}
-
-	function exportChartCne():Void
-	{
-		// Codename Engine (CNE) 谱面（移植自 Seiun CneExport）
-		saveFileDialog(Paths.formatToSongPath(_song.song) + '.json', CneExport.psychToCne(_song));
 	}
 
 	/**

@@ -113,17 +113,8 @@ class Character extends FlxSprite
 				if (FileSystem.exists(modJsonPath))
 					rawJson = File.getContent(modJsonPath);
 
-				#if sys
-				// ② CNE 模组兼容：mod 自带的 CNE 人物定义（mods/<mod>/data/characters/<名>.xml）
-				//    —— 必须排在**引擎内置 JSON 之前**。CNE 的资源语义是 mod 覆盖引擎，
-				//    而 Psych 的 preload 里有 gf/bf/dad 等同名人物；按「先查 preload」的旧顺序，
-				//    mod 的人物 XML 永远不会被读到（实测：saturday_morning_alive 的 GF 一直显示
-				//    引擎内置 gf 而不是 mod 的 `images/characters/gf/` 图集）。
-				if (rawJson == null && cne.CneModCompat.isEnabled())
-					rawJson = cne.CneModCompat.characterJson(curCharacter);
-				#end
 
-				// ③ 引擎内置人物 JSON；④ 兜底 DEFAULT_CHARACTER（防崩）
+				// ② 引擎内置人物 JSON；③ 兜底 DEFAULT_CHARACTER（防崩）
 				if (rawJson == null)
 				{
 					var path:String = Paths.getPreloadPath(characterPath);

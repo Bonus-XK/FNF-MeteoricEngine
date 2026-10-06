@@ -45,14 +45,6 @@ class HealthIcon extends FlxSprite
 		if(this.char != char) {
 			var name:String = 'icons/' + char;
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char; //Older versions of psych engine's support
-			#if (MODS_ALLOWED && sys)
-			// CNE 模组兼容：CNE 图标是目录形态 `images/icons/<名>/icon.png`
-			// （SMA 的 bfsma/happyrat/sadrat… 全是这种），Psych 只认 `icons/<名>.png` → 会掉到
-			// icon-face 兜底，看起来就是「小图标没加载」。
-			if(!Paths.fileExists('images/' + name + '.png', IMAGE) && cne.CneModCompat.isEnabled()
-				&& Paths.fileExists('images/icons/' + char + '/icon.png', IMAGE))
-				name = 'icons/' + char + '/icon';
-			#end
 			// PE 命名兜底：部分角色的图标只有 `icon-<角色>-pe.png`（Psych Engine 命名），
 			// 缺这一档时 Weekend1 等周的小图标会直接掉到 icon-face（表现为「图标缺失」）。
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char + '-pe';

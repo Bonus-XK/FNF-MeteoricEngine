@@ -16,7 +16,7 @@ import states.editors.ChartWidgets.EditorButton;
 
 /**
  * 导出谱面格式选择弹窗（沿用编谱面板控件库）。
- * 回调: onChoice(0=Psych 1.0.4, 1=Psych 0.6.3 旧版, 2=CNE, 3=取消)
+ * 回调: onChoice(0=Psych 1.0.4, 1=Psych 0.6.3 旧版, 2=取消)
  */
 class ChartExportPrompt extends FlxSubState
 {
@@ -55,8 +55,7 @@ class ChartExportPrompt extends FlxSubState
 
 		var labels:Array<String> = [
 			Lang.tOr('chart.export.current', 'Psych 1.0.4（当前格式）'),
-			Lang.tOr('chart.export.legacy', 'Psych 0.6.3（旧版兼容）'),
-			'Codename Engine (CNE)'
+			Lang.tOr('chart.export.legacy', 'Psych 0.6.3（旧版兼容）')
 		];
 		var btnW:Float = w - 48;
 		for (i in 0...labels.length)
@@ -75,7 +74,7 @@ class ChartExportPrompt extends FlxSubState
 		var cancelBtn:EditorButton = new EditorButton(x + 24, y + h - 44, btnW, 34, Lang.tOr('common.cancel', '取消'), function()
 		{
 			close();
-			if (onChoice != null) onChoice(3);
+			if (onChoice != null) onChoice(2);
 		}, 13);
 		add(cancelBtn);
 		buttons.push({btn: cancelBtn, choice: 3});
