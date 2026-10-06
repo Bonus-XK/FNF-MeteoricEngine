@@ -29,26 +29,26 @@ class PauseSubState extends MusicBeatSubstate
 	static final SAFE_MARGIN:Float = 72;      // 面板内文本左边距
 	static final SAFE_RIGHT:Float = 1100;     // 任何文本右缘不得超过此值（画布 1280 内留 180px 余量）
 	static final INFO_Y_START:Float = 100;    // 信息文本起始 Y
-	static final INFO_LINE_GAP:Float = 34;    // 信息文本行距
+	static final INFO_LINE_GAP:Float = 30;    // 信息文本行距（改版前 34：4 行只占到面板 60%，底部空一大块）
 	static final MENU_X:Float = 72;           // 菜单 X
-	static final MENU_Y:Float = 302;          // 菜单起始 Y
-	static final MENU_LINE_GAP:Float = 34;    // 菜单行距（MenuText 内部会再乘 1.3，实际约 44px）
+	/** 菜单项起始 Y = 卡片顶部 + 头部高度 + 分隔线下方留白。
+	 *  改版前是固定 302（因为信息卡片是独立的、在它上方）；信息并入同一张卡后
+	 *  菜单必须跟着头部高度走，否则会压在曲目信息上。 */
+	static final MENU_HEAD_H:Float = 26 + INFO_LINE_GAP * 3;
+	static final MENU_Y:Float = INFO_PANEL_Y + MENU_HEAD_H + 22;
+	static final MENU_LINE_GAP:Float = 36;    // 菜单行距（MenuText 内部会再乘 1.3，实际约 47px）
 
 	// 圆角磨砂面板
 	static final PANEL_X:Float = 40;          // 面板 X
 	static final PANEL_W:Float = 600;         // 面板宽度
 	static final INFO_PANEL_Y:Float = 70;     // 信息面板 Y
-	static final INFO_PANEL_H:Float = 200;    // 信息面板高度
-	static final MENU_PANEL_Y:Float = 290;    // 菜单面板 Y
 
 	// 右侧统计面板
 	static final STATS_X:Float = 680;         // 面板 X
 	static final STATS_W:Float = 560;         // 面板宽度
-	static final STATS_Y:Float = 70;          // 面板 Y
 	static final STATS_TEXT_X:Float = 716;    // 面板内文本左边距
-	static final STATS_TITLE_Y:Float = 96;    // 标题 Y
-	static final STATS_ROW_START:Float = 158; // 数据行起始 Y
-	static final STATS_ROW_GAP:Float = 48;    // 数据行距
+	static final STATS_ROW_START:Float = 82;  // 数据行起始 Y（相对卡片顶部；标题在 +26）
+	static final STATS_ROW_GAP:Float = 58;    // 数据行距（原 48：7 行只填面板 ~60%，底部空 170px）
 
 	var grpMenuShit:FlxTypedGroup<MenuText>;
 
@@ -174,15 +174,14 @@ class PauseSubState extends MusicBeatSubstate
 		add(bg);
 		FlxTween.tween(bg, {alpha: 0.6}, 0.25, {ease: FlxEase.quadOut});
 
-		// ---- 标题（水平居中，不贴任何边缘） ----
+		// ---- 标题（水平居中，从上方飞入；它是界面第一眼，先落位） ----
 		var titleText:FlxText = new FlxText(0, 22, FlxG.width, Lang.tOr('pause.paused', '已暂停'), 54);
 		titleText.scrollFactor.set();
 		titleText.setFormat(Paths.font('future.ttf'), 54, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		titleText.borderSize = 2.4;
 		titleText.antialiasing = ClientPrefs.data.antialiasing;
-		titleText.alpha = 0;
 		add(titleText);
-		FlxTween.tween(titleText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.05});
+		flyIn(titleText, FLY_DOWN, 0.04);
 
 		// ---- 编铺模式徽章（左上角圆角磨砂小面板） ----
 		var chartingPanel:FlxSprite = makePanel(40, 16, 130, 36, 12);
@@ -199,77 +198,83 @@ class PauseSubState extends MusicBeatSubstate
 		add(chartingText);
 		if(PlayState.chartingMode)
 		{
-			FlxTween.tween(chartingPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.1});
-			FlxTween.tween(chartingText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.1});
+			flyIn(chartingPanel, FLY_DOWN, 0.12);
+			flyIn(chartingText, FLY_DOWN, 0.12);
 		}
 
-		// ---- 信息面板（圆角磨砂） ----
-		var infoPanel:FlxSprite = makePanel(PANEL_X, INFO_PANEL_Y, PANEL_W, INFO_PANEL_H, 20);
-		infoPanel.alpha = 0;
-		add(infoPanel);
-		FlxTween.tween(infoPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		// ---- 左列：一张卡片 = 曲目信息（头部）+ 菜单项 ----
+		// 改版前是**两张**独立卡片（信息面板 / 菜单面板）上下排，1280×720 画布里
+		// 三块面板（+ 右侧数据面板）显得拥挤（用户实机报告「面板太多导致拥挤」）。
+		// 现在合成一张：信息当卡片头部的三行，菜单接在下面，用一条分隔线区分，
+		// 面板总数 3 → 2，垂直方向也腾出一整块空白。
+		var headerH:Float = MENU_HEAD_H;
+		var panelHeight:Float = headerH + 18 + (menuItems.length * MENU_LINE_GAP * 1.3);
+		var menuPanel:FlxSprite = makePanel(PANEL_X, INFO_PANEL_Y, PANEL_W, Std.int(panelHeight), 20);
+		add(menuPanel);
+		flyIn(menuPanel, FLY_LEFT, 0.10);
 
-		// ---- 信息文本（一律左对齐，右侧永不越界） ----
+		// ---- 信息文本（卡片头部，左对齐；右侧永不越界） ----
 		var levelInfo:FlxText = makeInfoText(Lang.tOr('pause.songLabel', '游玩曲目：') + PlayState.SONG.song, INFO_Y_START);
 		var levelDifficulty:FlxText = makeInfoText(Lang.tOr('pause.difficultyLabel', '游玩难度：') + translateDifficulty(Difficulty.getString()), INFO_Y_START + INFO_LINE_GAP);
 		var blueballedTxt:FlxText = makeInfoText(Lang.tOr('pause.deathsLabel', '死亡次数：') + PlayState.deathCounter, INFO_Y_START + INFO_LINE_GAP * 2);
 
 		practiceText = makeInfoText(Lang.tOr('pause.godModeActive', '上帝模式已激活！'), INFO_Y_START + INFO_LINE_GAP * 3, DesignTokens.secondary);
 		practiceText.visible = PlayState.instance.practiceMode;
-		if(PlayState.instance.practiceMode) FlxTween.tween(practiceText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		flyInRows([levelInfo, levelDifficulty, blueballedTxt], FLY_LEFT, 0.16);
+		if (PlayState.instance.practiceMode)
+			flyIn(practiceText, FLY_LEFT, 0.16 + FLY_STAGGER * 3);
 
-		FlxTween.tween(levelInfo, {alpha: 1, y: levelInfo.y + 8}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-		FlxTween.tween(levelDifficulty, {alpha: 1, y: levelDifficulty.y + 8}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-		FlxTween.tween(blueballedTxt, {alpha: 1, y: blueballedTxt.y + 8}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		// 头部分隔线：把「本局是什么」和「能点什么」在视觉上分开，
+		// 省掉一整块面板边框，信息密度高但不糊。
+		// ⚠ `makeGraphic` 第三参是 `FlxGraphicAsset`（贴图），**不是颜色** ——
+		// 传颜色会编译失败。分隔线要纯色，用 `FlxSpriteUtil.drawRect` 画。
+		var sepW:Float = PANEL_W - (SAFE_MARGIN - 32) * 2;
+		var sep:FlxSprite = new FlxSprite(PANEL_X + SAFE_MARGIN - 32, INFO_PANEL_Y + headerH + 4);
+		sep.makeGraphic(Std.int(sepW), 1, FlxColor.TRANSPARENT);
+		FlxSpriteUtil.drawRect(sep, 0, 0, sepW, 1, FlxColor.TRANSPARENT, {color: DesignTokens.panelOutline, thickness: 1});
+		sep.scrollFactor.set();
+		sep.alpha = 0.6;
+		add(sep);
+		flyIn(sep, FLY_LEFT, 0.20);
 
-		// ---- 菜单面板（圆角磨砂，高度随菜单项数量自适应） ----
-		var panelHeight:Float = 16 + (menuItems.length * MENU_LINE_GAP * 1.3);
-		var menuPanel:FlxSprite = makePanel(PANEL_X, MENU_PANEL_Y, PANEL_W, Std.int(panelHeight), 20);
-		menuPanel.alpha = 0;
-		add(menuPanel);
-		FlxTween.tween(menuPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
-
-		// ---- 右侧统计面板（圆角磨砂，显示本局数据） ----
-		var statsPanelH:Float = (MENU_PANEL_Y + panelHeight) - STATS_Y;
-		statPanel = makePanel(STATS_X, STATS_Y, STATS_W, Std.int(statsPanelH), 20);
-		statPanel.alpha = 0;
+		// ---- 右侧统计面板（第二张卡片，与左列等高） ----
+		var statsPanelH:Float = panelHeight;
+		statPanel = makePanel(STATS_X, INFO_PANEL_Y, STATS_W, Std.int(statsPanelH), 20);
 		add(statPanel);
-		FlxTween.tween(statPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		flyIn(statPanel, FLY_RIGHT, 0.10);
 
-		var statTitle:FlxText = new FlxText(STATS_TEXT_X, STATS_TITLE_Y, 0, Lang.tOr('pause.sessionData', '本局数据'), 26);
+		var statTitle:FlxText = new FlxText(STATS_TEXT_X, INFO_PANEL_Y + 26, 0, Lang.tOr('pause.sessionData', '本局数据'), 26);
 		statTitle.scrollFactor.set();
 		statTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		statTitle.borderSize = 2;
 		statTitle.antialiasing = ClientPrefs.data.antialiasing;
-		statTitle.alpha = 0;
 		add(statTitle);
-		FlxTween.tween(statTitle, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		flyIn(statTitle, FLY_RIGHT, 0.16);
 
 		var statDefs:Array<String> = [Lang.tOr('pause.score', '当前分数'), Lang.tOr('pause.misses', '失误数'), Lang.tOr('pause.combo', '当前连击'), Lang.tOr('pause.rating', '评分'), Lang.tOr('pause.accuracy', '准确度'), Lang.tOr('pause.hitsTotal', '命中 / 总音符'), Lang.tOr('pause.songProgress', '歌曲进度')];
 		for (i in 0...statDefs.length)
 		{
-			var rowY:Float = STATS_ROW_START + (i * STATS_ROW_GAP);
+			var rowY:Float = INFO_PANEL_Y + STATS_ROW_START + (i * STATS_ROW_GAP);
 
 			var lbl:FlxText = new FlxText(STATS_TEXT_X, rowY, 0, statDefs[i] + '：', 24);
 			lbl.scrollFactor.set();
 			lbl.setFormat(Paths.font('future.ttf'), 24, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			lbl.borderSize = 1.5;
 			lbl.antialiasing = ClientPrefs.data.antialiasing;
-			lbl.alpha = 0;
 			add(lbl);
-			FlxTween.tween(lbl, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 			statLabels.push(lbl);
+			flyIn(lbl, FLY_RIGHT, 0.30 + FLY_STAGGER * i);
 
 			var val:FlxText = new FlxText(STATS_TEXT_X + 210, rowY, 0, '', 24);
 			val.scrollFactor.set();
 			val.setFormat(Paths.font('future.ttf'), 24, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			val.borderSize = 1.5;
 			val.antialiasing = ClientPrefs.data.antialiasing;
-			val.alpha = 0;
 			add(val);
-			FlxTween.tween(val, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 			statTexts.push(val);
 			statLast.push('');
+			// 数值与标签同一行、同一延迟到达（标签先建但延迟相同，视觉上成对出现）
+			flyIn(val, FLY_RIGHT, 0.30 + FLY_STAGGER * i);
 		}
 		updateStats();
 
@@ -277,7 +282,10 @@ class PauseSubState extends MusicBeatSubstate
 		menuSelector = makePanel(PANEL_X + 16, MENU_Y - 3, PANEL_W - 32, 44, 12, DesignTokens.rowHighlight, null);
 		menuSelector.alpha = 0;
 		add(menuSelector);
-		FlxTween.tween(menuSelector, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+		// 高亮条只淡入、不飞入：它的 y 会被 `changeSelection` 的 menuSelectorTween 接管
+		//（补间 `{y: barY}`），这里若也补间 y 会和选中移动打架。
+		// 延迟对齐菜单项（0.26 + 0.028*i），让高亮条和它框住的第一项几乎同时出现。
+		FlxTween.tween(menuSelector, {alpha: 1}, 0.2, {ease: FlxEase.quadOut, startDelay: 0.27});
 
 		grpMenuShit = new FlxTypedGroup<MenuText>();
 		add(grpMenuShit);
@@ -305,7 +313,7 @@ class PauseSubState extends MusicBeatSubstate
 		add(pausePad);
 		#end
 
-		regenMenu();
+		regenMenu(true); // 首次打开：菜单项逐项飞入
 		FlxG.mouse.visible = true;
 		Lib.application.window.title = Lang.tOr('pause.windowTitle', "FNF':Meteoric Engine - 暂停");
 
@@ -315,8 +323,8 @@ class PauseSubState extends MusicBeatSubstate
 		loadUIscripts('pause');
 
 		// 收集"菜单侧"UI：子页打开时整体隐藏（右侧本局数据面板 statPanel/statLabels/statTexts 保留）
-		menuUI = [bg, titleText, chartingPanel, chartingText, infoPanel, levelInfo, levelDifficulty,
-			blueballedTxt, practiceText, menuPanel, menuSelector, grpMenuShit,
+		menuUI = [bg, titleText, chartingPanel, chartingText, menuPanel, sep, levelInfo, levelDifficulty,
+			blueballedTxt, practiceText, menuSelector, grpMenuShit,
 			backBtn.glow, backBtn.spr, backBtn.label];
 	}
 
@@ -352,6 +360,67 @@ class PauseSubState extends MusicBeatSubstate
 			FlxSpriteUtil.drawRoundRect(spr, 1, 1, w - 2, h - 2, radius, radius, FlxColor.TRANSPARENT, {color: border, thickness: 1.5});
 		spr.scrollFactor.set();
 		return spr;
+	}
+
+	// ==================== 入场动画 ====================
+
+	/** 飞入方向。 */
+	static inline var FLY_UP:Int = 0;
+	static inline var FLY_DOWN:Int = 1;
+	static inline var FLY_LEFT:Int = 2;
+	static inline var FLY_RIGHT:Int = 3;
+
+	/** 单个元素的飞入位移（px）。够明显但不夸张。 */
+	static inline var FLY_DIST:Float = 26;
+
+	/** 飞入时长 / 同组内每行的错峰间隔（秒）。 */
+	static inline var FLY_DUR:Float = 0.26;
+	static inline var FLY_STAGGER:Float = 0.028;
+
+	/**
+	 * 元素飞入：位移 + 淡入，位移用 `quadOut`（起步快、收尾稳）。
+	 *
+	 * 改版前整个暂停界面所有元素都用**同一个** `startDelay: 0.08` 一起淡入 ——
+	 * 视觉上像「整块一起亮起来」，没有主次；而且菜单项（`regenMenu` 里建的
+	 * `MenuText`）**完全没有动画**，直接闪现，和周围的面板/文本脱节。
+	 * 现在改成按组错峰飞入：标题 → 左列菜单 → 右列数据。
+	 *
+	 * @param obj   目标（会先记录当前 x/y 作为终点）
+	 * @param dir   FLY_* 方向
+	 * @param delay 该元素在组内的起始延迟
+	 * @param targetAlpha 终态透明度。菜单项**必须**传对：非选中项常态是 0.6，
+	 *        若一律补到 1，未选中项会比选中项还亮（且 `changeSelection` 只在
+	 *        切换选中时才跑，不会来纠正）。
+	 */
+	function flyIn(obj:FlxSprite, dir:Int, delay:Float, ?targetAlpha:Float):Void
+	{
+		if (obj == null) return;
+		var endAlpha:Float = (targetAlpha != null) ? targetAlpha : 1;
+		var tx:Float = obj.x;
+		var ty:Float = obj.y;
+		var ox:Float = 0;
+		var oy:Float = 0;
+		switch (dir)
+		{
+			case FLY_UP: oy = FLY_DIST;
+			case FLY_DOWN: oy = -FLY_DIST;
+			case FLY_LEFT: ox = -FLY_DIST;
+			default: ox = FLY_DIST;
+		}
+		obj.alpha = 0;
+		obj.x = tx + ox;
+		obj.y = ty + oy;
+		FlxTween.tween(obj, {alpha: endAlpha, x: tx, y: ty}, FLY_DUR, {ease: FlxEase.quadOut, startDelay: delay});
+	}
+
+	/**
+	 * 按行错峰飞入一组文本（每行 `i * stagger`）。
+	 * 面板本体先落位、文本随后浮现，读起来是「卡片进来 → 内容展开」。
+	 */
+	function flyInRows(rows:Array<FlxSprite>, dir:Int, baseDelay:Float):Void
+	{
+		for (i in 0...rows.length)
+			flyIn(rows[i], dir, baseDelay + FLY_STAGGER * i);
 	}
 
 	var holdTime:Float = 0;
@@ -601,7 +670,7 @@ class PauseSubState extends MusicBeatSubstate
 
 
 				menuItems = menuItemsOG;
-				regenMenu();
+				regenMenu(); // 从子页返回：列表内容未变，不重播入场动画
 			}
 
 			switch (daSelected)
@@ -615,7 +684,7 @@ class PauseSubState extends MusicBeatSubstate
 				case ID_DIFFICULTY:
 					menuItems = difficultyChoices;
 					deleteSkipTimeText();
-					regenMenu();
+					regenMenu(true); // 难度列表换了内容 → 播一次飞入
 				case ID_RESTART:
 					restartSong();
 				case ID_EXIT_CHARTING:
@@ -784,6 +853,12 @@ class PauseSubState extends MusicBeatSubstate
 
 		for (item in grpMenuShit.members)
 		{
+			// 入场动画进行中：让 flyIn 独占 alpha，否则这里会把它刚设的 0 覆盖成 0.6/1
+			//（用户实机报告「没看见动画」的确定原因之一 —— 菜单项一直是闪现的）。
+			// 判定用 alpha < 1 而不是另开标志位：动画期间 alpha 必然 <1，
+			// 动画一结束就交回本函数控制，不会残留状态。
+			if (item.alpha < 1) continue;
+
 			item.alpha = 0.6;
 			item.color = 0xFFCFCFDC;
 
@@ -892,7 +967,7 @@ class PauseSubState extends MusicBeatSubstate
 		return translateDifficulty(id);
 	}
 
-	function regenMenu():Void {
+	function regenMenu(?animate:Bool = false):Void {
 		for (i in 0...grpMenuShit.members.length) {
 			var obj = grpMenuShit.members[0];
 			obj.kill();
@@ -906,6 +981,21 @@ class PauseSubState extends MusicBeatSubstate
 			item.isMenuItem = false;
 			item.ID = i;
 			grpMenuShit.add(item);
+
+			// 菜单项此前**完全没有入场动画**（面板与文本都在淡入，它却直接闪现，
+			// 视觉上像掉进界面里）。这里补上：与菜单面板同一方向、逐项错峰，
+			// 且必须排在面板之后。只在首次打开（new()）与切换难度列表时播；
+			// 从子页返回时列表内容没变，重播会显得啰嗦，所以那边不传 animate。
+			//
+			// 终态 alpha 必须按「是否选中」给（1 / 0.6），color 同理 ——
+			// 否则动画结束后未选中项会比选中项还亮，而 `changeSelection` 只在
+			// 下次切换选中时才跑，不会来纠正。
+			if (animate)
+			{
+				var isSel:Bool = (i == curSelected);
+				item.color = isSel ? FlxColor.WHITE : 0xFFCFCFDC;
+				flyIn(item, FLY_LEFT, 0.24 + FLY_STAGGER * i, isSel ? 1 : 0.6);
+			}
 
 			if(menuItems[i] == ID_SKIP)
 			{
