@@ -714,7 +714,7 @@ class HostDomain
 	}
 
 	/** 原 PlayState.initHScript（作用域分析：零遮蔽，15 处成员引用已限定）。 */
-	public static function initHScript(ps:PlayState, file:String, ?cneGlobals:Map<String, Dynamic> = null, ?cneCallbacks:Bool = false)
+	public static function initHScript(ps:PlayState, file:String)
 	{
 		// 回放模式不加载 HScript（与 Lua 同理：避免脚本修改箭头显示影响回放）
 		if (ps.replayMode) return;
@@ -730,10 +730,9 @@ class HostDomain
 			}
 			catch (e:Dynamic) {}
 			#end
-			// executeNow=false：先把 globals（含 CNE 的 FunkinSprite/stage/insert）注入，再执行脚本。
-			// CNE 歌曲脚本顶层就有 `var pluh:FlxSprite = new FlxSprite();` /
-			// `var fadeThing:FunkinSprite = new FunkinSprite()...`，若先 execute 会报
-			// "Unknown variable: FunkinSprite"（2026-09-18 实测）。
+			// executeNow=false：先把 globals 注入，再执行脚本。模组脚本顶层常直接 `new 某引擎类()`
+			// （如 `var x:FlxSprite = new FlxSprite();`），若先 execute 会报 "Unknown variable"
+			// （2026-09-18 实测）。
 			var newScript:HScript = new HScript(null, scriptCode, false);
 			// 66mod 等 Psych 0.7 模组对话脚本需要 songName / startDialogue
 			newScript.set('songName', ps.songName);
@@ -746,16 +745,7 @@ class HostDomain
 			// 兼容 66mod 舞台脚本（home.hx 等直接访问 camFollow/camHUD）
 			newScript.set('camFollow', ps.camFollow);
 			newScript.set('camHUD', ps.camHUD);
-			// CNE 歌曲脚本：注入 CNE 专用 globals（stage/FunkinSprite/insert…），必须在 execute 之前。
-			if (cneGlobals != null)
-			{
-				for (k => v in cneGlobals) newScript.set(k, v);
-			}
 			try newScript.execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
-			// CNE 回调别名（create→onCreate、stepHit→onStepHit…）必须在 execute 之后：
-			// 脚本函数已解析，`exists('create')` 才为真；同时要早于下面的 onCreate 调用。
-			if (cneCallbacks)
-				bridge.CneBridge.applyCallbacks(newScript);
 			@:privateAccess
 			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
 			{
@@ -1367,6 +1357,8 @@ class HostDomain
 		if (ps._npsTimer >= 1)
 		{
 			ps.npsDisplay = ps._npsCount;
+			// 记峰值：清零前先比一次（_npsCount 是这一整秒的命中数 = 这一秒的点击数）
+			if (ps._npsCount > ps.maxNpsDisplay) ps.maxNpsDisplay = ps._npsCount;
 			ps._npsCount = 0;
 			ps._npsTimer -= 1;
 			if (ClientPrefs.data.showNPS && !ps.endingSong && ps.scoreTxt != null) ps.updateScore();

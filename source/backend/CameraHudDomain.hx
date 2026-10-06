@@ -327,10 +327,14 @@ class CameraHudDomain
 	public static function buildScoreText(ps:PlayState):String
 	{
 		var fmt:String = ClientPrefs.data.scoreTxtFormat;
-		// 兼容旧“显示NPS”开关：开启且格式里没写 {nps} 时，自动在 {fc} 后追加
+		// 兼容旧“显示NPS”开关：开启且格式里没写 {nps} 时，自动在 {fc} 后追加当前值 + 本局峰值。
+		// 峰值是关键 —— {nps} 是滚动 1 秒窗口，遇间奏/长条就掉回 0，看不出真实爆发力。
 		if (ClientPrefs.data.showNPS && fmt.indexOf('{nps}') == -1)
-			fmt = StringTools.replace(fmt, '{fc}', '{fc} | NPS: {nps}');
+			fmt = StringTools.replace(fmt, '{fc}', '{fc} | NPS: {nps} (Max {maxnps})');
 
+		// 游玩中 HUD 的 `{accuracy}` **始终**用引擎原口径 ratingPercent（权重和 ÷ 已判定数）。
+		// 「Phigros 准确率」的 ACC 分母是整张谱面音符数，只有打完之后才有意义 ——
+		// 曾在游玩中替换过它，导致开局瞬间显示 0%（0 命中 ÷ 全谱面音符）。故只在结算页生效。
 		var acc:String = Std.string(CoolUtil.floorDecimal(ps.ratingPercent * 100, 2));
 		// health 范围 0~2（默认 1 = 50%），换算成 0%~100%；
 		// 开启「血条溢出图标飞出」时改用显示级 healthDisplayPct（音符爆发可冲到 1000%，随后回落到真实血量）
@@ -342,6 +346,7 @@ class CameraHudDomain
 			.replace('{rank}', ps.ratingName)
 			.replace('{accuracy}', acc)
 			.replace('{nps}', Std.string(ps.npsDisplay))
+			.replace('{maxnps}', Std.string(ps.maxNpsDisplay))
 			.replace('{fc}', ps.ratingFC)
 			.replace('{combo}', Std.string(ps.combo))
 			.replace('{health}', healthPct);

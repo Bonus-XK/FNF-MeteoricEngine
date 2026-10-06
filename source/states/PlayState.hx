@@ -172,6 +172,20 @@ class PlayState extends MusicBeatState
 
 	// NPS 统计：每秒收到并判定的音符数（不含长条），供 FPS 计数器显示
 	public var npsDisplay:Int = 0;
+
+	/**
+	 * 本局**峰值** NPS（最近 1 秒内命中最多的那一秒）。
+	 *
+	 * `npsDisplay` 是滚动 1 秒窗口的当前值（`_npsTimer` 每满 1 秒把 `_npsCount`
+	 * 滚进去并清零，见 `backend/HostDomain.hx`），它只反映「此刻」的读谱速度 ——
+	 * 遇到间奏或长条就会掉回 0，看不出玩家真实的爆发力。
+	 * 本字段记历史峰值，结算页与 Score 栏的 `{maxnps}` 槽用它。
+	 *
+	 * 与 `npsDisplay` 同一口径：不含长条尾击，按 `density` 计（挤在一起的一簇算多个），
+	 * 所以它就是「那一秒里你敲了多少下」。
+	 */
+	public var maxNpsDisplay:Int = 0;
+
 	var _npsCount:Int = 0;
 	var _npsTimer:Float = 0;
 
@@ -762,12 +776,6 @@ class PlayState extends MusicBeatState
 			case 'phillyStreets': new states.stages.PhillyStreets(); //Weekend 1 - Darnell, Lit Up, 2Hot
 			case 'phillyBlazin': new states.stages.PhillyBlazin(); //Weekend 1 - Blazin
 			default:
-				#if (MODS_ALLOWED && sys)
-				// CNE 模组兼容：CNE 舞台没有 Psych 舞台类，图层写在 data/stages/<名>.xml 的
-				// <sprite> 元素里（站位/缩放已由 StageData 的 CNE 分支喂给 StageFile）。
-				if (bridge.CneBridge.hasStageXml(curStage))
-					new states.stages.CneXmlStage(curStage);
-				#end
 		}
 
 		if(isPixelStage) {
@@ -840,14 +848,6 @@ class PlayState extends MusicBeatState
 		setOnScripts('boyfriend', boyfriend);
 		setOnScripts('gf', gf);
 		setOnScripts('camGame', camGame);
-
-		// CNE 模组兼容：歌曲脚本（`mods/<mod>/songs/<song>/scripts/*.hx`）在角色/舞台就绪后加载。
-		// CNE 脚本用 `stage.stageSprites[...]`、`FunkinSprite`、`insert` 等名字，globals/回调别名的
-		// 注入在 `CneScriptCompat`；`create` 会在 initHScript 内部立即执行。
-		#if (MODS_ALLOWED && sys && HSCRIPT_ALLOWED)
-		if (bridge.CneBridge.isEnabled())
-			bridge.CneBridge.loadSongScripts(this, songName);
-		#end
 
 		// STAGE SCRIPTS（在角色创建后加载，使 onCreate 可访问 dad/boyfriend/gf）
 		// JS Engine 移植：只显示 HUD 时跳过舞台脚本（舞台已不渲染，脚本多为视觉/相机效果）
@@ -2336,6 +2336,10 @@ class PlayState extends MusicBeatState
 		totalPlayed = 0;
 		totalNotesHit = 0;
 		combo = 0;
+		npsDisplay = 0;
+		maxNpsDisplay = 0;
+		_npsCount = 0;
+		_npsTimer = 0;
 		maxCombo = 0; // 结算界面：最高连击随重开清零
 		allSicks = true; // 金色 Combo：重开复位
 		songPercent = 0;
@@ -3024,7 +3028,7 @@ class PlayState extends MusicBeatState
 	#if HSCRIPT_ALLOWED
 	public function startHScriptsNamed(scriptFile:String):Bool return HostDomain.startHScriptsNamed(this, scriptFile);
 
-	public function initHScript(file:String, ?cneGlobals:Map<String, Dynamic> = null, ?cneCallbacks:Bool = false) HostDomain.initHScript(this, file, cneGlobals, cneCallbacks);
+	public function initHScript(file:String) HostDomain.initHScript(this, file);
 	#end
 
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {

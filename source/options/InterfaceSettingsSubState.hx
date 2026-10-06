@@ -44,7 +44,7 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Score栏格式',
-			'自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {fc} {combo} {health}。按确认键打开输入框',
+			'自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {maxnps} {fc} {combo} {health}。按确认键打开输入框',
 			'scoreTxtFormat',
 			'string',
 			[ClientPrefs.data.scoreTxtFormat]);
@@ -133,7 +133,8 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('显示NPS',
-			'开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）',
+			'开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）。\n'
+			+ '同时显示本局峰值（Max）—— {nps} 是滚动 1 秒窗口，遇间奏或长条会掉回 0，峰值才反映真实爆发力。',
 			'showNPS',
 			'bool');
 		addOption(option);
@@ -179,7 +180,7 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		// openPrompt：分页路径自己 openSubState；headless（单界面宿主）路由到宿主状态
 		openPrompt(new TextInputPrompt(
 			'自定义 Score 栏格式',
-			'可用变量：\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\n{nps} 每秒音符 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比',
+			'可用变量：\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\n{nps} 每秒音符 | {maxnps} 峰值NPS | {fc} FC状态 | {combo} 连击 | {health} 血量百分比',
 			ClientPrefs.data.scoreTxtFormat,
 			function(value:String) {
 				if (value != null && value.trim() != '')
