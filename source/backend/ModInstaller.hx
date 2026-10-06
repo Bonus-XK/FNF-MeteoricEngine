@@ -94,7 +94,7 @@ class ModInstaller
 		try
 		{
 			var window = lime.app.Application.current.window;
-			if (window != null) window.onDropFile.add(onDropFile);
+			if (window != null) window.onDropFile.add(enqueueDrop);
 			trace('ModInstaller: drop-to-install listening (window.onDropFile).');
 		}
 		catch (e:Dynamic)
@@ -154,6 +154,10 @@ class ModInstaller
 			}
 		}
 
+		// 处理「延后到本帧」的拖入路径。`enqueueDrop`（原生 SDL 回调里）只存字符串，
+		// 真正的工作（判定上下文 → 读文件 → 建 UI → 起解压线程）全在这里做。
+		// 一次只取一个：同帧多次拖入时，第一个在处理中，第二个因 busy 被塞回
+		// pendingDrop，下一帧继续（拖 N 个包会依次安装，不会互相打断）。
 		if (pendingDrop != null)
 		{
 			var p:String = pendingDrop;
@@ -211,7 +215,42 @@ class ModInstaller
 		}
 	}
 
-	/** Entry point for the lime window drop event. */
+	/**
+	 * 原生拖放回调入口 —— **只做一件事：把路径排队，交给下一帧的 `pump()` 处理。**
+	 *
+	 * ## 为什么不能在原生回调里直接干活
+	 *
+	 * `window.onDropFile` 由 lime 在 SDL 事件分发中派发（`lime` 的
+	 * `NativeApplication.handleDropEvent` → `window.onDropFile.dispatch(...)`），
+	 * 而事件分发发生在 `FlxG.step()` 内部。此时若同步执行拖入流程，会在
+	 * **状态机遍历途中**做出这些事：
+	 *  - `FlxG.state.openSubState(new ModInstallUI())`（`openUI`）—— 在事件回调里
+	 *    创建 FlxObject 并挂到正在遍历的 state 上；
+	 *  - 同步读 zip（`ZipReader.readEntries` / `ModZipPlanner.analyze`）；
+	 *  - `new ZipExtractor(...)` + `start()` 起后台线程。
+	 *
+	 * 实测（macOS 26.6.2 x86_64，2026-10-05 21:22）：拖入 .zip 后引擎立即
+	 * `SIGABRT`（信号 6），原生回溯是 `abort ← malloc_vreport ← malloc_report`
+	 * 即 **堆损坏**，且 `crash/last_stage.txt` 停在 `ModInstaller:drop`
+	 * —— 说明崩在这条路径里、而不是更早。
+	 * （该 release 构建的回溯无调试信息，符号不可用，无法指到具体指令；
+	 *   但「在原生事件回调里重入状态机」是这里唯一能解释堆损坏的结构性问题。）
+	 *
+	 * 所以这里**只留一个字符串赋值**（无分配 FlxObject、无文件 I/O、无线程），
+	 * 全部实际工作延到 `pump()`，也就是正常帧更新里。
+	 */
+	public function enqueueDrop(path:String):Void
+	{
+		if (path == null || path.length < 1) return;
+		pendingDrop = path;
+	}
+
+	/**
+	 * 真正的拖入处理 —— **只应在帧更新里调用**（`pump()`），不要从原生事件回调直达。
+	 *
+	 * 保留 public 是为了给测试/脚本一个同步入口；`Main.hx` 的 `_dropHandler`
+	 * 走的是上面的 `enqueueDrop()`，两者不要混用。
+	 */
 	public function onDropFile(path:String):Void
 	{
 		// 阶段标记：此后任何拖入路径上的崩溃/异常都能在 crash/last_stage.txt 定位到本入口
@@ -702,6 +741,11 @@ class ModInstaller
 	public function openUI():Void
 	{
 		if (ui != null && ui.exists) return;
+		// 无状态 / 状态正在切换时不能挂 substate（openSubState 会崩）。
+		// 这在延迟处理后仍可能发生：拖入被排到下一帧，而这一帧的状态可能刚好在切换
+		// （例如从标题画面跳主菜单、或正在关闭）。此时放弃本次 UI，
+		// `pump()` 里 `ui == null` 会让后续状态写入自动补开（见 ModInstallUI.create）。
+		if (FlxG.state == null) return;
 		ui = new ModInstallUI();
 		FlxG.state.openSubState(ui);
 	}

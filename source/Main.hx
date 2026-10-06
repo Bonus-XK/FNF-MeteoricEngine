@@ -378,11 +378,22 @@ class Main extends Sprite
 		#if sys
 		// ---- 拖入 zip / 文件夹安装 mod（SDL 拖放 → lime window.onDropFile → ModInstaller） ----
 		// 闭包存字段（_dropHandler）：lime C++ 事件持有时 Haxe 侧无引用会被 GC 回收 → 悬垂 free 崩溃
+		//
+		// ⚠ 这里**只把路径交给 ModInstaller 排队**，绝不同步跑安装流程。
+		// `window.onDropFile` 由 lime 在 SDL 事件分发中派发，而事件分发发生在 `FlxG.step()`
+		// 内部；此时若同步执行，会在状态机遍历途中 `FlxG.state.openSubState(new ModInstallUI())`、
+		// 同步读 zip、并 `new ZipExtractor(...).start()` 起后台线程。
+		// 实测（macOS 26.6.2 x86_64，2026-10-05 21:22）：拖入 .zip 后引擎立即 SIGABRT（信号 6），
+		// 原生回溯 `abort ← malloc_vreport ← malloc_report` = **堆损坏**，
+		// 且 `crash/last_stage.txt` 停在 `ModInstaller:drop` —— 崩在这条路径里。
+		// （该 release 回溯无调试信息、符号不可用，无法指到具体指令；但「在原生事件回调里
+		//   重入状态机」是这里唯一能解释堆损坏的结构性问题。）
+		// 实际处理延到下一帧 `ModInstaller.update()`（由 MusicBeatState/Substate 泵）。
 		_dropHandler = function(file:String)
 		{
 			try
 			{
-				backend.ModInstaller.get().onDropFile(file);
+				backend.ModInstaller.get().enqueueDrop(file);
 			}
 			catch (e:Dynamic)
 			{
