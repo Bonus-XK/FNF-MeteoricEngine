@@ -10,6 +10,7 @@ import flixel.FlxBasic;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.input.keyboard.FlxKey;
 import flixel.math.FlxPoint;
+import flixel.math.FlxMath;
 import objects.BackButton;
 import flixel.util.FlxSpriteUtil;
 import flixel.util.FlxSpriteUtil;
@@ -31,12 +32,36 @@ class PauseSubState extends MusicBeatSubstate
 	static final INFO_Y_START:Float = 100;    // 信息文本起始 Y
 	static final INFO_LINE_GAP:Float = 30;    // 信息文本行距（改版前 34：4 行只占到面板 60%，底部空一大块）
 	static final MENU_X:Float = 72;           // 菜单 X
-	/** 菜单项起始 Y = 卡片顶部 + 头部高度 + 分隔线下方留白。
-	 *  改版前是固定 302（因为信息卡片是独立的、在它上方）；信息并入同一张卡后
-	 *  菜单必须跟着头部高度走，否则会压在曲目信息上。 */
-	static final MENU_HEAD_H:Float = 26 + INFO_LINE_GAP * 3;
-	static final MENU_Y:Float = INFO_PANEL_Y + MENU_HEAD_H + 22;
-	static final MENU_LINE_GAP:Float = 36;    // 菜单行距（MenuText 内部会再乘 1.3，实际约 47px）
+	/** 分隔线上方留白 / 下方留白（px）。 */
+	static final SEP_PAD_TOP:Float = 8;
+	static final SEP_PAD_BOTTOM:Float = 16;
+
+	/** 卡片头部高度（信息区）—— 按**实际行数**算。
+	 *
+	 *  ⚠ 之前写成常量 `26 + INFO_LINE_GAP * 3` 是错的：漏算了 `INFO_Y_START`
+	 *  相对面板顶部的 30px 上边距（INFO_Y_START=100、INFO_PANEL_Y=70），
+	 *  也漏算了「上帝模式已激活」那行的条件出现 —— 结果头部比实际矮 30px，
+	 *  菜单整体上移，**「游玩难度 / 死亡次数」被前两个菜单项压住**
+	 *  （用户实机截图：游玩难度与「返回游戏」重叠）。
+	 *
+	 *  正确算法：`上边距 + 行数×行距 + 分隔线上方留白`。
+	 */
+	function calcHeadH(infoRows:Int):Float
+	{
+		return (INFO_Y_START - INFO_PANEL_Y) + infoRows * INFO_LINE_GAP + SEP_PAD_TOP;
+	}
+
+	/** 菜单项起始 Y = 面板顶部 + 头部高度 + 分隔线 + 下方留白。实例字段，随行数变化。 */
+	var MENU_Y:Float = 0;
+	/**
+	 * 菜单行距（MenuText 内部再乘 1.3 → 约 43px）。
+	 * 33 而非 36 的原因：36 时 10 项菜单会把卡片撑到 708px、溢出 720 画布。
+	 * **实例字段**：菜单项异常多时会按可用高度自动压缩（见 new() 里的兜底），
+	 * 所以每次 regenMenu 前要恢复默认值，否则上一次压缩后的窄行距会被继承。
+	 */
+	var MENU_LINE_GAP:Float = MENU_LINE_GAP_DEFAULT;
+
+	static inline var MENU_LINE_GAP_DEFAULT:Float = 33;
 
 	// 圆角磨砂面板
 	static final PANEL_X:Float = 40;          // 面板 X
@@ -48,7 +73,8 @@ class PauseSubState extends MusicBeatSubstate
 	static final STATS_W:Float = 560;         // 面板宽度
 	static final STATS_TEXT_X:Float = 716;    // 面板内文本左边距
 	static final STATS_ROW_START:Float = 82;  // 数据行起始 Y（相对卡片顶部；标题在 +26）
-	static final STATS_ROW_GAP:Float = 58;    // 数据行距（原 48：7 行只填面板 ~60%，底部空 170px）
+	/** 数据行距的**兜底值**（仅 1 行时用）；正常按卡片高度自适应，见 new() 里的 statGap。 */
+	static final STATS_ROW_GAP:Float = 58;
 
 	var grpMenuShit:FlxTypedGroup<MenuText>;
 
@@ -207,8 +233,24 @@ class PauseSubState extends MusicBeatSubstate
 		// 三块面板（+ 右侧数据面板）显得拥挤（用户实机报告「面板太多导致拥挤」）。
 		// 现在合成一张：信息当卡片头部的三行，菜单接在下面，用一条分隔线区分，
 		// 面板总数 3 → 2，垂直方向也腾出一整块空白。
-		var headerH:Float = MENU_HEAD_H;
-		var panelHeight:Float = headerH + 18 + (menuItems.length * MENU_LINE_GAP * 1.3);
+		// 头部高度按实际行数算：常态 3 行，上帝模式时多一行「上帝模式已激活！」
+		var infoRows:Int = PlayState.instance.practiceMode ? 4 : 3;
+		var headerH:Float = calcHeadH(infoRows);
+		MENU_Y = INFO_PANEL_Y + headerH + SEP_PAD_TOP + SEP_PAD_BOTTOM;
+		var menuBlockH:Float = menuItems.length * MENU_LINE_GAP * 1.3;
+		// 兜底：菜单项异常多时（如编谱模式额外插入「退出编铺 / 结束歌曲」等），
+		// 固定行距会把卡片撑出画布底部。按可用高度压缩行距，而不是让它溢出屏幕。
+		var maxPanelH:Float = 720 - 16 - INFO_PANEL_Y;   // 画布 720，留 16px 底边距
+		var minGap:Float = 26;                            // 行距下限（×1.3 后约 34px，仍可读）
+		var maxGap:Float = MENU_LINE_GAP;
+		if (headerH + SEP_PAD_TOP + SEP_PAD_BOTTOM + 10 + menuBlockH > maxPanelH)
+		{
+			var usable:Float = maxPanelH - headerH - SEP_PAD_TOP - SEP_PAD_BOTTOM - 10;
+			var gap:Float = (menuItems.length > 0) ? usable / (menuItems.length * 1.3) : maxGap;
+			MENU_LINE_GAP = FlxMath.bound(gap, minGap, maxGap);
+			menuBlockH = menuItems.length * MENU_LINE_GAP * 1.3;
+		}
+		var panelHeight:Float = headerH + SEP_PAD_TOP + SEP_PAD_BOTTOM + menuBlockH + 10;
 		var menuPanel:FlxSprite = makePanel(PANEL_X, INFO_PANEL_Y, PANEL_W, Std.int(panelHeight), 20);
 		add(menuPanel);
 		flyIn(menuPanel, FLY_LEFT, 0.10);
@@ -229,7 +271,7 @@ class PauseSubState extends MusicBeatSubstate
 		// ⚠ `makeGraphic` 第三参是 `FlxGraphicAsset`（贴图），**不是颜色** ——
 		// 传颜色会编译失败。分隔线要纯色，用 `FlxSpriteUtil.drawRect` 画。
 		var sepW:Float = PANEL_W - (SAFE_MARGIN - 32) * 2;
-		var sep:FlxSprite = new FlxSprite(PANEL_X + SAFE_MARGIN - 32, INFO_PANEL_Y + headerH + 4);
+		var sep:FlxSprite = new FlxSprite(PANEL_X + SAFE_MARGIN - 32, INFO_PANEL_Y + headerH + SEP_PAD_TOP);
 		sep.makeGraphic(Std.int(sepW), 1, FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRect(sep, 0, 0, sepW, 1, FlxColor.TRANSPARENT, {color: DesignTokens.panelOutline, thickness: 1});
 		sep.scrollFactor.set();
@@ -252,9 +294,16 @@ class PauseSubState extends MusicBeatSubstate
 		flyIn(statTitle, FLY_RIGHT, 0.16);
 
 		var statDefs:Array<String> = [Lang.tOr('pause.score', '当前分数'), Lang.tOr('pause.misses', '失误数'), Lang.tOr('pause.combo', '当前连击'), Lang.tOr('pause.rating', '评分'), Lang.tOr('pause.accuracy', '准确度'), Lang.tOr('pause.hitsTotal', '命中 / 总音符'), Lang.tOr('pause.songProgress', '歌曲进度')];
+		// 行距按卡片实际高度自适应：左卡片高度随菜单项数量与信息行数变化，
+		// 行距若写死，菜单项一多右卡片底部就空一大块（原先固定 58px 时约 100px 空白）。
+		// 这里把可用高度均分成 (行数-1) 段，并夹在可读区间内，避免过疏或过挤。
+		var statRows:Int = statDefs.length;
+		var statAvail:Float = panelHeight - STATS_ROW_START - 44;   // 44 = 底部留白
+		var statGap:Float = (statRows > 1) ? statAvail / (statRows - 1) : STATS_ROW_GAP;
+		statGap = FlxMath.bound(statGap, 46, 68);
 		for (i in 0...statDefs.length)
 		{
-			var rowY:Float = INFO_PANEL_Y + STATS_ROW_START + (i * STATS_ROW_GAP);
+			var rowY:Float = INFO_PANEL_Y + STATS_ROW_START + (i * statGap);
 
 			var lbl:FlxText = new FlxText(STATS_TEXT_X, rowY, 0, statDefs[i] + '：', 24);
 			lbl.scrollFactor.set();
@@ -968,6 +1017,10 @@ class PauseSubState extends MusicBeatSubstate
 	}
 
 	function regenMenu(?animate:Bool = false):Void {
+		// 行距是实例字段（可能被 new() 的溢出兜底压缩过），重建列表前先恢复默认，
+		// 否则从「11 项」切回「4 项」时会继承上一次压缩出来的窄行距。
+		MENU_LINE_GAP = MENU_LINE_GAP_DEFAULT;
+
 		for (i in 0...grpMenuShit.members.length) {
 			var obj = grpMenuShit.members[0];
 			obj.kill();
