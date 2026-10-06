@@ -210,11 +210,6 @@ source/backend/NoteChartDomain.hx	[Memory] 谱面恢复异常：	1	诊断日志�
 source/backend/Paths.hx	[Audio] 流式加载不可用，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/Paths.hx	[Audio] 流式加载失败，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/ReplayDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
-source/backend/Song.hx	converted CNE chart → psych_v1: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/cne/CneModCompat.hx	 → 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
-source/cne/CneModCompat.hx	 → Psych JSON (	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/cne/CneModCompat.hx	 → StageFile (zoom=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/cne/CneZipStore.hx	" → 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（中间对象缺失）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（目标值非数值）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（目标或值为 null）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
@@ -627,12 +622,13 @@ source/options/InterfaceSettingsSubState.hx	关闭后，帧数计数器（FPS）
 source/options/InterfaceSettingsSubState.hx	关闭后，评级与 Combo 数字将不再堆叠，节省系统内存，读谱也更清晰	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	判定计数侧边栏	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	剩余时间	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	可用变量：\\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\\n{nps} 每秒音符 | {fc} FC状态 | {combo} 连击 | {health} 血量百分比	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	可用变量：\\n{score} 分数 | {misses} Miss | {rank} 评级 | {accuracy} 准度(不含%)\\n{nps} 每秒音符 | {maxnps} 峰值NPS | {fc} FC状态 | {combo} 连击 | {health} 血量百分比	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	同时显示本局峰值（Max）—— {nps} 是滚动 1 秒窗口，遇间奏或长条会掉回 0，峰值才反映真实爆发力。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	否则用主题色（颜色过暗时自动兜底）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	已过时间	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	开启后，FPS 计数器下方显示当前音符滚动速度，颜色随速度变化（慢速绿色、中速黄色、快速红色）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	开启后，FPS/内存/峰值内存/CPU 显示在窗口标题栏，屏幕上的计数器隐藏	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	开启后，Score 栏显示每秒收到的音符数（NPS），用于查看自己的读谱速度（不含长条，每秒更新）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	开启后，任意堆叠命中（≥2 连打簇，即使没顶破 100%）都会触发：血量显示按该堆叠提供的血量%爆发	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	开启后，屏幕右上角显示总命中数、连击数、Marvelous/Sick/Good/Bad/Shit/Misses 数量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	开启后，左下角的水印将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -654,7 +650,7 @@ source/options/InterfaceSettingsSubState.hx	禁用	1	Option 兜底原文：Optio
 source/options/InterfaceSettingsSubState.hx	红色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	绿色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	自动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {fc} {combo} {health}。按确认键打开输入框	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {maxnps} {fc} {combo} {health}。按确认键打开输入框	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	自定义 Score 栏格式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	蓝色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	血条上限仍为 100%，仅显示与飞行节奏发生变化	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -672,6 +668,9 @@ source/options/InterfaceSettingsSubState.hx	青色	1	Option 兜底原文：Optio
 source/options/InterfaceSettingsSubState.hx	黄色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	默认	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	（堆叠越大越高，最多 1000%），小图标按比例冲出条外再被慢速拉回；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	**仅结算页生效**（游玩中 HUD 的 Rank/Accuracy 保持原样 —— ACC 分母是整张谱面音符数，打完才有意义）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	**仅结算页生效**：游玩中 HUD 的 Accuracy 始终是原口径，否则开局会显示 0%。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	**分数与判定完全不变**：分数仍是引擎原口径（每判定固定加分），高分榜/回放/暂停界面都不受影响。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Bad 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Bad判定窗口	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Good 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -679,11 +678,19 @@ source/options/JudgmentSettingsSubState.hx	Good判定窗口	1	Option 兜底原�
 source/options/JudgmentSettingsSubState.hx	KE 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Marvelous 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	PE 判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Phigros 准确率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	Phigros 式评级	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Sick! 判定的可命中时间窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	Sick!判定窗口	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	两者权重不同，同一局会得到不同数字（Good 算 65% vs 67%），分母也不同（已判定数 vs 谱面总数）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	允许提前或延迟按下的安全帧数，数值越大判定越宽松	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	关闭时用引擎原口径：命中权重和 ÷ 已判定数（Sick=1 / Good=0.67 / Bad=0.34 / Shit=0）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	关闭时评级与改动前完全一致（PF/SHDC/F…AAA 那套）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	准确率 =（Sick/Marvelous + Good×0.65）÷ 谱面音符总数。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	准确率（ACC）换用 Phigros 的算法：（Sick/Marvelous + Good×0.65）÷ 总音符。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	判定设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	只把**评级**换成 Phigros 的档位：φ / V（全连）/ S / A / B / C / F，分档依据是准确率。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	安全帧数	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	开启后，最高判定（Sick/45ms）显示为 Marvelous 贴图（KE 1.8 风格）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	打击音音量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -755,44 +762,12 @@ source/options/PerformanceSubState.hx	配合快速跳谱使用；普通游玩逐
 source/options/PerformanceSubState.hx	重叠隐藏间距	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	限制同时存在的音符对象数量（0 = 不限）。堆叠谱面防爆内存时使用；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	默认关闭以保持与旧版完全一致的绘制顺序	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	CNE 式 HScript 编程层	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	CNE 模组兼容	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	Lua 0.6.3 兼容	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	ModState/ModSubState、界面重定向与脚本热重载。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	Psych 0.6.3 兼容模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	· mods/ 下的 .zip 包（首次使用时自动解到 mods/_cnestage/，可在 Mod 列表里识别）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	· 人物 data/characters/<名字>.xml（自动转成 Psych 人物 JSON）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	· 周目 data/weeks/weeks/<周目>.xml（出现在 Story/Freeplay）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	· 谱面 songs/<song>/charts/<难度>.json（自动转成 psych_v1）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	· 音频 songs/<song>/song/Inst|Voices[-难度]；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	⚠ 未覆盖：CNE 舞台 data/stages/*.xml、人物 .hx 扩展、data/notes/*.hx 自定义音符行为。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	⚠ 脚本可访问 Sys/File 等引擎能力，只对你信任的 mod 开启；关闭时零行为变化。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	允许 HScript 在脚本里定义 class 并继承引擎类（SScript EX 模式）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	允许 mod 用 flags.ini 的 [StateRedirects] / [StateRedirects.force] 把引擎界面\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	允许常驻 HScript：data/global/LIB_<mod>.hx。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	允许每个引擎界面加载自己的 HScript：data/states/<界面类名>/LIB_<mod>.hx。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	允许用 HScript 写完整界面：new ModState("MyState") / new ModSubState("MySubState")。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	全局脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	全局脚本跨界面运行，可用于全局 UI、事件总线和整局游戏逻辑（需先开启编程层）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	关闭可降低脚本误用引擎内部结构的风险。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	开启后在控制台打印脚本加载/销毁/重载记录，便于调试（默认关闭，避免刷屏）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨兵按 Psych Engine 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	开启后：F5 重载当前界面脚本；Shift+F5 重建全局脚本。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	总开关。开启后 Meteoric 会加载 CNE 风格的 HScript 编程层：\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	替换成自己的 HScript 界面。会改写状态切换请求，风险较高，默认关闭。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	状态脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	状态脚本（data/states/<界面类名>/LIB_<mod>.hx）、全局脚本（data/global/LIB_<mod>.hx）、\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	界面重定向	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	第一版走 CNE 忠实语义（F5 会重进当前界面/关卡），不重启游戏。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	脚本加载日志	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	脚本可挂 create/update/stepHit/beatHit/destroy 等钩子（需先开启编程层）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	脚本定义/继承类	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	脚本放在 data/states/MyState/LIB_<mod>.hx；这是“不编译引擎也能做独立游戏”的核心入口。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	脚本热重载	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	让 Codename Engine 格式的 mod 在 Meteoric 里加载（默认关闭）：\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/psychlua/LuaClass.hx	    -- Enemy.isInstanceOf(instance) 与 instance:isInstanceOf(Enemy) 均可用\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类部分），否则创建新实例。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本

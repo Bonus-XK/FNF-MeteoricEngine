@@ -168,6 +168,16 @@ class SaveVariables {
 	// Function_StopLua=2），0.7.x 起改为字符串哨兵。开启后 dispatch 会数字<->字符串双向归一化，
 	// 使 0.6.3 老模组里 `return Function_StopLua` 之类的写法重新生效。默认关闭。
 	@:keep public var luaUse063Compat:Bool = false;
+	// Phigros 式评分（默认关）：把「每判定固定加分」换成两段式 ——
+	// 分数 = 900000×ACC + 100000×(最大连击/总音符)，ACC = (Perfect + Good×0.65)/总音符。
+	// 满分固定 100 万；评级 φ / V(全连) / S≥92万 / A≥88万 / B≥82万 / C≥70万 / F。
+	// 实现见 backend/PhigrosRating.hx。关闭时分数与高分榜与改动前完全一致。
+	@:keep public var phigrosRating:Bool = false;
+	// 准确率口径切换（独立于 phigrosRating，可任意组合）：
+	//   false = 引擎原口径 ratingPercent = totalNotesHit/totalPlayed（权重 sick=1/good=0.67/bad=0.34/shit=0）
+	//   true  = Phigros ACC =（Sick/Marvelous + Good×0.65）÷ 总音符
+	// 两者权重不同，同一局会得到不同数字；这里独立开关，想用哪个用哪个。
+	@:keep public var phigrosAccuracy:Bool = false;
 	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
 	// 主题色（Meteoric 主题色功能）：固定 10 色色板的索引，0=青（默认）。
 	// 令牌派生见 backend/DesignTokens.hx；越界索引在 applyTheme 内夹取回 0，不会崩。
@@ -233,30 +243,6 @@ class SaveVariables {
 	#else
 	@:keep public var containerExitKeys:Array<FlxKey> = [CONTROL, C];
 	#end
-
-	// ===== 编程分区：CNE 式 HScript 编程层（默认保守开关）=====
-	// 总开关：关闭时引擎行为与改动前完全一致（不加载 CNE 风格脚本、不注册状态改写钩子）。
-	@:keep public var cneScripting:Bool = false;
-	// 状态脚本：data/states/<界面类名>/LIB_<mod>.hx
-	@:keep public var cneStateScripts:Bool = true;
-	// 全局脚本：data/global/LIB_<mod>.hx
-	@:keep public var cneGlobalScripts:Bool = true;
-	// ModState / ModSubState：允许 HScript 写完整界面
-	@:keep public var cneModStates:Bool = true;
-	// 界面重定向：flags.ini [StateRedirects] 改写引擎界面（默认关）
-	@:keep public var cneStateRedirects:Bool = false;
-	// 脚本热重载：F5 重载当前界面脚本；Shift+F5 重建全局脚本
-	@:keep public var cneHotReload:Bool = true;
-	// 脚本定义/继承类：SScript EX 模式
-	@:keep public var cneScriptClasses:Bool = true;
-	// 脚本加载日志
-	@:keep public var cneScriptLogs:Bool = false;
-	// CNE 模组兼容：让 Codename Engine 格式的 mod（data/characters/*.xml、songs/<song>/charts/*.json、
-	// songs/<song>/song/Inst|Voices-*、data/weeks/weeks/*.xml，文件夹或 .zip 包）能在 Meteoric 里加载。
-	// 默认关：关闭时 mod 加载路径与改动前完全一致（不扫 CNE 布局、不挂 zip 暂存、不翻译谱面/人物/周目）。
-	@:keep public var cneModCompat:Bool = false;
-	// 热重载键位：放在编程专属字段而不是 keyBinds，避免改动 ControlsSubState 的 keyBinds 表结构
-	@:keep public var cneHotReloadKeys:Array<FlxKey> = [F5];
 
 	public function new()
 	{
