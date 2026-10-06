@@ -3,6 +3,8 @@ import backend.Lang;
 import backend.WheelScroll;
 
 import backend.Highscore;
+import backend.PhigrosRating;
+import backend.PhigrosRating.PhigrosResult;
 
 import flixel.math.FlxPoint;
 import flixel.util.FlxSpriteUtil;
@@ -46,15 +48,23 @@ class ResultsSubState extends MusicBeatSubstate
 	static final JUDGE_COL1:Float = PANEL_X + 320;        // 360
 	static final JUDGE_VAL_GAP:Float = 175;               // 标签后数值 x 偏移（MARVELOUS 较长，需留宽）
 
+	// 左：Phigros 式评级面板（仅在「Phigros 式评分」开启时创建；关闭时高度为 0，布局零变化）
+	static final PGR_Y:Float = JUDGE_Y + JUDGE_H + 14;
+	static final PGR_H:Float = 172;
+	static final PGR_TITLE_Y:Float = PGR_Y + 18;
+	static final PGR_BIG_X:Float = PANEL_X + 26;   // 大评级符号
+	static final PGR_ROW_X:Float = PANEL_X + 150;  // 分数 / ACC / 连击 三行
+	static final PGR_ROW_GAP:Float = 28;
+
 	// 左：操作菜单
-	static final MENU_Y:Float = JUDGE_Y + JUDGE_H + 14;
+	static final MENU_Y:Float = PGR_Y + PGR_H + 14;
 	static final MENU_LINE_GAP:Float = 34;
 
 	// 右：本局数据
 	static final STATS_X:Float = RIGHT_X;
 	static final STATS_W:Float = RIGHT_W;
 	static final STATS_Y:Float = PANEL_TOP;
-	static final STATS_H:Float = 288;
+	static final STATS_H:Float = 318;
 	static final STATS_TITLE_Y:Float = STATS_Y + 24;
 	static final STATS_ROW_START:Float = STATS_Y + 80;
 	static final STATS_ROW_GAP:Float = 32;
@@ -212,6 +222,100 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(count, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 		}
 
+		// ---- Phigros 式评级面板（仅「Phigros 式评分」开启时出现） ----
+		// 分开成独立面板而不是把原「评级：」那行换掉：原评级（ratingName，如 PF/SHDC）是
+		// 引擎既有的**判定分布**评级，与 Phigros 的**分数**评级是两套口径，混在一起会误导。
+		// 关闭开关时本段完全不创建任何对象，布局与改动前逐像素一致。
+		var pgr:PhigrosResult = ClientPrefs.data.phigrosRating ? PhigrosRating.fromPlayState(st) : null;
+		if (pgr != null)
+		{
+			var pgrPanel:FlxSprite = makePanel(PANEL_X, PGR_Y, PANEL_W, PGR_H, 20);
+			pgrPanel.alpha = 0;
+			add(pgrPanel);
+			FlxTween.tween(pgrPanel, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+
+			var pgrTitle:FlxText = new FlxText(PANEL_X + TEXT_PAD, PGR_TITLE_Y, 0,
+				Lang.tOr('results.phigrosRating', 'Phigros 式评级'), 26);
+			pgrTitle.scrollFactor.set();
+			pgrTitle.setFormat(Paths.font('future.ttf'), 26, 0xFFD7D7E0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			pgrTitle.borderSize = 2;
+			pgrTitle.antialiasing = ClientPrefs.data.antialiasing;
+			pgrTitle.alpha = 0;
+			add(pgrTitle);
+			FlxTween.tween(pgrTitle, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
+
+			// 大评级符号（φ / V / S / A / B / C / F），字号 64 居左。
+			// ⚠ 字体必须用 future.ttf：**vcr.ttf 没有希腊字母字形**，φ 会渲染成空白
+			// （用户实机报告：评级面板左边一片空白，只有右边的三行数字）。
+			// 已逐字体核对字形表：future/bahnschrift/loadText 都有 φ(U+03C6)，
+			// vcr.ttf 与 pixel.otf 都没有。future.ttf 还能顺带显示面板里的中文说明。
+			var rankBig:FlxText = new FlxText(PGR_BIG_X, PGR_Y + 44, 0, pgr.rank, 64);
+			rankBig.scrollFactor.set();
+			rankBig.setFormat(Paths.font('future.ttf'), 64, pgr.color, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			rankBig.borderSize = 3;
+			rankBig.antialiasing = ClientPrefs.data.antialiasing;
+			rankBig.alpha = 0;
+			add(rankBig);
+			FlxTween.tween(rankBig, {alpha: 1, y: rankBig.y - 10}, 0.32, {ease: FlxEase.backOut, startDelay: 0.18});
+
+			// φ / V 补一行说明（Phigros 里 V 是「全连」特殊评级，语义与分数无关）
+			var noteStr:String = switch (pgr.rank)
+			{
+				case 'φ': Lang.tOr('results.pgrAllPerfect', '全部判定完美');
+				case 'V': pgr.special ? Lang.tOr('results.pgrFullCombo', '全连（无失误）') : Lang.tOr('results.pgrHighScore', '高分（未全连）');
+				default: pgr.cleared ? Lang.tOr('results.pgrCleared', '已通关') : Lang.tOr('results.pgrNotCleared', '未通关');
+			}
+			var pgrNote:FlxText = new FlxText(PGR_ROW_X, PGR_Y + 52 + 3 * PGR_ROW_GAP + 2, PANEL_W - 170, noteStr, 16);
+			pgrNote.scrollFactor.set();
+			pgrNote.setFormat(Paths.font('future.ttf'), 16, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			pgrNote.borderSize = 1.2;
+			pgrNote.antialiasing = ClientPrefs.data.antialiasing;
+			pgrNote.alpha = 0;
+			add(pgrNote);
+			FlxTween.tween(pgrNote, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.2});
+
+			// 准确率 / 连击率 / 判定计数 三行。**不显示 Phigros 分数** —— 分数仍是引擎原口径
+			// （已在「本局数据」面板里），这里只解释评级是怎么来的。
+			var pgrRows:Array<{label:String, value:String, color:Int}> = [
+				{label: Lang.tOr('results.pgrAccuracy', '准确率'), value: CoolUtil.floorDecimal(pgr.accuracy * 100, 2) + '%', color: FlxColor.WHITE},
+				{
+					label: Lang.tOr('results.pgrComboRate', '连击率'),
+					value: (pgr.totalNotes > 0 ? CoolUtil.floorDecimal(pgr.maxCombo / (pgr.totalNotes : Float) * 100, 2) : 0) + '%',
+					color: FlxColor.WHITE
+				},
+				{
+					// 原始计数：P/G/B/M 与「最大连击 / 总音符」。既对应 Phigros 结算页的信息量，
+					// 也让「为什么评级这么低」可直接核对，不必猜公式。
+					label: Lang.tOr('results.pgrCounts', '判定 / 总数'),
+					value: pgr.perfect + ' / ' + pgr.good + ' / ' + pgr.bad + ' / ' + pgr.miss
+						+ '   |   ' + pgr.maxCombo + ' / ' + pgr.totalNotes,
+					color: 0xFFA9A9B8
+				}
+			];
+			for (i in 0...pgrRows.length)
+			{
+				var rowY:Float = PGR_Y + 50 + i * PGR_ROW_GAP;
+
+				var lbl:FlxText = new FlxText(PGR_ROW_X, rowY, 0, pgrRows[i].label, 20);
+				lbl.scrollFactor.set();
+				lbl.setFormat(Paths.font('future.ttf'), 20, 0xFFA9A9B8, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+				lbl.borderSize = 1.4;
+				lbl.antialiasing = ClientPrefs.data.antialiasing;
+				lbl.alpha = 0;
+				add(lbl);
+				FlxTween.tween(lbl, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.14});
+
+				var val:FlxText = new FlxText(PGR_ROW_X + 130, rowY, 0, pgrRows[i].value, 20);
+				val.scrollFactor.set();
+				val.setFormat(Paths.font('future.ttf'), 20, pgrRows[i].color, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+				val.borderSize = 1.4;
+				val.antialiasing = ClientPrefs.data.antialiasing;
+				val.alpha = 0;
+				add(val);
+				FlxTween.tween(val, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.14});
+			}
+		}
+
 		// ================= 右列 =================
 
 		// ---- 本局数据面板 ----
@@ -230,6 +334,7 @@ class ResultsSubState extends MusicBeatSubstate
 		FlxTween.tween(statTitle, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 
 		var bestScore:Int = Highscore.getScore(PlayState.SONG.song, PlayState.storyDifficulty);
+		// 比较必须用同一口径（Phigros 模式下存档里是 100 万制）
 		if (!invalidResult && st.songScore >= bestScore && st.songScore > 0)
 		{
 			var newRecordText:FlxText = new FlxText(STATS_LABEL_X + 230, STATS_TITLE_Y + 4, 0, Lang.tOr('results.newRecord', '新纪录！ New Record'), 22);
@@ -242,14 +347,22 @@ class ResultsSubState extends MusicBeatSubstate
 			FlxTween.tween(newRecordText, {alpha: 1}, 0.25, {ease: FlxEase.quadOut, startDelay: 0.08});
 		}
 
-		var statDefs:Array<String> = [Lang.tOr('results.currentScore', '当前分数'), Lang.tOr('results.bestScore', '最佳分数'), Lang.tOr('results.statMaxCombo', '最高连击'), Lang.tOr('results.statMisses', '失误数'), Lang.tOr('results.statHitTotal', '命中 / 总音符'), Lang.tOr('results.statAccuracy', '准确度')];
+		var statDefs:Array<String> = [Lang.tOr('results.currentScore', '当前分数'), Lang.tOr('results.bestScore', '最佳分数'), Lang.tOr('results.statMaxCombo', '最高连击'), Lang.tOr('results.statMisses', '失误数'), Lang.tOr('results.statHitTotal', '命中 / 总音符'), Lang.tOr('results.statMaxNps', '峰值NPS'), Lang.tOr('results.statAccuracy', '准确度')];
+		// 「准确度」行：跟随 `phigrosAccuracy` 开关（独立于「Phigros 式评分」）
+		var accDisplay:Float = st.ratingPercent;
+		if (ClientPrefs.data.phigrosAccuracy)
+		{
+			var accRes:PhigrosResult = PhigrosRating.fromPlayState(st);
+			if (accRes != null) accDisplay = accRes.accuracy;
+		}
 		var statVals:Array<String> = [
 			FlxStringUtil.formatMoney(st.songScore),
 			FlxStringUtil.formatMoney(bestScore),
 			Std.string(st.maxCombo),
 			Std.string(st.songMisses),
 			Std.string(st.songHits) + ' / ' + Std.string(st.totalNotes),
-			CoolUtil.floorDecimal(st.ratingPercent * 100, 2) + '%'
+			Std.string(st.maxNpsDisplay),
+			CoolUtil.floorDecimal(accDisplay * 100, 2) + '%'
 		];
 		for (i in 0...statDefs.length)
 		{
