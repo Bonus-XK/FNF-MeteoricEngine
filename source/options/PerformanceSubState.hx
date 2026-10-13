@@ -34,6 +34,29 @@ class PerformanceSubState extends BaseOptionsMenu
 		option.maxValue = 100;
 		addOption(option);
 
+		option = new Option('偏移有界化',
+			'开启后每个堆叠合并簇只保留前若干个时间偏移（真实数量另行记录），\n'
+			+ '内存占用从「与音符总数成正比」降为「与簇数成正比」——\n'
+			+ '5900 万音符的谱面从 ~470MB 降到几百字节；计分/命中量完全不变。\n'
+			+ '关闭则保留全量偏移，视觉与旧版逐像素一致', 'boundedOffs', 'bool');
+		addOption(option);
+
+		option = new Option('每簇保留偏移数',
+			'有界化时每个簇保留多少个时间偏移（生成期最多只用 12 个，超过无意义）。\n'
+			+ '12 是引擎视觉预算上限；调小更省内存、调大超大簇的视觉分布更精确',
+			'boundedOffsKeep', 'int');
+		option.changeValue = 1;
+		option.minValue = 1;
+		option.maxValue = 64;
+		addOption(option);
+
+		option = new Option('Parts 组合难度',
+			'开启后难度列表追加一个「Parts」条目；选中它会把该歌曲 data/ 目录下的\n'
+			+ '全部 Part（如 song-1、song-2…）**同时叠加**成一个谱面。\n'
+			+ '同刻同轨的多个 Part 音符会并成一簇并累加计数（按两颗算）。\n'
+			+ '仅对超大谱面有效；加载耗时与 Part 数量成正比。', 'partsMode', 'bool');
+		addOption(option);
+
 		option = new Option('已过音符不再生成',
 			'开启后，跳转时间/快速重开时已过出生窗口的音符被静默消费（不判 Miss、不溅射），\n'
 			+ '配合快速跳谱使用；普通游玩逐帧生成不受影响',
@@ -162,6 +185,13 @@ class PerformanceSubState extends BaseOptionsMenu
 			'命中音符不再触发 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调；\n'
 			+ '依赖这些回调的模组（如计分/特效脚本）请保持开启',
 			'noHitFuncs',
+			'bool');
+		addOption(option);
+
+		option = new Option(
+			backend.Lang.tOr('option.gfxCpuRelease', '大图集显存预提交'),
+			backend.Lang.tOr('optionDesc.gfxCpuRelease', '进曲时一次性把所有大图集（≥2048px）推上显存并立即丢弃 CPU 副本：游玩头几秒不再有纹理上传卡顿，内存占用下降。渲染画面不变。会增加进曲瞬间的等待'),
+			'gfxCpuRelease',
 			'bool');
 		addOption(option);
 

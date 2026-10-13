@@ -16,6 +16,10 @@ import openfl.events.MouseEvent;
 import openfl.display.StageScaleMode;
 import lime.app.Application;
 import states.TitleState;
+import states.PlayState;
+import states.LoadingState;
+import flixel.FlxG;
+import backend.PerfProbe;
 #if mobile
 import flixel.input.touch.FlxTouch;
 #end
@@ -33,14 +37,17 @@ class Main extends Sprite
 		//   （ci/lime-sdl3-patch 那道墙钟补丁）时才安全 —— 否则 `nextUpdate += framePeriod`
 		//   被整型截断成 +0、catch-up 循环永不前进 → 主线程 100% 死循环、卡在黑屏加载界面
 		//   （Preloader 阶段就已发生，改设置里的默认值来不及）。
-		//   · macOS  —— 构建后恢复 tools/lime.ndll.wallclock 保证补丁在位 → 100000；
-		//   · Windows —— 不再靠"假定 ndll 有补丁"，而是启动时探测原生能力标记：
-		//                补丁版 ndll 给 100000，老 ndll 回退 1000（老 ndll 上实测安全上限）。
-		//                这是"加标记 + 启动自检"的落点，取代了此前"Windows 一律 120"的硬编码。
+		//   · macOS  —— 与 Windows 统一：启动时探测 lime.ndll 的能力标记
+		//                （SDL3_DYNAMIC_API）。有墙钟补丁 → 100000（无人工限制）；
+		//                无补丁 → 回退 1000（老 ndll 上实测安全上限）。
+		//                不再靠"构建脚本必定还原了墙钟版 ndll"这个外部约定 ——
+		//                那样只要还原步骤被跳过/顺序写错（校验早于破坏性操作），
+		//                就会用老 ndll 配 100000 → 启动黑屏死循环。
+		//   · Windows —— 同上（此前已改）。
 		//   注意：ClientPrefs 的静态字段此时已初始化（Haxe 静态初始化先于本类的实例化），
 		//   所以第 365 行把它同时用于 update/draw 帧率时，两侧取值一致、不会触发 flixel 的
 		//   "update 帧率不应小于 draw 帧率" 警告。
-		framerate: #if mac 100000 #elseif windows ClientPrefs.unlimitedFramerateValue() #else 120 #end,
+		framerate: #if (mac || windows) ClientPrefs.unlimitedFramerateValue() #else 120 #end,
 		skipSplash: true, // if the default flixel splash screen should be skipped
 		startFullscreen: false // if the game should start at fullscreen mode
 	};
@@ -374,6 +381,24 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		var flxGame = new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen);
 		addChild(flxGame);
+
+		// ---- 自动进歌（性能实测用，仅在设置环境变量时生效）----
+		// METEORIC_AUTOSONG=stupid-griefer / METEORIC_AUTOPART=3
+		// 目的是让加载耗时可被自动化测量，不依赖人工点选。
+		#if sys
+		var autoSong:String = null;
+		var autoPart:String = null;
+		try
+		{
+			autoSong = Sys.getEnv("METEORIC_AUTOSONG");
+			autoPart = Sys.getEnv("METEORIC_AUTOPART");
+		}
+		catch (e:Dynamic) {}
+		if (autoSong != null && autoSong.length > 0)
+		{
+			PerfProbe.arm(autoSong, (autoPart != null && autoPart.length > 0) ? autoPart : null);
+		}
+		#end
 
 		#if sys
 		// ---- 拖入 zip / 文件夹安装 mod（SDL 拖放 → lime window.onDropFile → ModInstaller） ----

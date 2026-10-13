@@ -21,6 +21,8 @@ import backend.IconBop;
 import backend.NoteChartDomain;
 import backend.Song;
 import backend.Section;
+import backend.PackedChart;
+import backend.PerfProbe;
 import backend.Rating;
 import backend.Replay;
 import backend.CrashHandler;
@@ -490,6 +492,7 @@ class PlayState extends MusicBeatState
 	public var songHits:Int = 0;
 	public var songMisses:Int = 0;
 	public var usedAutoplay:Bool = false;   // 本局是否用过自动游玩（用于判断成绩是否有效）
+	public var destroyedNotes:Int = 0;        // 销毁模式：音符到判定线即销毁的累计数（含长条段/堆叠 density）
 	public var usedGodMode:Bool = false;    // 本局是否用过上帝模式（用于判断成绩是否有效）
 
 	public var replayMode:Bool = false;             // 本局是否为回放
@@ -577,6 +580,7 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		trace('[PLAY create] ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 		// JS Engine 移植：GC 开关（true=允许 GC=系统默认；false=关闭 GC 消除尖峰，内存可能上升）
 		#if cpp
 		cpp.vm.Gc.enable(ClientPrefs.data.enableGC);
@@ -585,12 +589,14 @@ class PlayState extends MusicBeatState
 		// 上一局结束时 SONG 的逐音符数组可能已被剥离：先恢复完整谱面，
 		// 下面的回放指纹/生成逻辑都依赖完整 DOM
 		reloadChartSourceIfNeeded();
+		trace('[PLAY create] reloadChart ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		//trace('Playback Rate: ' + playbackRate);
 		// 进曲目即丢弃上一局的运行时音符图集缓存：其 FlxGraphic 随上次退出被内存清理销毁，
 		// 跨曲目复用会拿到 bitmap=null 的图集导致绘制崩溃（FlxDrawQuadsItem Null Object Reference）
 		objects.Note.clearRuntimeAtlasCache();
 		Paths.clearStoredMemory();
+		trace('[PLAY create] clearMem ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		startCallback = startCountdown;
 		endCallback = endSong;
@@ -707,12 +713,15 @@ class PlayState extends MusicBeatState
 		curStage = SONG.stage;
 		// JS Engine 移植：只显示 HUD（charsAndBG）——保留真实 stage 数据（UI/像素/相机/缩放不变），
 		// 仅跳过舞台实例化与舞台脚本，角色组整组不可见（GPU 不再绘制角色/舞台/雨滤镜等）
-		var showBgChars:Bool = !ClientPrefs.data.hudOnly; // hudOnly=false=完整画面（默认）
+		// TuoboLoad=2（极简）复用这条既有通路：不构造舞台、不构造角色、不加载它们的图集，
+		// 进曲只剩判定线/音符/HUD。效果与 hudOnly 一致，但由极速加载开关驱动。
+		var showBgChars:Bool = !ClientPrefs.data.hudOnly && ClientPrefs.tuoboLoadLevel() < 2; // hudOnly=false=完整画面（默认）
 
 		var stageData:StageFile = StageData.getStageFile(curStage);
 		if(stageData == null) { //Stage couldn't be found, create a dummy stage for preventing a crash
 			stageData = StageData.dummy();
 		}
+		trace('[PLAY create] stageFile ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		defaultCamZoom = stageData.defaultZoom;
 
@@ -759,6 +768,7 @@ class PlayState extends MusicBeatState
 		dadGroup = new FlxSpriteGroup(DAD_X, DAD_Y);
 		gfGroup = new FlxSpriteGroup(GF_X, GF_Y);
 
+		PerfProbe.mark('stage: begin ' + curStage);
 		trace('[Stage] create stage: ' + curStage + ' | replayMode=' + replayMode + ' | isPixelStage=' + isPixelStage);
 
 		if (showBgChars)
@@ -777,6 +787,8 @@ class PlayState extends MusicBeatState
 			case 'phillyBlazin': new states.stages.PhillyBlazin(); //Weekend 1 - Blazin
 			default:
 		}
+		PerfProbe.mark('stage: constructed');
+		trace('[PLAY create] stageDone ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		if(isPixelStage) {
 			introSoundsSuffix = '-pixel';
@@ -808,16 +820,28 @@ class PlayState extends MusicBeatState
 		}
 		#end
 
-		if (!stageData.hide_girlfriend)
+		trace('[PLAY create] globalScripts ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
+
+		// TuoboLoad=2（极简）：跳过 gf 构造。
+		// 为什么必须单独处理 gf：showBgChars 只挡住了**舞台**构造
+		//（`if (showBgChars) switch(curStage)`），角色构造在本 if 之外**无条件执行**——
+		// 所以 hudOnly 只是"隐藏不显示"，角色图集照样解码+上传，一毫秒都省不下。
+		// 实测：gf 的 GF_assets.png（8000×6000→192MB 纹理）单项吃掉 create 的 601ms，
+		// 而 gf 的全部下游引用（camPos 偏移 / 跳舞 / 复位，见 892/900/1313/2674）
+		// 都已有 `gf != null` 判断，跳过是安全的。
+		// dad / boyfriend 不跳：HUD 依赖它们的 healthIcon / healthColorArray
+		//（3331/3343/3438/3772），且两者合计仅 ~290ms，不是主要矛盾。
+		if (!stageData.hide_girlfriend && ClientPrefs.tuoboLoadLevel() < 2)
 		{
 			if(SONG.gfVersion == null || SONG.gfVersion.length < 1) SONG.gfVersion = 'gf'; //Fix for the Chart Editor
 		gf = new Character(0, 0, SONG.gfVersion);
-	
+
 			startCharacterPos(gf);
 			gf.scrollFactor.set(0.95, 0.95);
 			gfGroup.add(gf);
 			gfMap.set(SONG.gfVersion, gf); // 快速重开恢复默认角色用
 			startCharacterScripts(gf.curCharacter);
+			trace('[PLAY create] gfDone ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 		}
 
 		// 联机角色选择：本端映射（我=BF，对方=Dad）——双端均为标准单机布局：
@@ -827,12 +851,14 @@ class PlayState extends MusicBeatState
 		dadGroup.add(dad);
 		dadMap.set(SONG.player2, dad); // 快速重开恢复默认角色用
 		startCharacterScripts(dad.curCharacter);
+		trace('[PLAY create] dadDone ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		boyfriend = new Character(0, 0, SONG.player1, true);
 		startCharacterPos(boyfriend);
 		boyfriendGroup.add(boyfriend);
 		boyfriendMap.set(SONG.player1, boyfriend); // 快速重开恢复默认角色用
 		startCharacterScripts(boyfriend.curCharacter);
+		trace('[PLAY create] bfDone ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		// JS Engine 移植：只显示 HUD——角色组整组不可见（含子级角色，渲染裁剪在组层完成；
 		// 角色对象保留，脚本/血条颜色/相机跟随不受影响）
@@ -895,6 +921,7 @@ class PlayState extends MusicBeatState
 		playerStrums = new FlxTypedGroup<StrumNote>();
 
 		generateSong(SONG.song);
+		trace('[PLAY create] generateSong ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		// ===== 联机真双人：客户端镜像（自己唱 player2/Dad 半边）=====
 		// 双端屏幕均为标准单机布局：自己（右侧 BF 位）= 自己选的半边，对方（左侧 Dad 位）= 对方选的半边。
@@ -921,14 +948,20 @@ class PlayState extends MusicBeatState
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 
 		// 场景 createPost（Psych 1.0.4 时序：camFollow/generateSong 之后，场景可安全访问 camFollow/unspawnNotes）
+		PerfProbe.mark('before createPost');
 		stagesFunc(function(stage:BaseStage) stage.createPost());
+		PerfProbe.mark('after createPost');
+		trace('[PLAY create] createPost ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		moveCameraSection();
+		PerfProbe.mark('after moveCameraSection');
 
 		// ===== HUD/UI 子系统（GameHUD）：时间条/血条/图标/分数/歌曲名/标签的创建、
 		// 每帧更新与可见性权威全部集中于此，PlayState 只保留玩法逻辑 =====
 		hud = new GameHUD(this);
 		hud.build();
+		PerfProbe.mark('after GameHUD.build');
+		trace('[PLAY create] hudBuild ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 		// 小图标跳动：清空上一局的每帧状态（hop 位移 / squash 相位 / 交替奇偶 / 上一档位），
 		// 必须在 hud.build() 之后、第一次 GameHUD.update 之前 —— 否则重进曲目会带着旧位移起跳。
 		IconBop.reset();
@@ -1012,6 +1045,26 @@ class PlayState extends MusicBeatState
 		}
 		#end
 
+		// 大纹理显存预提交 + CPU 副本释放（SeiunEngine GfxPolicy 移植）：
+		// 把本局所有 ≥2048px 的大图集在这一刻推上显存并丢掉 CPU 副本 ——
+		// 之后游玩中不再有任何纹理上传（消除进曲后头几秒的卡顿），CPU 内存立减一份。
+		// 默认关闭（ClientPrefs.data.gfxCpuRelease=false）时是纯 no-op，零行为变化。
+		backend.GfxPolicy.onPlayStateCreate(SONG != null && SONG.song != null ? SONG.song : 'unknown');
+		backend.GfxPolicy.preloadWarm();
+
+		// SeiunEngine 同款：create 末尾强制一次完整 GC + 堆压缩。
+		// 加载期产生的巨量临时对象（谱面解析、帧构造）若不在这里收走，
+		// 第一次游玩中的分配会连带触发一次大 GC → 明显卡顿。
+		// 仅在功能开启时执行，且 GC 开关为 true 才动（尊重 enableGC=false 的用户）。
+		#if cpp
+		if (backend.GfxPolicy.enabledInline() && ClientPrefs.data.enableGC)
+		{
+			cpp.vm.Gc.run(true);
+			cpp.vm.Gc.compact();
+		}
+		#end
+
+		trace('[PLAY create] end ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 		startCallback();
 		RecalculateRating();
 
@@ -1224,6 +1277,7 @@ class PlayState extends MusicBeatState
 
 	public function startCountdown()
 	{
+		trace('[PLAY startCountdown] called, skipCountdown=' + skipCountdown + ' startOnTime=' + startOnTime);
 		if(startedCountdown) {
 			callOnScripts('onStartCountdown');
 			return false;
@@ -1515,11 +1569,12 @@ class PlayState extends MusicBeatState
 		FlxG.sound.list.add(vocals);
 		FlxG.sound.list.add(opponentVocals);
 		FlxG.sound.list.add(inst);
+		trace('[PLAY create] audioLoaded ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 
 		notes = new NoteGroup();
 		add(notes);
-
 		generateChartNotes(true);
+		trace('[PLAY create] chartNotes ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 	}
 
 	// 根据内存中的谱面数据生成音符与事件。
@@ -1528,6 +1583,8 @@ class PlayState extends MusicBeatState
 	// ===== 提前生成（LoadingState 空闲期构建整张谱面，create 时直接消费，大谱面省去 500ms+） =====
 	public static var preGenNotes:Array<CastNote> = null;
 	static var preGenNoteTypes:Array<String> = null;
+	/** Turbo 聚合区预生成结果（preGenerateChart 后台算好，generateChartNotes 直接消费） */
+	static var preGenTurboZones:Array<backend.TurboZone> = null;
 	static var preGenTotalNotes:Int = 0;
 	static var preGenBotLaneCounts:Array<Int> = null;
 	static var preGenSong:String = null;
@@ -1551,6 +1608,7 @@ class PlayState extends MusicBeatState
 		// 每次加载都重建：上一轮预生成一定已被 create 消费；残留数据直接覆盖，防止跨曲/跨难度误用
 		preGenNotes = null;
 		preGenSong = null;
+		preGenTurboZones = null;
 
 		var oldUI:String = stageUI;
 		var stageName:String = SONG.stage;
@@ -1595,12 +1653,41 @@ class PlayState extends MusicBeatState
 			// botplay 计划随预生成一次成型（绝对列号规则），取代 preRenderBotplay 的二次全谱扫描
 			if (res.botplayLanes != null)
 				Note.storeBotplayPlan(res.botplayLanes);
+			// Turbo 聚合区预生成：chartFingerprint + buildZones 是 O(n) 全遍历，
+			// 19.2 亿音符级谱面在主线程要 600ms+。这里用同一份 preGenNotes 在后台算好，
+			// create 的 generateChartNotes 直接消费（见 preGenTurboZones）。
+			preGenTurboZones = null;
+			// 仅密集谱需要 turboZones（generateChartNotes 只在 densePerfMode 时消费）
+			if (densePerfMode)
+			try
+			{
+				var meta:Dynamic = {
+					song: SONG.song,
+					mod: (backend.Mods.currentModDirectory != null ? backend.Mods.currentModDirectory : ''),
+					notes: preGenNotes != null ? preGenNotes.length : 0,
+					fingerprint: backend.TurboDensity.chartFingerprint(preGenNotes)
+				};
+				var tPath:String = backend.TurboDensity.cachePath(SONG.song, meta.mod, preGenNotes);
+				var tCached:Array<backend.TurboZone> = backend.TurboDensity.loadCache(tPath, meta);
+				if (tCached != null)
+					preGenTurboZones = tCached;
+				else
+				{
+					preGenTurboZones = backend.TurboDensity.buildZones(preGenNotes);
+					backend.TurboDensity.saveCache(tPath, preGenTurboZones, meta);
+				}
+			}
+			catch (eTurbo:Dynamic)
+			{
+				preGenTurboZones = null; // 失败则 create 期回退原有 initTurboZones 逻辑
+			}
 			CrashHandler.mark('PlayState.preGen:done');
 		}
 		catch (e:Dynamic)
 		{
 			preGenNotes = null;
 			preGenNoteTypes = null;      // 防残留上一曲类型（预渲染直接消费该字段）
+			preGenTurboZones = null;
 			preGenTotalNotes = 0;
 			preGenBotLaneCounts = null;
 			preGenSong = null;
@@ -1632,6 +1719,19 @@ class PlayState extends MusicBeatState
 		var chartSeqCounter:Int = 0;
 
 		var stepCrochet:Float = ((60 / song.bpm) * 1000) / 4;
+
+		// ===== 超大字谱面：packed 快路径 =====
+		// Song.loadPackedChart 已用音符级流式扫描完成**堆叠合并**，产出 packedNotes
+		// （PackedChart 簇数组），此时 sectionNotes 为空 —— 逐音符 DOM 从未被构造。
+		// 这里只做「簇 → CastNote」的转换，**绝不能再合并一次**（簇已是合并结果）。
+		// 内存：驻留量与原始音符总数无关，只随「簇数 + 簇内 offs 总数」增长。
+		if (song.packedNotes != null)
+		{
+			PerfProbe.mark('buildChartNotes: packed begin');
+			var pr = buildFromPacked(song, botplayPlan, stepCrochet);
+			PerfProbe.mark('buildChartNotes: packed done');
+			return pr;
+		}
 		// 超密集谱面自动降级（Obsolescence-spam 1180 万音符级）：原始音符总数 ≥ DENSE_FORCE_MERGE 时
 		// 无视 skipGhostNotes 强制开启堆叠合并；ghostDensity（计数/丢弃）仍尊重用户设置。
 		// 否则合并关闭时 11.8M 颗音符合生成 11.8M 条 CastNote（加载期 OOM 且运行时 26 万 NPS/轨
@@ -1647,6 +1747,8 @@ class PlayState extends MusicBeatState
 		if (forceDenseMerge && !ClientPrefs.data.skipGhostNotes)
 			trace('[DenseChart] rawNotes=' + rawNoteCount + ' 触发超密集谱面自动合并（skipGhostNotes 被强制开启）');
 		var ghostRange:Float = ClientPrefs.data.ghostRange;
+		// 每簇保留的偏移样本数上限（0 = 全量，行为与旧版完全一致）
+		var boundedKeep:Int = (ClientPrefs.data.boundedOffs) ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
 		var doGhostMerge:Bool = ClientPrefs.data.skipGhostNotes || forceDenseMerge;
 		var ghostDensity:Bool = ClientPrefs.data.ghostDensity;
 		var lastLaneArrow:Array<CastNote> = [null, null, null, null];
@@ -1687,8 +1789,14 @@ class PlayState extends MusicBeatState
 					{
 						if (ghostDensity) merged.density += 1;
 						// 后台压缩 + 表面不压缩：记录该箭头相对基准的时间偏移，生成时按偏移展开回 N 个视觉箭头
+						// 【有界偏移】生成期最多读 clusterVisCap（≤12）个，所以只保留前 KEEP 个
+						// + 末个（lastOffset），真实数量记在 offsKeep。内存从 O(音符数) 降为 O(簇数×KEEP)，
+						// 计分不受影响（density 仍是簇总颗数）。boundedOffs 关闭时行为与旧版完全一致。
+						var off:Float = daStrumTime - merged.strumTime;
+						merged.offsKeep++;
+						merged.lastOffset = off;
 						if (merged.offs == null) merged.offs = [];
-						merged.offs.push(daStrumTime - merged.strumTime);
+						if (boundedKeep <= 0 || merged.offs.length < boundedKeep) merged.offs.push(off);
 						if (gottaHitNote)
 						{
 							totalNotes++;
@@ -1711,6 +1819,8 @@ class PlayState extends MusicBeatState
 				swagNote.multSpeed = 1;
 				swagNote.cmpSpam = null;
 				swagNote.offs = null;
+				swagNote.offsKeep = 0;
+				swagNote.lastOffset = 0;
 				swagNote.noAnimation = false;
 				swagNote.noMissAnimation = false;
 				swagNote.blockHit = false;
@@ -1797,6 +1907,90 @@ class PlayState extends MusicBeatState
 				if (sec != null) sec.sectionNotes = null;
 
 		return { notes: unspawnNotes, noteTypes: noteTypes, totalNotes: totalNotes, botLaneCounts: botLaneCounts, botplayLanes: botplayLanes };
+	}
+
+	// ========================================================================
+	// packed 快路径：把已合并的音符簇转成 CastNote
+	// ========================================================================
+	// 与主路径的语义对应关系（逐条对齐 buildChartNotes 的主循环）：
+	//   - chartSeq：簇的 chartSeq 直接沿用（扫描期已按谱面顺序分配）
+	//   - density ：簇代表的原始箭头数（一击记整簇，与 density 计分一致）
+	//   - offs    ：簇内偏移数组，挂到 CastNote.offs 供生成期视觉展开
+	//   - gfNote / noteType / multSpeed：扫描期已写入簇，直接搬运
+	//   - 长条    ：与主路径同口径计入 botLaneCounts / botplayLanes
+	// ⚠ 主路径的 DENSE_FORCE_MERGE 强制合并在扫描期已由 doMerge 覆盖，
+	//   此处不再判断 rawNoteCount（packed 路径的 raw 数必然远超阈值）。
+	static function buildFromPacked(song:SwagSong, botplayPlan:Array<Array<Float>>, stepCrochet:Float):PreGenResult
+	{
+		CastNote.resetPacked();
+		var clusters:Array<PackedChart> = song.packedNotes;
+		var noteTypes:Array<String> = [];
+		// ⚠ 用 Float 累加：66 Part 组合实测 mustHit 总数 ≈ 1,923,457,370，已逼近 Int32 上限
+		//   2,147,483,647；再多两个 Part 就会溢出成负数，而 totalNotes 是 HUD「Hits: x / y」
+		//   与命中倍率判定的基准，负数会让判定全部失效。返回前夹到 Int 范围内。
+		var totalNotesF:Float = 0;
+		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
+		var botplayLanes:Array<Array<Float>> = botplayPlan != null ? [[], [], [], []] : null;
+		var unspawnNotes:Array<CastNote> = [];
+
+		for (c in clusters)
+		{
+			var n = new CastNote();
+			n.strumTime = c.t;
+			var mustHit:Bool = c.mustHit;
+			// noteData 位布局与主路径一致：低 8 位轨道 + 1<<8 mustHit + 1<<11 gfNote
+			n.noteData = c.lane | (mustHit ? (1 << 8) : 0);
+			if (c.gfNote) n.noteData |= 1 << 11;
+			n.density = c.density;
+			n.chartSeq = c.chartSeq;
+			n.holdLength = c.holdLength;
+			n.multSpeed = c.multSpeed;
+			n.noAnimation = false;
+			n.noMissAnimation = false;
+			n.blockHit = false;
+			n.noteType = c.noteType;
+			n.offs = c.offs;
+			n.offsKeep = c.offsKeep;
+			n.lastOffset = c.lastOffset;
+
+			if (c.noteType != null && !noteTypes.contains(c.noteType)) noteTypes.push(c.noteType);
+
+			unspawnNotes.push(n);
+
+			if (mustHit)
+			{
+				totalNotesF += c.density;
+				if (botLaneCounts != null) botLaneCounts[c.lane] += c.density;
+				if (botplayLanes != null) botplayLanes[c.lane].push(c.t);
+			}
+
+			// 长条分段：与主路径同口径（含密度倍数）
+			var floorSus:Int = Math.floor((c.holdLength / stepCrochet));
+			if (botLaneCounts != null && mustHit && floorSus > 0)
+				botLaneCounts[c.lane] += Std.int((floorSus + 1) * c.density);
+			if (botplayLanes != null && floorSus > 0)
+			{
+				for (r in 0...c.density)
+					for (susNote in 0...floorSus + 1)
+						botplayLanes[c.lane].push(c.t + stepCrochet * susNote);
+			}
+		}
+
+		unspawnNotes.sort(sortByTime);
+		_segmentSeqBase = unspawnNotes.length;
+
+		var totalNotes:Int = (totalNotesF > 2147483000) ? 2147483000 : Std.int(totalNotesF);
+
+		trace('[PACKEDBUILD] clusters=' + clusters.length + ' totalNotes=' + totalNotes
+			+ ' sections=' + (song.packedSectionCount != null ? song.packedSectionCount : -1));
+
+		return {
+			notes: unspawnNotes,
+			noteTypes: noteTypes,
+			totalNotes: totalNotes,
+			botLaneCounts: botLaneCounts,
+			botplayLanes: botplayLanes
+		};
 	}
 
 	// 谱面生成期即拼接完整脚本路径（create 后期才拼接会读到 GC 后悬垂的字符串）
@@ -2000,7 +2194,11 @@ class PlayState extends MusicBeatState
 	{
 		var offs:Array<Float> = target.offs;
 		var base:CastNote = target;
+		var offsKeep:Int = target.offsKeep;      // 簇内真实合并数量
+		var lastOff:Float = target.lastOffset;   // 簇内最后一个偏移
 		base.offs = null;
+		base.offsKeep = 0;
+		base.lastOffset = 0;
 		// 基准保持 density=簇总颗数（计分）；采样副本 density=1 且不参与判定
 		var lastNote:Note = spawnOne(base);
 		// 长条重构：基准箭头（含 holdLength）的尾巴挂在 base 上（最后一个视觉副本不是锚点）
@@ -2009,18 +2207,35 @@ class PlayState extends MusicBeatState
 
 		// 均匀采样：保留首、尾与等距中间点（视觉跨度/密度与原版一致）；
 		// maxVis 由 noteSpawn 按"2s 窗口簇数"动态预算（场上精灵总额控制）
-		var picks:Array<Float> = offs;
+		var full:Array<Float> = offs;
 		var maxVis:Int = clusterVisCap; // 动态视觉预算（见 noteSpawn）
 		if (maxVis < 1) maxVis = 12;
-		if (offs.length > maxVis - 1)
+
+		// 【有界偏移还原】boundedOffs 开启时 offs 只存了前 KEEP 个（+ lastOff），
+		// 而真实数量是 offsKeep。若直接按 offs.length 采样，所有箭头会挤在簇的前段，
+		// 视觉跨度完全丢失。这里用「前 KEEP 个 + 末个」在尾部线性插值，
+		// 把视觉分布还原成 0→全跨度的均匀铺开（与全量采样的效果接近）。
+		var total:Int = (offsKeep > offs.length) ? offsKeep : offs.length;
+		if (total > offs.length && offs.length > 0)
+		{
+			var tail:Array<Float> = [];
+			var span:Int = total - (offs.length - 1);   // 需要补出的尾部点数
+			var firstTail:Float = offs[offs.length - 1];
+			var denom:Float = (span > 1) ? (span - 1) : 1;
+			for (j in 0...span) tail.push(firstTail + (lastOff - firstTail) * (j / denom));
+			full = offs.concat(tail);
+		}
+
+		var picks:Array<Float> = full;
+		if (full.length > maxVis - 1)
 		{
 			picks = [];
-			var step:Float = (offs.length - 1) / (maxVis - 1);
+			var step:Float = (full.length - 1) / (maxVis - 1);
 			for (i in 0...maxVis)
 			{
 				var idx:Int = Std.int(i * step);
-				if (idx >= offs.length) idx = offs.length - 1;
-				picks.push(offs[idx]);
+				if (idx >= full.length) idx = full.length - 1;
+				picks.push(full[idx]);
 			}
 		}
 		for (i in 0...picks.length)
@@ -2087,6 +2302,8 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
+		// 大纹理 CPU 副本的周期性兜底释放（默认关闭时 no-op）
+		backend.GfxPolicy.onPlayUpdate(elapsed);
 		HostDomain.update(this, elapsed);
 	}
 
@@ -2345,6 +2562,7 @@ class PlayState extends MusicBeatState
 		songPercent = 0;
 		usedAutoplay = cpuControlled || replayMode;
 		usedGodMode = false; // 上帝模式正常记分
+		destroyedNotes = 0; // 销毁模式本局统计清零
 		for (rating in ratingsData) rating.hits = 0;
 		ratingName = '?';
 		ratingPercent = 0;
@@ -2587,7 +2805,8 @@ class PlayState extends MusicBeatState
 	{
 		// 【密集谱·安静命中档】densePerfMode + 自动游玩/回放：跳过纯视觉与低频刷新开销；
 		// 计分/命中/评级计数/溅射节流均不受影响（本函数前半段照常执行）。
-		var quietHit:Bool = PlayState.densePerfMode && (cpuControlled || replayMode);
+		var quietHit:Bool = PlayState.densePerfMode && (cpuControlled || replayMode)
+			&& ClientPrefs.data.botMode != 'destroy'; // 销毁模式即使密集也保留命中计数弹窗（密集批下每批只弹一次，见 botBatchScoreShown）
 		// 首次命中才落盘（原实现每命中 mark → 每命中一次磁盘写，密集团灭段每秒数千次）
 		if (!_stageMarkPop)
 		{
@@ -2638,7 +2857,8 @@ class PlayState extends MusicBeatState
 			judgementHistory.push({t: note.strumTime, d: note.strumTime - Conductor.songPosition, r: note.rating});
 		score = daRating.score * scoreMult;
 
-		if(daRating.noteSplash && !note.noteSplashData.disabled && !(cpuControlled && botHitBatch && botBatchSplashDone[note.noteData]))
+		if(daRating.noteSplash && !note.noteSplashData.disabled && !(cpuControlled && botHitBatch && botBatchSplashDone[note.noteData])
+			&& !(ClientPrefs.data.botMode == 'destroy' && cpuControlled)) // 销毁模式只弹数字，不产生 rating/溅射
 		{
 			spawnNoteSplashOnNote(note);
 			if (cpuControlled && botHitBatch) botBatchSplashDone[note.noteData] = true;
@@ -2676,7 +2896,8 @@ class PlayState extends MusicBeatState
 		// 即大命中批帧）；密集档直接等同 lessBotLag。手动游玩不受影响。
 		if (quietHit) return;
 		// JS Engine 移植：评分/连击弹窗开关（默认=当前行为）
-		var showRatingPop:Bool = showRating && ClientPrefs.data.ratingPopups;
+		var showRatingPop:Bool = showRating && ClientPrefs.data.ratingPopups
+			&& !(ClientPrefs.data.botMode == 'destroy' && cpuControlled); // 销毁模式：只保留数字计数弹窗，不弹 Sick/评级条
 		var showComboPop:Bool = showCombo && ClientPrefs.data.comboPopups;
 		var showComboNumPop:Bool = showComboNum && ClientPrefs.data.comboPopups;
 		if (!showRatingPop && !showComboPop) return;

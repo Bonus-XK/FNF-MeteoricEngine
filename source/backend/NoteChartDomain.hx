@@ -209,7 +209,8 @@ class NoteChartDomain
 		// 按密度加权、判定恒为满分），物化预算集中到外半带 —— 过载时不再为"注定要结算"的
 		// 音符白付构造费，也不触发对象上限的延迟进场（聚合区内禁软截止：走真实物化+上限，
 		// 视觉完整）。长条（holdLength>0）留给逐对象路径（保 prevNote/nextNote 链）。
-		var canDataSettle:Bool = PlayState.densePerfMode && ps.cpuControlled && !ps.replayMode && ps._overloadFrames > 0;
+		var canDataSettle:Bool = PlayState.densePerfMode && ps.cpuControlled && !ps.replayMode && ps._overloadFrames > 0
+			&& ClientPrefs.data.botMode != 'destroy'; // 销毁模式不走计分结算：笔记必须经 botHitQueue 才能计入 destroyedNotes
 		if (canDataSettle && !ps.isTurboAggregateIndex(ps.currentSpawnId))
 		{
 			var settleCut:Float = fixedPosition + ps.spawnWindowFor(ps.unspawnNotes[ps.currentSpawnId]) * 0.5;
@@ -433,8 +434,10 @@ class NoteChartDomain
 	/** 原 PlayState.generateChartNotes（作用域分析：零遮蔽，93 处成员引用已限定）。 */
 	public static function generateChartNotes(ps:PlayState, loadPhase:Bool):Void
 	{
+		var _tG0:Float = haxe.Timer.stamp() * 1000;
 		// 重开/回溯路径可能带着被剥离的 SONG：先恢复完整逐音符 DOM 再生成
 		PlayState.reloadChartSourceIfNeeded();
+		trace('[PLAY gcn] reloadChart ' + Std.int(haxe.Timer.stamp()*1000 - _tG0) + 'ms');
 		// 生成完成后标记 done（原生崩溃时日志簿显示最终到达的阶段）
 		ps.totalNotes = 0;
 		// 新曲/重开：stage 落盘标记复位（每曲各记一次首次生成/首次命中）
@@ -466,22 +469,25 @@ class NoteChartDomain
 				#else
 				if (OpenFlAssets.exists(file)) {
 				#end
+			var _tEvd:Float = haxe.Timer.stamp() * 1000;
 					ps.cachedEventsData = Song.loadFromJson('events', ps.songName).events;
+			trace("[PLAY gcn] eventsDataLoad " + Std.int(haxe.Timer.stamp()*1000 - _tEvd) + "ms (count=" + (ps.cachedEventsData != null ? ps.cachedEventsData.length : -1) + ")");
 				}
 				else {
 					ps.cachedEventsData = [];
 				}
 			}
+			var _tEvm:Float = haxe.Timer.stamp() * 1000;
 			for (event in ps.cachedEventsData) //Event Notes
 				for (i in 0...event[1].length)
 					ps.makeEvent(event, i);
+			trace('[PLAY gcn] cachedEventsMakeEvent ' + Std.int(haxe.Timer.stamp()*1000 - _tEvm) + 'ms');
 		}
 		else
 		{
 			for (event in ps.cachedEventNotes)
 				ps.eventNotes.push(event);
 		}
-
 		#if false
 		// ===== 安卓最稳定管线：备份式直建 Note 对象（8月17 实机验证可用）=====
 		// 不使用 CastNote/对象池/回收；音符在生成期直接创建，noteSpawn 按时间插入。
@@ -610,9 +616,12 @@ class NoteChartDomain
 		#end
 		if (loadPhase)
 		{
+			var _tEv:Float = haxe.Timer.stamp() * 1000;
+			trace('[PLAY gcn] beforeEvents ' + Std.int(_tEv - _tG0) + 'ms (events=' + (songData.events != null ? songData.events.length : -1) + ')');
 			for (event in songData.events) //Event Notes
 				for (i in 0...event[1].length)
 					ps.makeEvent(event, i);
+			trace('[PLAY gcn] events ' + Std.int(haxe.Timer.stamp()*1000 - _tEv) + 'ms');
 		}
 		// 【密集对象硬上限】在 densePerfMode 定案后（预生成与创建期兜底的 buildChartNotes
 		// 均已执行、此处为两路径汇合点）再生效：只对超密集谱自动开启（不写存档；非密集谱恒 0=关闭）
@@ -624,7 +633,16 @@ class NoteChartDomain
 		ps.turboZones = [];
 		ps.turboZoneCursor = 0;
 		if (PlayState.densePerfMode)
-			ps.initTurboZones();
+		{
+			// 优先消费 preGenerateChart 后台算好的 turboZones（省 chartFingerprint+buildZones 全遍历）
+			if (PlayState.preGenTurboZones != null)
+			{
+				ps.turboZones = PlayState.preGenTurboZones;
+				PlayState.preGenTurboZones = null;
+			}
+			else
+				ps.initTurboZones();
+		}
 
 		if (ps.botplayPlan != null)
 		{
@@ -651,6 +669,7 @@ class NoteChartDomain
 			ps.chartEndTimeMs = _lastCast.strumTime + _lastCast.holdLength + Conductor.safeZoneOffset + 1000;
 		}
 
+		trace('[PLAY gcn] total ' + Std.int(haxe.Timer.stamp()*1000 - _tG0) + 'ms (dense=' + PlayState.densePerfMode + ' notes=' + (ps.unspawnNotes != null ? ps.unspawnNotes.length : -1) + ')');
 		ps.generatedMusic = true;
 		CrashHandler.mark('PlayState.generateChartNotes:done');
 	}
@@ -726,6 +745,23 @@ class NoteChartDomain
 				ps.botBatchSeenSeq.set(note.chartSeq, true);
 			}
 			// 【500 帧补丁】同簇视觉副本不再逐命中全表扫描，统一在批处理末尾一次 O(成员) 扫
+			if (ClientPrefs.data.botMode == 'destroy' && !note.ignoreNote && !note.hitCausesMiss)
+			{
+				// 销毁模式：不产生评级/连击/分数，只把玩家侧主音符（含长条段、按 density 口径）在判定线销毁
+				var hitMult:Int = Std.int(note.density);
+				if (hitMult < 1) hitMult = 1;
+				if (ps.totalNotes > 0)
+					ps.destroyedNotes = Std.int(Math.min(ps.totalNotes, ps.destroyedNotes + hitMult));
+				else
+					ps.destroyedNotes += hitMult;
+				note.wasGoodHit = true;
+				note.active = false;
+				note.visible = false;
+				ps.vocals.volume = 1; // 不计分，但保留人声同步（否则销毁模式整首无人声）
+				ps.popUpScore(note, hitMult); // 销毁模式按已击中口径计数，并弹数字连击窗
+				ps.notes.invalidateNote(note);
+				continue;
+			}
 			if (ClientPrefs.data.noteJudgment == 'KE 判定' && note.isSustainNote)
 			{
 				// KE 判定：长条不参与判定，子段仅做视觉消除

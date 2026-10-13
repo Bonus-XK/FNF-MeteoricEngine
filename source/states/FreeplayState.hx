@@ -10,6 +10,7 @@ import flixel.system.ui.FlxSoundTray;
 import flixel.math.FlxPoint;
 
 import openfl.Lib;
+import openfl.utils.Assets;
 
 import objects.HealthIcon;
 import objects.BackButton;
@@ -339,6 +340,45 @@ class FreeplayState extends MusicBeatState
 			bg.color = songs[curSelected].color;
 			intendedColor = bg.color;
 		}
+	}
+
+	function startFreeplayOut()
+	{
+		// 让所有元素各自沿“离屏中心”方向飞出，视觉上像散落到四周
+		function fly(o:Dynamic):Void
+		{
+			if (o == null) return;
+			var cx:Float = FlxG.width * 0.5;
+			var cy:Float = FlxG.height * 0.5;
+			var mx:Float = o.x + o.width * 0.5;
+			var my:Float = o.y + o.height * 0.5;
+			var dx:Float = mx - cx;
+			var dy:Float = my - cy;
+			var len:Float = Math.sqrt(dx * dx + dy * dy);
+			if (len < 1) { dx = -cx + mx; dy = -cy + my; len = Math.sqrt(dx * dx + dy * dy); if (len < 1) { dx = 0; dy = -1; len = 1; } }
+			var dist:Float = Math.max(FlxG.width, FlxG.height) * 1.2;
+			// 0.26→0.15：飞出只是过渡遮罩，谱面解析/音频解码已在 startChartPreload + 预热里
+			// 并行完成，这段空白纯粹是用户感知的等待，每 100ms 都是白等。
+			FlxTween.tween(o, {x: o.x + dx / len * dist, y: o.y + dy / len * dist, alpha: 0}, 0.15, {ease: FlxEase.quadIn});
+		}
+
+		for (item in grpSongs.members)
+			fly(item);
+		for (icon in iconArray)
+			fly(icon);
+
+		if (backBtn != null)
+		{
+			fly(backBtn.glow);
+			fly(backBtn.spr);
+			fly(backBtn.label);
+		}
+		fly(songTitleText);
+		fly(scoreText);
+		fly(ratingText);
+		fly(diffText);
+		fly(bottomPanel);
+		fly(bottomHint);
 	}
 
 	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
@@ -678,33 +718,77 @@ class FreeplayState extends MusicBeatState
 			PlayState.isStoryMode = false;
 			PlayState.storyDifficulty = curDifficulty;
 
-			if(!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
+			if (Song.resolveChartPath(poop, songLowercase) == null)
 			{
 				missingText.text = Lang.tOr('freeplay.missingChart', '在加载铺面文件时出错：\n缺失的文件：data/') + songLowercase + '/' + poop;
 				missingText.screenCenter(Y);
 				missingText.visible = true;
 				missingTextBG.visible = true;
 				FlxG.sound.play(Paths.sound('cancelMenu'));
-
 				super.update(elapsed);
 				return;
 			}
 
-			if(colorTween != null) {
-				colorTween.cancel();
+			// 谱面+音频+音符烘焙都就绪时跳过加载界面，直接进 Song
+			if (LoadingState.canSkipLoading(songLowercase, poop, songLowercase))
+			{
+				if(colorTween != null) colorTween.cancel();
+				#if PRELOAD_ALL
+				if (previewActive) stopPreview(false);
+				#end
+				FlxG.sound.music.volume = 0;
+				destroyFreeplayVocals();
+				#if MODS_ALLOWED
+				#if desktop
+				DiscordClient.loadModRPC();
+				#end
+				#end
+				LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState());
+				super.update(elapsed);
+				return;
 			}
 
-			#if PRELOAD_ALL
-			if (previewActive) stopPreview(false); // 不恢复菜单音乐：PlayState 将加载自己的音乐
-			#end
-			FlxG.sound.music.volume = 0;
+			// 先把待加载谱面登记，确保 chart/pregen 预加载可在动画期间接管
+			LoadingState.pendingSongName = songLowercase;
+			LoadingState.pendingChartJson = poop;
+			LoadingState.pendingChartFolder = songLowercase;
+			LoadingState.pendingReturnState = new FreeplayState();
+			LoadingState.startChartPreload();
 
-			destroyFreeplayVocals();
-			#if MODS_ALLOWED
-			#if desktop
-			DiscordClient.loadModRPC();
-			#end
-			#end
+			// Freeplay 元素向四周飞出，紧接着加载界面
+			startFreeplayOut();
+			// 0.28→0.16：与 tween 时长对齐（0.15s + 一帧余量），不再额外空等 120ms
+			new FlxTimer().start(0.16, function(_)
+			{
+				if(!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
+				{
+					missingText.text = Lang.tOr('freeplay.missingChart', '在加载铺面文件时出错：\n缺失的文件：data/') + songLowercase + '/' + poop;
+					missingText.screenCenter(Y);
+					missingText.visible = true;
+					missingTextBG.visible = true;
+					FlxG.sound.play(Paths.sound('cancelMenu'));
+					return;
+				}
+
+				if(colorTween != null) {
+					colorTween.cancel();
+				}
+
+				#if PRELOAD_ALL
+				if (previewActive) stopPreview(false); // 不恢复菜单音乐：PlayState 将加载自己的音乐
+				#end
+				FlxG.sound.music.volume = 0;
+
+				destroyFreeplayVocals();
+				#if MODS_ALLOWED
+				#if desktop
+				DiscordClient.loadModRPC();
+				#end
+				#end
+			});
+
+			super.update(elapsed);
+			return;
 		}
 		else if(controls.RESET)
 		{

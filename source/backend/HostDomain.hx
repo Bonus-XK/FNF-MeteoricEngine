@@ -971,6 +971,7 @@ class HostDomain
 	/** 原 PlayState.startSong（作用域分析：零遮蔽，36 处成员引用已限定）。 */
 	public static function startSong(ps:PlayState):Void
 	{
+		trace('[PLAY startSong] ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 		ps.startingSong = false;
 
 		@:privateAccess FlxG.sound.playMusic(ps.inst._sound, 1, false);

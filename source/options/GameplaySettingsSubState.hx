@@ -77,6 +77,13 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 		option.onChange = onChangeAutoPause;
 
+		var option:Option = new Option('自动游玩模式',
+			'敲击 = 正常机器人模式；销毁 = 音符到判定线立即销毁，不产生评级/分数，结算显示销毁数量',
+			'botMode',
+			'string',
+			['tap', 'destroy']);
+		addOption(option);
+
 		var option:Option = new Option('禁用重置键',
 			'开启后，按下重置键不会触发任何效果',
 			'noReset',
@@ -93,6 +100,15 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'快速重开时，屏幕上的箭头会像时间倒流一样飞回起点，然后再重新开始',
 			'rewindOnRestart',
 			'bool');
+		addOption(option);
+
+		// TuoboLoad：牺牲画质换加载速度。默认关闭 = 零行为变化。
+		// 1=轻量（角色/舞台贴图降采样，总纹理省约 70%）；2=极简（不加载角色与舞台）。
+		var option:Option = new Option(backend.Lang.tOr('option.tuoboLoad', 'TuoboLoad 极速加载'),
+			backend.Lang.tOr('optionDesc.tuoboLoad', '牺牲画面换加载速度。关闭 = 完整画面（默认）。极简 = 不加载角色与舞台，只保留判定线与音符'),
+			'tuoboLoad',
+			'string',
+			['0', '1']);
 		addOption(option);
 
 		super();

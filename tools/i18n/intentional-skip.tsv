@@ -190,6 +190,12 @@ source/backend/DesignTokens.hx	蓝	1	主题名：显示走 themeNameAt()
 source/backend/DesignTokens.hx	金	1	主题名：显示走 themeNameAt()
 source/backend/DesignTokens.hx	青绿	1	主题名：显示走 themeNameAt()
 source/backend/DesignTokens.hx	青（默认）	1	主题名：显示走 themeNameAt()
+source/backend/GfxPolicy.hx	 MB）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/GfxPolicy.hx	 份 CPU 副本，耗时 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/GfxPolicy.hx	 张大图 CPU 副本（累计 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/GfxPolicy.hx	 张大纹理到显存、释放 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/GfxPolicy.hx	: 释放 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/GfxPolicy.hx	[GfxPolicy] preloadWarm: 提交 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/HostDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
 source/backend/HostDomain.hx	[Audio] songLength 按谱面末尾兜底：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/HostDomain.hx	[角色自愈] boyfriend 重建失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
@@ -563,6 +569,7 @@ source/options/GameplaySettingsSubState.hx	开启后，隐藏血量条图标与�
 source/options/GameplaySettingsSubState.hx	快速重开回溯箭头	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	快速重开时，屏幕上的箭头会像时间倒流一样飞回起点，然后再重新开始	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	快速重新开始	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	敲击 = 正常机器人模式；销毁 = 音符到判定线立即销毁，不产生评级/分数，结算显示销毁数量	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	新版血量条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	旧版血量条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	极简血条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -570,6 +577,7 @@ source/options/GameplaySettingsSubState.hx	玩法	1	Option 兜底原文：Option
 source/options/GameplaySettingsSubState.hx	玩法设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	禁用重置键	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GameplaySettingsSubState.hx	自动游玩模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	血条覆盖	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	选择血量条两侧小图标随节拍跳动的样式。脉冲最贴合手、点头保留一点手绘律动；	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	错拍两侧反相、跳跃会上下弹起、挤压是卡通式压扁拉伸；关闭 = 完全静止	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -711,17 +719,26 @@ source/options/OptionsState.hx	点左侧分区栏即直接打开（选中后按 
 source/options/OptionsState.hx	点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/OptionsState.hx	点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）；退出后自动回到暂停菜单（曲目内进入时）。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	0 = 关闭。开启后可显著降低极端堆叠谱的渲染开销	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	12 是引擎视觉预算上限；调小更省内存、调大超大簇的视觉分布更精确	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	15 万级堆叠谱面的解析与渲染开销大幅下降；正常谱面没有重复箭头，不受影响	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	5900 万音符的谱面从 ~470MB 降到几百字节；计分/命中量完全不变。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	Parts 组合难度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	仅对超大谱面有效；加载耗时与 Part 数量成正比。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	依赖舞台视觉或舞台脚本的模组请保持关闭	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	依赖这些回调的模组（如计分/特效脚本）请保持开启	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	偏移有界化	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	全部 Part（如 song-1、song-2…）**同时叠加**成一个谱面。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	关闭则保留全量偏移，视觉与旧版逐像素一致	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	关闭可消除 GC 尖峰（内存可能上升）；默认开启与旧版一致	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	关闭后生成音符不再触发 Lua/Hscript 的 onSpawnNote（15 万级堆叠谱可省去海量回调开销）；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	关闭命中回调	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	内存占用从「与音符总数成正比」降为「与簇数成正比」——\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	只显示 HUD	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	可见音符快速排序	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	合并窗口（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	合并计数模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	同一轨道上间距小于该值的后一个音符会被隐藏（渲染裁剪，不参与判定），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	同刻同轨的多个 Part 音符会并成一簇并累加计数（按两颗算）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	同轨时间差不超过该值的箭头视为堆叠。15 建议值；调大可合并更多，调小更保守	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	启用 GC	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	命中时是否创建评级弹窗（Sick/Good…）；关闭后仍正常计分，只少视觉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -733,7 +750,9 @@ source/options/PerformanceSubState.hx	对手命中时 strum 是否高亮 confirm
 source/options/PerformanceSubState.hx	对手箭头点亮	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	已过音符不再生成	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	开启后仅渲染音符与 HUD（角色/舞台/雨效等全场景不渲染，舞台脚本也跳过），帧率大幅提升；\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后每个堆叠合并簇只保留前若干个时间偏移（真实数量另行记录），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	开启后每帧只对可见音符排序（绘制顺序），大谱面下排序开销降为 O(可见数)。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	开启后难度列表追加一个「Parts」条目；选中它会把该歌曲 data/ 目录下的\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	开启后，同一轨道在 ±合并窗口 内的重复箭头会合并为一个音符（用 density 计数），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	开启后，自动游玩命中走"生成即排期、到点入队"架构（大谱面 100% 覆盖的核心）。\n关闭则回退逐帧入队（旧行为，密集谱覆盖下降）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	开启后，跳转时间/快速重开时已过出生窗口的音符被静默消费（不判 Miss、不溅射），\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -745,7 +764,9 @@ source/options/PerformanceSubState.hx	性能	1	Option 兜底原文：Option 构�
 source/options/PerformanceSubState.hx	性能设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	手动命中/按下时玩家 strum 是否高亮；关闭省绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	排期弹出余量（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	有界化时每个簇保留多少个时间偏移（生成期最多只用 12 个，超过无意义）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	未命中箭头在判定线后的存活时间（越小柱子越贴线；< 弹出余量会竞态漏命中）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/PerformanceSubState.hx	每簇保留偏移数	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	玩家箭头点亮	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	生成回调 onSpawnNote	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	自动游玩命中时玩家 strum 是否高亮 confirm；关闭省绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -814,5 +835,5 @@ source/substates/PauseSubState.hx	：	1	分隔符/标点片段（连接已翻译
 source/substates/ReplaySubState.hx	   ·   	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ReplaySubState.hx	%   ·   	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
-source/substates/ResultsSubState.hx	：	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ResultsSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）

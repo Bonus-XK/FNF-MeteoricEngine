@@ -7,9 +7,11 @@ import openfl.utils.AssetType;
 #if sys
 import sys.io.File;
 import sys.FileSystem;
+import sys.io.FileInput;
 #end
 
 import backend.Section;
+import backend.PerfProbe;
 
 typedef SwagSong =
 {
@@ -35,6 +37,16 @@ typedef SwagSong =
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
 	@:optional var format:String;
+
+	// ===== 超大字谱面（packed 路径）专用 =====
+	// 音符级流式解析产出：packedNotes 承载**已合并**的音符簇（PackedChart），
+	// 此时 sectionNotes 为空数组。PlayState.buildChartNotes 检测到 packedNotes
+	// 非空时走 packed 分支，**不再重复合并**。
+	// 内存特性：驻留量与音符总数无关，只随「簇数 + 簇内 offs 总数」增长。
+	//   实测 200 万音符（880 空 + 1 巨型 section）→ 138MB；旧路径 → 6.9GB 失败。
+	@:optional var packedNotes:Array<PackedChart>;
+	@:optional var packedTotalNotes:Int;
+	@:optional var packedSectionCount:Int;
 }
 
 class Song
@@ -280,8 +292,38 @@ class Song
 	}
 
 	// 解析出谱面实际文件路径（mod 优先），不存在返回 null
+	/**
+	 * 缓存键种子。必须由**写入与读取两侧用同一算法**得出，否则键不同 → 永远不命中。
+	 * （开发期真实踩过：写入用歌名、读取用 'parts'，导致缓存写了但读不到。）
+	 */
+	static function cacheSeedFor(jsonInput:String):String
+	{
+		return (jsonInput != null) ? jsonInput : '';
+	}
+
+	/** 谱面名是否是 Parts 组合难度（"song-parts"，大小写不敏感） */
+	public static function isPartsChartName(jsonInput:String):Bool
+	{
+		if (jsonInput == null) return false;
+		return Difficulty.isPartsDifficulty(jsonInput.substr(jsonInput.lastIndexOf('-') + 1));
+	}
+
 	public static function resolveChartPath(jsonInput:String, ?folder:String):String
 	{
+		// 多 Part 组合难度：本体文件不存在，用**第一个 Part** 的真实路径作为
+		// 「存在性凭证」，让选歌流程能正常进入。
+		// 两种形态：① "song-1+2+3" 显式组合 ② "song-parts" 枚举全部 Part。
+		if (jsonInput != null && (jsonInput.indexOf('+') >= 0 || isPartsChartName(jsonInput)))
+		{
+			var comboPaths:Array<String> = resolvePartPaths(jsonInput, folder);
+			if (comboPaths != null)
+			{
+				for (cp in comboPaths)
+					if (cp != null && FileSystem.exists(cp)) return cp;
+				return null;
+			}
+			return null;
+		}
 		var formattedFolder:String = Paths.formatToSongPath(folder);
 		var formattedSong:String = Paths.formatToSongPath(jsonInput);
 
@@ -333,6 +375,38 @@ class Song
 		// 活过 LoadingState 生命周期，是"退出重进同曲闪退"的间接诱因）；语义与 loadFromJson 缓存命中一致
 		var cachedHit:SwagSong = getCachedChart(chartCacheKey(filePath));
 		if (cachedHit != null) return copySong(cachedHit);
+
+		// ===== 音符级流式解析（超大字谱面专用，>= STREAM_CHART_MIN 字节）=====
+		// 旧路径（File.getContent + fastParseSong）在这类谱面上必崩：
+		//   ① 整份 JSON 读成单个 String（1.29GB → hxcpp 上 ~2.6GB UTF-16 连续驻留）
+		//   ② 每颗音符变成一个 Array<Float>（5900 万个 → ~6.9GB）
+		//   ③ 实测该谱结构为 880 个空 section + 1 个含全部音符的巨型 section，
+		//      fastParseSong 的 fastFindObjEnd + substr 会试图切出 1.28GB 的子串
+		// 实测证据（同构样本：880 空 + 1 巨型 / 200 万音符）：
+		//   旧路径 → 6.9GB 失败；新路径 → 138MB 峰值，音符数与小节数逐项精确。
+		//
+		// 任何异常一律 throw，由本函数回退到旧整读路径（绝不静默降级）。
+		#if (sys && !android)
+		try
+		{
+			var sz:Int = 0;
+			try { sz = FileSystem.stat(filePath).size; } catch (eStat:Dynamic) { sz = 0; }
+			// 调试开关：METEORIC_NO_PACKED=1 强制走旧整读路径（用于 A/B 对照定位回归）
+			var packedDisabled:Bool = false;
+			try { packedDisabled = (Sys.getEnv("METEORIC_NO_PACKED") == "1"); } catch (eEnv:Dynamic) {}
+			if (packedDisabled) trace('[PACKEDCHART] disabled by METEORIC_NO_PACKED');
+			if (sz >= STREAM_CHART_MIN && !packedDisabled)
+			{
+				var packedSong:SwagSong = loadPackedChart(filePath);
+				if (packedSong != null) return packedSong;
+			}
+		}
+		catch (eStream:Dynamic)
+		{
+			trace('[PACKEDCHART] failed, fallback to full read: ' + Std.string(eStream));
+		}
+		#end
+
 		var rawJson = null;
 		#if (sys && !android)
 		rawJson = File.getContent(filePath).trim();
@@ -424,6 +498,43 @@ class Song
 
 	public static function loadFromJson(jsonInput:String, ?folder:String):SwagSong
 	{
+		// ===== 多 Part 组合难度（jsonInput 含 '+'）=====
+		// 例如 stupid-griefer-1+2+3：同时叠加三个 Part 的音符。
+		// 只走 packed 流式路径（小谱面的合并需物化 sectionNotes，暂不支持组合）。
+		if (jsonInput != null && (jsonInput.indexOf('+') >= 0 || isPartsChartName(jsonInput)))
+		{
+			var partPaths:Array<String> = resolvePartPaths(jsonInput, folder);
+			trace('[COMBO] jsonInput=' + jsonInput + ' folder=' + Std.string(folder)
+				+ ' resolved=' + (partPaths == null ? "null" : Std.string(partPaths.length) + " paths"));
+			if (partPaths != null)
+			{
+				for (pp in partPaths)
+					trace('[COMBO]   part -> ' + pp + (FileSystem.exists(pp) ? " OK" : " MISSING"));
+				#if (sys && !android)
+				try
+				{
+					var combo:SwagSong = loadPackedParts(partPaths, jsonInput);
+					if (combo != null)
+					{
+						if (jsonInput != 'events') StageData.loadDirectory(combo);
+						return combo;
+					}
+				}
+				catch (eCombo:Dynamic)
+				{
+					trace('[PACKEDPARTS] failed: ' + Std.string(eCombo));
+				}
+				#end
+				// 回退：只加载第一个 Part，保证可玩（并明确记 trace，不静默）
+				var firstPart:String = (partPaths.length > 0) ? partFileToJson(partPaths[0], jsonInput, folder) : null;
+				if (firstPart != null)
+				{
+					trace('[PACKEDPARTS] combo path unavailable, loaded first part only: ' + firstPart);
+					return loadFromJson(firstPart, folder);
+				}
+			}
+		}
+
 		var filePath:String = resolveChartPath(jsonInput, folder);
 		if(filePath == null)
 			throw 'Missing chart file: data/' + jsonInput;
@@ -440,6 +551,19 @@ class Song
 	// 用于 42MB / 2.26M 音符级谱面：haxe.Json/TJSON 会把每颗音符做成对象树（1.5-2GB 峰值），
 	// 本路径只产出引擎需要的扁平结构，解析耗时/内存下降 1-2 个数量级。失败返回 null 走通用解析。
 	#if sys
+
+	// 分块流式解析的启用阈值（字节）。低于此值整读更划算（避免额外 IO 与状态机开销）。
+	// 8MB = 原始整读峰值约 16MB UTF-16 + 解析产物；超过后分块的收益才明显。
+	inline static var STREAM_CHART_MIN:Int = 8 * 1024 * 1024;
+
+	// 单块读取字节数。16MB 兼顾 IO 次数与单块驻留：每块在 hxcpp 上是 ~32MB UTF-16，
+	// 加上当前小节文本（最大小节实测 1.4MB）仍有充足余量。
+	inline static var STREAM_CHUNK:Int = 16 * 1024 * 1024;
+
+	// 跨块残留（pending）的字节上限。超过即判定为「深度匹配无法闭合」——
+	// 必须 throw 回退整读路径，绝不能让它无限增长把内存吃光。
+	// 正常最大小节实测 1.4MB，64MB 是 45 倍余量。
+	inline static var STREAM_PENDING_MAX:Int = 64 * 1024 * 1024;
 	static function fastNumAt(text:String, pos:Int):Float
 	{
 		var start:Int = pos;
@@ -703,6 +827,373 @@ class Song
 		if (!Reflect.hasField(song, 'events')) Reflect.setField(song, 'events', []);
 
 		return cast song;
+	}
+
+	// ========================================================================
+	// 超大字谱面：音符级流式 + 扫描即合并
+	// ========================================================================
+	// 产出 SwagSong，其中 packedNotes 字段承载**已合并**的音符簇，
+	// sectionNotes 保持空数组。下游 buildChartNotes 走 packed 分支时**不再合并**。
+	//
+	// 元数据（song/bpm/speed/stage/...）仍需读取，这里只读文件头部
+	// （实测头部 < 1KB），用一次小范围读取完成，不触碰整份 JSON。
+	static function loadPackedChart(filePath:String):SwagSong
+	{
+		// 头部：只读前 8KB，元数据全在这里
+		PerfProbe.mark('packed: begin scan ' + filePath);
+		var head:String = readHead(filePath, 8192);
+		if (head.length <= 0) return null;
+
+		var song:Dynamic = {};
+		var inS:Int = 0;
+		var envIdx:Int = head.indexOf('"song"');
+		if (envIdx >= 0)
+		{
+			var braceIdx:Int = head.indexOf('{', envIdx);
+			if (braceIdx >= 0) inS = braceIdx + 1;
+		}
+		Reflect.setField(song, 'song', fastReadStringAfter2(head, 'song', '', inS));
+		var bpm:Float = fastReadNumberAfter2(head, 'bpm', 120.0, inS);
+		Reflect.setField(song, 'bpm', bpm);
+		Reflect.setField(song, 'speed', fastReadNumberAfter2(head, 'speed', 1.0, inS));
+		Reflect.setField(song, 'player1', fastReadStringAfter2(head, 'player1', 'bf', inS));
+		Reflect.setField(song, 'player2', fastReadStringAfter2(head, 'player2', 'dad', inS));
+		Reflect.setField(song, 'gfVersion', fastReadStringAfter2(head, 'gfVersion', 'gf', inS));
+		Reflect.setField(song, 'stage', fastReadStringAfter2(head, 'stage', 'stage', inS));
+		Reflect.setField(song, 'needsVoices', fastReadBoolAfter2(head, 'needsVoices', true, inS));
+		Reflect.setField(song, 'validScore', fastReadBoolAfter2(head, 'validScore', false, inS));
+		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(head, 'arrowSkin', null, inS));
+		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(head, 'splashSkin', null, inS));
+		Reflect.setField(song, 'format', 'psych_v1');
+
+		// 合并参数与 buildChartNotes 同源（ClientPrefs 的堆叠合并设置）
+		var ghostRange:Float = ClientPrefs.data.ghostRange;
+		var doMerge:Bool = ClientPrefs.data.skipGhostNotes;
+		var ghostDensity:Bool = ClientPrefs.data.ghostDensity;
+
+		var keepLimit:Int = (ClientPrefs.data.boundedOffs) ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
+		var scanner:PackedScanner = new PackedScanner(ghostRange, ghostDensity, keepLimit);
+		var clusters:Array<PackedChart> = scanner.scan(filePath, bpm, doMerge);
+		if (clusters == null) return null;
+		PerfProbe.mark('packed: scan done');
+		var st:Dynamic = scanner.stats();
+		trace('[PACKEDCHART] raw=' + st.raw + ' merged=' + st.merged + ' clusters=' + st.clusters + ' sections=' + st.sections);
+
+		// sectionNotes 置空：packed 路径不再需要逐音符 DOM。
+		// ⚠ 下游按 sectionNotes 遍历的路径（currentChartSignature / Replay /
+		//   ChartingState）对本谱面会得到「空」—— 已由 PlayState 的 packed 分支覆盖，
+		//   且大谱面本就不支持编辑器打开。
+		var notes:Array<SwagSection> = [];
+		Reflect.setField(song, 'notes', notes);
+		Reflect.setField(song, 'packedNotes', clusters);
+		Reflect.setField(song, 'packedTotalNotes', st.totalNotes);
+		Reflect.setField(song, 'packedSectionCount', st.sections);
+		Reflect.setField(song, 'events', []);
+
+		// 自检：解析数明显偏小视为失败（异常谱面回退整读）
+		if (st.raw <= 0) return null;
+		return cast song;
+	}
+
+	// ========================================================================
+	// 多 Part 叠加：stupid-griefer-1+2+3 这类「组合难度」
+	// ========================================================================
+	// 语义（与用户确认一致）：
+	//   ① 同时叠加 —— 所有 Part 的音符出现在同 4 条轨道上
+	//   ② 同刻同轨两颗算 2 —— 因为**共用一个合并器**，不同 Part 的同刻同轨音符
+	//      会并进同一个簇并累加 density，计分天然正确（若各 Part 各自合并再拼接则做不到）
+	//   ③ Part 数量不设上限（有多少合多少）
+	//
+	// 元数据（bpm/speed/stage/characters）取**第一个 Part**，其余 Part 仅提供音符；
+	// 若各 Part 的 bpm/stage 不一致会记 trace 警告（不阻断）。
+	/**
+	 * 多 Part 组合难度入口（供 LoadingState 调用）。
+	 * 返回 null = 不是组合难度，或组合加载不可用（调用方应退回单谱路径）。
+	 */
+	public static function loadCombo(jsonInput:String, ?folder:String):SwagSong
+	{
+		if (jsonInput == null) return null;
+		if (jsonInput.indexOf('+') < 0 && !isPartsChartName(jsonInput)) return null;
+		var partPaths:Array<String> = resolvePartPaths(jsonInput, folder);
+		trace('[COMBO] loadCombo jsonInput=' + jsonInput + ' folder=' + Std.string(folder)
+			+ ' resolved=' + (partPaths == null ? "null" : Std.string(partPaths.length)));
+		if (partPaths == null) return null;
+		#if (sys && !android)
+		// ---- 先查磁盘缓存：命中就完全跳过扫描（79GB 原始数据 → 几十 MB 簇缓存）----
+		if (ClientPrefs.data.partsCache)
+		{
+			var ck:String = PackedCache.keyForParts(partPaths, cacheSeedFor(jsonInput));
+			if (ck != null)
+			{
+				PerfProbe.mark('parts: cache probe ' + ck);
+				var hit:Array<PackedChart> = PackedCache.load(ck, partPaths.length);
+				if (hit != null)
+				{
+					trace('[PACKEDPARTS] CACHE HIT parts=' + partPaths.length + ' clusters=' + hit.length);
+					var songCached:Dynamic = {};
+					// 元数据仍从第一个 Part 的头部读（轻量，几 KB）
+					var headC:String = readHead(partPaths[0], 8192);
+					if (headC == null || headC.length <= 0) return null;
+					var inSC:Int = 0;
+					var evC:Int = headC.indexOf('"song"');
+					if (evC >= 0)
+					{
+						var brC:Int = headC.indexOf('{', evC);
+						if (brC >= 0) inSC = brC + 1;
+					}
+					Reflect.setField(songCached, 'song', fastReadStringAfter2(headC, 'song', '', inSC));
+					Reflect.setField(songCached, 'bpm', fastReadNumberAfter2(headC, 'bpm', 120.0, inSC));
+					Reflect.setField(songCached, 'speed', fastReadNumberAfter2(headC, 'speed', 1.0, inSC));
+					Reflect.setField(songCached, 'player1', fastReadStringAfter2(headC, 'player1', 'bf', inSC));
+					Reflect.setField(songCached, 'player2', fastReadStringAfter2(headC, 'player2', 'dad', inSC));
+					Reflect.setField(songCached, 'gfVersion', fastReadStringAfter2(headC, 'gfVersion', 'gf', inSC));
+					Reflect.setField(songCached, 'stage', fastReadStringAfter2(headC, 'stage', 'stage', inSC));
+					Reflect.setField(songCached, 'needsVoices', fastReadBoolAfter2(headC, 'needsVoices', true, inSC));
+					Reflect.setField(songCached, 'arrowSkin', fastReadStringAfter2(headC, 'arrowSkin', null, inSC));
+					Reflect.setField(songCached, 'splashSkin', fastReadStringAfter2(headC, 'splashSkin', null, inSC));
+					Reflect.setField(songCached, 'format', 'psych_v1');
+					// 同 PackedScanner：66 Part 的 mustHit 总数可达 ~19.2 亿，逼近 Int32 上限，
+					// 用 Float 累加再夹到 Int 范围，避免夹到负数（HUD/判分都依赖它为正）。
+					var totF:Float = 0;
+					for (c in hit) if (c.mustHit) totF += c.density;
+					var tot:Int = (totF > 2147483000) ? 2147483000 : Std.int(totF);
+					Reflect.setField(songCached, 'notes', []);
+					Reflect.setField(songCached, 'packedNotes', hit);
+					Reflect.setField(songCached, 'packedTotalNotes', tot);
+					// ⚠ 缓存命中路径原先**漏了 packedSectionCount**（实测 trace 里 sections=-1），
+					//   而扫描路径是设置了的 —— 同一首歌两条路径字段集不一致。
+					//   从缓存 meta 的 sections 补回来。
+					Reflect.setField(songCached, 'packedSectionCount',
+						(PackedCache.lastMeta != null && PackedCache.lastMeta.sections != null) ? Std.int(PackedCache.lastMeta.sections) : hit.length);
+					Reflect.setField(songCached, 'packedPartCount', partPaths.length);
+					Reflect.setField(songCached, 'events', []);
+					StageData.loadDirectory(songCached);
+					return cast songCached;
+				}
+			}
+		}
+		try
+		{
+			var combo:SwagSong = loadPackedParts(partPaths, jsonInput);
+			if (combo != null)
+			{
+				if (jsonInput != 'events') StageData.loadDirectory(combo);
+				return combo;
+			}
+		}
+		catch (e:Dynamic)
+		{
+			trace('[COMBO] failed: ' + Std.string(e));
+		}
+		#end
+		return null;
+	}
+
+	static function loadPackedParts(filePaths:Array<String>, jsonInput:String):SwagSong
+	{
+		if (filePaths == null || filePaths.length == 0) return null;
+
+		var head:String = readHead(filePaths[0], 8192);
+		if (head == null || head.length <= 0) return null;
+
+		var song:Dynamic = {};
+		var inS:Int = 0;
+		var envIdx:Int = head.indexOf('"song"');
+		if (envIdx >= 0)
+		{
+			var braceIdx:Int = head.indexOf('{', envIdx);
+			if (braceIdx >= 0) inS = braceIdx + 1;
+		}
+		Reflect.setField(song, 'song', fastReadStringAfter2(head, 'song', '', inS));
+		var bpm:Float = fastReadNumberAfter2(head, 'bpm', 120.0, inS);
+		Reflect.setField(song, 'bpm', bpm);
+		Reflect.setField(song, 'speed', fastReadNumberAfter2(head, 'speed', 1.0, inS));
+		Reflect.setField(song, 'player1', fastReadStringAfter2(head, 'player1', 'bf', inS));
+		Reflect.setField(song, 'player2', fastReadStringAfter2(head, 'player2', 'dad', inS));
+		Reflect.setField(song, 'gfVersion', fastReadStringAfter2(head, 'gfVersion', 'gf', inS));
+		Reflect.setField(song, 'stage', fastReadStringAfter2(head, 'stage', 'stage', inS));
+		Reflect.setField(song, 'needsVoices', fastReadBoolAfter2(head, 'needsVoices', true, inS));
+		Reflect.setField(song, 'validScore', fastReadBoolAfter2(head, 'validScore', false, inS));
+		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(head, 'arrowSkin', null, inS));
+		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(head, 'splashSkin', null, inS));
+		Reflect.setField(song, 'format', 'psych_v1');
+
+		var ghostRange:Float = ClientPrefs.data.ghostRange;
+		var doMerge:Bool = ClientPrefs.data.skipGhostNotes;
+		var ghostDensity:Bool = ClientPrefs.data.ghostDensity;
+		var keepLimit:Int = (ClientPrefs.data.boundedOffs) ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
+
+		// 关键：一个 scanner 扫所有 Part —— 合并状态跨文件保持
+		var scanner:PackedScanner = new PackedScanner(ghostRange, ghostDensity, keepLimit);
+		var t0:Float = Sys.time();
+		var used:Int = 0;
+		for (p in filePaths)
+		{
+			if (p == null || !FileSystem.exists(p)) continue;
+			PerfProbe.mark('parts: scan begin ' + p);
+			scanner.scanPart(p);
+			used++;
+			PerfProbe.mark('parts: scan done ' + p);
+		}
+		if (used <= 0) return null;
+
+		var st:Dynamic = scanner.stats();
+		trace('[PACKEDPARTS] parts=' + used + ' raw=' + st.raw + ' merged=' + st.merged + ' clusters=' + st.clusters
+			+ ' totalNotes=' + st.totalNotes + ' elapsed=' + Std.string(Std.int(Sys.time() - t0)) + 's');
+
+		var clusters:Array<PackedChart> = scanner.result();
+		// 扫描完成后落盘：下次进同一组 Part 直接读缓存，跳过全部扫描（79GB → 几十 MB）
+		var cacheKey:String = PackedCache.keyForParts(filePaths, cacheSeedFor(jsonInput));
+		if (cacheKey != null)
+		{
+			PerfProbe.mark('parts: cache save begin');
+			PackedCache.save(cacheKey, clusters, {
+				parts: used,
+				totalNotes: st.totalNotes,
+				sections: st.sections,
+				raw: st.raw,
+				merged: st.merged,
+				ghostRange: ghostRange,
+				ghostDensity: ghostDensity,
+				keep: keepLimit,
+				version: 1
+			});
+			PerfProbe.mark('parts: cache save done');
+		}
+
+		Reflect.setField(song, 'notes', []);
+		Reflect.setField(song, 'packedNotes', clusters);
+		Reflect.setField(song, 'packedTotalNotes', st.totalNotes);
+		Reflect.setField(song, 'packedSectionCount', st.sections);
+		Reflect.setField(song, 'packedPartCount', used);
+		Reflect.setField(song, 'events', []);
+		// ⚠ 判空只看「是否真的读到过音符」，**不能看 rawCount**：
+		//   rawCount 是音符总数，Parts 组合下轻松超过 Int32 上限（66 Part ≈ 38.5 亿），
+		//   一旦溢出成负数，这里就会 return null，把已经扫好的组合谱**静默丢掉**，
+		//   上层退回「只加载第一个 Part」—— 症状是加载极慢且 Note 数量看起来没变化。
+		//   （实测 meta 里 raw=-448051906 就是这个坑的现场证据。）
+		if (!scanner.sawAnyNote) return null;
+		return cast song;
+	}
+
+	/**
+	 * 把 `song-1+2+3` 解析成各 Part 的实际谱面路径列表。
+	 * 命名规则：组合难度名 `A+B+C` → `<song>-A.json` / `<song>-B.json` / `<song>-C.json`
+	 * （folder 与 song 名沿用调用方传入值）。
+	 * 返回 null 表示不是组合难度（普通单谱）。
+	 */
+	static function resolvePartPaths(jsonInput:String, folder:String):Array<String>
+	{
+		if (jsonInput == null) return null;
+		// Parts 形态没有 '+'，但同样是组合难度
+		if (jsonInput.indexOf('+') < 0 && !isPartsChartName(jsonInput)) return null;
+		var songBase:String = Paths.formatToSongPath(folder);
+		var jsonName:String = Paths.formatToSongPath(jsonInput);
+		// jsonName 形如 "stupid-griefer-1+2+3"：去掉最后一个 "-<组合>" 段
+		var cut:Int = jsonName.lastIndexOf('-');
+		if (cut <= 0) return null;
+		var base:String = jsonName.substr(0, cut);          // stupid-griefer
+		var combo:String = jsonName.substr(cut + 1);          // 1+2+3
+
+		var parts:Array<String> = combo.split('+');
+
+		// Parts 组合难度（"song-parts"）：枚举该歌 data/ 目录下的**全部** Part
+		if (parts.length == 1 && parts[0].trim().toLowerCase() == 'parts')
+			return enumerateAllPartPaths(base, folder);
+
+		var paths:Array<String> = [];
+		for (p in parts)
+		{
+			var t:String = p.trim();
+			if (t.length == 0) continue;
+			var rel:String = songBase + '/' + base + '-' + t + '.json';
+			var resolved:String = resolveChartPath(base + '-' + t, folder);
+			paths.push((resolved != null) ? resolved : rel);
+		}
+		if (paths.length < 2) return null; // 单个片段不算组合
+		return paths;
+	}
+
+	/** Map 计数（Haxe 的 Map 没有公开 size，这里用显式计数避免 API 依赖） */
+	static inline function foundCount(m:Map<String, Int>):Int
+	{
+		var n:Int = 0;
+		for (_ in m.keys()) n++;
+		return n;
+	}
+
+	/**
+	 * 枚举 <base>-<数字>.json 的全部 Part（Parts 组合难度用）。
+	 * 按文件名里的数字**数值序**排序 —— 纯字典序会把 10 排到 2 前面。
+	 */
+	static function enumerateAllPartPaths(base:String, folder:String):Array<String>
+	{
+		var songBase:String = Paths.formatToSongPath(folder);
+		var rel:String = 'data/' + songBase + '/';
+
+		// ⚠ 不能用 modsJson(base) 反推目录：**本体文件（如 stupid-griefer.json）不存在**
+		//   （只有 -1…-64），modFolders 会一路 fallthrough 到默认资源目录，路径全错。
+		//   这里改为与 modFolders 同一套遍历：当前模组 → 全局模组 → 默认资源。
+		var roots:Array<String> = [];
+		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0) roots.push(Mods.currentModDirectory);
+		for (m in Mods.getGlobalMods()) roots.push(m);
+
+		var prefix:String = base + '-';
+		for (root in roots)
+		{
+			var dir:String = Paths.mods(root + '/' + rel);
+			if (!FileSystem.exists(dir)) continue;
+			var found:Map<String, Int> = new Map();   // path → 数字序号
+			for (f in FileSystem.readDirectory(dir))
+			{
+				if (f.indexOf(prefix) != 0 || !StringTools.endsWith(f, '.json')) continue;
+				var numStr:String = f.substr(prefix.length, f.length - prefix.length - 5);
+				var n:Null<Int> = Std.parseInt(numStr);
+				if (n == null) continue;   // 非纯数字后缀（如 -easy）不算 Part
+				found.set(dir + '/' + f, n);
+			}
+			if (foundCount(found) < 2) continue;
+
+			var paths:Array<String> = [for (k in found.keys()) k];
+			paths.sort(function(a:String, b:String):Int return found.get(a) - found.get(b));
+			trace('[COMBO] enumerateAllPartPaths base=' + base + ' dir=' + dir + ' found=' + paths.length);
+			return paths;
+		}
+		return null;
+	}
+
+	/** 把 Part 的实际文件路径还原成 loadFromJson 可用的 jsonInput（如 stupid-griefer-3） */
+	static function partFileToJson(absPath:String, comboJson:String, folder:String):String
+	{
+		if (absPath == null) return null;
+		var name:String = haxe.io.Path.extension(absPath) == null ? absPath : absPath.substr(0, absPath.lastIndexOf('.'));
+		var slash:Int = name.lastIndexOf('/');
+		if (slash >= 0) name = name.substr(slash + 1);
+		// 组合名形如 stupid-griefer-1+2+3，取其中的歌名前缀再拼 Part 号
+		var cut:Int = comboJson.lastIndexOf('-');
+		var base:String = (cut > 0) ? comboJson.substr(0, cut) : comboJson;
+		return name.startsWith(base) ? name : base + name.substr(base.length);
+	}
+
+	/** 只读文件开头 n 字节（不整读） */
+	static function readHead(filePath:String, n:Int):String
+	{
+		try
+		{
+			var input:FileInput = File.read(filePath);
+			if (input == null) return null;
+			var total:Int = FileSystem.stat(filePath).size;
+			var want:Int = (total < n) ? total : n;
+			if (want <= 0) { input.close(); return null; }
+			var b:haxe.io.Bytes = input.read(want);
+			input.close();
+			if (b == null) return null;
+			return b.toString();
+		}
+		catch (e:Dynamic)
+		{
+			return null;
+		}
 	}
 
 	static function fastReadNumberAfter2(text:String, key:String, fallback:Float, from:Int):Float

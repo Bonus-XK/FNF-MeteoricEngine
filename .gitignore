@@ -49,3 +49,6 @@ meteoric_dpi_mode.txt
 # Python 字节码缓存（不得入库）
 __pycache__/
 *.pyc
+
+# 降采样实验遗留的 ndll 备份（已废弃，不再入库）
+tools/lime.ndll.wallclock.bak-prepngscale

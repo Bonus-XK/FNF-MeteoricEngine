@@ -70,6 +70,16 @@
 	<!-- Windows x86 构建：命令行传 -D win32build 时使用 32 位工具链（lime 8 的 -32 参数经 haxelib 传递会丢失） -->
 	<architecture name="x86" if="win32build" />
 	<architecture if="win32build" exclude="x64" />
+	<!-- macOS arm64 原生构建：命令行传 -D arm64 时启用（compile-mac.sh 在 Apple Silicon 上自动加）。
+	     为什么必须在这里声明、而不是只靠命令行 target flag：
+	     lime 8 的 MacPlatform.setup() 里 targetArchitecture 取自 project.architectures
+	     （`for (architecture in project.architectures) ... targetArchitecture = architecture`），
+	     命令行的 -D arm64 只能影响 rebuild() 生成的 hxml，改不了 targetArchitecture。
+	     本机 haxe/lime 装在 /usr/local（Intel Homebrew），整个工具链跑在 Rosetta 下，
+	     System.hostArchitecture 返回 X64 → 不声明就会编出 x86_64 目标，游戏整个跑在
+	     Rosetta 转译器里（实测 PNG 解码惩罚 ~2.0×，进曲加载 64% 的时间花在位图解码上）。
+	     不传 -D arm64 时本元素不生效，行为与原来完全一致（走 host 架构）。 -->
+	<architecture name="arm64" if="arm64" />
 
 	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />

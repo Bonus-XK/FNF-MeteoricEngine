@@ -208,6 +208,7 @@ class Paths
 			var file:String = imageDecodeQueue.shift();
 			imageDecodeQueued.remove(file);
 			if (currentTrackedAssets.exists(file) || pendingBitmaps.exists(file)) continue;
+			var _t0:Float = haxe.Timer.stamp();
 			try
 			{
 				var bmp:BitmapData = BitmapData.fromFile(file);
@@ -220,8 +221,21 @@ class Paths
 				}
 			}
 			catch (e:Dynamic) {}
+			trace('[IMG+' + Std.int(_t0 * 1000) + '] decode ' + Std.int((haxe.Timer.stamp() - _t0) * 1000) + 'ms '
+				+ (bmpSize(file)) + ' -> ' + imageDecodeQueue.length + ' left');
 			n++;
 		}
+	}
+
+	/** 解码出的位图尺寸（读缓存里的 BitmapData，失败返回 '?'） */
+	static function bmpSize(file:String):String
+	{
+		if (pendingBitmaps.exists(file))
+		{
+			var b:BitmapData = pendingBitmaps.get(file);
+			if (b != null) return b.width + 'x' + b.height;
+		}
+		return '?';
 	}
 
 	// ===== 内存明细导出（诊断用）=====
@@ -500,6 +514,8 @@ class Paths
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
 	// 后台线程预解码完成的贴图（LoadingState 并行解码人物等大图），主线程 image() 消费并转入正式缓存
 	public static var pendingBitmaps:Map<String, BitmapData> = [];
+
+
 	// 已告警过的缺失图片（只 trace 一次，避免高帧/高命中率下重复格式化+写屏）
 	public static var missingImageTraced:Map<String, Bool> = new Map<String, Bool>();
 

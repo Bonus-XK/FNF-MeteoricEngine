@@ -107,6 +107,7 @@ class LoadingState extends MusicBeatState
 
 	override function create()
 	{
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] create start');
 		// 加载界面不调用 MusicBeatState.create()，这里单独清理（先清理再加载，避免误删）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory(false); // 加载途中不做 System.gc()，避免卡住主线程
@@ -193,6 +194,7 @@ class LoadingState extends MusicBeatState
 
 	function startLoading()
 	{
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] startLoading');
 		callbacks = new MultiCallback(onLoad);
 		introComplete = callbacks.add("introComplete");
 
@@ -214,9 +216,14 @@ class LoadingState extends MusicBeatState
 			{
 				try
 				{
+					trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] chartParseStart');
 					CrashHandler.mark('LoadingState:chart-parse');
-					chartMessage = Song.loadFromFile(_syncChartPath, pendingChartJson == 'events');
+					// 组合谱（多 Part 叠加）走 loadCombo：命中磁盘打包缓存时
+					// 79GB 原始数据 → 几十 MB 簇缓存，秒开；未命中/非组合谱退 loadFromFile
+					var _combo:SwagSong = Song.loadCombo(pendingChartJson, pendingChartFolder);
+					chartMessage = (_combo != null) ? _combo : Song.loadFromFile(_syncChartPath, pendingChartJson == 'events');
 					CrashHandler.mark('LoadingState:chart-loaded');
+					trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] chartParseDone');
 					onChartLoaded();
 				}
 				catch(e:Dynamic)
@@ -239,9 +246,12 @@ class LoadingState extends MusicBeatState
 				// 非桌面平台没有线程：直接在加载界面里同步解析
 				try
 				{
+					trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] chartParseStart');
 					CrashHandler.mark('LoadingState:chart-parse');
-					chartMessage = Song.loadFromFile(filePath, pendingChartJson == 'events');
+					var _combo:SwagSong = Song.loadCombo(pendingChartJson, pendingChartFolder);
+					chartMessage = (_combo != null) ? _combo : Song.loadFromFile(filePath, pendingChartJson == 'events');
 					CrashHandler.mark('LoadingState:chart-loaded');
+					trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] chartParseDone');
 					onChartLoaded();
 				}
 				catch(e:Dynamic)
@@ -279,6 +289,7 @@ class LoadingState extends MusicBeatState
 			#end
 		}
 
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] checkLibs directory=' + directory + ' stageDir=' + StageData.forceNextDirectory + ' curLevel=' + Paths.currentLevel);
 		checkLibrary("shared");
 		if(directory != null && directory.length > 0 && directory != 'shared') {
 			checkLibrary('week_assets');
@@ -287,7 +298,7 @@ class LoadingState extends MusicBeatState
 
 	#if sys
 	// 后台线程解析谱面（选歌确认时或加载界面里调用，主线程轮询消息）
-	static function startChartPreload()
+	public static function startChartPreload()
 	{
 		if (pendingChartJson == null) return;
 		if (preloadChartThread != null && preloadThreadJson == pendingChartJson) return;
@@ -307,22 +318,62 @@ class LoadingState extends MusicBeatState
 			decodeSoundAsync(file);
 	}
 
+	// 列出进入 PlayState 前**必须**就位的歌曲音频缓存键。
+	//
+	// PlayState.generateSong 会按顺序请求：
+	//   Voices-<playerFile> → Voices → Voices-<oppFile> → Inst
+	// 其中 playerFile / oppFile 来自角色 json 的 vocals_file（Psych 0.7.3 split vocals，
+	// 缺省分别是 'Player' / 'Opponent'）。旧实现只预载 Inst + 无后缀 Voices，
+	// split vocals 曲的两个带后缀键只能等 PlayState.create 现解码 —— 那里无法分片，
+	// 是进曲窗口里最长的一段主线程卡顿（stupid-griefer 实测 audioLoaded +576ms）。
+	//
+	// 键名必须与 Paths.returnSound 的 modsSounds('songs', songPath + '/Xxx') 完全一致，
+	// 否则预载白做、缓存永不命中。
 	static function getSongAudioFiles(songName:String):Array<String>
 	{
 		var songPath:String = Paths.formatToSongPath(songName);
-		var files:Array<String> = [resolveSongAudioPath('assets/songs/' + songPath + '/Inst.' + Paths.SOUND_EXT)];
-		if (Song.voicesFileExists(songName))
-			files.push(resolveSongAudioPath('assets/songs/' + songPath + '/Voices.' + Paths.SOUND_EXT));
+
+		// 候选文件名：Inst + 无后缀 Voices + split vocals 的每个实际后缀
+		var names:Array<String> = ['Inst'];
+		if (Song.voicesFileExists(songName)) names.push('Voices');
+		if (PlayState.SONG != null)
+		{
+			for (sfx in charVocalsPostfixes(PlayState.SONG.player1, PlayState.SONG.player2))
+				if (Song.voicesFileExists(songName, sfx)) names.push('Voices-' + sfx);
+		}
+
+		var files:Array<String> = [];
+		for (nm in names)
+			files.push(resolveSongAudioPath('assets/songs/' + songPath + '/' + nm + '.' + Paths.SOUND_EXT));
 
 		#if MODS_ALLOWED
 		for (i in 0...files.length)
 		{
-			var key:String = songPath + (i == 0 ? '/Inst' : '/Voices');
-			var modsFile:String = Paths.modsSounds('songs', key);
+			var modsFile:String = Paths.modsSounds('songs', songPath + '/' + names[i]);
 			if (FileSystem.exists(modsFile)) files[i] = modsFile;
 		}
 		#end
 		return files;
+	}
+
+	// 读角色 json 的 vocals_file（与 objects/Character.parseJSON 同一字段）；
+	// 并入 PlayState 缺省使用的 'Player' / 'Opponent'（角色 json 未声明该字段时生效）
+	static function charVocalsPostfixes(player1:String, player2:String):Array<String>
+	{
+		var out:Array<String> = ['Player', 'Opponent'];
+		for (charName in [player1, player2])
+		{
+			if (charName == null || charName.length < 1) continue;
+			try
+			{
+				var p:String = Paths.resolveAssetPath('characters/' + charName + '.json');
+				if (p == null || !FileSystem.exists(p)) continue;
+				var vf:Dynamic = Reflect.field(haxe.Json.parse(File.getContent(p)), 'vocals_file');
+				if (vf != null && Std.string(vf).length > 0 && !out.contains(Std.string(vf))) out.push(Std.string(vf));
+			}
+			catch (e:Dynamic) {}
+		}
+		return out;
 	}
 
 	// 把相对资源路径解析为与 returnSound 缓存键完全一致的路径：
@@ -432,6 +483,39 @@ class LoadingState extends MusicBeatState
 		var p1:String = PlayState.SONG.player1;
 		var p2:String = PlayState.SONG.player2;
 		var names:Array<String> = [PlayState.SONG.gfVersion, p2, p1];
+		// 顺带收集 events.json 里 "Change Character" 的目标角色：
+		// 否则这些角色会在 PlayState.create 的 makeEvent 里同步加载图集
+		// （stupid-griefer 实测 3 个事件角色 = 620ms 黑屏卡顿）
+		try
+		{
+			var evFile:String = Paths.json(PlayState.SONG.song + '/events');
+			#if MODS_ALLOWED
+			var evMods:String = Paths.modsJson(PlayState.SONG.song + '/events');
+			var evPath:String = FileSystem.exists(evMods) ? evMods : (FileSystem.exists(evFile) ? evFile : null);
+			#else
+			var evPath:String = FileSystem.exists(evFile) ? evFile : null;
+			#end
+			if (evPath != null)
+			{
+				var evData:Dynamic = haxe.Json.parse(File.getContent(evPath));
+				var evGroups:Array<Dynamic> = evData != null ? Reflect.field(evData, 'events') : null;
+				if (evGroups != null)
+				{
+					for (gi in 0...evGroups.length)
+					{
+						var grp:Dynamic = evGroups[gi];
+						var subs:Array<Dynamic> = grp[1];
+						for (si in 0...subs.length)
+						{
+							var sub:Array<Dynamic> = subs[si];
+							if (sub[0] == 'Change Character' && sub.length > 2 && sub[2] != null && sub[2].length > 0 && !names.contains(sub[2]))
+								names.push(sub[2]);
+						}
+					}
+				}
+			}
+		}
+		catch (e:Dynamic) {}
 		for (name in names)
 			if (name != null && name.length > 0 && !charPreloads.contains(name))
 				charPreloads.push(name);
@@ -636,6 +720,7 @@ class LoadingState extends MusicBeatState
 
 	function onChartLoaded()
 	{
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] onChartLoaded');
 		PlayState.setSong(chartMessage);
 		// 登记谱面身份：PlayState 游玩期会剥离 SONG.notes（省内存），重开/编谱靠此从缓存恢复
 		PlayState.registerChartSource(pendingChartJson, pendingChartFolder, chartMessage.song);
@@ -656,7 +741,9 @@ class LoadingState extends MusicBeatState
 		if (chartDone != null) chartDone();
 
 		#if sys
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] charPreloadStart');
 		startCharPreload();
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] charPreloadDone');
 		#end
 
 		// 提前生成（先）：构建整张谱面的 CastNote + noteTypes + botplay 计划（一次遍历完成）——
@@ -694,7 +781,9 @@ class LoadingState extends MusicBeatState
 	function startPreGen()
 	{
 		var cb:Void->Void = callbacks != null ? callbacks.add('pregen') : null;
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] preGenStart');
 		PlayState.preGenerateChart();
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] preGenDone');
 		if (cb != null) cb();
 	}
 
@@ -724,7 +813,11 @@ class LoadingState extends MusicBeatState
 				throw "Missing library: " + library;
 
 			var callback = callbacks.add("library:" + library);
-			Assets.loadLibrary(library).onComplete(function (_) { callback(); });
+			trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] libLoadStart ' + library);
+			Assets.loadLibrary(library).onComplete(function (_) {
+				trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] libLoadDone ' + library);
+				callback();
+			});
 		}
 	}
 	
@@ -800,6 +893,7 @@ class LoadingState extends MusicBeatState
 	
 	function onLoad()
 	{
+		trace('[LOAD+' + Std.int(haxe.Timer.stamp()*1000) + '] onLoad');
 		#if sys
 		charPreloads = [];
 		charPreloadCallbacks = [];
@@ -1028,6 +1122,24 @@ class LoadingState extends MusicBeatState
 
 		return promise.future;
 	}
+
+	/**
+	 * 谱面+音频+音符烘焙全部就绪时可以跳过加载界面直接进游戏。
+	 * FreeplayState 选歌时调用，全部命中返回 true。
+	 */
+	public static function canSkipLoading(songName:String, jsonInput:String, folder:String):Bool
+	{
+		if (jsonInput == null || folder == null || songName == null) return false;
+		if (Song.resolveChartPath(jsonInput, folder) == null) return false;
+		// 谱面缓存
+		if (Song.tryLoadFromCache(jsonInput, folder) == null) return false;
+		// 音频缓存
+		if (!Song.songAudioCached(songName)) return false;
+		// 音符烘焙（开启时）
+		if (ClientPrefs.data.preRenderNotes && !Note.chartBakesReady()) return false;
+		return true;
+	}
+
 }
 
 class MultiCallback

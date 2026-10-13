@@ -54,7 +54,28 @@ class SaveVariables {
 	// 位图缩小后精灵渲染尺寸减半但坐标不变 → 布局大错位。因此**默认 1.0（关闭）**，
 	// 需要时在设置里手动开启并自行确认布局（或后续做“位置同比例补偿”的完整方案）。
 	@:keep public var backgroundScale:Float = 1.0;
-	// 高清渲染开关（重启生效）：true=Retina 2x 清晰（游戏内大规模谱面约 700~1400 帧）；
+	/**
+	 * TuoboLoad（极速加载）：牺牲画面换加载速度。默认 '0'=关闭（行为完全不变）。
+	 *
+	 * 背景：实测进曲最大的一笔是角色图集解码 + GPU 纹理上传。gf 的
+	 * characters/GF_assets.png 是 8000×6000 → 192MB 纹理，单这一项在
+	 * PlayState.create 里就要 ~524ms（占 create 725ms 的 72%）。
+	 *
+	 * 该资产是刻意的 Retina 高分图（alpha 包围盒 7941×5931，铺满无透明边，
+	 * 对比 BOYFRIEND 仅 4096×2820），192MB 是真实渲染需求。
+	 *
+	 * '2'=极简：跳过角色与舞台的构造与图集加载（复用引擎既有的 hudOnly 通路），
+	 *   只保留判定线/轨道/音符/HUD。进入最快、显存占用最低。
+	 *
+	 * ⚠️ 曾尝试的「轻量」档（角色图集降采样 50%）已撤回：GF_assets.xml 有
+	 * 148/190 帧边缘坐标为奇数，位图缩放与帧坐标缩放无法保证像素级一致，
+	 * 实测导致角色错位/缺失/大小错误、以及主界面艺术图乱码。
+	 * 若要真正降低纹理成本，正确做法是改 lime 的 PNG 解码器使其直接输出
+	 * 目标分辨率（帧坐标天然一致，无需补偿），而不是解码后再缩放。
+	 */
+	@:keep public var tuoboLoad:String = '0';
+
+// 高清渲染开关（重启生效）：true=Retina 2x 清晰（游戏内大规模谱面约 700~1400 帧）；
 	// false=1x 高性能（画面略糊，帧率约 3 倍，游戏内可 2200+）。由 SDLWindow.cpp 在创建窗口时读取模式文件。
 	@:keep public var highDPIRender:Bool = true;
 	// 性能模式（Seiun 移植）：音符走「无着色器 + ColorTransform 上色 + 直连 quad 合批」快速路径，
@@ -136,6 +157,7 @@ class SaveVariables {
 	@:keep public var bgScaleMigrated:Bool = false;   // 背景图降采样撤回迁移标记（一次性：把已写盘 0.5 复位为 1.0）
 	@:keep public var gpuCacheForceOnMigrated:Bool = false; // GPU 缓存强制开启迁移（一次性；参考对话“开/关都炸”根因=Convert 栈下溢，已修复）
 	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
+	@:keep public var gfxCpuRelease:Bool = false;  // 大纹理显存预提交 + 释放 CPU 副本（SeiunEngine 方案）：进曲时一次性上传所有大图集并丢弃 CPU 侧数据，消除游玩头几秒的上传卡顿；默认关 = 零行为变化
 	// ===== H-Slice 移植：音符管线性能设置 =====
 	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）
 	@:keep public var ghostDensity:Bool = true;     // 合并模式：true=计数合并（保分数/命中量）；false=直接丢弃重复
@@ -146,10 +168,24 @@ class SaveVariables {
 	@:keep public var limitNotes:Int = 0;           // 场上音符对象上限（0=不限；堆叠谱防爆）
 	@:keep public var hideOverlapped:Float = 0;     // 重叠隐藏间距（0=关闭）：同轨过近音符隐藏后段（渲染裁剪）
 	@:keep public var spawnNoteEvent:Bool = true;   // 生成时触发 onSpawnNote 回调（关闭后可省去 15 万级回调开销）
+	// 簇内偏移有界化：每个合并簇只保留前 boundedOffsKeep 个偏移 + 末个偏移 + 真实总数。
+	// 生成期最多只读 clusterVisCap（≤12）个偏移（PlayState.hx 的均匀采样），
+	// 所以存全量是纯浪费：5900 万音符的谱面 offs 占 472MB，实际只用 12 个。
+	// 开启后内存从 O(音符总数) 降为 O(簇数 × boundedOffsKeep)，计分不受影响
+	//（density 仍是真实总数）。关闭则保留全量偏移，视觉与旧版完全一致。
+	@:keep public var boundedOffs:Bool = true;
+	@:keep public var boundedOffsKeep:Int = 12;
+	// Parts 组合难度：开启后难度列表追加一个 "Parts" 条目，选中即把该歌曲
+	// data/ 目录下**全部** Part（<song>-1.json、-2.json…）合并成一个谱面同时叠加。
+	// 只对走 packed 流式路径的超大谱面有效（小谱面会回退到单个 Part）。
+	@:keep public var partsMode:Bool = false;
+	// Parts 组合谱面磁盘缓存：合并后的簇落盘，二次进歌秒开（79GB 原始数据 → 几十 MB）
+	@:keep public var partsCache:Bool = true;
 	// ===== 自动游玩命中排期（性能页可调） =====
 	@:keep public var botplayScheduledHits:Bool = true; // 生成即排期命中（大谱面自动游玩 100% 覆盖的架构开关）
 	@:keep public var botplayPopMargin:Int = 6;         // 排期弹出提前余量（毫秒）：弹出窗 = 帧步长 + 余量，须 ≥ 回收窗
 	@:keep public var botplayKillWindow:Int = 6;        // 自动游玩未命中回收窗（毫秒）：越小柱子越贴判定线，太小会与弹出竞态
+	@:keep public var botMode:String = 'tap';           // 'tap'=敲击（正常机器人模式）；'destroy'=到线销毁，不产生判定，结算统计销毁数
 
 	// ===== JS Engine（JordanSantiagoYT/FNF-JS-Engine 优化页）移植 =====
 	// 默认全部 = 当前行为，纯自愿开启的性能开关
@@ -670,11 +706,28 @@ class ClientPrefs {
 
 		// 图集降采样撤回迁移：本会话曾把 textureScale 写盘为 0.5（标题黑屏/文字错乱回归），
 		// 一次性复位为 1.0（100% 原分辨率）
+		// ⚠️ TuoboLoad 是用户**显式**选择的新开关，与本次撤回迁移无关：
+		// 它走独立的 tuoboScale() 通路（只影响角色图集 + 边缘对齐取整 + 帧坐标同步），
+		// 绝不能被这里的 textureScale 复位逻辑牵连。
 		if (!data.texScaleMigrated)
 		{
 			data.texScaleMigrated = true;
 			if (data.textureScale < 1) data.textureScale = 1.0;
 			saveSettings();
+		}
+
+		// TuoboLoad 档位归一（配置被手改/跨版本时兜底；'0'=关闭是默认，绝不强制改动）
+		// 存档用 '0'/'1' 两档（Option 的离散档位按数组位置索引派���文案 key，
+		// 用非连续索引会让 i18n 校验要求不存在的 .1）。
+		// 语义映射：'0'=关闭，'1'=极简（= 内部 2 档）。
+		// 旧的 '2'（原三档里的"轻量/降采样"）已撤回，任何其它值一律回落到关闭。
+		{
+			var _t:Dynamic = Reflect.field(data, 'tuoboLoad');
+			var _n:Int = -1;
+			if (_t is String) _n = Std.parseInt(cast _t);
+			else if (_t is Int) _n = cast _t;
+			if (_n == 2) data.tuoboLoad = '0'; // 撤回档：降采样，绝不静默沿用
+			else if (_n != 1) data.tuoboLoad = '0';
 		}
 
 		// 背景图降采样撤回迁移：本会话曾把 backgroundScale 写盘为 0.5（舞台/菜单绝对坐标
@@ -771,6 +824,23 @@ class ClientPrefs {
 			sys.io.File.saveContent(modeFile, data.highDPIRender ? '1' : '0');
 		} catch (e:Dynamic) {}
 		#end
+	}
+
+	// TuoboLoad 档位读取：设置项按 string 存（Option 的 'int' 是滑条、不支持离散档位），
+	// 这里容错解析字符串/数字两种形态，非法值一律回落到 0（关闭）。
+	// 存档 '0' → 0（关闭）；存档 '1' → 2（极简，不加载角色与舞台）。
+	// 注：非连续索引是为对齐 i18n 派生 key（Option 按数组位置派生 optionValue.N）。
+	// 旧的降采样档（曾为 '1'=轻量/'2'）已撤回 —— 位图缩放与帧坐标无法像素级一致，
+	// 会造成角色错位/缺失与主界面艺术图乱码。
+	public static function tuoboLoadLevel():Int
+	{
+		var v:Dynamic = Reflect.field(data, 'tuoboLoad');
+		var n:Int = 0;
+		if (v is String) n = Std.parseInt(cast v);
+		else if (v is Int) n = cast v;
+		else if (v is Float) n = Std.int(cast v);
+		if (n == 1) return 2; // 极简
+		return 0; // 关闭（含所有非法值）
 	}
 
 	public static function reloadVolumeKeys() {

@@ -5,6 +5,34 @@
 set -e
 cd "$(dirname "$0")"
 
+# ---- 目标架构：Apple Silicon 上默认出 arm64 原生二进制 ----
+# 为什么必须显式指定：haxe/lime 装在 /usr/local（Intel Homebrew 路径），在 M 系列 Mac 上
+# 整个工具链跑在 Rosetta 2 下，`System.hostArchitecture` 因此返回 X64 —— lime 的
+# MacPlatform.rebuild() 据此走 `case X64` 分支，编出 x86_64 目标，游戏**整个跑在
+# Rosetta 转译器上**（`oahd` 进程可见）。实测 PNG 解码惩罚 ~2.0×、纯计算 ~1.76×，
+# 进曲加载里 64% 的时间花在 BitmapData.fromFile，这部分白丢一半。
+# 覆盖方式：METEORIC_ARCH=x86_64 强制回退 Intel 构建。
+case "${METEORIC_ARCH:-auto}" in
+  arm64)  TARGET_ARCH="arm64" ;;
+  x86_64) TARGET_ARCH="x86_64" ;;
+  auto)
+    if [ "$(uname -m)" = "arm64" ] && [ -f "tools/lime.ndll.wallclock-arm64" ]; then
+      TARGET_ARCH="arm64"
+    else
+      TARGET_ARCH="x86_64"
+    fi
+    ;;
+  *) echo "未知 METEORIC_ARCH=${METEORIC_ARCH}（可选 auto/arm64/x86_64）" >&2; exit 2 ;;
+esac
+if [ "$TARGET_ARCH" = "arm64" ]; then
+  ARCH_FLAG="-Darm64"
+  NDLL_SRC="tools/lime.ndll.wallclock-arm64"
+else
+  ARCH_FLAG=""
+  NDLL_SRC="tools/lime.ndll.wallclock"
+fi
+export METEORIC_TARGET_ARCH="$TARGET_ARCH"
+
 # 加载 Homebrew 环境与 NEKOPATH（从 ~/.zprofile）
 if [ -f "$HOME/.zprofile" ]; then
   . "$HOME/.zprofile" 2>/dev/null || true
@@ -118,8 +146,11 @@ if [ "$1" = "typecheck" ]; then
   # 无条件还原（无论检查成功与否）
   if [ -n "$TC_BAK" ] && [ -f "$TC_BAK" ]; then
     # lime 返回后仍可能有异步收尾在覆盖，先等干净
+    # ⚠ 排除自身 PID：本脚本命令行含 lime/hxcpp 字面量，`pgrep -f` 会把本脚本自己
+    #   当成残留构建进程 → 循环永不退出（与 post-build 同款自匹配 bug）。
+    TC_SELF=$$
     for attempt in $(seq 1 12); do
-      if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|no-output)|hxcpp.*Build" >/dev/null 2>&1; then break; fi
+      if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|no-output)|hxcpp.*Build" 2>/dev/null | grep -qvE "^(${TC_SELF}|$$)$"; then break; fi
       sleep 2
     done
     cp "$TC_BAK" "$APP_NDLL_TC"
@@ -138,17 +169,17 @@ if [ "$1" = "typecheck" ]; then
 
       # ① 命中已知坏指纹 → 用权威墙钟版覆盖后再看一轮
       if [ "$APP_SIZE" = "$BAD_SIZE" ]; then
-        echo "[typecheck] ⚠ app 内 ndll 命中已知坏指纹（size=$APP_SIZE）→ 用 tools/lime.ndll.wallclock 覆盖"
-        cp "tools/lime.ndll.wallclock" "$APP_NDLL_TC"
+        echo "[typecheck] ⚠ app 内 ndll 命中已知坏指纹（size=$APP_SIZE）→ 用 $NDLL_SRC 覆盖"
+        cp "$NDLL_SRC" "$APP_NDLL_TC"
         sleep 2
         continue
       fi
 
       # ② 与权威墙钟版一致 → 通过
-      if cmp -s "tools/lime.ndll.wallclock" "$APP_NDLL_TC"; then TC_OK=1; break; fi
+      if cmp -s "$NDLL_SRC" "$APP_NDLL_TC"; then TC_OK=1; break; fi
 
       # ③ 与备份一致且大小明显不是坏版（可能是另一份墙钟构建）→ 通过
-      if cmp -s "$TC_BAK" "$APP_NDLL_TC" && [ "$APP_SIZE" -gt 9000000 ]; then TC_OK=1; break; fi
+      if cmp -s "$TC_BAK" "$APP_NDLL_TC" && [ "$APP_SIZE" -gt 8000000 ]; then TC_OK=1; break; fi
 
       # ④ 其余：先还原备份，下一轮再验
       cp "$TC_BAK" "$APP_NDLL_TC"
@@ -156,8 +187,17 @@ if [ "$1" = "typecheck" ]; then
     done
 
     if [ "$TC_OK" = "1" ]; then
-      codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
-      echo "[typecheck] 已还原墙钟版 lime.ndll + 重新签名 (md5: $(md5 -q "$APP_NDLL_TC"), size: $(stat -f%z "$APP_NDLL_TC"))"
+      # 同 post-build：不带 --deep 的 codesign 才不会替换 ndll（见下方 post-build 注释）
+      codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+      sleep 2
+      # 签名后再确认一次 —— 旧写法用 --deep 会把 ndll 换回 lime 自带版，
+      # 而日志却打印「已还原」，是假成功（实测 2026-10-06）
+      if cmp -s "$NDLL_SRC" "$APP_NDLL_TC"; then
+        echo "[typecheck] ✓ 已还原墙钟版 lime.ndll (md5: $(md5 -q "$APP_NDLL_TC"), size: $(stat -f%z "$APP_NDLL_TC"))"
+      else
+        cp "$NDLL_SRC" "$APP_NDLL_TC"
+        echo "[typecheck] ✓ 已还原墙钟版 lime.ndll（签名过程替换过，已再次覆盖）size: $(stat -f%z "$APP_NDLL_TC")"
+      fi
     else
       echo "[typecheck] ✘ 还原失败：app 内 ndll 始终不稳定（size=$(stat -f%z "$APP_NDLL_TC" 2>/dev/null)）"
       echo "[typecheck]   → 请直接跑 ./compile-mac.sh 重建（其 post-build 会恢复墙钟版）"
@@ -172,10 +212,23 @@ if [ "$1" = "typecheck" ]; then
   exit $TC_EXIT
 fi
 
+# ---- 架构切换：清空 hxcpp 中间产物 ----
+# hxcpp 的 obj 目录名是 obj/darwin64/（只区分位宽与 static_link，不含 CPU 架构），
+# 跨架构增量编译会把上一架构的 .o 直接链接进新二进制 → 链接期架构混用报错，
+# 或更糟：静默产出畸形 Mach-O。因此检测到架构变化就整体清空。
+ARCH_STAMP="export/release/macos/.last-arch"
+mkdir -p "$(dirname "$ARCH_STAMP")"
+if [ -f "$ARCH_STAMP" ] && [ "$(cat "$ARCH_STAMP")" != "$TARGET_ARCH" ]; then
+  echo "[pre-build] 架构切换 $(cat "$ARCH_STAMP") → $TARGET_ARCH：清空 hxcpp obj（目录名不含架构，会混用 .o）"
+  rm -rf export/release/macos/obj
+fi
+echo "$TARGET_ARCH" > "$ARCH_STAMP"
+echo "[pre-build] 目标架构 $TARGET_ARCH（ndll: $NDLL_SRC）"
+
 if [ "$1" = "test" ]; then
-  haxelib run lime test macos -release $PROFILE_DEFINE $DEBUG_FLAGS
+  haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS
 else
-  haxelib run lime build macos -release $PROFILE_DEFINE $DEBUG_FLAGS
+  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS
 fi
 
 # ---- 构建后处理：恢复墙钟版 lime.ndll ----
@@ -187,25 +240,63 @@ fi
 # 若沿用 8月17 旧 stable ndll（nextUpdate 是 Uint32），亚毫秒 framePeriod 每次 += 被截断成 +0
 # → catch-up 循环 while (nextUpdate <= currentUpdate) 永不前进 → 主线程 100% 死循环
 # → 启动后卡死在加载界面（CPU 100%）。因此这里恢复「墙钟版」而不是旧 stable。
-STABLE_NDLL="tools/lime.ndll.wallclock"
+STABLE_NDLL="$NDLL_SRC"
 APP_NDLL="export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll"
 echo "[post-build] waiting for lime/hxcpp tail processes to finish..."
+# ⚠ 必须排除自身 PID：本脚本的命令行里含 lime/hxcpp 等字面量（见上面的构建调用），
+#   `pgrep -f` 匹配完整命令行 → 会把**本脚本自己**当成残留构建进程，
+#   循环永远不退出，post-build 每次空等满 30×5=150 秒（实测卡死 8 分钟）。
+#   `pgrep` 无匹配时返回 1，所以这里用 `pgrep -v "^($$)$"` 反选自身之外的命中。
+SELF_PID=$$
 for attempt in $(seq 1 30); do
-  if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|test)|hxcpp.*Build" >/dev/null 2>&1; then
+  # 只看真正在跑的编译器：排除本脚本自身，以及 pgrep 自己的瞬时进程
+  if ! pgrep -f "haxe.*(lime|hxcpp)|lime.*(build|test)|hxcpp.*Build" 2>/dev/null | grep -qvE "^(${SELF_PID}|$$)$"; then
     break
   fi
   sleep 5
 done
 sleep 3
 if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
+  # ---- 墙钟版 ndll 现在是「性能加成」而非「正确性前提」----
+  # Main.hx 的启动帧率已改为 ClientPrefs.unlimitedFramerateValue()（与 Windows 统一）：
+  # 启动时读 lime.ndll 内容里的 SDL3_DYNAMIC_API 标记判断有没有墙钟补丁，
+  # 有 → 100000（无人工限制），没有 → 1000（老 ndll 上的安全上限）。
+  # 因此**即使本步骤失败或被跳过**，引擎也只会退到 1000 帧上限运行，
+  # 不会再出现「老 ndll + 100000 → 启动黑屏死循环」。这才是真正"甩掉墙钟依赖"。
+  #
+  # 顺序：先拷贝、再签名（不带 --deep）。带签名的 ndll 与未签名参考无法逐字节比对
+  # （codesign 改写 Mach-O 头的 LC_CODE_SIGNATURE），故只校验签名有效 + 架构匹配。
+  # 签名顺序（实测 2026-10-06）：必须**先签 ndll、再签主程序、最后签 bundle**。
+  # 只签 bundle 会留下 "code object is not signed at all / In subcomponent: lime.ndll"
+  # —— 拷进来的 ndll 是独立代码对象，需要单独签名。只签一次 bundle 不会递归处理它。
+  #
+  # ⚠ 绝对不要加 --deep：它会用 ndll 目录里 lime 自带的版本覆盖掉刚拷进来的
+  #   墙钟版/PNG decodeScale 版（--recursive 重新签名整个 bundle 的子组件），
+  #   于是 frame_loop 补丁与解码期缩放原语一起消失，老 ndll + 100000 帧哨兵
+  #   → 启动即 100% CPU 死循环。三层分开签（ndll → 主程序 → bundle）即可。
   cp "$STABLE_NDLL" "$APP_NDLL"
-  sleep 3
-  if cmp -s "$STABLE_NDLL" "$APP_NDLL"; then
-    codesign --force --deep -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
-    echo "[post-build] restored wallclock lime.ndll + re-signed  (md5: $(md5 -q "$APP_NDLL"))"
+  sleep 2
+  codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll" 2>/dev/null || true
+  codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" 2>/dev/null || true
+  codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+  sleep 2
+  # 判据：三层签名各自有效 + ndll 架构与主程序一致 + 补丁符号在位。
+  # 不再用「尺寸 ≥ 参考」判断 —— ad-hoc 签名会**改写** Mach-O 的 LC_CODE_SIGNATURE，
+  # 签完的 ndll 反而比未签名的参考小（arm64 实测 8283872 → 8253840），
+  # `-ge` 在 arm64 上恒假 → 每轮都误报「签名未完全成功」（实测 2026-10-12）。
+  REF_ARCH=$(lipo -archs "$STABLE_NDLL" 2>/dev/null)
+  APP_ARCH=$(lipo -archs "$APP_NDLL" 2>/dev/null)
+  MAIN_ARCH=$(lipo -archs "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" 2>/dev/null)
+  if codesign -v "export/release/macos/bin/Meteoric.app" >/dev/null 2>&1 \
+     && codesign -v "$APP_NDLL" >/dev/null 2>&1 \
+     && [ "$REF_ARCH" = "$APP_ARCH" ] && [ "$APP_ARCH" = "$MAIN_ARCH" ]; then
+      echo "[post-build] ✓ 签名有效（bundle/主程序/ndll 三层）+ $NDLL_SRC 已就位 (arch: $APP_ARCH)"
   else
-    echo "[post-build] WARNING: lime.ndll was overwritten again after restore"
+      echo "[post-build] ⚠ 签名或 ndll 还原未完全成功（ndll arch=$APP_ARCH / 主程序 arch=$MAIN_ARCH / 参考=$REF_ARCH）"
+      echo "[post-build]    非致命：引擎会按 SDL3_DYNAMIC_API 标记自动回退 1000 帧档运行。"
   fi
+else
+  echo "[post-build] ⚠ 找不到 $STABLE_NDLL 或产物 ndll，跳过墙钟版还原（引擎自动回退 1000 帧档）"
 fi
 
 # ---- 恢复用户 mods（lime 构建会重置 Resources，用户装过的 mod 会丢）----

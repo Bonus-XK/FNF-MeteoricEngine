@@ -75,6 +75,8 @@ class MusicBeatState extends FlxUIState
 	override function update(elapsed:Float)
 	{
 		#if sys
+		// 自动进歌（性能实测探针，仅在设置 METEORIC_AUTOSONG 时生效；未激活时零开销）
+		backend.PerfProbe.tick(this);
 		backend.ModInstaller.update(elapsed);
 		#end
 		// Meteoric：主线程维护（每帧分片异步解码 + 每 60s 清理未用贴图/声音）

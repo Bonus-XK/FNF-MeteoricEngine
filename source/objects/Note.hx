@@ -65,6 +65,11 @@ class CastNote
 	public var multSpeed:Float;       // 每音符滚动倍速（默认 1）
 	public var cmpSpam:Array<Dynamic>;// H-Slice 挤压音符扩展 [剩余数, 密度]（展开为连续同轨音符）
 	public var offs:Array<Float>;     // 堆叠合并展开：本组内每个箭头相对基准时间的偏移（ms）
+	// 【有界偏移】offs 开启有界化后只保留前 N 个 + 末个（lastOffset），
+	// offsKeep 记录**真实**合并数量。生成期靠这两个字段把视觉展开还原成均匀分布，
+	// 否则截断会让所有箭头挤在簇的前段。
+	public var offsKeep:Int;        // 簇内真实合并数量（offs.length 可能远小于它）
+	public var lastOffset:Float;    // 簇内最后一个偏移（截断时用于尾部插值）
 									//（后台压缩为一条 CastNote；生成时按偏移展开为 N 个视觉箭头，
 									//  画面与未压缩时逐像素一致）
 	// 舞台脚本（PhillyStreets/PhillyBlazin 等）会直接改这些字段；必须初始化默认值
@@ -110,6 +115,8 @@ class CastNote
 	static var __multSpeed:Array<Float> = [];
 	static var __cmpSpam:Array<Dynamic> = [];    // 元素 = Array<Dynamic> | null
 	static var __offs:Array<Dynamic> = [];       // 元素 = Array<Float> | null
+	static var __offsKeep:Array<Int> = [];     // 簇内真实合并数量
+	static var __lastOffset:Array<Float> = []; // 簇内最后一个偏移
 	static var __noAnimation:Array<Bool> = [];
 	static var __noMissAnimation:Array<Bool> = [];
 	static var __blockHit:Array<Bool> = [];
@@ -123,7 +130,7 @@ class CastNote
 	{
 		__slotCount = 0;
 		__strumTime = []; __noteData = []; __chartSeq = []; __density = []; __holdLength = [];
-		__noteType = []; __multSpeed = []; __cmpSpam = []; __offs = [];
+		__noteType = []; __multSpeed = []; __cmpSpam = []; __offs = []; __offsKeep = []; __lastOffset = [];
 		__noAnimation = []; __noMissAnimation = []; __blockHit = [];
 		__angle = []; __offsetAngle = []; __wasHit = [];
 	}
@@ -150,6 +157,8 @@ class CastNote
 			__multSpeed.push(1);
 			__cmpSpam.push(null);
 			__offs.push(null);
+			__offsKeep.push(0);
+			__lastOffset.push(0);
 			__noAnimation.push(false);
 			__noMissAnimation.push(false);
 			__blockHit.push(false);
@@ -194,6 +203,14 @@ class CastNote
 	public var offs(get, set):Array<Float>;
 	inline function get_offs():Array<Float> return __offs[idx];
 	inline function set_offs(v:Array<Float>):Array<Float> return __offs[idx] = v;
+
+	public var offsKeep(get, set):Int;
+	inline function get_offsKeep():Int return __offsKeep[idx];
+	inline function set_offsKeep(v:Int):Int return __offsKeep[idx] = v;
+
+	public var lastOffset(get, set):Float;
+	inline function get_lastOffset():Float return __lastOffset[idx];
+	inline function set_lastOffset(v:Float):Float return __lastOffset[idx] = v;
 
 	public var noAnimation(get, set):Bool;
 	inline function get_noAnimation():Bool return __noAnimation[idx];
