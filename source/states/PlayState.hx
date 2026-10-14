@@ -2207,35 +2207,57 @@ class PlayState extends MusicBeatState
 
 		// 均匀采样：保留首、尾与等距中间点（视觉跨度/密度与原版一致）；
 		// maxVis 由 noteSpawn 按"2s 窗口簇数"动态预算（场上精灵总额控制）
-		var full:Array<Float> = offs;
 		var maxVis:Int = clusterVisCap; // 动态视觉预算（见 noteSpawn）
 		if (maxVis < 1) maxVis = 12;
 
-		// 【有界偏移还原】boundedOffs 开启时 offs 只存了前 KEEP 个（+ lastOff），
-		// 而真实数量是 offsKeep。若直接按 offs.length 采样，所有箭头会挤在簇的前段，
-		// 视觉跨度完全丢失。这里用「前 KEEP 个 + 末个」在尾部线性插值，
-		// 把视觉分布还原成 0→全跨度的均匀铺开（与全量采样的效果接近）。
-		var total:Int = (offsKeep > offs.length) ? offsKeep : offs.length;
-		if (total > offs.length && offs.length > 0)
+		// 【有界偏移还原·O(maxVis)】boundedOffs 开启时 offs 只存了前 KEEP 个（+ lastOff），
+		// 真实数量记在 offsKeep —— 多 Part 组合谱里单个簇可达 **190 万颗**（66 Part 同刻叠加；
+		// 实测 stupid-griefer 尾段 980 个簇的 density 和 = 18.94 亿）。
+		// 旧实现为了采样 ≤maxVis 个点，先把尾部线性插值**整段展开**成 Array 再采样：
+		//   span = offsKeep - (offs.length - 1) ≈ 190 万 → 每簇一次性 push 190 万个元素，
+		//   随后 offs.concat(tail) 再整体复制一份；980 个这样的簇 ≈ 数十 GB 分配。
+		// 实测后果：尾段彻底卡死（用户反馈「尾杀段很卡」），这些簇走不到命中路径，
+		//   可击中数量只剩轻簇的 2,931 万（应为 19.23 亿，差 65 倍）。
+		// 现改为按采样下标**反算**偏移值：前半段直接取存下来的，越界段走尾部闭式线性插值，
+		// 复杂度 O(maxVis)。同一 idx 的取值与旧实现逐点等价 —— 普通谱面（tailSpan 本就很小）
+		// 走的仍是同一分支，行为与旧版完全一致。
+		var picks:Array<Float> = [];
+		if (offs.length > 0)   // offs 为空时旧版 full=[] → 不展开任何视觉副本，保持一致
 		{
-			var tail:Array<Float> = [];
-			var span:Int = total - (offs.length - 1);   // 需要补出的尾部点数
+			var total:Int = (offsKeep > offs.length) ? offsKeep : offs.length;
+			var tailSpan:Int = (total > offs.length) ? (total - (offs.length - 1)) : 0;
 			var firstTail:Float = offs[offs.length - 1];
-			var denom:Float = (span > 1) ? (span - 1) : 1;
-			for (j in 0...span) tail.push(firstTail + (lastOff - firstTail) * (j / denom));
-			full = offs.concat(tail);
-		}
+			var denom:Float = (tailSpan > 1) ? (tailSpan - 1) : 1;
 
-		var picks:Array<Float> = full;
-		if (full.length > maxVis - 1)
-		{
-			picks = [];
-			var step:Float = (full.length - 1) / (maxVis - 1);
-			for (i in 0...maxVis)
+			// idx ∈ [0, total) → 该位置的偏移；idx ≥ offs.length 时落到尾部插值段
+			var offsetAt = function(idx:Int):Float {
+				if (idx < 0) idx = 0;
+				if (idx < offs.length) return offs[idx];
+				if (tailSpan <= 0) return firstTail;
+				var j:Int = idx - (offs.length - 1);
+				if (j > tailSpan - 1) j = tailSpan - 1;
+				return firstTail + (lastOff - firstTail) * (j / denom);
+			};
+
+			if (total > maxVis - 1)
 			{
-				var idx:Int = Std.int(i * step);
-				if (idx >= full.length) idx = full.length - 1;
-				picks.push(full[idx]);
+				var step:Float = (total - 1) / (maxVis - 1);
+				for (i in 0...maxVis)
+				{
+					var idx:Int = Std.int(i * step);
+					if (idx >= total) idx = total - 1;
+					picks.push(offsetAt(idx));
+				}
+			}
+			else
+			{
+				// 采样点覆盖不了全部 → 全部铺开（尾部本来就短，tailSpan ≤ maxVis-1）
+				picks = offs;
+				if (tailSpan > 0)
+				{
+					picks = offs.copy();
+					for (j in 0...tailSpan) picks.push(firstTail + (lastOff - firstTail) * (j / denom));
+				}
 			}
 		}
 		for (i in 0...picks.length)

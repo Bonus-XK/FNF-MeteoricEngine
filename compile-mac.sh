@@ -276,9 +276,19 @@ if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
   #   → 启动即 100% CPU 死循环。三层分开签（ndll → 主程序 → bundle）即可。
   cp "$STABLE_NDLL" "$APP_NDLL"
   sleep 2
+  # ---- 迭代模式：跳过 bundle 层签名 ----
+  # bundle 里塞了 79GB 的 mod 谱面数据（stupid-griefer 66 个 Part），codesign 要把
+  # 整个 resources 哈希一遍：实测单是「签主程序」就要 30 分钟以上且会被 shell 的 idle
+  # 超时砍在半写状态。但终端直接 ./Meteoric 启动只需要 Mach-O 自身的签名 ——
+  # 链接器自带的 ad-hoc（linker-signed）已足够，实测可正常进游戏。
+  # 只有要分发给别人时才需要完整三层签名。
+  if [ "$METEORIC_SKIP_CODESIGN" = "1" ]; then
+    echo "[post-build] ⚠ METEORIC_SKIP_CODESIGN=1：跳过签名（仅供本地迭代，勿分发）"
+  else
   codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll" 2>/dev/null || true
   codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" 2>/dev/null || true
   codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+  fi
   sleep 2
   # 判据：三层签名各自有效 + ndll 架构与主程序一致 + 补丁符号在位。
   # 不再用「尺寸 ≥ 参考」判断 —— ad-hoc 签名会**改写** Mach-O 的 LC_CODE_SIGNATURE，

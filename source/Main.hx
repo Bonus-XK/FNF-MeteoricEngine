@@ -4,6 +4,7 @@ import flixel.graphics.FlxGraphic;
 
 import backend.CrashHandler;
 import backend.ClientPrefs;
+import backend.Lang;
 
 import flixel.FlxGame;
 import flixel.FlxState;
