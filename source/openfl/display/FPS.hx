@@ -248,6 +248,9 @@ class FPS extends TextField
 		if (ClientPrefs.data.showVer)
 		{
 			buf.add('\nMeteoric Engine v${Main.meVersion}');
+			// commit 数 / 短 hash / 分支名 + 未提交标记，编译期由 GitInfo 宏烘焙（运行时零开销）
+			var gi:String = backend.GitInfo.summary();
+			if (gi != "-" && gi.length > 0) buf.add('\n$gi');
 			buf.add('\nPsych Engine');
 		}
 
@@ -287,6 +290,12 @@ class FPS extends TextField
 		#if sys
 		buf.add(' | CPU: ${Math.round(_cpuPct)}%');
 		#end
+		// commit 信息跟随 showVer，与屏幕计数器口径一致（都是编译期烘焙，零开销）
+		if (ClientPrefs.data.showVer)
+		{
+			var gi:String = backend.GitInfo.summary();
+			if (gi != "-" && gi.length > 0) buf.add(' | $gi');
+		}
 		return buf.toString();
 	}
 

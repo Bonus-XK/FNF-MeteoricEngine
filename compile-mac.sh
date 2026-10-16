@@ -159,6 +159,34 @@ if [ -n "$DEBUG_FLAGS" ]; then
   echo "[compile] 调试构建：启用 meteoric_debug 诊断输出"
 fi
 
+# ---- 构建期 git 信息 → GitInfoData.hx（FPS 显示用）----
+# 值烘焙进二进制，运行时零开销。
+# ⚠ 不用 Haxe 宏：Codename Engine 的 GitCommitMacro 走 #if macro + sys.io.Process，
+#   但本项目有全局自动导入 source/import.hx（内含 import llua.*），llua 在宏上下文
+#   引用 cpp.RawPointer 被 Haxe 禁止（"You cannot access the cpp package while in a
+#   macro"）→ 只要 import.hx 在，任何宏类都编译失败。故改为脚本生成数据文件。
+GITDATA="source/backend/GitInfoData.hx"
+_git_num=$(git rev-list HEAD --count 2>/dev/null || echo "")
+_git_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+_git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+_git_dirty=$(git status --porcelain 2>/dev/null | head -1)
+[ -n "$_git_num" ] || _git_num=0
+[ -n "$_git_hash" ] || _git_hash="-"
+[ -n "$_git_branch" ] || _git_branch="-"
+_git_dirty_flag="false"
+[ -n "$_git_dirty" ] && _git_dirty_flag="true"
+python3 - "$GITDATA" "$_git_num" "$_git_hash" "$_git_branch" "$_git_dirty_flag" <<'PYEOF'
+import re, sys
+path, num, h, br, dirty = sys.argv[1:6]
+s = open(path, encoding='utf-8').read()
+s = re.sub(r'var commitNumber:Int = -?\d+;', 'var commitNumber:Int = %s;' % num, s)
+s = re.sub(r'var commitHash:String = "[^"]*";', 'var commitHash:String = "%s";' % h, s)
+s = re.sub(r'var branchName:String = "[^"]*";', 'var branchName:String = "%s";' % br, s)
+s = re.sub(r'var dirty:Bool = (true|false);', 'var dirty:Bool = %s;' % dirty, s)
+open(path, 'w', encoding='utf-8').write(s)
+PYEOF
+echo "[compile] git: #$_git_num $_git_hash $_git_branch (dirty=$_git_dirty_flag)"
+
 # ---- 类型检查模式：./compile-mac.sh typecheck ----
 # 只做 Haxe 类型检查，**绝不改动 app**：
 # `haxelib run lime build macos --no-output` 这个名字很有欺骗性 —— 它**不阻止写出**，
