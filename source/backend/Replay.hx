@@ -146,6 +146,14 @@ class Replay
 	#if sys
 	public static function getReplayDir():String
 	{
+		// 携带模式 + 用户勾选「回放跟着走」时，回放落到便携目录（与设置同处）。
+		// ⚠ 这里返回**绝对**路径：返回值直接喂 FileSystem，而便携相对写法
+		//   （../../..）只对 FlxSave.bind 有效 —— 那里会自己拼 applicationStorageDirectory，
+		//   直接给 FileSystem 会按进程 CWD 解析，落点完全不对。
+		if (ClientPrefs.data != null && ClientPrefs.data.portableReplays && CoolUtil.isPortable())
+		{
+			return CoolUtil.portableDir() + 'replays/';
+		}
 		var dir:String = System.applicationStorageDirectory;
 		if (dir.length > 0 && !dir.endsWith('/') && !dir.endsWith('\\')) dir += '/';
 		return dir + 'replays/';

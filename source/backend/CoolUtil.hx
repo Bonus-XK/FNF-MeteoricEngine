@@ -120,9 +120,143 @@ class CoolUtil
 		@BeastlyGabi
 	**/
 	inline public static function getSavePath(folder:String = 'ShadowMario'):String {
+		#if (sys && !android)
+		// 携带模式：设置改写到引擎目录（详见 portableRelativeTo）
+		// ⚠ 必须放在 @:privateAccess **之前**：那个标记只作用于紧随其后的 return 表达式，
+		//   插在中间会让 FlxSave.validate 的私有访问授权落到本段代码上（编译报
+		//   "Cannot access private field validate"）。
+		var portable:String = portableSavePath();
+		if (portable != null) return portable;
+		#end
 		@:privateAccess
 		return #if (flixel < "5.0.0") folder #else FlxG.stage.application.meta.get('company')
 			+ '/'
 			+ FlxSave.validate(FlxG.stage.application.meta.get('file')) #end;
+	}
+
+	// ================= 携带模式（Portable Mode） =================
+	//
+	// 目标：设置/键位/高分/回放跟着引擎目录走，整套拷到 U 盘上插到别的电脑也能用。
+	//
+	// 为什么不能直接传绝对路径给 FlxSave：
+	//   openfl/net/SharedObject.hx:881 把落点写死成
+	//       System.applicationStorageDirectory + "/" + localPath + "/"
+	//   localPath 永远是相对 `applicationStorageDirectory`（macOS 上是
+	//   ~/Library/Application Support/）的片段，传绝对路径会被当成相对路径拼上去。
+	//   但它**不对 localPath 做规范化**（只规范化 name），所以 `../` 会被文件系统
+	//   原样解析 —— 于是只能用「上溯到根 + 目标绝对路径」的相对写法绕过去。
+	//
+	// 上溯层数在运行时算（数 applicationStorageDirectory 的路径段数），
+	// 所以 U 盘挂载点变化、换机器都能自动重算。
+
+	/** 携带模式标记文件（放在 .app 旁边）。存在 = 携带模式开启。 */
+	static inline var PORTABLE_MARKER:String = 'portable';
+
+	/** 便携目录名（放在 .app 旁边）。 */
+	static inline var PORTABLE_DIR:String = 'MeteoricPortable';
+
+	/** .app 所在目录（即「引擎目录」，录像输出也用这个基准）。 */
+	public static function appDirectory():String
+	{
+		#if (sys && !android)
+		try
+		{
+			// applicationDirectory 在 macOS 上是 <app>/Contents/MacOS/，
+			// 往两级上才是「.app 所在目录」，和录像输出口径保持一致。
+			var d:String = lime.system.System.applicationDirectory;
+			if (d == null || d.length == 0) return './';
+			if (d.charAt(d.length - 1) != '/' && d.charAt(d.length - 1) != '\\') d += '/';
+			var s:String = new String(haxe.io.Path.directory(haxe.io.Path.directory(d)));
+			if (s.length == 0) return './';
+			return (s.charAt(s.length - 1) == '/' || s.charAt(s.length - 1) == '\\') ? s : s + '/';
+		}
+		catch (e:Dynamic) {}
+		#end
+		return './';
+	}
+
+	/** 携带模式标记文件的绝对路径。 */
+	public static function portableMarkerPath():String
+	{
+		return appDirectory() + PORTABLE_MARKER;
+	}
+
+	/** 是否处于携带模式（标记文件存在）。 */
+	public static function isPortable():Bool
+	{
+		#if (sys && !android)
+		try
+		{
+
+			return sys.FileSystem.exists(portableMarkerPath());
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
+	}
+
+	/** 打开/关闭携带模式（写/删标记文件）。返回切换后的状态。 */
+	public static function setPortable(on:Bool):Bool
+	{
+		#if (sys && !android)
+		try
+		{
+			var p:String = portableMarkerPath();
+			if (on)
+			{
+				if (!sys.FileSystem.exists(p)) sys.io.File.saveContent(p, 'Meteoric Engine 携带模式：删除本文件即可恢复正常存档路径。\n');
+				return true;
+			}
+			if (sys.FileSystem.exists(p)) sys.FileSystem.deleteFile(p);
+			return false;
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
+	}
+
+	/** 便携目录（.app 旁边的 MeteoricPortable/）。 */
+	public static function portableDir():String
+	{
+		return appDirectory() + PORTABLE_DIR + '/';
+	}
+
+	/**
+	 * 把绝对路径转成「从 applicationStorageDirectory 上溯到根」的相对写法。
+	 * 例：storage=~/Library/Application Support/，target=/Volumes/USB/M/MeteoricPortable/
+	 *   → "../../../../Volumes/USB/M/MeteoricPortable"
+	 */
+	public static function portableRelativeTo(target:String):String
+	{
+		if (target == null || target.length == 0) return null;
+		var storage:String = lime.system.System.applicationStorageDirectory;
+		if (storage == null || storage.length == 0) return null;
+		// 段数 = 去掉首尾斜杠后按 '/' 切开的个数；上溯这么多层正好回到根
+		var t:String = storage;
+		while (t.length > 0 && (t.charAt(0) == '/' || t.charAt(0) == '\\')) t = t.substr(1);
+		while (t.length > 0 && (t.charAt(t.length - 1) == '/' || t.charAt(t.length - 1) == '\\')) t = t.substr(0, t.length - 1);
+		var depth:Int = 0;
+		for (_ in t.split('/')) depth++;
+
+		var up:StringBuf = new StringBuf();
+		for (_ in 0...depth) up.add('../');
+
+		var dst:String = target;
+		while (dst.length > 0 && (dst.charAt(0) == '/' || dst.charAt(0) == '\\')) dst = dst.substr(1);
+		return up.toString() + dst;
+	}
+
+	/** 携带模式下的存档目录（相对写法，可直接给 FlxSave.bind）；非携带模式返回 null。 */
+	public static function portableSavePath():String
+	{
+		if (!isPortable()) return null;
+		var dir:String = portableDir();
+		try
+		{
+
+			sys.FileSystem.createDirectory(dir);
+		}
+		catch (e:Dynamic) {}
+		return portableRelativeTo(dir);
 	}
 }

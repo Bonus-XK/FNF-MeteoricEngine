@@ -166,6 +166,18 @@ class SaveVariables {
 	@:keep public var renderBitrate:Float = 8;     // 视频码率（Mb/s）
 	@:keep public var renderEncoder:String = 'libx264'; // 视频编码器
 	@:keep public var renderPath:String = 'recordings/'; // 输出子目录（相对 app 所在目录，不是 bundle 内部）
+	// ===== 携带模式：各类用户数据是否跟着引擎目录走 =====
+	// 总开关是引擎目录的 `portable` 标记文件（引擎读设置前必须先知道），
+	// 这里控制的是**各类数据分别跟不跟随**。设置/键位/高分/回放 走 CoolUtil.getSavePath，
+	// 这里只管 replays 与 chartcache 这两个自己解析路径的。
+	@:keep public var portableReplays:Bool = true;  // 回放录像跟着走
+	@:keep public var portableChartCache:Bool = false; // 谱面缓存跟着走（几 GB，可重建，默认不带）
+	// 总开关的**显示镜像**：真实状态是引擎目录的 `portable` 标记文件，这个字段只负责
+	// 让设置页有个可勾选的条目（设置页每次打开都用标记文件覆盖它，存档里存的值不作数）。
+	@:keep public var portableModeOn:Bool = false;
+	// 两个「一次性动作」：勾上触发动作后立即复位，checkbox 不会停在勾选态
+	@:keep public var portableBackupAction:Bool = false;
+	@:keep public var portableRestoreAction:Bool = false;
 	@:keep public var gfxCpuRelease:Bool = false;  // 大纹理显存预提交 + 释放 CPU 副本（SeiunEngine 方案）：进曲时一次性上传所有大图集并丢弃 CPU 侧数据，消除游玩头几秒的上传卡顿；默认关 = 零行为变化
 	// ===== H-Slice 移植：音符管线性能设置 =====
 	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）

@@ -133,6 +133,9 @@ class OptionsState extends MusicBeatState
 		e.make = function() return new RenderModeSubState();
 		list.push(e);
 
+		e = new SectionEntry(Lang.tOr('options.category.move', '携带与备份'), Lang.tOr('options.title.move', '携带模式设置'));
+		e.make = function() return new MoveState();
+		list.push(e);
 
 		e = new SectionEntry(Lang.tOr('options.category.programming', '编程'), Lang.tOr('options.title.programming', '编程'));
 		e.make = function() return new ProgrammingSettingsSubState();

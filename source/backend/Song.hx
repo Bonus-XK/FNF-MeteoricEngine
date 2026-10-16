@@ -1132,17 +1132,50 @@ class Song
 		var rel:String = 'data/' + songBase + '/';
 
 		// ⚠ 不能用 modsJson(base) 反推目录：**本体文件（如 stupid-griefer.json）不存在**
-		//   （只有 -1…-64），modFolders 会一路 fallthrough 到默认资源目录，路径全错。
-		//   这里改为与 modFolders 同一套遍历：当前模组 → 全局模组 → 默认资源。
+		//   （只有 -1…-66），modFolders 会一路 fallthrough 到默认资源目录，路径全错。
+		//
+		// 候选根目录必须与 resolveChartPath 的解析链对齐，否则「别的玩家的分段谱」一律
+		// 报「找不到 xxx-parts 谱面」。原实现只查了前两级：
+		//   ① Mods.currentModDirectory   —— 只有当前正在加载的那个模组
+		//   ② Mods.getGlobalMods()       —— 只有 pack.json 里 runsGlobally 的模组
+		// 普通歌曲模组**两者都不满足**：它不 runsGlobally，且选曲前还没成为 currentModDirectory。
+		// 补上：
+		//   ③ Mods.getModDirectories()   —— 扫全部模组
+		//   ④ Paths.mods(rel)            —— mods 根下的 data/（modFolders 的第三级兜底）
+		//   ⑤ Paths.json(rel)            —— assets/data/（本体歌曲，resolveChartPath 的本体分支）
 		var roots:Array<String> = [];
-		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0) roots.push(Mods.currentModDirectory);
-		for (m in Mods.getGlobalMods()) roots.push(m);
+		var seen:Map<String, Bool> = new Map();
+		function addRoot(r:String):Void
+		{
+			if (r == null || r.length == 0 || seen.exists(r)) return;
+			seen.set(r, true);
+			roots.push(r);
+		}
+		addRoot(Mods.currentModDirectory);
+		for (m in Mods.getGlobalMods()) addRoot(m);
+		#if MODS_ALLOWED
+		for (m in Mods.getModDirectories()) addRoot(m);
+		#end
 
 		var prefix:String = base + '-';
+
+		// 候选目录：先各根下的 data/<歌名>/（标准布局），再 data/ 根下（扁平布局，
+		// 少数分段谱把 song-1.json 直接摊在 data/ 里）。扁平布局放在最后，避免抢在标准布局前面。
+		var dirs:Array<String> = [];
 		for (root in roots)
 		{
-			var dir:String = Paths.mods(root + '/' + rel);
-			if (!FileSystem.exists(dir)) continue;
+			var d:String = Paths.mods(root + '/' + rel);
+			if (FileSystem.exists(d)) dirs.push(d);
+		}
+		var modsFlat:String = Paths.mods('data/');
+		if (FileSystem.exists(modsFlat)) dirs.push(modsFlat);
+		#if (sys && !android)
+		var assetDir:String = Paths.json(rel.substr(0, rel.length - 1));
+		if (FileSystem.exists(assetDir)) dirs.push(assetDir);
+		#end
+
+		for (dir in dirs)
+		{
 			var found:Map<String, Int> = new Map();   // path → 数字序号
 			for (f in FileSystem.readDirectory(dir))
 			{

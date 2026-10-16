@@ -49,6 +49,12 @@ class PackedCache
 	{
 		#if sys
 		var candidates:Array<String> = [];
+		// 携带模式 + 用户勾选「谱面缓存跟着走」时，缓存优先落便携目录。
+		// ⚠ 绝对路径（候选列表本身就是绝对路径体系，见下面的 Sys.programPath 兜底）。
+		if (ClientPrefs.data != null && ClientPrefs.data.portableChartCache && CoolUtil.isPortable())
+		{
+			candidates.push(CoolUtil.portableDir() + 'chartcache');
+		}
 		try
 		{
 			var storage = System.applicationStorageDirectory;
