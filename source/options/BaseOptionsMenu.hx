@@ -628,17 +628,23 @@ class BaseOptionsMenu extends MusicBeatSubstate
 				}
 
 			case 'string':
-				var num:Int = curOption.curOption;
-				num += dir;
+				// ⚠ string 档位必须有 options 数组（下面直接读 .length）。
+				//   传 null 会在这里空引用崩溃 —— 加一道防御：缺档位时按「无变化」处理。
+				//   正确做法仍是调用方补齐 options（选项 UI 不支持自由文本输入）。
+				if (curOption.options != null && curOption.options.length > 0)
+				{
+					var num:Int = curOption.curOption;
+					num += dir;
 
-				if (num < 0) {
-					num = curOption.options.length - 1;
-				} else if (num >= curOption.options.length) {
-					num = 0;
+					if (num < 0) {
+						num = curOption.options.length - 1;
+					} else if (num >= curOption.options.length) {
+						num = 0;
+					}
+
+					curOption.curOption = num;
+					curOption.setValue(curOption.options[num]);
 				}
-
-				curOption.curOption = num;
-				curOption.setValue(curOption.options[num]);
 		}
 		updateTextFrom(curOption);
 		curOption.change();

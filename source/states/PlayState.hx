@@ -2327,6 +2327,10 @@ class PlayState extends MusicBeatState
 		// 大纹理 CPU 副本的周期性兜底释放（默认关闭时 no-op）
 		backend.GfxPolicy.onPlayUpdate(elapsed);
 		HostDomain.update(this, elapsed);
+		// Render Mode 抓帧（内部按 targetFPS 节流）。放在 update 末尾是刻意的：
+		// Flixel 的绘制发生在 ENTER_FRAME 的 update 之后，所以此刻帧缓冲里是**上一帧**
+		// 已完成的画面 —— 恒定滞后一帧（60fps 下 16ms），音画对齐见 VideoRecorder.start 注释。
+		backend.VideoRecorder.update(haxe.Timer.stamp());
 	}
 
 	@:noCompletion public function meteoSuper_update(elapsed:Float) return super.update(elapsed);

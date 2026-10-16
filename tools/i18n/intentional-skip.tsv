@@ -216,6 +216,27 @@ source/backend/NoteChartDomain.hx	[Memory] 谱面恢复异常：	1	诊断日志�
 source/backend/Paths.hx	[Audio] 流式加载不可用，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/Paths.hx	[Audio] 流式加载失败，回退全量解码：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/backend/ReplayDomain.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
+source/backend/VideoRecorder.hx	 (含音频)	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	 (无声)	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	 单帧缓冲=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	 帧（路径=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	MB → 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] readPixels 返回空，跳过一帧	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 写 ffmpeg 管道失败（可能磁盘满或进程已退出）：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 启动 ffmpeg 失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 开始录像 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 当前平台不支持录像	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 快路径初始化失败，回退 Window.readPixels：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 快路径宏已开启（lime_cffi + lime_opengl）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 快路径宏未开启（lime_cffi/lime_opengl 缺一），只能回退 Window.readPixels	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 快路径抓帧失败，本帧起降级为 Window.readPixels：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 拿不到窗口句柄，无法录像	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 未找到 ffmpeg，无法录像（装 Homebrew: brew install ffmpeg）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 窗口尺寸异常：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	[Recorder] 结束录像，共 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	fps 路径=	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	ms）→ 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/backend/VideoRecorder.hx	，平均抓帧 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（中间对象缺失）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（目标值非数值）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/flixel/tweens/misc/VarTween.hx	"（目标或值为 null）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
@@ -789,6 +810,24 @@ source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨
 source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	ffmpeg 未安装	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	libx264 兼容性最好，通用首选；\\nlibx265 同画质体积更小但编码慢；\\n其它编码器可用性取决于你的 ffmpeg 构建	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	不需要额外的录屏软件。录像期间会有轻微帧率开销\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	开启后，进曲时自动开始录像，录完整首直到结算，\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像功能需要 ffmpeg。装好后重启引擎即可使用：\\n\\nbrew install ffmpeg	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像文件的输出子目录（相对于 Meteoric.app 所在目录）。\\n默认落在 app 旁边，不会写进 bundle 内部	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像的目标帧率。与游戏实际帧率解耦 ——\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	录像设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	游戏跑再快也只按这个帧率抓帧，避免白白拖慢自己	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	码率越高画质越好、文件越大。\\n1080p60 建议 8-16，720p60 建议 4-8	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	视频帧率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	视频码率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	视频编码器	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	输出到「输出目录」下的 .mp4。\\n\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	输出目录	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/RenderModeSubState.hx	（每帧要把画面从显卡读回内存），介意的话录完记得关掉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/psychlua/LuaClass.hx	    -- Enemy.isInstanceOf(instance) 与 instance:isInstanceOf(Enemy) 均可用\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类部分），否则创建新实例。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本

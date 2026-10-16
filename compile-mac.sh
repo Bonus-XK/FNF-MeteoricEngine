@@ -73,15 +73,47 @@ rm_force() {
 # ---- 构建前：备份当前用户 mods（构建会重置 Resources）----
 # 用"上一次构建产物里的 mods"作备份源，这样用户删除的 mod 不会在下次构建时复活；
 # 首次构建（无产物）时回退到 tools/user_mods 快照。
+#
+# ⚠ 体积陷阱（实测 2026-10-16）：mods 目录里可能塞着几十 GB 的谱面数据
+#   （stupid-griefer 66 个 Part × 1.2GB = 78GB）。这个备份 + 下方 post-build 的
+#   还原，每次构建各拷一遍 → 单次构建多花 30-40 分钟（实测 typecheck 从 4 分钟
+#   涨到 41 分钟，脚本 CPU 时间为 0，全是 I/O 等待）。
+#
+#   开关：METEORIC_BACKUP_MODS=0 跳过 / =1 强制备份 / 不设 = auto
+#     auto 规则：mods 超过 2GB 就跳过（这么大的目录逐次全量拷贝显然不是本意）。
+#
+#   ⚠ 跳过备份时**必须同时跳过还原**：post-build 的还原流程是
+#     `rm_force "$RES/mods"` 再拷回，没有备份就会把玩家的 mods 直接删光。
+#     两侧由同一个变量 BACKUP_MODS 门控。
 RES="export/release/macos/bin/Meteoric.app/Contents/Resources"
+BACKUP_MODS="${METEORIC_BACKUP_MODS:-auto}"
+BACKUP_MODS_THRESHOLD_MB="${METEORIC_BACKUP_MODS_THRESHOLD_MB:-2048}"
+
 if [ -d "$RES/mods" ]; then
-  rm_force tools/user_mods_prev
-  mkdir -p tools/user_mods_prev
-  cp_clone "$RES/mods" tools/user_mods_prev/mods
-  if [ -f "$RES/modsList.txt" ]; then
-    cp "$RES/modsList.txt" tools/user_mods_prev/modsList.txt
+  if [ "$BACKUP_MODS" = "auto" ]; then
+    _mods_mb=$(du -sm "$RES/mods" 2>/dev/null | cut -f1)
+    _mods_mb=${_mods_mb:-0}
+    if [ "$_mods_mb" -gt "$BACKUP_MODS_THRESHOLD_MB" ]; then
+      BACKUP_MODS=0
+      echo "[pre-build] mods 目录 ${_mods_mb}MB > ${BACKUP_MODS_THRESHOLD_MB}MB → 自动跳过 mods 备份（省两次全量拷贝）"
+    else
+      BACKUP_MODS=1
+    fi
   fi
-  echo "[pre-build] backed up current user mods"
+
+  if [ "$BACKUP_MODS" = "1" ]; then
+    rm_force tools/user_mods_prev
+    mkdir -p tools/user_mods_prev
+    cp_clone "$RES/mods" tools/user_mods_prev/mods
+    if [ -f "$RES/modsList.txt" ]; then
+      cp "$RES/modsList.txt" tools/user_mods_prev/modsList.txt
+    fi
+    echo "[pre-build] backed up current user mods"
+  else
+    echo "[pre-build] 已跳过 mods 备份（METEORIC_BACKUP_MODS=$BACKUP_MODS）—— 构建期间不会触碰 $RES/mods"
+  fi
+else
+  BACKUP_MODS=0
 fi
 
 # ---- 构建前：单独备份多版本容器（mods/_containers 里是玩家塞进来的整个引擎，体积大）----
@@ -90,7 +122,11 @@ fi
 # 注意：mods 备份 + 恢复（下方 post-build）会整体还原 _containers，本快照只作兜底。
 CONTAINERS_SRC="$RES/mods/_containers"
 CONTAINERS_SNAP="tools/user_containers_prev"
-if [ -d "$CONTAINERS_SRC" ]; then
+# 同理受开关控制：容器常驻整个引擎（GB 级），逐次全量拷贝代价不小。
+# 目录不存在时引擎侧 ContainerStore.ensureDir() 会自己建空目录，删掉不影响运行。
+if [ "${METEORIC_BACKUP_CONTAINERS:-auto}" = "0" ]; then
+  echo "[pre-build] 已跳过容器备份（METEORIC_BACKUP_CONTAINERS=0）"
+elif [ "${METEORIC_BACKUP_CONTAINERS:-auto}" = "1" ] || [ -d "$CONTAINERS_SRC" ]; then
   rm_force "$CONTAINERS_SNAP"
   mkdir -p "$CONTAINERS_SNAP"
   cp_clone "$CONTAINERS_SRC" "$CONTAINERS_SNAP/_containers"
@@ -312,11 +348,18 @@ fi
 # ---- 恢复用户 mods（lime 构建会重置 Resources，用户装过的 mod 会丢）----
 # 先删掉目标 mods 目录再拷贝：cp -R 目标已存在时会嵌套成 mods/mods/，
 # 被 updateModList 扫成名为 "mods" 的假模组（用户看到的"永远有一个 mods 模组"）。
-MODS_SRC="tools/user_mods_prev"
-if [ ! -d "$MODS_SRC/mods" ]; then
-  MODS_SRC="tools/user_mods" # 首次构建回退快照
+# ⚠ 与 pre-build 同一个开关：跳过备份时这里必须整体跳过。
+#   否则下面的 `rm_force "$RES/mods"` 会删掉玩家的 mods 却没有东西可恢复。
+MODS_SRC=""
+if [ "$BACKUP_MODS" = "1" ]; then
+  MODS_SRC="tools/user_mods_prev"
+  if [ ! -d "$MODS_SRC/mods" ]; then
+    MODS_SRC="tools/user_mods" # 首次构建回退快照
+  fi
+else
+  echo "[post-build] 跳过 mods 还原（pre-build 未备份）"
 fi
-if [ -d "$MODS_SRC/mods" ]; then
+if [ -n "$MODS_SRC" ] && [ -d "$MODS_SRC/mods" ]; then
   rm_force "$RES/mods"
   cp_clone "$MODS_SRC/mods" "$RES/mods"
   if [ -f "$MODS_SRC/modsList.txt" ]; then

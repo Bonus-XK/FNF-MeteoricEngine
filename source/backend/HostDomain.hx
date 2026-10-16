@@ -917,6 +917,8 @@ class HostDomain
 	public static function finishSong(ps:PlayState, ?ignoreNoteOffset:Bool = false):Void
 	{
 		if (ps.endingSong || ps.finishingSong) return; // 防重入：哑谱自动结算与空音频 onComplete / 延迟窗口内的重复触发
+		// Render Mode：结算前收尾（ffmpeg 需要在 stdin 关闭后写 moov atom）
+		if (VideoRecorder.isRecording) VideoRecorder.stop();
 		ps.finishingSong = true;
 		ps.updateTime = false;
 		FlxG.sound.music.volume = 0;
@@ -1018,6 +1020,15 @@ class HostDomain
 		#end
 		ps.setOnScripts('songLength', ps.songLength);
 		ps.callOnScripts('onSongStart');
+		// ===== Render Mode：进曲自动开录 =====
+		// 音频直接用 FlxG.sound.music 的源文件（而非实时抓音）：此刻音乐刚开始播，
+		// ffmpeg 从音频 0ms 起录，与视频同起点 → 天然同步。
+		if (ClientPrefs.data.renderMode && !VideoRecorder.isRecording)
+		{
+			var songName:String = (PlayState.SONG != null) ? PlayState.SONG.song : 'song';
+			VideoRecorder.start(songName, VideoRecorder.resolveSongAudioPath(songName), ClientPrefs.data.renderFPS,
+				ClientPrefs.data.renderBitrate, ClientPrefs.data.renderEncoder, ClientPrefs.data.renderPath);
+		}
 		CrashHandler.mark('PlayState.startSong:music-playing');
 	}
 

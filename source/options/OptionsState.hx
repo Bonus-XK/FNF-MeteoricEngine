@@ -129,6 +129,11 @@ class OptionsState extends MusicBeatState
 		e.make = function() return new PerformanceSubState();
 		list.push(e);
 
+		e = new SectionEntry(Lang.tOr('options.category.render', '录像'), Lang.tOr('options.title.render', '录像设置'));
+		e.make = function() return new RenderModeSubState();
+		list.push(e);
+
+
 		e = new SectionEntry(Lang.tOr('options.category.programming', '编程'), Lang.tOr('options.title.programming', '编程'));
 		e.make = function() return new ProgrammingSettingsSubState();
 		list.push(e);

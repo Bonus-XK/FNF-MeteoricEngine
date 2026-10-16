@@ -157,6 +157,15 @@ class SaveVariables {
 	@:keep public var bgScaleMigrated:Bool = false;   // 背景图降采样撤回迁移标记（一次性：把已写盘 0.5 复位为 1.0）
 	@:keep public var gpuCacheForceOnMigrated:Bool = false; // GPU 缓存强制开启迁移（一次性；参考对话“开/关都炸”根因=Convert 栈下溢，已修复）
 	@:keep public var preRenderNotes:Bool = false; // 提前渲染：加载曲目时烘焙音符贴图，优化大谱面堆叠（开启后会牺牲加载速度）
+	// ===== Render Mode：引擎内置录像（不依赖外部录屏软件）=====
+	// 机制：lime readPixels() 抓帧 → 管道喂 ffmpeg 子进程（不落盘每帧图片），
+	// 音频直接复用歌曲自己的音频文件作为 ffmpeg 第二路输入（同起点 → 天然同步）。
+	// 默认关闭 = 零行为变化。
+	@:keep public var renderMode:Bool = false;      // 录像总开关：进曲自动开录，录完整首到结算
+	@:keep public var renderFPS:Float = 60;        // 视频帧率（与游戏帧率解耦）
+	@:keep public var renderBitrate:Float = 8;     // 视频码率（Mb/s）
+	@:keep public var renderEncoder:String = 'libx264'; // 视频编码器
+	@:keep public var renderPath:String = 'recordings/'; // 输出子目录（相对 app 所在目录，不是 bundle 内部）
 	@:keep public var gfxCpuRelease:Bool = false;  // 大纹理显存预提交 + 释放 CPU 副本（SeiunEngine 方案）：进曲时一次性上传所有大图集并丢弃 CPU 侧数据，消除游玩头几秒的上传卡顿；默认关 = 零行为变化
 	// ===== H-Slice 移植：音符管线性能设置 =====
 	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）
