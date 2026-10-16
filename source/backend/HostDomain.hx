@@ -1341,7 +1341,13 @@ class HostDomain
 		if (ps._visualsTorn)
 			return;
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('scriptOnUpdate');
+		#end
 		ps.callOnScripts('onUpdate', [elapsed]);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('scriptOnUpdate');
+		#end
 
 		// 原生长条按压覆盖：每帧同步判定线位置
 		if (ps.holdCoverHandler != null)
@@ -1349,7 +1355,13 @@ class HostDomain
 
 		// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
 		// （blissful-erect 接箭头闪退现场）——按谱面默认配置逐个重建缺失角色，绝不闪退
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('selfheal');
+		#end
 		ps.ensureCharactersAlive();
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('selfheal');
+		#end
 
 		// 延迟 GC（一次）：进曲 0.5s 后回收已剥离的谱面 DOM/解析暂存（倒计时期间，无音符生成）
 		if (ps._deferredGC)
@@ -1382,7 +1394,13 @@ class HostDomain
 		//    → 每帧强制拉回设置值。从根上杜绝“游玩中 UI 突然消失”。
 		// 注意：此函数只在非暂停/非结算（persistentUpdate=true）时执行，
 		// 不会干扰暂停界面、结算界面自身的显隐逻辑。
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('enforceHUD');
+		#end
 		ps.enforceHUD();
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('enforceHUD');
+		#end
 
 		// 自愈：paused 卡死但没有打开任何子界面（如 PauseSubState 构造中途异常、
 		// Lua 拦截 onPause 后遗留）时解锁，避免“暂停界面显示不出来”却把游戏冻结住。
@@ -1419,7 +1437,13 @@ class HostDomain
 		var healthLerp:Float = FlxMath.lerp(ps.smoothHealth, ps.health, FlxMath.bound(elapsed * 9 * ps.playbackRate, 0, 1));
 		ps.smoothHealth = healthLerp;
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('superUpdate');
+		#end
 		ps.meteoSuper_update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('superUpdate');
+		#end
 
 		// 快速重开回溯：时间倒流（箭头随 songPosition 回退而飞回）
 		if (ps.rewinding)
@@ -1471,6 +1495,9 @@ class HostDomain
 			}
 		}
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('scriptSetProps');
+		#end
 		ps.setOnScripts('curDecStep', ps.curDecStep);
 		ps.setOnScripts('curDecBeat', ps.curDecBeat);
 
@@ -1479,6 +1506,9 @@ class HostDomain
 		ps.setOnScripts('endingSong', ps.endingSong);
 		ps.setOnScripts('curBeat', ps.curBeat);
 		ps.setOnScripts('isCameraOnForcedPos', ps.isCameraOnForcedPos);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('scriptSetProps');
+		#end
 
 		// HUD 每帧更新（图标跳动/跟随/阴影滚动/botplay 呼吸/可见性权威）全部收敛到 GameHUD
 		#if METEORIC_PROFILE
@@ -1780,8 +1810,14 @@ class HostDomain
 
 		ps.setOnScripts('cameraX', ps.camFollow.x);
 		ps.setOnScripts('cameraY', ps.camFollow.y);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('scriptOnUpdatePost');
+		#end
 		ps.setOnScripts('botPlay', ps.cpuControlled);
 		ps.callOnScripts('onUpdatePost', [elapsed]);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('scriptOnUpdatePost');
+		#end
 
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.end('PlayState.update');

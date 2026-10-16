@@ -60,6 +60,160 @@ class MeteoricProfile
 	// trace 不可见；与 CrashHandler 的 crash/ 目录同址，便于直接发文件。
 	static var _profilePath:String = null;
 
+	// ===================== 时钟选择（**先量分辨率再选**） =====================
+	// ⚠ 为什么不能直接用 haxe.Timer.stamp()：
+	//   cpp 目标上它 = hxcpp 的 __time_stamp()（hx/StdLibs.cpp:334），macOS 走
+	//   `gettimeofday` —— 而 macOS 的 gettimeofday 粒度约 **1ms**。我们要测的是
+	//   「每帧几十微秒的 phase」，比时钟粗两个数量级，用它只会得到 0 / 1000us 的量化假象。
+	//   实测症状：所有 max 都是 1000 的整数倍、直方图 0.5-0.75 与 1.25-1.5 恒空、
+	//   p50 恒为 1000us。
+	//   可用替代：lime_system_get_timer（CFFI → SDL_GetPerformanceCounter，纳秒），
+	//   但它**返回原始值、单位未文档化**，所以下面先标定单位再选。
+	static inline var CLK_STAMP:Int = 0; // haxe.Timer.stamp()，原生单位 = 秒
+	static inline var CLK_LIME:Int = 1; // lime_system_get_timer，单位待标定
+	static var _clk:Int = -1; // -1 = 未选
+	static var _clkScale:Float = 1; // 原始单位 → 秒
+	static var _limeFn:Dynamic = null;
+	static var _clockReady:Bool = false;
+
+	/** 取候选时钟的原始计数值（不做单位换算）。CLK_STAMP 一律返回 **ms**。 */
+	static function rawNow(kind:Int):Float
+	{
+		if (kind == CLK_STAMP) return haxe.Timer.stamp() * 1000.0;
+		if (_limeFn == null) _limeFn = tryLoadLime();
+		if (_limeFn == null) return haxe.Timer.stamp() * 1000.0;
+		try
+		{
+			var v:Float = cast _limeFn();
+			// CFFI 不可用时 load 会返回 var-args 桩（调用得到 {}），这里必须挡住，
+			// 否则 cast 会抛，整个探针跟着挂
+			if (Math.isFinite(v)) return v;
+		}
+		catch (e:Dynamic) {}
+		_limeFn = null; // 确认不可用 → 永久退回粗时钟，别每帧重试
+		return haxe.Timer.stamp() * 1000.0;
+	}
+
+	static function tryLoadLime():Dynamic
+	{
+		try
+		{
+			var f:Dynamic = lime.system.CFFI.load("lime", "lime_system_get_timer", 0);
+			if (f == null) return null;
+			var probe:Float = cast f();
+			if (!Math.isFinite(probe)) return null;
+			return f;
+		}
+		catch (e:Dynamic)
+		{
+			trace('[PROFILE-CLOCK] lime_system_get_timer unavailable: ' + Std.string(e));
+			return null;
+		}
+	}
+
+	/**
+	 * 量某个时钟的**最小非零步进**（真实分辨率）。
+	 *
+	 * ⚠ 采样必须**按时间窗口**而不是按次数：固定次数会踩坑 —— 20,000 次调用总耗时
+	 *    只有 ~0.2ms，比粗时钟 1ms 的量子还短，一个非零步进都采不到（实测踩过：
+	 *    res=-1000ns + lime=unavailable）。这里用粗时钟只界定窗口长度（窗口够长时
+	 *    粗时钟本身是准的），窗口内尽量多采。
+	 */
+	static function probeStep(kind:Int, windowMs:Float = 5.0):Float
+	{
+		var w0:Float = haxe.Timer.stamp() * 1000.0;
+		var min:Float = -1;
+		var cnt:Int = 0;
+		var prev:Float = rawNow(kind);
+		var guard:Int = 0;
+		while (haxe.Timer.stamp() * 1000.0 - w0 < windowMs && guard < 20000000)
+		{
+			guard++;
+			var t:Float = rawNow(kind);
+			var d:Float = t - prev;
+			prev = t;
+			cnt++;
+			if (d > 0 && (min < 0 || d < min)) min = d;
+		}
+		_lastProbeCount = cnt;
+		return min;
+	}
+
+	static var _lastProbeCount:Int = 0;
+
+	/**
+	 * 一次性选时钟：实测各候选的最小步进（统一换算到 ms 后比大小），选最细的。
+	 *
+	 * lime 时钟的**单位用长窗口标定**而不是猜：在 ~0.4s 的窗口上对比粗时钟的漂移，
+	 * 此时 ±1ms 的量化误差只占 0.25%，足以区分「秒 / 毫秒 / 微秒 / 纳秒」四种量级。
+	 */
+	static function pickClock():Void
+	{
+		var stampStep:Float = probeStep(CLK_STAMP);
+		var stampN:Int = _lastProbeCount;
+		var best:Int = CLK_STAMP;
+		var bestStep:Float = (stampStep > 0) ? stampStep : 1e9;
+		var limeStep:Float = -1;
+		var limeN:Int = 0;
+		var scale:Float = 1;
+
+		if (_limeFn == null) _limeFn = tryLoadLime();
+		if (_limeFn != null)
+		{
+			var s0:Float = haxe.Timer.stamp();
+			var l0:Float = rawNow(CLK_LIME);
+			// 自旋等一个 ~0.4s 的窗口（粗时钟在长窗口上是准的），步数兜底防死循环
+			var guard:Int = 0;
+			while (haxe.Timer.stamp() - s0 < 0.4 && guard < 400000000)
+			{
+				guard++;
+			}
+			var s1:Float = haxe.Timer.stamp();
+			var l1:Float = rawNow(CLK_LIME);
+			var ds:Float = s1 - s0;
+			var dl:Float = l1 - l0;
+			if (ds > 0.05 && dl > 0)
+			{
+				scale = dl / ds; // 原始单位 → 秒
+				var step:Float = probeStep(CLK_LIME);
+				limeN = _lastProbeCount;
+				if (step > 0)
+				{
+					limeStep = step * scale * 1000.0; // → ms
+					if (limeStep < bestStep)
+					{
+						best = CLK_LIME;
+						bestStep = limeStep;
+					}
+				}
+			}
+		}
+		_clk = best;
+		_clkScale = scale; // 仅 CLK_LIME 时用到（原始单位 → 秒）
+
+		_clockReady = true;
+		// 拆成多行拼装：嵌套三元 + 字符串拼接的括号很容易数错，报错还指不到真正的地方
+		var who:String = (_clk == CLK_LIME) ? 'lime_system_get_timer' : 'haxe.Timer.stamp()';
+		var resTxt:String = (bestStep < 1e8) ? Std.int(bestStep * 1000) + 'ns' : 'unknown';
+		var stampTxt:String = (stampStep > 0) ? Std.int(stampStep * 1000) + 'ns' : ('>5ms(n=' + stampN + ')');
+		var limeTxt:String = 'unavailable';
+		if (limeStep > 0)
+			limeTxt = Std.int(limeStep * 1000) + 'ns scale=' + scale + ' n=' + limeN;
+		else if (_limeFn != null)
+			limeTxt = 'no-step n=' + limeN;
+		else
+			limeTxt = 'load-failed';
+		trace('[PROFILE-CLOCK] chosen=' + who + ' res=' + resTxt + ' | stamp=' + stampTxt + ' | lime=' + limeTxt);
+	}
+
+	/** 对外统一时钟：**秒**。命名用 tick 而不是 now —— 避免与调用点局部变量 `now` 遮蔽。 */
+	static inline function tick():Float
+	{
+		if (!_clockReady) pickClock();
+		if (_clk == CLK_LIME) return rawNow(CLK_LIME) * _clkScale;
+		return haxe.Timer.stamp();
+	}
+
 	static function logToFile(line:String):Void
 	{
 		if (_profilePath == null)
@@ -92,32 +246,32 @@ class MeteoricProfile
 
 	public static inline function frameTick():Void
 	{
-		var now:Float = haxe.Timer.stamp();
+		var t:Float = tick();
 		if (_frameStart > 0)
 		{
-			var d:Float = now - _frameStart;
+			var d:Float = t - _frameStart;
 			_fAcc += d;
 			if (d > _fMax) _fMax = d;
 			var ms:Float = d * 1000;
 			_fSamples.push(ms);
 			_fBuckets[_fBucketOf(ms)]++;
 		}
-		_frameStart = now;
+		_frameStart = t;
 	}
 
 	public static inline function begin():Void
 	{
-		_t = haxe.Timer.stamp();
+		_t = tick();
 	}
 
 	public static inline function phaseBegin(name:String):Void
 	{
-		_phT = haxe.Timer.stamp();
+		_phT = tick();
 	}
 
 	public static inline function phaseEnd(name:String):Void
 	{
-		var d:Float = haxe.Timer.stamp() - _phT;
+		var d:Float = tick() - _phT;
 		_phAcc.set(name, (_phAcc.exists(name) ? _phAcc.get(name) : 0) + d);
 		_phCnt.set(name, (_phCnt.exists(name) ? _phCnt.get(name) : 0) + 1);
 		var m:Float = _phMax.exists(name) ? _phMax.get(name) : 0;
@@ -126,12 +280,12 @@ class MeteoricProfile
 
 	public static inline function end(tag:String):Void
 	{
-		var now:Float = haxe.Timer.stamp();
-		var d:Float = now - _t;
+		var t:Float = tick();
+		var d:Float = t - _t;
 		_acc += d;
 		if (d > _max) _max = d;
 		_n++;
-		if (now - _lastLog >= 1.0)
+		if (t - _lastLog >= 1.0)
 		{
 			var sb:StringBuf = new StringBuf();
 			sb.add('[PROFILE] ' + tag + ' update_avg=' + Math.round(_acc / _n * 1000000) + 'us update_max=' + Math.round(_max * 1000000)
@@ -158,7 +312,7 @@ class MeteoricProfile
 			}
 			trace(sb.toString());
 			logToFile(sb.toString());
-			_acc = 0; _max = 0; _n = 0; _lastLog = now;
+			_acc = 0; _max = 0; _n = 0; _lastLog = t;
 			_fAcc = 0; _fMax = 0;
 			_fSamples.resize(0);
 			for (i in 0..._fBuckets.length) _fBuckets[i] = 0;
