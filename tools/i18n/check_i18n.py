@@ -362,6 +362,8 @@ SKIP_REASONS = [
     ("source/luagraph/LuaBlockDefs.hx", "积木数据表：中文为唯一真源，显示走 BlockDef.labelOf/paramLabel"),
     ("source/options/", "Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue"),
     ("source/backend/ContainerLauncher.hx", "写到磁盘的 PowerShell/.bat 脚本正文，非界面文案"),
+    ("source/substates/BackupSubState.hx", "备份页状态提示文案（拼在 Lang.tOr 结果之后的尾部片段，属同一条文案的一部分）"),
+    ("source/backend/CoolUtil.hx", "携带模式标记文件的正文（写进引擎目录的 portable 文件，给使用者看，不是界面文案）"),
     ("source/backend/CrashHandler.hx", "崩溃报告文件正文（写进 crash/*.txt，给开发者看）"),
     ("source/backend/Achievements.hx", "成就数据表 RAW：中文为唯一真源，显示走 nameOf/descOf/triggerOf"),
     ("source/backend/ClientPrefs.hx", "存档值字面量：改了会静默失效（显示由 optionValue.* 负责）"),
@@ -386,8 +388,10 @@ PUNCT_ONLY = re.compile(r"^[\s\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d
 SAVE_VALUE = re.compile(r"(?:ClientPrefs\.(?:data|defaultData)|\b\w+\.data)[\w.]*\s*[!=]==?\s*$|^\s*case\s*$")
 # trace('/[Tag] ...') 可能跨行，所以不要求「到字面量为止无右括号」
 DIAG = re.compile(r"(?:\btrace\s*\(|Sys\.print\w*\s*\(|FlxG\.log\.add\s*\(|\w[\w.]*\.log\s*\(|\blog\s*\()")
-# 形如 '[Replay] ...' / '[Audio] ...' 的结构化诊断前缀
-DIAG_TAG = re.compile(r"^\[[A-Za-z][A-Za-z ]*\]\s*")
+# 形如 '[Replay] ...' / '[Audio] ...' / '[PROFILE-CLOCK] ...' 的结构化诊断前缀。
+# ⚠ 标签里允许连字符与数字：'[PROFILE-CLOCK]' 这类带连字符的标签是合法的，
+#   原来的 [A-Za-z ]* 会漏判 → 逼着人给正常诊断日志硬塞一条 SKIP_REASONS 理由。
+DIAG_TAG = re.compile(r"^\[[A-Za-z][A-Za-z0-9_-]*\]\s*")
 
 
 def reason_of(path, text="", before=""):

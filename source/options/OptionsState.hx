@@ -133,9 +133,6 @@ class OptionsState extends MusicBeatState
 		e.make = function() return new RenderModeSubState();
 		list.push(e);
 
-		e = new SectionEntry(Lang.tOr('options.category.move', '携带与备份'), Lang.tOr('options.title.move', '携带模式设置'));
-		e.make = function() return new MoveState();
-		list.push(e);
 
 		e = new SectionEntry(Lang.tOr('options.category.programming', '编程'), Lang.tOr('options.title.programming', '编程'));
 		e.make = function() return new ProgrammingSettingsSubState();
@@ -169,6 +166,15 @@ class OptionsState extends MusicBeatState
 		list.push(e);
 
 		#if desktop
+		e = new SectionEntry(Lang.tOr('options.category.backup', '备份与迁移'), Lang.tOr('options.title.backup', '备份与迁移'));
+		e.external = true;
+		e.hint = Lang.tOr('options.hint.backup',
+			'备份与迁移是独立整屏界面（磨砂面板 + 卡片行）：携带模式开关、打包项勾选、'
+			+ '以及 zip / msb / json 三种备份格式的导出与还原。\n'
+			+ '点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。');
+		e.open = enterBackupScreen;
+		list.push(e);
+
 		e = new SectionEntry(Lang.tOr('options.category.containers', '容器'), Lang.tOr('options.title.containers', '容器'));
 		e.external = true;
 		e.hint = Lang.tOr('options.hint.containers',
@@ -707,6 +713,12 @@ class OptionsState extends MusicBeatState
 	 * 做法：用 `FlxG.switchState()` 直接换状态，**不再挂出场转场** ⇒ 不存在"转场层空窗"。
 	 * ⚠ 若以后要恢复转场：不要只把这一行换回 `MusicBeatState.switchState`，那正是本次要修的症状。
 	 */
+	function enterBackupScreen():Void
+	{
+		OptionsState.onPlayState = false;
+		FlxG.switchState(new substates.BackupSubState());
+	}
+
 	function enterContainersMenu():Void
 	{
 		// 返回时按标签恢复选中（列表顺序若变动，光靠索引会错位）

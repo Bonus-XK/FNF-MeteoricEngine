@@ -178,6 +178,10 @@ class SaveVariables {
 	// 两个「一次性动作」：勾上触发动作后立即复位，checkbox 不会停在勾选态
 	@:keep public var portableBackupAction:Bool = false;
 	@:keep public var portableRestoreAction:Bool = false;
+	// 「导出备份时把哪些数据打进去」——与上面 portableReplays / portableChartCache 是**两件事**：
+	// 那两个决定「目录是否搬到便携目录」，这两个只决定「打包内容」，勾错不会移动用户数据。
+	@:keep public var backupIncludeReplays:Bool = true;  // 导出时打包回放录像
+	@:keep public var backupIncludeCache:Bool = false;    // 导出时打包谱面缓存（几 GB，可重建）
 	@:keep public var gfxCpuRelease:Bool = false;  // 大纹理显存预提交 + 释放 CPU 副本（SeiunEngine 方案）：进曲时一次性上传所有大图集并丢弃 CPU 侧数据，消除游玩头几秒的上传卡顿；默认关 = 零行为变化
 	// ===== H-Slice 移植：音符管线性能设置 =====
 	@:keep public var skipGhostNotes:Bool = true;   // 堆叠音符合并：同轨 ±ghostRange 的幽灵箭头合并为一个音符（density 计数）

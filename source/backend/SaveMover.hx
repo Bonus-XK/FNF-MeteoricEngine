@@ -1,5 +1,8 @@
 package backend;
 
+import haxe.io.Bytes;
+import haxe.io.BytesBuffer;
+
 #if (sys && !android)
 import sys.io.File;
 import sys.FileSystem;
@@ -25,6 +28,217 @@ class SaveMover
 	static inline var MAX_REPLAY_FILES:Int = 3000;
 	/** 谱面缓存的文件数上限（缓存文件动辄几十 MB，必须限）。 */
 	static inline var MAX_CACHE_FILES:Int = 60;
+
+	// ================= 备份格式 =================
+
+	/** 自定义二进制格式的魔数（Seiun Engine 用 "SEB1"，这里用自己的 "MSB1"）。 */
+	static inline var BIN_MAGIC:String = 'MSB1';
+	/** 自定义二进制格式的版本号（结构变化时 +1，还原时按版本校验）。 */
+	static inline var BIN_VERSION:Int = 1;
+	/** 自定义二进制格式的文件扩展名。 */
+	public static inline var BIN_EXT:String = '.msb';
+
+	public static function extOf(f:BackupFormat):String
+	{
+		if (f == BackupFormat.ZIP) return '.zip';
+		if (f == BackupFormat.BINARY) return BIN_EXT;
+		return '.json';
+	}
+
+	public static function defaultName(f:BackupFormat):String
+	{
+		if (f == BackupFormat.ZIP) return BACKUP_PREFIX + 'zip';
+		if (f == BackupFormat.BINARY) return BACKUP_PREFIX + 'bin';
+		return BACKUP_PREFIX + 'json';
+	}
+
+	/**
+	 * 导出一份备份。
+	 *
+	 * @param format     备份格式
+	 * @param replays    是否包含回放录像（ZIP / BINARY 生效；JSON 本就不含）
+	 * @param chartCache 是否包含谱面缓存（ZIP / BINARY 生效）
+	 * @return 写出的文件绝对路径；失败 null
+	 */
+	public static function exportBackup(format:BackupFormat, replays:Bool, chartCache:Bool):String
+	{
+		#if (sys && !android)
+		var stamp:String = DateTools.format(Date.now(), '%Y-%m-%d_%H-%M-%S');
+		try
+		{
+			if (format == BackupFormat.ZIP) return zipBackup(replays, chartCache, stamp);
+			if (format == BackupFormat.BINARY) return binBackup(replays, chartCache, stamp);
+			return jsonBackup(stamp);
+		}
+		catch (e:Dynamic)
+		{
+			trace('[Move] 导出失败（' + extOf(format) + '）：' + Std.string(e));
+		}
+		#else
+		return null;
+		#end
+		return null;
+	}
+
+	static function zipBackup(replays:Bool, chartCache:Bool, stamp:String):String
+	{
+		var entries:List<haxe.zip.Entry> = new List();
+		addFile(entries, 'funkin.sol', 'funkin.sol');
+		addFile(entries, 'controls_v3.sol', 'controls_v3.sol');
+		addSolFiles(entries);
+		if (replays) addDir(entries, Replay.getReplayDir(), 'replays', MAX_REPLAY_FILES);
+		if (chartCache) addDir(entries, PackedCache.cacheDir(), 'chartcache', MAX_CACHE_FILES);
+		if (entries.length == 0) return null;
+		var out:String = backupDir() + BACKUP_PREFIX + 'zip-' + stamp + '.zip';
+		var fo = File.write(out);
+		new haxe.zip.Writer(fo).write(entries);
+		fo.close();
+		trace('[Move] 备份(zip) ' + entries.length + ' 项 → ' + out);
+		return out;
+	}
+
+	/**
+	 * 自定义二进制格式：MSB1 | version | flags | itemCount | [nameLen|name|...] | payload
+	 * 每项的 payload 长度在前（Int32），便于跳过不认识/不需要的项。
+	 */
+	static function binBackup(replays:Bool, chartCache:Bool, stamp:String):String
+	{
+		var items:Array<{name:String, data:Bytes}> = [];
+		collectBinItems(items, replays, chartCache);
+		if (items.length == 0) return null;
+
+		var flags:Int = (replays ? 1 : 0) | (chartCache ? 2 : 0);
+		var body = new haxe.io.BytesBuffer();
+		body.addByte(BIN_VERSION);
+		body.addByte(flags);
+		body.add(int32be(items.length));
+		for (it in items)
+		{
+			var nb:Bytes = Bytes.ofString(it.name);
+			body.add(int32be(nb.length));
+			body.add(nb);
+			body.add(int32be(it.data.length));
+			body.add(it.data);
+		}
+		var payload:Bytes = body.getBytes();
+		var out:Bytes = Bytes.ofString(BIN_MAGIC);
+		// 拼接魔数与负载
+		var outBuf = new BytesBuffer();
+		outBuf.add(out);
+		outBuf.add(payload);
+		out = outBuf.getBytes();
+
+		var path:String = backupDir() + BACKUP_PREFIX + 'bin-' + stamp + BIN_EXT;
+		File.saveBytes(path, out);
+		trace('[Move] 备份(bin) ' + items.length + ' 项，' + out.length + ' 字节 → ' + path);
+		return path;
+	}
+
+	static function collectBinItems(items:Array<{name:String, data:Bytes}>, replays:Bool, chartCache:Bool):Void
+	{
+		addBytesItem(items, 'funkin', settingsAbsDir() + 'funkin.sol');
+		addBytesItem(items, 'controls', settingsAbsDir() + 'controls_v3.sol');
+		if (replays)
+		{
+			// 回放量大，统一打成一个 tar 式原始块（自定义格式内部用长度前缀即可）
+			var pack = new haxe.io.BytesBuffer();
+			var rd:String = Replay.getReplayDir();
+			addDirBytes(pack, rd, 'replays/', MAX_REPLAY_FILES);
+			items.push({name: 'replays', data: pack.getBytes()});
+		}
+		if (chartCache)
+		{
+			var pack = new haxe.io.BytesBuffer();
+			addDirBytes(pack, PackedCache.cacheDir(), 'chartcache/', MAX_CACHE_FILES);
+			items.push({name: 'chartcache', data: pack.getBytes()});
+		}
+	}
+
+	static function addBytesItem(items:Array<{name:String, data:Bytes}>, name:String, path:String):Void
+	{
+		try
+		{
+			if (!FileSystem.exists(path)) return;
+			items.push({name: name, data: File.getBytes(path)});
+		}
+		catch (e:Dynamic) {}
+	}
+
+	/** 把目录下的文件按「相对路径 + Int32 长度 + 内容」串进 buffer（自定义块格式）。 */
+	static function addDirBytes(buf:haxe.io.BytesBuffer, root:String, prefix:String, maxFiles:Int):Void
+	{
+		try
+		{
+			if (!FileSystem.exists(root)) return;
+			var n:Int = 0;
+			for (f in FileSystem.readDirectory(root))
+			{
+				if (n >= maxFiles) break;
+				if (f.indexOf(BACKUP_PREFIX) == 0) continue;
+				var p:String = root + (StringTools.endsWith(root, '/') ? '' : '/') + f;
+				if (FileSystem.isDirectory(p)) continue;
+				var b:Bytes = File.getBytes(p);
+				if (b == null) continue;
+				var rel:Bytes = Bytes.ofString(prefix + f);
+				buf.add(int32be(rel.length));
+				buf.add(rel);
+				buf.add(int32be(b.length));
+				buf.add(b);
+				n++;
+			}
+		}
+		catch (e:Dynamic) {}
+	}
+
+	/** 结构化 JSON：只导出设置类数据（人类可读、体积最小）。 */
+	static function jsonBackup(stamp:String):String
+	{
+		var out:Dynamic = {};
+		out.version = 1;
+		out.timestamp = Date.now();
+		out.engine = 'Meteoric Engine ' + Main.meVersion;
+		out.commit = backend.GitInfo.summary();
+		out.settings = captureSettingsJson();
+		out.keybinds = captureKeybindsJson();
+		var path:String = backupDir() + BACKUP_PREFIX + 'json-' + stamp + '.json';
+		File.saveContent(path, haxe.Json.stringify(out, '\t'));
+		trace('[Move] 备份(json) → ' + path);
+		return path;
+	}
+
+	static function captureSettingsJson():Dynamic
+	{
+		var d:Dynamic = {};
+		if (ClientPrefs.data == null) return d;
+		for (k in Reflect.fields(ClientPrefs.data))
+		{
+			// 跳过 Map / 数组等非 JSON 友好的类型（键位另有专门结构）
+			var v:Dynamic = Reflect.field(ClientPrefs.data, k);
+			// 只收基础类型：Array / Date 走 Json 往返会变形或报错；
+			// Map 存的是键位等结构化数据，由 captureKeybindsJson 单独处理。
+			if (v == null) continue;
+			var cls:Class<Dynamic> = Type.getClass(v);
+			if (cls == Array || cls == Date) continue;
+			Reflect.setField(d, k, v);
+		}
+		return d;
+	}
+
+	static function captureKeybindsJson():Dynamic
+	{
+		var d:Dynamic = {};
+		try
+		{
+			for (k in ClientPrefs.keyBinds.keys())
+			{
+				var arr:Array<Int> = [];
+				for (kk in ClientPrefs.keyBinds.get(k)) arr.push(kk);
+				Reflect.setField(d, k, arr);
+			}
+		}
+		catch (e:Dynamic) {}
+		return d;
+	}
 
 	/** 备份放到哪：引擎目录（.app 旁边）。 */
 	public static function backupDir():String
@@ -157,6 +371,18 @@ class SaveMover
 		#else
 		return -1;
 		#end
+	}
+
+	/** Int32 大端序列化成 4 字节。Haxe 的 BytesBuffer 只有 addByte/addBytes，
+	 *  没有 writeInt32 —— 用 Bytes 手工拼（大端，与自定义格式的头部约定一致）。 */
+	static inline function int32be(v:Int):Bytes
+	{
+		var b = Bytes.alloc(4);
+		b.set(0, (v >> 24) & 0xFF);
+		b.set(1, (v >> 16) & 0xFF);
+		b.set(2, (v >> 8) & 0xFF);
+		b.set(3, v & 0xFF);
+		return b;
 	}
 
 	static function addFile(entries:List<haxe.zip.Entry>, path:String, name:String):Void

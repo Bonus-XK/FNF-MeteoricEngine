@@ -204,7 +204,8 @@ class CoolUtil
 			var p:String = portableMarkerPath();
 			if (on)
 			{
-				if (!sys.FileSystem.exists(p)) sys.io.File.saveContent(p, 'Meteoric Engine 携带模式：删除本文件即可恢复正常存档路径。\n');
+				if (!sys.FileSystem.exists(p))
+					sys.io.File.saveContent(p, 'Meteoric Engine 携带模式：删除本文件即可恢复正常存档路径。');
 				return true;
 			}
 			if (sys.FileSystem.exists(p)) sys.FileSystem.deleteFile(p);
