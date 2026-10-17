@@ -143,9 +143,18 @@ class VideoRecorder
 		#end
 	}
 
+	#if (sys && !android)
 	/**
 	 * 幂等启动后台安装。已在装 / 已装好返回 false；error 态允许重入（下次进设置页自动重试一次）。
 	 * @return true = 已交给工作线程
+	 *
+	 * ⚠ 这一段（startPortableInstall / findFFmpeg / installWorker）必须整体留在
+	 *    #if (sys && !android) 里，三个函数互相依赖、且都依赖 #if 内的成员：
+	 *      - startPortableInstall 用 installState / installCurMB / installError / installThread
+	 *      - findFFmpeg 调 portableFFmpegPath()（本身也在 #if 内）
+	 *      - installWorker 是 curl 下载 + tar 解压的桌面端安装流程
+	 *    声明漏在外面、成员被排除 → Android 编译报 "has no field"，
+	 *    并连带把 RenderModeSubState 的引用一起打挂（实测 5 个错误）。
 	 */
 	public static function startPortableInstall():Bool
 	{
@@ -348,6 +357,7 @@ class VideoRecorder
 		//   线程自己退完不清引用 → 后续 error 态重试（重新进设置页）会被永久卡死。
 		installThread = null;
 	}
+	#end
 
 	static function readDirSafe(p:String):Array<String>
 	{

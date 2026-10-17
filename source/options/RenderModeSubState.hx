@@ -36,11 +36,17 @@ class RenderModeSubState extends BaseOptionsMenu
 		rpcTitle = '录像设置菜单';
 
 		// ffmpeg 已可用（自带 / 用户自装 / 便携已装好）→ 本行根本没有，页面就是纯设置表
+		//
+		// ⚠ #if (sys && !android)：「自动获取便携 ffmpeg」是桌面端能力（要起线程下载/解压），
+		//    VideoRecorder 的 install* 成员与 startPortableInstall 都被 #if 排除。
+		//    Android 上若还建这行，refreshDynamicRow 会读到不存在的 installState → 编译失败。
+		#if (sys && !android)
 		if (!VideoRecorder.ffmpegAvailable())
 		{
 			fetchRow = makeFetchRow();
 			addOption(fetchRow);
 		}
+		#end
 
 		var option:Option = new Option('录像模式',
 			'开启后，进曲时自动开始录像，录完整首直到结算，\n'
@@ -93,13 +99,18 @@ class RenderModeSubState extends BaseOptionsMenu
 		// 自动获取：构造期撂给后台线程（幂等，在装/已装好都是 no-op）。
 		// OptionsState 的分区是懒构造的 —— 用户第一次进到「录像」分区这里才执行，
 		// 不碰暂停内嵌（别的页面）与 PlayState，满足「只在设置页里发生」。
+		#if (sys && !android)
 		if (ClientPrefs.data.ffmpegAutoFetch == true)
 			startInstall();
 		else
 			refreshDynamicRow(); // 首帧把行名/说明落到确切状态
+		#end
 	}
 
-	/** 包装一下：防御性 try —— 安装触发失败不能把页面构造拉崩。 */
+	/** 包装一下：防御性 try —— 安装触发失败不能把页面构造拉崩。
+	 *  ⚠ Android 上「自动获取」整个不存在（见上面创建行的 #if），这里必须一起排除，
+	 *    否则引用 VideoRecorder.startPortableInstall 会报 "has no field"。 */
+	#if (sys && !android)
 	function startInstall():Void
 	{
 		try
@@ -109,6 +120,9 @@ class RenderModeSubState extends BaseOptionsMenu
 		catch (e:Dynamic) {}
 		refreshDynamicRow();
 	}
+	#else
+	function startInstall():Void {}
+	#end
 
 	/**
 	 * 「自动获取便携 ffmpeg」行：
@@ -128,7 +142,9 @@ class RenderModeSubState extends BaseOptionsMenu
 			'bool');
 		row.onChange = function()
 		{
+			#if (sys && !android)
 			if (ClientPrefs.data.ffmpegAutoFetch == true) startInstall();
+			#end
 			// 无论开关方向，强制下一帧重算行名/说明（显示要跟状态走）
 			paintedRow = '';
 			paintedDesc = '';
@@ -142,9 +158,15 @@ class RenderModeSubState extends BaseOptionsMenu
 	 */
 	override public function externalStep():Void
 	{
+		#if (sys && !android)
 		refreshDynamicRow();
+		#end
 	}
 
+	// ⚠ 整个函数体包在 #if (sys && !android) 里：installState / installCurMB / installError
+	//   在 Android 上被排除。运行时 fetchRow 在 Android 上恒为 null（行根本不创建），
+	//   所以这个 early-return 永远命中 —— 但编译器仍要过一遍函数体，必须一起排除。
+	#if (sys && !android)
 	function refreshDynamicRow():Void
 	{
 		if (fetchRow == null) return;
@@ -198,4 +220,5 @@ class RenderModeSubState extends BaseOptionsMenu
 			BaseOptionsMenu.rowsDirty = true;
 		}
 	}
+	#end
 }
