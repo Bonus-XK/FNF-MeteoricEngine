@@ -1125,7 +1125,10 @@ class NoteChartDomain
 			// JS Engine 移植：关闭命中回调（noHitFuncs）
 			if (!ClientPrefs.data.noHitFuncs)
 			{
-				var result:Dynamic = ps.callOnLuas('goodNoteHit', [ps.notes.members.indexOf(note), leData, leType, isSus]);
+				// 无 Lua 脚本时跳过 O(notes) 的 indexOf 与空转 callOnLuas（HScript 回调照常执行）
+				var result:Dynamic = null;
+				if (ps.luaArray.length > 0)
+					result = ps.callOnLuas('goodNoteHit', [ps.notes.members.indexOf(note), leData, leType, isSus]);
 				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('goodNoteHit', [note]);
 			}
 
@@ -1184,7 +1187,10 @@ class NoteChartDomain
 		// JS Engine 移植：关闭命中回调（noHitFuncs）
 		if (!ClientPrefs.data.noHitFuncs)
 		{
-			var result:Dynamic = ps.callOnLuas('opponentNoteHit', [ps.notes.members.indexOf(note), Math.abs(note.noteData), note.noteType, note.isSustainNote]);
+			// 无 Lua 脚本时跳过 O(notes) 的 indexOf 与空转 callOnLuas（HScript 回调照常执行）
+			var result:Dynamic = null;
+			if (ps.luaArray.length > 0)
+				result = ps.callOnLuas('opponentNoteHit', [ps.notes.members.indexOf(note), Math.abs(note.noteData), note.noteType, note.isSustainNote]);
 			if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('opponentNoteHit', [note]);
 		}
 
@@ -1220,7 +1226,10 @@ class NoteChartDomain
 				});
 
 				ps.noteMissCommon(daNote.noteData, daNote);
-				var result:Dynamic = ps.callOnLuas('noteMiss', [ps.notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
+				// 无 Lua 脚本时跳过 O(notes) 的 indexOf 与空转 callOnLuas（HScript 回调照常执行）
+				var result:Dynamic = null;
+				if (ps.luaArray.length > 0)
+					result = ps.callOnLuas('noteMiss', [ps.notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
 				if(result != FunkinLua.Function_Stop && result != FunkinLua.Function_StopHScript && result != FunkinLua.Function_StopAll) ps.callOnHScript('noteMiss', [daNote]);
 	}
 
