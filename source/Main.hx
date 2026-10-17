@@ -500,10 +500,23 @@ class Main extends Sprite
 		// F3 已释放（FPS 波动图移除后不再占用）
 		#end
 
-		#if !mobile
+		// ⚠ 必须对所有平台（含 mobile）设 NO_SCALE，不能只给桌面。
+		//
+		// OpenFL Stage.__resize()（openfl/display/Stage.hx:3105）的分支判据：
+		//     if (__logicalWidth == 0 || __logicalHeight == 0 || scaleMode == NO_SCALE || ...)
+		//         → stageWidth = windowWidth / window.scale   （= 物理窗口尺寸）
+		//     else { stageWidth = __logicalWidth(1280); switch(scaleMode){ ... default: SHOW_ALL } }
+		//
+		// scaleMode 为 null 时 `null == NO_SCALE` 为假 → 走 else → **stage 尺寸被重置成
+		// 逻辑 1280×720**。于是 Flixel 的 BaseScaleMode.onMeasure 收到 1280×720，
+		// 算出 scale=1.0 / offset=0；而 stage 实际按 min(windowW/1280, windowH/720) 渲染。
+		// 两者不一致 → 画面被拉伸/偏移，且触摸坐标映射全错（点不到按钮）。
+		//
+		// 这与下面 mobile 分支的注释直接矛盾 —— 那里写着「交给 flixel 等比缩放适配
+		// 任意屏幕」，但拿不到真实窗口尺寸，flixel 根本无从缩放。
+		// 设 NO_SCALE 后 stage 把物理窗口尺寸交给 flixel，等比缩放与触摸换算才都成立。
 		Lib.current.stage.align = "tl";
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
-		#end
 
 		#if html5
 		FlxG.autoPause = false;
