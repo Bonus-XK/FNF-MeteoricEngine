@@ -2829,6 +2829,16 @@ class PlayState extends MusicBeatState
 	// KE 判定评级（Kade Engine）：45/90/135ms 窗口，提前/晚到分开判断，随安全帧缩放
 	private function judgeRatingKE(note:Note):Rating return CameraHudDomain.judgeRatingKE(this, note);
 
+	// 评级/连击弹窗贴图存在性缓存：同一实例（同一首歌）内皮肤与文件不变，
+	// 避免每次命中都打文件系统（Paths.fileExists 每次含多次 exists 探测 + 字符串分配）。
+	var _popupAssetExists:Map<String, Bool> = [];
+	function popupAssetExists(imgPath:String):Bool
+	{
+		if (!_popupAssetExists.exists(imgPath))
+			_popupAssetExists.set(imgPath, Paths.fileExists('images/' + imgPath + '.png', IMAGE));
+		return _popupAssetExists.get(imgPath);
+	}
+
 	private function popUpScore(note:Note = null, ?cappedMult:Int = null):Void
 	{
 		// 【密集谱·安静命中档】densePerfMode + 自动游玩/回放：跳过纯视觉与低频刷新开销；
@@ -2951,7 +2961,7 @@ class PlayState extends MusicBeatState
 			// 缺失（如 Marvelous / 自定义皮肤）回退基础图
 			var daTiming:String = (note.strumTime < Conductor.songPosition) ? '-late' : '-early';
 			var ratingPath:String = uiPrefix + ratingImg + daTiming + uiSuffix;
-			if (Paths.fileExists('images/' + ratingPath + '.png', IMAGE))
+			if (popupAssetExists(ratingPath))
 				rating.loadGraphic(Paths.image(ratingPath));
 			else
 				rating.loadGraphic(Paths.image(uiPrefix + ratingImg + uiSuffix));
@@ -2974,7 +2984,7 @@ class PlayState extends MusicBeatState
 		{
 			var comboPath:String = uiPrefix + 'combo' + (allSicks ? '-golden' : '') + uiSuffix;
 			comboSpr = new FlxSprite();
-			if (Paths.fileExists('images/' + comboPath + '.png', IMAGE))
+			if (popupAssetExists(comboPath))
 				comboSpr.loadGraphic(Paths.image(comboPath));
 			else
 				comboSpr.loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));

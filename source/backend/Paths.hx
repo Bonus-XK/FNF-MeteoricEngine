@@ -766,7 +766,9 @@ class Paths
 		}
 		#end
 
-		if(FileSystem.exists(getPath(key, type, library, false)) || OpenFlAssets.exists(getPath(key, type, library, false))) {
+		// getPath 内含多次 exists 探测 + 字符串分配，这里只求值一次（原实现计算两遍）
+		var path:String = getPath(key, type, library, false);
+		if(FileSystem.exists(path) || OpenFlAssets.exists(path)) {
 			return true;
 		}
 		return false;
