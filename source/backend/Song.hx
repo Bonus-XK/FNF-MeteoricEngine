@@ -513,12 +513,10 @@ class Song
 				#if (sys && !android)
 				try
 				{
-					var combo:SwagSong = loadPackedParts(partPaths, jsonInput);
-					if (combo != null)
-					{
-						if (jsonInput != 'events') StageData.loadDirectory(combo);
-						return combo;
-					}
+					// 统一走 loadCombo：先查磁盘簇缓存（partsCache），未命中再全量扫描。
+					// 修复重启/换难度/重开经 loadFromJson 时绕过缓存、重复全量扫描的问题。
+					var combo:SwagSong = loadCombo(jsonInput, folder);
+					if (combo != null) return combo;
 				}
 				catch (eCombo:Dynamic)
 				{
