@@ -267,8 +267,15 @@ class CameraHudDomain
 		if (ps.health <= 0.4) txtColor = FlxColor.RED;
 		else if (ps.health >= 1.55) txtColor = FlxColor.LIME;
 
-		ps.scoreTxt.setFormat(fontPath, 15, txtColor, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		ps.scoreTxt.borderSize = 1.25;
+		// 格式串未变则跳过 setFormat（每次都会重建字形位图并标脏重绘）；
+		// 字体或颜色任一变化（换字体设置、血量跨阈值）仍会立即生效。
+		var fmtKey:String = fontPath + '|' + Std.string(txtColor);
+		if (ps._scoreTxtFmtKey != fmtKey)
+		{
+			ps._scoreTxtFmtKey = fmtKey;
+			ps.scoreTxt.setFormat(fontPath, 15, txtColor, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			ps.scoreTxt.borderSize = 1.25;
+		}
 		ps.callOnScripts('onUpdateScore', [miss]);
 	}
 

@@ -515,6 +515,8 @@ class PlayState extends MusicBeatState
 	public var judgementField:openfl.text.TextField; // 判定计数侧边栏
 	public var timeTxt:FlxText;
 	var scoreTxtTween:FlxTween;
+	// scoreTxt 已应用的 setFormat 参数签名（与 CameraHudDomain.updateScore 配合，避免每次重复 setFormat）
+	var _scoreTxtFmtKey:String = '';
 
 	public static var campaignScore:Int = 0;
 	public static var campaignMisses:Int = 0;
