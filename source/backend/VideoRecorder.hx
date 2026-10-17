@@ -175,10 +175,10 @@ class VideoRecorder
 		trace('[Recorder] 快路径宏已开启（lime_cffi + lime_opengl）');
 		try
 		{
-			// ⚠ window.context 是**容器** RenderContext，GL 对象挂在它的 .webgl 上。
-			//   直接调 context.readPixels 会是 Null Function Pointer（readPixels 定义在
-			//   NativeOpenGLRenderContext 上，见 lime NativeWindow.hx:348）。
-			glCtx = win.context.webgl;
+			// ⚠ Windows/桌面 OpenGL 渲染时，context.webgl 是 null（WebGL 兼容层未创建）。
+			//   必须用 context.gl（OpenGLRenderContext → NativeOpenGLRenderContext），
+			//   它的 readPixels 定义在 NativeOpenGLRenderContext 上（lime 8.2.2 源码确认）。
+			glCtx = win.context.gl;
 			// 只判非 null；方法是否存在交给 capture() 的 try/catch 实测
 			// （Haxe 没有 Reflect.hasMethod，预检只能靠类型判断，反而不可靠）。
 			// capture() 首次失败会自动降级成 window 路径，不会崩也不会静默出黑屏。
