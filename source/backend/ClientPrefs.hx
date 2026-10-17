@@ -166,6 +166,10 @@ class SaveVariables {
 	@:keep public var renderBitrate:Float = 8;     // 视频码率（Mb/s）
 	@:keep public var renderEncoder:String = 'libx264'; // 视频编码器
 	@:keep public var renderPath:String = 'recordings/'; // 输出子目录（相对 app 所在目录，不是 bundle 内部）
+	// 自动获取便携 ffmpeg：设置页检测到本机没有 ffmpeg 时，后台下载官方静态构建到
+	// 引擎目录 ffmpeg/ 下（zero-install，玩家无感）。关掉 = 由用户自装/自带 ffmpeg，
+	// 录像入口保持不可用（进曲 start() 直接失败并 trace）。默认开：玩家不该被要求先装 ffmpeg。
+	@:keep public var ffmpegAutoFetch:Bool = true;
 	// ===== 携带模式：各类用户数据是否跟着引擎目录走 =====
 	// 总开关是引擎目录的 `portable` 标记文件（引擎读设置前必须先知道），
 	// 这里控制的是**各类数据分别跟不跟随**。设置/键位/高分/回放 走 CoolUtil.getSavePath，

@@ -44,7 +44,13 @@ class VideoRecorder
 	static final FFMPEG_CANDIDATES:Array<String> = [
 		'/opt/homebrew/bin/ffmpeg', // Apple Silicon Homebrew
 		'/usr/local/bin/ffmpeg', // Intel Homebrew
-		'/usr/bin/ffmpeg'
+		'/usr/bin/ffmpeg',
+		// Windows 常见**跨用户**安装位置（winget 的 per-user Links 目录不做枚举，交给 PATH 探测兜底）
+		'C:\\ffmpeg\\bin\\ffmpeg.exe',
+		'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+		'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
+		'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
+		'C:\\msys64\\mingw64\\bin\\ffmpeg.exe'
 	];
 
 	public static var isRecording:Bool = false;
@@ -54,6 +60,25 @@ class VideoRecorder
 	public static var lastCaptureMs:Float = 0;
 	/** 实际使用的抓帧路径（'gl' = 零分配快路径；'window' = 回退，会分配）。 */
 	public static var activePath:String = 'none';
+
+	// ============== 便携 ffmpeg 自动获取（玩家零安装） ==============
+	// 缺 ffmpeg 时由设置页（RenderModeSubState，需 ClientPrefs.data.ffmpegAutoFetch = true）
+	// 起一个后台线程：官方静态构建 curl 直下 → 系统 tar 单条目解压 → 改名到
+	// 引擎目录 ffmpeg/ffmpeg(.exe) → -version 烟雾测试。与引擎目录一起可携带、随目录跑。
+	// 状态机（installState）：idle →（下载中）→（解压中）→ ready / error；
+	// 页面只读这几个值做展示，重试 = 下次进设置页自动再来一次（error 态允许重入）。
+	#if (sys && !android)
+	/** 自动获取当前阶段：'idle' | 'downloading' | 'unpacking' | 'ready' | 'error'。 */
+	public static var installState:String = 'idle';
+	/** 已下载 MB 数（下载期由工作线程每 0.4s 回填；UI 只读）。 */
+	public static var installCurMB:Int = 0;
+	/** 失败原因（英文技术信息，UI 直接展示）。 */
+	public static var installError:String = null;
+	static var installThread:sys.thread.Thread = null;
+	// 下载监视线程的握手位：写者仅监视线程（worker 主循环轮询）
+	static var installDlDone:Bool = false;
+	static var installDlCode:Int = -1;
+	#end
 
 	#if (sys && !android)
 	static var proc:Process = null;
@@ -76,12 +101,11 @@ class VideoRecorder
 	static var useFastPath:Bool = false;
 	#end
 
-	/** ffmpeg 是否可用（选项页据此置灰开关并给出提示）。 */
+	/** ffmpeg 是否可用（选项页据此决定是否给出自动获取行）。 */
 	public static function ffmpegAvailable():Bool
 	{
 		#if (sys && !android)
-		for (p in FFMPEG_CANDIDATES)
-			if (FileSystem.exists(p)) return true;
+		if (findFFmpeg() != null) return true;
 		try
 		{
 			var pr = new Process('ffmpeg', ['-version']);
@@ -92,6 +116,311 @@ class VideoRecorder
 		#end
 		return false;
 	}
+
+	#if (sys && !android)
+	/**
+	 * 引擎目录下便携 ffmpeg 的绝对路径；拿不到应用目录时 null。
+	 * 与录像输出同基准（可执行文件所在目录，见 start() 里的 appDir 注释）——
+	 * 换目录/换机器随手整个目录带走就还能用。
+	 */
+	public static function portableFFmpegPath():String
+	{
+		var base:String = null;
+		try
+		{
+			base = lime.system.System.applicationDirectory;
+		}
+		catch (e:Dynamic)
+		{
+			base = null;
+		}
+		if (base == null || base.length == 0) return null;
+		if (base.charAt(base.length - 1) != '/' && base.charAt(base.length - 1) != '\\') base += '/';
+		#if windows
+		return base + 'ffmpeg/ffmpeg.exe';
+		#else
+		return base + 'ffmpeg/ffmpeg';
+		#end
+	}
+
+	/**
+	 * 幂等启动后台安装。已在装 / 已装好返回 false；error 态允许重入（下次进设置页自动重试一次）。
+	 * @return true = 已交给工作线程
+	 */
+	public static function startPortableInstall():Bool
+	{
+		if (ffmpegAvailable()) return false;
+		if (installThread != null) return false;
+		if (installState == 'downloading' || installState == 'unpacking') return false;
+		installState = 'downloading';
+		installCurMB = 0;
+		installError = null;
+		installThread = sys.thread.Thread.create(installWorker);
+		return true;
+	}
+
+	/**
+	 * ffmpeg 可执行文件解析顺序：便携目录优先（自包含，跟引擎目录走），其次安装位置候选。
+	 * 注意**不含** PATH 探测 —— start() 的录像启动只信任「明确的文件」，PATH 探测只给选项页用。
+	 */
+	static function findFFmpeg():String
+	{
+		var portable:String = portableFFmpegPath();
+		if (portable != null && FileSystem.exists(portable)) return portable;
+		for (p in FFMPEG_CANDIDATES)
+			if (FileSystem.exists(p)) return p;
+		return null;
+	}
+
+	/**
+	 * 安装工作线程主体。hxcpp 线程闭包没有异常保护 —— 任何逃逸异常 Release 下是堆损坏
+	 * abort（见 ZipReader.runWorker 的崩溃加固注释），所以整个函数体包进 try/catch。
+	 *
+	 * 流程：清上次残件 → curl 官方静态包 → 系统 tar 单条目解压 → 改名就位 →
+	 * chmod（mac）→ `ffmpeg -version` 烟雾测试 → 删临时件。任何一步失败置 error 态。
+	 */
+	static function installWorker():Void
+	{
+		var stage:String = null;
+		var tmpZip:String = null;
+		var ok:Bool = false;
+		try
+		{
+			var exePath:String = portableFFmpegPath();
+			if (exePath == null) throw 'portable path unavailable on this platform';
+			var dir:String = null;
+			try
+			{
+				dir = haxe.io.Path.directory(exePath);
+			}
+			catch (e:Dynamic)
+			{
+				dir = null;
+			}
+			if (dir == null || dir.length == 0) throw 'cannot resolve engine ffmpeg directory';
+			stage = dir + '/_stage';
+			tmpZip = dir + '/_dl.zip';
+			// 清理上次被打断（游戏退出 / 断电 / 断网）留下的残件，从零重下
+			try
+			{
+				if (FileSystem.exists(stage)) ContainerStore.deleteTree(stage);
+			}
+			catch (e:Dynamic) {}
+			try
+			{
+				if (FileSystem.exists(tmpZip)) FileSystem.deleteFile(tmpZip);
+			}
+			catch (e:Dynamic) {}
+			if (!FileSystem.exists(dir)) FileSystem.createDirectory(dir);
+			FileSystem.createDirectory(stage);
+
+			// 官方静态构建（两条都在本机实测过 URL 有效性 + 包内布局）：
+			// Windows：gyan.dev release-essentials（稳定别名 URL，重定向自动跟随）
+			//          内部 ffmpeg-<版本>-essentials_build/bin/ffmpeg.exe
+			// macOS：evermeet.cx 静态 ffmpeg（Intel 版，Apple Silicon 下走 Rosetta 跑起来）
+			//        内部单条目 ffmpeg；URL 钉在具体版本号，包发布后长期在线。
+			#if windows
+			var url:String = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
+			#else
+			var url:String = 'https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip';
+			#end
+			if (!downloadPortable(url, tmpZip))
+				throw 'download (curl) failed, exit ' + installDlCode;
+
+			installState = 'unpacking';
+			// 系统 tar / unzip：bulk deflate 走 native zlib，大条目不进 Haxe 堆（ZipReader 同一依据）
+			#if windows
+			// essentials 包里还有 400MB+ 的 ffplay/ffprobe，用通配只掏 ffmpeg.exe（bsdtar 提取模式支持通配，已实测）
+			var tarCmd:String = 'tar -xf "' + tmpZip + '" -C "' + stage + '" '
+				+ '"ffmpeg-*-essentials_build/bin/ffmpeg.exe"';
+			#else
+			// mac 包单条目，直接全解
+			var tarCmd:String = 'tar -xf "' + tmpZip + '" -C "' + stage + '"';
+			#end
+			var exitTar:Int = -1;
+			try
+			{
+				exitTar = Sys.command(tarCmd);
+			}
+			catch (e:Dynamic)
+			{
+				exitTar = -1;
+			}
+			if (exitTar != 0) throw 'unpack (tar) failed, exit ' + exitTar;
+
+			// 在 stage 里找解出来的可执行文件（Windows 在 <版本目录>/bin/ 下；mac 是根下 ffmpeg）
+			// 目录树很小（essentials 通配只解出 3 项以内的路径），仍给 64 次迭代硬上界防异常结构。
+			var produced:String = null;
+			var stack:Array<String> = [stage];
+			var visited:Int = 0;
+			while (stack.length > 0 && visited < 64)
+			{
+				visited++;
+				var cur:String = stack.pop();
+				for (f in readDirSafe(cur))
+				{
+					var full:String = cur + '/' + f;
+					if (FileSystem.isDirectory(full))
+					{
+						stack.push(full);
+						continue;
+					}
+					#if windows
+					if (f == 'ffmpeg.exe')
+					{
+						produced = full;
+						break;
+					}
+					#else
+					if (f == 'ffmpeg')
+					{
+						produced = full;
+						break;
+					}
+					#end
+				}
+				if (produced != null) break;
+			}
+			if (produced == null) throw 'ffmpeg binary not found in downloaded archive';
+
+			// 原子就位：rename 到最终路径（同分区 rename 是原子的）；先删可能存在的半份旧文件
+			try
+			{
+				if (FileSystem.exists(exePath)) FileSystem.deleteFile(exePath);
+			}
+			catch (e:Dynamic) {}
+			FileSystem.rename(produced, exePath);
+			#if mac
+			// evermeet 的 zip 自带 +x 位；为防 Haxe 写盘路径改位丢失，补一次
+			Sys.command('chmod', ['+x', exePath]);
+			#end
+
+			// 烟雾测试：能跑起 -version 且退出码 0 才算装好
+			var pr:Process = null;
+			var smokeFail:String = '';
+			try
+			{
+				pr = new Process(exePath, ['-version']);
+			}
+			catch (e:Dynamic)
+			{
+				smokeFail = Std.string(e);
+			}
+			if (pr == null) throw 'installed ffmpeg cannot start: ' + smokeFail;
+			var smokeCode:Int = -1;
+			try
+			{
+				smokeCode = pr.exitCode();
+			}
+			catch (e:Dynamic)
+			{
+				smokeCode = -1;
+			}
+			try
+			{
+				pr.close();
+			}
+			catch (e:Dynamic) {}
+			if (smokeCode != 0) throw 'ffmpeg smoke test failed, exit ' + smokeCode;
+
+			installState = 'ready';
+			trace('[Recorder] portable ffmpeg ready: ' + exePath);
+			ok = true;
+		}
+		catch (e:Dynamic)
+		{
+			installError = Std.string(e);
+			installState = 'error';
+			trace('[Recorder] portable ffmpeg install failed: ' + installError);
+		}
+		// 收尾：临时件无论成败都尽力清（失败的 zip 留着只会占盘）
+		try
+		{
+			if (stage != null && FileSystem.exists(stage)) ContainerStore.deleteTree(stage);
+		}
+		catch (e:Dynamic) {}
+		try
+		{
+			if (tmpZip != null && FileSystem.exists(tmpZip)) FileSystem.deleteFile(tmpZip);
+		}
+		catch (e:Dynamic) {}
+		// ⚠ 必须 null 掉线程引用：主线程的重入判定是「installThread != null 就拒绝」，
+		//   线程自己退完不清引用 → 后续 error 态重试（重新进设置页）会被永久卡死。
+		installThread = null;
+	}
+
+	static function readDirSafe(p:String):Array<String>
+	{
+		try
+		{
+			return FileSystem.readDirectory(p);
+		}
+		catch (e:Dynamic)
+		{
+			return [];
+		}
+	}
+
+	/**
+	 * curl 下载到 dest。监视线程阻塞收退出码（不占主线程），本线程每 0.4s
+	 * 轮询文件大小回填 installCurMB（UI 得到活进度）。
+	 * curl 自带说明：-L 跟随重定向；--fail 把 4xx/5xx 变非零退出；
+	 * --speed-time/--speed-limit 防「连接死了但没断」半永久挂起；--max-time 30 分钟总兜底。
+	 * macOS 的 curl 下载**不带** quarantine xattr，子进程能直接拉起（浏览器下载则会）。
+	 */
+	static function downloadPortable(url:String, dest:String):Bool
+	{
+		installDlDone = false;
+		installDlCode = -1;
+		installCurMB = 0;
+		var proc:Process = null;
+		// Sys.println 之外的 stderr：curl -sS 进度静默，错误文本极短，不会塞爆管道
+		var args:Array<String> = ['-sS', '-L', '--fail', '--retry', '2',
+			'--connect-timeout', '20', '--max-time', '1800',
+			'--speed-time', '30', '--speed-limit', '1024',
+			'-o', dest, url];
+		try
+		{
+			proc = new Process('curl', args);
+		}
+		catch (e:Dynamic)
+		{
+			installError = 'curl not available: ' + Std.string(e);
+			return false;
+		}
+		// 监视线程：hxcpp 线程闭包无异常保护 → 全体 try/catch
+		sys.thread.Thread.create(function():Void
+		{
+			var code:Int = -2;
+			try
+			{
+				code = proc.exitCode(); // 阻塞至 curl 收敛
+			}
+			catch (e:Dynamic)
+			{
+				code = -2;
+			}
+			try
+			{
+				proc.close();
+			}
+			catch (e:Dynamic) {}
+			installDlCode = code;
+			installDlDone = true;
+		});
+		while (!installDlDone)
+		{
+			Sys.sleep(0.4);
+			try
+			{
+				var st = FileSystem.stat(dest);
+				if (st != null && st.size > 0) installCurMB = Std.int(st.size / 1048576);
+			}
+			catch (e:Dynamic) {}
+		}
+		return installDlCode == 0 && FileSystem.exists(dest);
+	}
+	#end
 
 	/**
 	 * 解析歌曲 Inst 音频的可用路径（给 ffmpeg 当第二路输入用）。
@@ -431,13 +760,4 @@ class VideoRecorder
 		activePath = 'none';
 		#end
 	}
-
-	#if (sys && !android)
-	static function findFFmpeg():String
-	{
-		for (p in FFMPEG_CANDIDATES)
-			if (FileSystem.exists(p)) return p;
-		return null;
-	}
-	#end
 }

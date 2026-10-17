@@ -503,6 +503,11 @@ class OptionsState extends MusicBeatState
 
 		FlxG.mouse.visible = true;
 
+		// 外部动态行（RenderModeSubState 的 ffmpeg 自动获取进度等）：
+		// 分区实例是 headless 构造、不进状态树，因而必须由宿主每帧 STEP 一次。
+		// 只在行文本实变时发生重绘（rowsDirty 消费一次），平时零开销。
+		if (pane != null) pane.stepExternal();
+
 		// 子界面（箭头配色/按键设置/移动触控/输入框）打开期间：本层冻结输入并隐藏移动端 A 键
 		if (subState != null)
 		{

@@ -107,6 +107,19 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	 */
 	public static var headless:Bool = false;
 	/**
+	 * 【外部动态行】某分区在运行期（如 RenderModeSubState 的 ffmpeg 自动获取进度行）
+	 * 改动了选项的行名/说明后置 true；**下一帧**由宿主消费置 false 并重绘一次：
+	 *   整屏路径在 BaseOptionsMenu.update() 的开头，单界面路径在 OptionsState.update() → OptionsPane.stepExternal()。
+	 * 只在文本实变时置位，平时零开销；两次消费之间不叠加（一次 repaint 足够）。
+	 */
+	public static var rowsDirty:Bool = false;
+	/**
+	 * 【外部动态行】宿主每帧驱动的钩子。默认空实现；需要动态行的子类覆写
+	 * （RenderModeSubState.externalStep）。整屏路径在本类 update() 里调，
+	 * 单界面路径由 OptionsPane.stepExternal() 调 —— 两个宿主共用同一约定。
+	 */
+	public function externalStep():Void {}
+	/**
 	 * 【单界面宿主切片】本实例是否正被 `OptionsPane` 驱动（内容区就地渲染）。
 	 * ⚠ 与 `headless` 的区别（2026-09-16 实机截图定位）：`headless` 只在**构造期**为 true ——
 	 * `OptionsState.sectionInstance` 构造完就把它还原，所以**选中行/换行时它是 false**。
@@ -654,6 +667,19 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	// ===== 主循环 =====
 	override function update(elapsed:Float)
 	{
+		// 外部动态行：字面实变时置 rowsDirty，本帧开头消费一次（重绘行名/右栏说明）
+		externalStep();
+		if (BaseOptionsMenu.rowsDirty)
+		{
+			BaseOptionsMenu.rowsDirty = false;
+			if (curSelected >= 0 && curSelected < optionsArray.length)
+			{
+				descText.text = optionsArray[curSelected].description;
+				descText.updateHitbox();
+			}
+			refreshRows();
+		}
+
 		// 开关滑块逐帧插值（圆心空间，elapsed*18）
 		for (sw in switchCols)
 			if (sw != null && sw.track != null && sw.track.visible) sw.animate(elapsed);

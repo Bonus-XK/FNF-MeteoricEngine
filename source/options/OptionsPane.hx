@@ -495,6 +495,31 @@ class OptionsPane extends FlxGroup
 	}
 
 	/**
+	 * 【外部动态行】宿主每帧 STEP（OptionsState.update() 调用）：
+	 * ① 让当前分区跑自己的动态钩子（externalStep —— 比如按 ffmpeg 安装批次改行名/说明）；
+	 * ② 有字面变化（rowsDirty）就消费置 false 并重绘一次 —— 行名走刷新行表、
+	 *    被选中行的右栏说明同步按新 description 重填（与 changeSelection 的赋值同源，仅不换选中）。
+	 * 这里不做暂停/外部卡模式的特殊化：dynamic 行只属于普通选项表（canvas/external 模式直接 no-op）。
+	 */
+	public function stepExternal():Void
+	{
+		if (canvasMode) return;
+		if (isExternal) return;
+		if (section != null) section.externalStep();
+		if (BaseOptionsMenu.rowsDirty)
+		{
+			BaseOptionsMenu.rowsDirty = false;
+			refreshRows();
+			if (curSelected >= 0 && curSelected < options.length)
+			{
+				var o:Option = options[curSelected];
+				descText.text = (o == null) ? '' : o.description;
+				descText.updateHitbox();
+			}
+		}
+	}
+
+	/**
 	 * 主题色变更：原地重绘本内容区的**令牌化装饰**（面板 / 选中高亮条 / 外链卡 / 色板底板），
 	 * 并让开关轨道按新 primary 重绘 —— 使"设置 → 界面 → 主题色"当场全面换色。
 	 *
