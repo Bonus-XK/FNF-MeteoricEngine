@@ -1,9 +1,4 @@
 
-//Discord API
-#if desktop
-import backend.Discord;
-#end
-
 //Psych
 #if LUA_ALLOWED
 import llua.*;

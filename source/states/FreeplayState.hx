@@ -110,11 +110,6 @@ class FreeplayState extends MusicBeatState
 		PlayState.isStoryMode = false;
 		WeekData.reloadWeekFiles(false);
 
-		#if desktop
-		// Updating Discord Rich Presence
-		DiscordClient.changePresence("In the Menus", null);
-		#end
-
 		for (i in 0...WeekData.weeksList.length) {
 			if(weekIsLocked(WeekData.weeksList[i])) continue;
 
@@ -738,11 +733,6 @@ class FreeplayState extends MusicBeatState
 				#end
 				FlxG.sound.music.volume = 0;
 				destroyFreeplayVocals();
-				#if MODS_ALLOWED
-				#if desktop
-				DiscordClient.loadModRPC();
-				#end
-				#end
 				LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState());
 				super.update(elapsed);
 				return;
@@ -780,11 +770,6 @@ class FreeplayState extends MusicBeatState
 				FlxG.sound.music.volume = 0;
 
 				destroyFreeplayVocals();
-				#if MODS_ALLOWED
-				#if desktop
-				DiscordClient.loadModRPC();
-				#end
-				#end
 			});
 
 			super.update(elapsed);

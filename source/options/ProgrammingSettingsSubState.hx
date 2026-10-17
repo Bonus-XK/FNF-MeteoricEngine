@@ -22,7 +22,6 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		super();
 
 		title = '编程';
-		rpcTitle = '编程设置菜单';
 
 		var option:Option = new Option('Psych 0.6.3 兼容模式',
 			'开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）',

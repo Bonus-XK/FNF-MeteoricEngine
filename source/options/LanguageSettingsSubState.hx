@@ -21,7 +21,6 @@ class LanguageSettingsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = Lang.t('settings.language');
-		rpcTitle = Lang.t('settings.language');
 
 		var codes:Array<String> = Lang.codes();
 		if (codes.length == 0) codes = [Lang.DEFAULT_LANG];

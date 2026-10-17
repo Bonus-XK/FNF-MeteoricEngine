@@ -5,7 +5,6 @@ class EffectsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '效果';
-		rpcTitle = '效果设置菜单'; //for Discord Rich Presence
 
 		var option:Option = new Option('频闪效果',
 			'关闭后，游戏将不会出现频闪效果',
@@ -69,14 +68,6 @@ class EffectsSubState extends BaseOptionsMenu
 			'updateNotify',
 			'bool');
 		addOption(option);
-
-		#if desktop
-		var option:Option = new Option('Discord在线状态',
-			'关闭后，Discord 的“正在游玩”状态将不再显示本应用，避免意外泄露',
-			'discordRPC',
-			'bool');
-		addOption(option);
-		#end
 
 		super();
 	}

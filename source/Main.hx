@@ -91,12 +91,6 @@ class Main extends Sprite
 		}
 	}
 
-	/** Discord RPC 主线程 tick：每帧处理 RPC 事件队列（未初始化时直接短路，零分配）。 */
-	static function onDiscordFrame(_):Void
-	{
-		if (backend.DiscordClient.isInitialized)
-			backend.DiscordClient.tick();
-	}
 	#end
 
 	#if mobile
@@ -476,11 +470,6 @@ class Main extends Sprite
 		stage.addEventListener(Event.ENTER_FRAME, onContainerFrame);
 		#end
 
-		#if desktop
-		// Discord RPC 主线程 tick（原实现误嵌在 mobile 分支的 #if desktop 内，桌面端永不执行）
-		stage.addEventListener(Event.ENTER_FRAME, onDiscordFrame);
-		#end
-
 		// Performance optimizations
 		FlxG.fixedTimestep = false;
 		// 【帧数上限已移除】不再硬编码 stage.frameRate = 120。
@@ -535,10 +524,6 @@ class Main extends Sprite
 		#elseif (cpp && !android)
 		// 非 release 构建也安装原生信号处理器（栈落盘 native_stack.txt；Haxe 异常界面不启用）
 		CrashHandler.installNativeHandlers();
-		#end
-
-		#if desktop
-		DiscordClient.start();
 		#end
 
 		#if desktop

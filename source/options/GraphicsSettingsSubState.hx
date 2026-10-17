@@ -10,7 +10,6 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '图像设置';
-		rpcTitle = '图像设置菜单'; //for Discord Rich Presence
 
 		// headless（单界面宿主）不创建预览角色：融合宿主内容区本轮没有预览承载位（见 NoteSettingsSubState 同款说明）
 		if (!BaseOptionsMenu.headless)

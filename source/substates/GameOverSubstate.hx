@@ -195,7 +195,6 @@ class GameOverSubstate extends MusicBeatSubstate
 	/** B 键 / 返回：回到选歌界面 */
 	function goBackToMenu():Void
 	{
-		#if desktop DiscordClient.resetClientID(); #end
 		FlxG.sound.music.stop();
 		PlayState.deathCounter = 0;
 		PlayState.seenCutscene = false;

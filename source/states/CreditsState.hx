@@ -95,11 +95,6 @@ class CreditsState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		Lib.application.window.title = Lang.tOr('win.credits', "FNF':Meteoric Engine - Credits");
 
-		#if desktop
-		// Updating Discord Rich Presence
-		DiscordClient.changePresence("In the Menus", null);
-		#end
-
 		persistentUpdate = true;
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;

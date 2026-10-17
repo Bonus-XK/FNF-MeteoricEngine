@@ -5,7 +5,6 @@ import flixel.util.FlxSort;
 import backend.BaseStage;
 import backend.ClientPrefs;
 import backend.Conductor;
-import backend.Discord;
 import backend.MusicBeatState;
 import backend.Paths;
 import backend.Song;
@@ -95,11 +94,6 @@ class NoteChartDomain
 		PlayState.cancelMusicFadeTween();
 		PlayState.chartingMode = true;
 
-		#if desktop
-		DiscordClient.changePresence("Chart Editor", null, null, true);
-		DiscordClient.resetClientID();
-		#end
-		
 		bridge.EditorBridge.openChartEditor();
 	}
 

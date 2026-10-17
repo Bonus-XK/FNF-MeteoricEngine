@@ -783,7 +783,6 @@ class PauseSubState extends MusicBeatSubstate
 					// 设置改动即时生效；需重载的项（判定模式/音符皮肤等）在下次重开曲目时生效。
 					openSubState(new PauseSettingsSubstate());
 				case ID_EXIT:
-					#if desktop DiscordClient.resetClientID(); #end
 					PlayState.deathCounter = 0;
 					PlayState.seenCutscene = false;
 

@@ -10,7 +10,6 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '界面';
-		rpcTitle = '界面设置菜单'; //for Discord Rich Presence
 
 		// ===== 主题色（固定 10 色色板；三强调令牌同步派生，见 backend/DesignTokens.hx）=====
 		// int 类型：左右键/◀▶/滚轮 每步 ±1 即换一套色板，选中项即时生效（onChange → applyThemeSelection）

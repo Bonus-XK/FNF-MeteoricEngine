@@ -82,8 +82,6 @@ class PlayCommands
 			else
 				MusicBeatState.switchState(new FreeplayState());
 
-			#if desktop DiscordClient.resetClientID(); #end
-
 			FlxG.sound.playMusic(Paths.music('freakyMenu'));
 			PlayState.changedDifficulty = false;
 			PlayState.chartingMode = false;

@@ -546,11 +546,6 @@ class PlayState extends MusicBeatState
 	public var opponentCameraOffset:Array<Float> = null;
 	public var girlfriendCameraOffset:Array<Float> = null;
 
-	#if desktop
-	// Discord RPC variables
-	var detailsText:String = "";
-	var detailsPausedText:String = "";
-	#end
 	// 曲目难度文本（HUD 与标题栏显示用，桌面与非桌面都保留）
 	public var storyDifficultyText:String = "";
 
@@ -695,17 +690,6 @@ class PlayState extends MusicBeatState
 		Conductor.bpm = SONG.bpm;
 
 		storyDifficultyText = Difficulty.getString();
-
-		#if desktop
-		// String that contains the mode defined here so it isn't necessary to call changePresence for each mode
-		if (isStoryMode)
-			detailsText = "Story Mode: " + WeekData.getCurrentWeek().weekName;
-		else
-			detailsText = "Freeplay";
-
-		// String for when the game is paused
-		detailsPausedText = "Paused - " + detailsText;
-		#end
 
 		GameOverSubstate.resetVariables();
 		songName = Paths.formatToSongPath(SONG.song);
@@ -1083,7 +1067,6 @@ class PlayState extends MusicBeatState
 		}
 
 		precacheList.set('alphabet', 'image');
-		resetRPC();
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
@@ -2056,12 +2039,6 @@ class PlayState extends MusicBeatState
 
 	@:noCompletion public function meteoSuper_onFocusLost() return super.onFocusLost();
 
-	// Updating Discord Rich Presence.
-	function resetRPC(?cond:Bool = false)
-	{
-		HostDomain.resetRPC(this, cond);
-	}
-
 	function resyncVocals():Void HostDomain.resyncVocals(this);
 
 	public var paused:Bool = false;
@@ -2355,7 +2332,6 @@ class PlayState extends MusicBeatState
 		persistentUpdate = false;
 		paused = true;
 		cancelMusicFadeTween();
-		#if desktop DiscordClient.resetClientID(); #end
 		bridge.EditorBridge.openCharacterEditor(SONG.player2);
 	}
 
@@ -2427,10 +2403,6 @@ class PlayState extends MusicBeatState
 
 				// MusicBeatState.switchState(new GameOverState(boyfriend.getScreenPosition().x, boyfriend.getScreenPosition().y));
 
-				#if desktop
-				// Game Over doesn't get his own variable because it's only used here
-				DiscordClient.changePresence("Game Over - " + detailsText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
-				#end
 				isDead = true;
 				return true;
 			}
@@ -2474,7 +2446,6 @@ class PlayState extends MusicBeatState
 			{
 				Mods.loadTopMod();
 				FlxG.sound.playMusic(Paths.music('freakyMenu'));
-				#if desktop DiscordClient.resetClientID(); #end
 
 				cancelMusicFadeTween();
 				if(FlxTransitionableState.skipNextTransIn) {
@@ -2520,7 +2491,6 @@ class PlayState extends MusicBeatState
 		{
 			trace('WENT BACK TO FREEPLAY??');
 			Mods.loadTopMod();
-			#if desktop DiscordClient.resetClientID(); #end
 
 			cancelMusicFadeTween();
 			if(FlxTransitionableState.skipNextTransIn) {
@@ -2762,9 +2732,6 @@ class PlayState extends MusicBeatState
 		moveCameraSection(0);
 
 		RecalculateRating();
-		#if desktop
-		resetRPC();
-		#end
 
 		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong;
 		// 重建完成（音符/判定线/人物全部就绪），解锁 update

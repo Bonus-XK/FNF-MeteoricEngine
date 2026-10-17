@@ -120,10 +120,6 @@ class MainMenuState extends MusicBeatState
 		#end
 		Mods.loadTopMod();
 
-		#if desktop
-		DiscordClient.changePresence("In the Menus", null);
-		#end
-
 		camGame = new FlxCamera();
 		camAchievement = new FlxCamera();
 		camAchievement.bgColor.alpha = 0;

@@ -91,10 +91,6 @@ class MasterEditorMenu extends MusicBeatState
 		Paths.clearUnusedMemory();
 		Lib.application.window.title = Lang.tOr('win.editorsMenu', "FNF':Meteoric Engine - Editors Menu");
 
-		#if desktop
-		DiscordClient.changePresence("Editors Main Menu", null);
-		#end
-
 		// Lua 图形化编辑器为桌面端功能（拖拽 + 键盘）：Android 上直接隐藏该条目，
 		// 避免暴露一个用不了的界面（其它 7 项行为不变）。
 		#if mobile

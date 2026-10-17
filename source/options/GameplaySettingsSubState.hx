@@ -5,7 +5,6 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '玩法';
-		rpcTitle = '玩法设置菜单'; //for Discord Rich Presence
 
 		//I'd suggest using "Downscroll" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('向下滚动', //Name

@@ -286,7 +286,6 @@ class SaveVariables {
 	@:keep public var marvelousJudgement:Bool = false; // Marvelous 判定：最高判定（Sick/45ms）显示为 Marvelous 贴图
 	@:keep public var showJudgementCounter:Bool = false; // 侧边栏显示总命中/连击/各判定计数
 	@:keep public var phigrosStyle:Bool = false; // Phigros 式判定线玩法
-	@:keep public var discordRPC:Bool = true;
 	@:keep public var hudLayout:Map<String, Array<Float>> = [ // 自定义界面：HUD 元素相对默认位置的偏移 [x, y]
 		'note' => [0, 0],
 		'timeBar' => [0, 0],
@@ -806,10 +805,6 @@ class ClientPrefs {
 			FlxG.sound.volume = FlxG.save.data.volume;
 		if (FlxG.save.data.mute != null)
 			FlxG.sound.muted = FlxG.save.data.mute;
-
-		#if desktop
-		DiscordClient.check();
-		#end
 
 		// controls on a separate save file
 		var save:FlxSave = new FlxSave();

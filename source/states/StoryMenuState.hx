@@ -115,10 +115,6 @@ class StoryMenuState extends MusicBeatState
 		grpLocks = new FlxTypedGroup<FlxSprite>();
 		add(grpLocks);
 
-		#if desktop
-		DiscordClient.changePresence("In the Menus", null);
-		#end
-
 		var num:Int = 0;
 		for (i in 0...WeekData.weeksList.length)
 		{
@@ -488,11 +484,6 @@ class StoryMenuState extends MusicBeatState
 				FreeplayState.destroyFreeplayVocals();
 			});
 
-			#if MODS_ALLOWED
-			#if desktop
-			DiscordClient.loadModRPC();
-			#end
-			#end
 		}
 		else
 		{

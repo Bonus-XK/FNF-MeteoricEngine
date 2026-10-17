@@ -428,7 +428,6 @@ class CharacterEditorState extends MusicBeatState
 			daAnim = characterList[Std.parseInt(character)];
 			check_player.checked = daAnim.startsWith('bf');
 			loadChar(!check_player.checked);
-			updatePresence();
 			reloadCharacterDropDown();
 		});
 		uiFont(charDropDown.header.text);
@@ -823,7 +822,6 @@ class CharacterEditorState extends MusicBeatState
 			if(sender == healthIconInputText) {
 				leHealthIcon.changeIcon(healthIconInputText.text, false);
 				char.healthIcon = healthIconInputText.text;
-				updatePresence();
 			}
 			else if(sender == imageInputText) {
 				char.imageFile = imageInputText.text;
@@ -1052,7 +1050,6 @@ class CharacterEditorState extends MusicBeatState
 			positionCameraXStepper.value = char.cameraPosition[0];
 			positionCameraYStepper.value = char.cameraPosition[1];
 			reloadAnimationDropDown();
-			updatePresence();
 		}
 	}
 
@@ -1135,13 +1132,6 @@ class CharacterEditorState extends MusicBeatState
 		healthColorStepperG.value = char.healthColorArray[1];
 		healthColorStepperB.value = char.healthColorArray[2];
 		healthBar.leftBar.color = healthBar.rightBar.color = FlxColor.fromRGB(char.healthColorArray[0], char.healthColorArray[1], char.healthColorArray[2]);
-	}
-
-	function updatePresence() {
-		#if desktop
-		// Updating Discord Rich Presence
-		DiscordClient.changePresence("Character Editor", "Character: " + daAnim, leHealthIcon.getCharacter());
-		#end
 	}
 
 	override function update(elapsed:Float)

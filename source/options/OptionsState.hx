@@ -207,10 +207,6 @@ class OptionsState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		Lib.application.window.title = Lang.tOr('settings.windowTitleFull', "FNF':Meteoric Engine - 设置菜单");
 
-		#if desktop
-		DiscordClient.changePresence(Lang.tOr('settings.discordTitle', "设置菜单"), null);
-		#end
-
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.color = DesignTokens.menuTint;

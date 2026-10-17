@@ -70,10 +70,6 @@ class AchievementsMenuState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		Lib.application.window.title = Lang.tOr('win.achievements', "FNF':Meteoric Engine - Achievements");
 
-		#if desktop
-		DiscordClient.changePresence("Achievements Menu", null);
-		#end
-
 		// ---- 背景 ----
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;

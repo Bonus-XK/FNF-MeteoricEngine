@@ -25,7 +25,6 @@ import backend.StageData;
 import backend.StageData.StageFile;
 import backend.Achievements;
 import backend.Difficulty;
-import backend.Discord.DiscordClient;
 import objects.MobileControls;
 import substates.PauseSubState;
 import psychlua.HScript;
@@ -590,9 +589,6 @@ class HostDomain
 		ps.openSubState(new PauseSubState(ps.boyfriend.getScreenPosition().x, ps.boyfriend.getScreenPosition().y, pauseKeyHeld));
 		//}
 
-		#if desktop
-		DiscordClient.changePresence(ps.detailsPausedText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
-		#end
 	}
 
 	/** 原 PlayState.startVideo（作用域分析：零遮蔽，5 处成员引用已限定）。 */
@@ -1014,10 +1010,6 @@ class HostDomain
 		FlxTween.tween(ps.timeBar, {alpha: 1}, 0.5, {ease: FlxEase.circOut});
 		FlxTween.tween(ps.timeTxt, {alpha: 1}, 0.5, {ease: FlxEase.circOut});
 
-		#if desktop
-		// Updating Discord Rich Presence (with Time Left)
-		DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter(), true, ps.songLength);
-		#end
 		ps.setOnScripts('songLength', ps.songLength);
 		ps.callOnScripts('onSongStart');
 		// ===== Render Mode：进曲自动开录 =====
@@ -1247,17 +1239,6 @@ class HostDomain
 		if (ps.songSpeed < 1) t /= ps.songSpeed;
 		if (target.multSpeed < 1) t /= target.multSpeed;
 		return t;
-	}
-
-	/** 原 PlayState.resetRPC（作用域分析：零遮蔽，9 处成员引用已限定）。 */
-	public static function resetRPC(ps:PlayState, ?cond:Bool = false)
-	{
-		#if desktop
-		if (cond)
-			DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter(), true, ps.songLength - Conductor.songPosition - ClientPrefs.data.noteOffset);
-		else
-			DiscordClient.changePresence(ps.detailsText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
-		#end
 	}
 
 	/** 原 PlayState.clampGameplayTotals（作用域分析：零遮蔽，15 处成员引用已限定）。 */
@@ -1851,7 +1832,6 @@ class HostDomain
 
 			ps.paused = false;
 			ps.callOnScripts('onResume');
-			ps.resetRPC(ps.startTimer != null && ps.startTimer.finished);
 
 			#if mobile
 			// 恢复游戏触控板
@@ -1899,10 +1879,6 @@ class HostDomain
 	/** 原 PlayState.onFocusLost（作用域分析：零遮蔽，11 处成员引用已限定）。 */
 	public static function onFocusLost(ps:PlayState):Void
 	{
-		#if desktop
-		if (ps.health > 0 && !ps.paused) DiscordClient.changePresence(ps.detailsPausedText, PlayState.SONG.song + " (" + ps.storyDifficultyText + ")", ps.iconP2.getCharacter());
-		#end
-
 		#if mobile
 		// 退到后台时立即暂停，避免“看似暂停实际还在运行”
 		if (ps.startedCountdown && !ps.endingSong && !ps.paused && ps.canPause)
@@ -1915,7 +1891,6 @@ class HostDomain
 	/** 原 PlayState.onFocus（作用域分析：零遮蔽，4 处成员引用已限定）。 */
 	public static function onFocus(ps:PlayState):Void
 	{
-		if (ps.health > 0 && !ps.paused) ps.resetRPC(Conductor.songPosition > 0.0);
 		// Meteoric：从后台回到前台时恢复被冻结的音频（游戏仍停留在暂停菜单，等玩家手动返回）
 		#if mobile
 		ps.restoreBackgroundAudio();

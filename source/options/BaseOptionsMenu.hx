@@ -90,7 +90,6 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var timeForMoving:Float = 0.1; // 进入子状态先忽略输入，防控制器误触
 
 	public var title:String;
-	public var rpcTitle:String;
 
 	/**
 	 * 【单界面融合】headless 模式：**只构建选项与业务回调，不建任何 UI**。
@@ -163,15 +162,10 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		// ⚠ 必须在下面早退**之前**快照：静态 headless 只在构造窗口内为 true（详见 builtHeadless 注释）
 		builtHeadless = headless;
 
-		// headless：子类的 addOption 全在 super() 之前跑完，这里直接返回即可（不建 UI、不动 Discord/鼠标状态）
+		// headless：子类的 addOption 全在 super() 之前跑完，这里直接返回即可（不建 UI、不动鼠标状态）
 		if (headless) return;
 
 		if (title == null) title = Lang.tOr('settings.title', '设置');
-		if (rpcTitle == null) rpcTitle = Lang.tOr('settings.windowTitle', '设置菜单');
-
-		#if desktop
-		DiscordClient.changePresence(rpcTitle, null);
-		#end
 
 		var bg:FlxSprite;
 		// 判定"暂停内嵌"：以游戏暂停状态为权威信号（无标志位/无相机时序依赖）。

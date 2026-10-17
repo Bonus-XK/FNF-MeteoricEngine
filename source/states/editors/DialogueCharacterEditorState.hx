@@ -484,10 +484,6 @@ class DialogueCharacterEditorState extends MusicBeatState
 		curAnim = 0;
 		animText.text = Lang.tOr('dlg.animLabel', '动画: ') + character.jsonFile.animations[curAnim].anim + ' (' + (curAnim + 1) +' / ' + character.jsonFile.animations.length + Lang.tOr('dlg.animSwitch', ') - 按 W/S 切换');
 
-		#if desktop
-		// Updating Discord Rich Presence
-		DiscordClient.changePresence("Dialogue Character Editor", "Editting: " + character.jsonFile.image);
-		#end
 	}
 
 	function updateTextBox() {

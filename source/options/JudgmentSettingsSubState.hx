@@ -5,7 +5,6 @@ class JudgmentSettingsSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '判定';
-		rpcTitle = '判定设置菜单'; //for Discord Rich Presence
 
 		var option:Option = new Option('打击音音量',
 			'按下音符时，会发出“叮！”的打击音',

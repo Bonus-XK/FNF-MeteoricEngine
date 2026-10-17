@@ -112,7 +112,12 @@ class FunkinLua {
 				Lua_helper.add_callback(lua, name, func);
 		}
 
-		#if desktop DiscordClient.addLuaCallbacks(lua); #end
+		// DiscordRPC 已整体移除（2026-10-17）。下面两个空回调仅为脚本契约冻结基线保留名字
+		// （tools/contract/script-surface.tsv「只增不减」），保证旧 mod 调用不报错、无任何行为。
+		#if desktop
+		Lua_helper.add_callback(lua, "changeDiscordPresence", function(details:String, state:Null<String>, ?smallImageKey:String, ?hasStartTimestamp:Bool, ?endTimestamp:Float) {});
+		Lua_helper.add_callback(lua, "changeDiscordClientID", function(?newID:String = null) {});
+		#end
 		#if (HSCRIPT_ALLOWED && SScript >= "3.0.0") HScript.implement(this); #end
 
 		// ==== 阶段 A 功能域模块（注册顺序 = 拆分前源码顺序，保证同名回调覆盖语义一致）====

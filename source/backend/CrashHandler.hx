@@ -373,9 +373,6 @@ class CrashHandler
 
 	static function fallbackDialog(source:String, error:String):Void
 	{
-		#if desktop
-		DiscordClient.shutdown();
-		#end
 		#if android
 		// 安卓：lime 的 window.alert 未实现（调了会抛异常 → 静默扇退），改用系统 Toast
 		try { extension.androidtools.widget.Toast.makeText(Lang.tOr('crash.toastPrefix', 'Meteoric Engine 发生错误，崩溃日志已保存：') + error, 1); } catch (e:Dynamic) {}

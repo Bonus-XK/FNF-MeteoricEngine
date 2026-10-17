@@ -33,7 +33,6 @@ class RenderModeSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '录像';
-		rpcTitle = '录像设置菜单';
 
 		// ffmpeg 已可用（自带 / 用户自装 / 便携已装好）→ 本行根本没有，页面就是纯设置表
 		//

@@ -9,7 +9,6 @@ class PerformanceSubState extends BaseOptionsMenu
 	public function new()
 	{
 		title = '性能';
-		rpcTitle = '性能设置菜单';
 
 		var option:Option = new Option('堆叠音符合并',
 			'开启后，同一轨道在 ±合并窗口 内的重复箭头会合并为一个音符（用 density 计数），\n'

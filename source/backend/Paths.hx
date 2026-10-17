@@ -144,7 +144,7 @@ class Paths
 
 	// ===== Meteoric：主线程维护（周期清理 / 分片异步解码 / 运行时密排列）=====
 	// 所有功能均在主线程执行（工作线程分配 hxcpp GC 对象会与主线程 GC 并发破坏堆，
-	// 见 LoadingState/discord 注释），因此“异步”= 每帧分片解码（不阻塞、无线程）。
+	// 历史事故见 git 记录），因此“异步”= 每帧分片解码（不阻塞、无线程）。
 
 	static var _periodicCleanAcc:Float = 0;
 	static inline var PERIODIC_CLEAN_INTERVAL:Float = 60;
