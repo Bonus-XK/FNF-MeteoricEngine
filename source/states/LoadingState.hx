@@ -546,7 +546,12 @@ class LoadingState extends MusicBeatState
 					}
 				}
 				if (file != null && FileSystem.exists(file))
-					Paths.requestImageDecode(file);
+				{
+					// 注册加载等待：人物大图解码计入加载进度，避免 PlayState.create 同步兜底解码（黑屏卡顿）。
+					// 完成/失败都会触发（见 Paths.fireImageDecodeWaiters），不会悬挂。
+					var wait:Void->Void = (callbacks != null) ? callbacks.add('charimg:' + file) : null;
+					Paths.requestImageDecode(file, wait);
+				}
 			}
 			catch(e:Dynamic) {}
 		}
@@ -825,6 +830,12 @@ class LoadingState extends MusicBeatState
 	{
 		super.update(elapsed);
 
+		#if (sys && !desktop)
+		// 移动端 MusicBeatState.update 不跑 Paths.tickMaintenance（desktop 限定），
+		// 这里手动泵分片解码：否则 startCharPreload 注册的加载等待永不完成 → 卡加载。
+		Paths.tickImageDecode(2);
+		#end
+
 		#if sys
 		// 轮询后台谱面解析线程（非阻塞）
 		if (chartThread != null && chartMessage == null && chartError == null)
@@ -1043,6 +1054,8 @@ class LoadingState extends MusicBeatState
 		#if sys
 		// 丢弃等待回调：解码仍在后台进行，完成后只缓存音频，不再触发已销毁的界面
 		audioPreloadCallbacks = [];
+		// 图片解码等待同理：避免晚到的回调递减已废弃的 MultiCallback（可能误触发 onLoad 切状态）
+		Paths.clearImageDecodeWaiters();
 		// 重置静态预载状态，避免第二次加载同一首歌时复用旧线程/旧缓存导致崩溃
 		preloadChartThread = null;
 		preloadThreadJson = null;

@@ -189,25 +189,63 @@ class Paths
 	// ---- 异步图片加载（主线程分片）：解码结果进 pendingBitmaps，image() 消费 ----
 	static var imageDecodeQueue:Array<String> = [];
 	static var imageDecodeQueued:Map<String, Bool> = [];
-	/** 请求异步解码一张图（已缓存/已排队/已解码则忽略） */
-	public static function requestImageDecode(file:String):Void
+	/** 解码等待者：加载界面把人物大图解码纳入加载进度（完成/失败都会触发，不悬挂） */
+	static var imageDecodeWaiters:Map<String, Array<Void->Void>> = [];
+	/** 请求异步解码一张图（已缓存/已排队/已解码则忽略；onDone 保证最终被调用一次） */
+	public static function requestImageDecode(file:String, ?onDone:Void->Void):Void
 	{
-		if (file == null || file.length < 1) return;
-		if (currentTrackedAssets.exists(file)) return;
-		if (pendingBitmaps.exists(file)) return;
+		if (file == null || file.length < 1)
+		{
+			if (onDone != null) onDone();
+			return;
+		}
+		if (currentTrackedAssets.exists(file) || pendingBitmaps.exists(file))
+		{
+			// 位图已就绪：无需排队等待，直接回调
+			if (onDone != null) onDone();
+			return;
+		}
+		if (onDone != null)
+		{
+			var list:Array<Void->Void> = imageDecodeWaiters.get(file);
+			if (list == null)
+			{
+				list = [];
+				imageDecodeWaiters.set(file, list);
+			}
+			list.push(onDone);
+		}
 		if (imageDecodeQueued.exists(file)) return;
 		imageDecodeQueued.set(file, true);
 		imageDecodeQueue.push(file);
 	}
-	/** 每帧最多解码 maxPerFrame 张（主线程分片，不阻塞） */
-	static function tickImageDecode(maxPerFrame:Int):Void
+	/** 触发某文件的全部等待者（完成/失败/已就绪时均要调用，保证等待不悬挂） */
+	static function fireImageDecodeWaiters(file:String):Void
+	{
+		var list:Array<Void->Void> = imageDecodeWaiters.get(file);
+		if (list == null) return;
+		imageDecodeWaiters.remove(file);
+		for (cb in list)
+			if (cb != null) cb();
+	}
+	/** 丢弃全部解码等待者（加载界面销毁时调用：晚到的解码不再回调已销毁的界面） */
+	public static function clearImageDecodeWaiters():Void
+	{
+		imageDecodeWaiters = [];
+	}
+	/** 每帧最多解码 maxPerFrame 张（主线程分片，不阻塞；加载界面亦用它手动泵移动端） */
+	public static function tickImageDecode(maxPerFrame:Int):Void
 	{
 		var n:Int = 0;
 		while (imageDecodeQueue.length > 0 && n < maxPerFrame)
 		{
 			var file:String = imageDecodeQueue.shift();
 			imageDecodeQueued.remove(file);
-			if (currentTrackedAssets.exists(file) || pendingBitmaps.exists(file)) continue;
+			if (currentTrackedAssets.exists(file) || pendingBitmaps.exists(file))
+			{
+				fireImageDecodeWaiters(file);
+				continue;
+			}
 			var _t0:Float = haxe.Timer.stamp();
 			try
 			{
@@ -221,6 +259,7 @@ class Paths
 				}
 			}
 			catch (e:Dynamic) {}
+			fireImageDecodeWaiters(file);
 			trace('[IMG+' + Std.int(_t0 * 1000) + '] decode ' + Std.int((haxe.Timer.stamp() - _t0) * 1000) + 'ms '
 				+ (bmpSize(file)) + ' -> ' + imageDecodeQueue.length + ' left');
 			n++;
