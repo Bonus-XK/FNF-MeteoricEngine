@@ -7,7 +7,7 @@
 输出：METEORIC-ARCH-AUDIT-20260918/OVERLAY-LEDGER.md + overlay-ledger.tsv
 """
 import os, re, difflib, subprocess, datetime
-REPO = '/Users/raidbounce/Documents/FNF-MeteoricEngine-1.0.4'
+REPO = '/Users/raidbounce/Documents/FNF-MeteoricEngine'
 AUD = '/Users/raidbounce/Documents/METEORIC-ARCH-AUDIT-20260918'
 HX = '/usr/local/lib/haxe/lib'
 UP = {'flixel': HX + '/flixel/5,2,2/flixel', 'openfl': HX + '/openfl/9,4,1/openfl', 'lime': HX + '/lime/8,3,0/lime'}

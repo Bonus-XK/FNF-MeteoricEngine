@@ -3,7 +3,7 @@
 ## 项目
 
 Meteoric Engine —— 基于 **Psych Engine 0.7.1h** 二次开发的 FNF 模组引擎（Haxe / OpenFL / Lime / hxcpp）。
-仓库根：`/Users/raidbounce/Documents/FNF-MeteoricEngine-1.0.4`，分支 `master`，remote `git@github.com:Bonus-XK/FNF-MeteoricEngine.git`。
+仓库根：`/Users/raidbounce/Documents/FNF-MeteoricEngine`，分支 `master`，remote `git@github.com:Bonus-XK/FNF-MeteoricEngine.git`。
 上游是 Psych，**不要**按原版 FNF / 旧版 Psych 的写法想当然。
 
 ## 界面改动前必读
@@ -25,7 +25,7 @@ Meteoric Engine —— 基于 **Psych Engine 0.7.1h** 二次开发的 FNF 模组
 ## 构建与验证
 
 ```bash
-cd /Users/raidbounce/Documents/FNF-MeteoricEngine-1.0.4
+cd /Users/raidbounce/Documents/FNF-MeteoricEngine
 METEORIC_BACKUP_MODS=0 METEORIC_BACKUP_CONTAINERS=0 ./compile-mac.sh typecheck   # 4~5 分钟，退出码 0 = 通过
 METEORIC_BACKUP_MODS=0 METEORIC_SKIP_CODESIGN=1 ./compile-mac.sh                # 本地迭代 ~25 秒（跳过签名，勿分发）
 python3 tools/i18n/check_i18n.py                                                 # 语言包自检，退出码 0 = PASS
