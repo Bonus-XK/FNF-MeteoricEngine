@@ -1128,7 +1128,10 @@ class Song
 	 */
 	static function enumerateAllPartPaths(base:String, folder:String):Array<String>
 	{
-		var songBase:String = Paths.formatToSongPath(folder);
+		// ⚠ 必须用 base（歌曲名）而不是 folder（mod 目录名）拼 data 路径：
+		//   实际布局是 mods/<mod名>/data/<歌曲名>/，用 mod 名会拼成
+		//   data/<mod名>/ → 目录不存在 → 枚举返回 null → 加载静默失败。
+		var songBase:String = Paths.formatToSongPath(base);
 		var rel:String = 'data/' + songBase + '/';
 
 		// ⚠ 不能用 modsJson(base) 反推目录：**本体文件（如 stupid-griefer.json）不存在**
