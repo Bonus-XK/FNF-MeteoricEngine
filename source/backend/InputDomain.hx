@@ -14,13 +14,21 @@ import openfl.events.KeyboardEvent;
 class InputDomain
 {
 
+	// keysCheck 每帧复用的输入数组（避免每帧新建 3 个数组及其扩容分配；单线程主循环使用，无并发）
+	static var _keysHold:Array<Bool> = [];
+	static var _keysPress:Array<Bool> = [];
+	static var _keysRelease:Array<Bool> = [];
+
 	/** 原 PlayState.keysCheck（作用域分析：零遮蔽，41 处成员引用已限定）。 */
 	public static function keysCheck(ps:PlayState):Void
 	{
-		// HOLDING
-		var holdArray:Array<Bool> = [];
-		var pressArray:Array<Bool> = [];
-		var releaseArray:Array<Bool> = [];
+		// HOLDING（复用静态数组：resize(0) 只清长度，push 复用原容量，不再每帧分配）
+		var holdArray:Array<Bool> = _keysHold;
+		var pressArray:Array<Bool> = _keysPress;
+		var releaseArray:Array<Bool> = _keysRelease;
+		holdArray.resize(0);
+		pressArray.resize(0);
+		releaseArray.resize(0);
 		for (key in ps.keysArray)
 		{
 			holdArray.push(ps.controls.pressed(key));
