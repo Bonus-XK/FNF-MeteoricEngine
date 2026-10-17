@@ -90,6 +90,13 @@ class Main extends Sprite
 			trace('[Container] tick error: ' + Std.string(e));
 		}
 	}
+
+	/** Discord RPC 主线程 tick：每帧处理 RPC 事件队列（未初始化时直接短路，零分配）。 */
+	static function onDiscordFrame(_):Void
+	{
+		if (backend.DiscordClient.isInitialized)
+			backend.DiscordClient.tick();
+	}
 	#end
 
 	#if mobile
@@ -453,11 +460,6 @@ class Main extends Sprite
 				stage.dispatchEvent(new Event(Event.RESIZE));
 			}
 			processTouchScroll();
-			#if desktop
-			// Discord RPC 主线程 tick（替代原守护线程：子线程分配与主线程 GC 并发破坏堆）
-			if (backend.DiscordClient.isInitialized)
-				backend.DiscordClient.tick();
-			#end
 		});
 		#end
 
@@ -472,6 +474,11 @@ class Main extends Sprite
 		// 注意：此处（init 早期）FlxG.stage 可能尚未就绪，挂到本 Sprite 自己的 stage 上，
 		// 与文件末尾 startCloseAnimation 的 stage.addEventListener 同款，必然可用。
 		stage.addEventListener(Event.ENTER_FRAME, onContainerFrame);
+		#end
+
+		#if desktop
+		// Discord RPC 主线程 tick（原实现误嵌在 mobile 分支的 #if desktop 内，桌面端永不执行）
+		stage.addEventListener(Event.ENTER_FRAME, onDiscordFrame);
 		#end
 
 		// Performance optimizations
