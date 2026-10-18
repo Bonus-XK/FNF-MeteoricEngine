@@ -71,6 +71,7 @@ class MeteoricProfile
 	static var _phLiveStart:Float = 0;
 	static var _wThreadOn:Bool = false;
 	static var _watchPath:String = null;
+	static var _lastHits:Int = -1; // 上一 帧·秒 命中数（songHits 增量 → nps=）
 	static var _phCnt:Map<String, Int> = new Map();
 
 	// 探针落盘（crash/profile.txt，追加）：release 双击运行时没有控制台，
@@ -368,6 +369,7 @@ class MeteoricProfile
 				try
 				{
 					sb.add(' gc=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb');
+					sb.add(' gcR=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED) / 1048576) + 'mb');
 				}
 				catch (e2:Dynamic) {}
 				#end
@@ -430,6 +432,38 @@ class MeteoricProfile
 				if (nC > 0) sb.add(' bmpN=' + nC + ' bmpMB=' + Std.int(pix / 1048576));
 			}
 			#end
+			// 【GC 保留内存】MEM_INFO_RESERVED = 当前存活 + 已申请未归还 OS 的池（含大块）。
+			// 关键读法：mem= 平而 memR= 随 ram 一起涨 → 「僵尸对象」实锤 —— Haxe 对象已死、
+			// 原生缓冲（位图像素/音频等）等 GC 析构函数排队，池只增不还（低 GC 压力下 major 极少跑）。
+			#if cpp
+			try { sb.add(' memR=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED) / 1048576) + 'mb'); } catch (eR:Dynamic) {}
+			#end
+			// 【声音通道账本】FlxG.sound.list = FlxSound 复用池。正常应为小常数；
+			// 若随秒线性涨 = 逐命中播放的通道未回收（音频缓冲泄漏的直接读数）。
+			if (FlxG.sound != null && FlxG.sound.list != null) sb.add(' sndN=' + FlxG.sound.list.length);
+			// 【曲内对齐】songPosition(ms)：把内存曲线对回谱面结构（墙段/空段/加载段）。
+			sb.add(' pos=' + (Conductor.songPosition > 0 ? Std.int(Conductor.songPosition) : 0));
+			// 【命中速率】songHits 增量/秒 ≈ 实际 NPS：验证泄漏速率与命中率的相关性
+			//（PlayState 在 states 包，经 Type/Reflect 取静态 instance，避免 backend→states 静态依赖）。
+			{
+				var hits:Int = -1;
+				try
+				{
+					var cls = Type.resolveClass('PlayState');
+					if (cls == null) cls = Type.resolveClass('states.PlayState');
+					if (cls != null)
+					{
+						var inst = Reflect.field(cls, 'instance');
+						if (inst != null) hits = Reflect.field(inst, 'songHits');
+					}
+				}
+				catch (eH:Dynamic) {}
+				if (hits >= 0)
+				{
+					if (_lastHits >= 0 && hits >= _lastHits) sb.add(' nps=' + (hits - _lastHits));
+					_lastHits = hits;
+				}
+			}
 			for (k in _phAcc.keys())
 			{
 				var c:Int = _phCnt.exists(k) ? _phCnt.get(k) : 1;
