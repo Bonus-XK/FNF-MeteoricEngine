@@ -1983,6 +1983,17 @@ class PlayState extends MusicBeatState
 		trace('[PACKEDBUILD] clusters=' + clusters.length + ' totalNotes=' + totalNotes
 			+ ' sections=' + (song.packedSectionCount != null ? song.packedSectionCount : -1));
 
+		// 【内存遥测】packed 构建完成快照：dense 标志的真实态（packed 分支从未赋值，
+		// 若实测 dense=false 则密集栈护栏对墙谱整层失效，属设计缺口待数据确认）+
+		// botplayLanes 条目数（buildFromPacked 1970 起按「箭头数×段数」展开，
+		// preRenderNotes 开启时是 O(原始音符数) 的潜在内存炸弹，墙簇 density 190 万起步）。
+		var _laneEntries:Int = 0;
+		if (botplayLanes != null)
+			for (l in 0...4)
+				if (botplayLanes[l] != null) _laneEntries += botplayLanes[l].length;
+		PerfProbe.mark('packedbuild: done clusters=' + clusters.length
+			+ ' dense=' + densePerfMode + ' lanes=' + (botplayLanes == null ? 'off' : Std.string(_laneEntries)));
+
 		return {
 			notes: unspawnNotes,
 			noteTypes: noteTypes,
