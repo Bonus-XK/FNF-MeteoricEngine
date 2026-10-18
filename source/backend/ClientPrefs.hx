@@ -226,6 +226,10 @@ class SaveVariables {
 	@:keep public var ratingPopups:Bool = true;         // 评级弹窗（Sick/Good…）
 	@:keep public var comboPopups:Bool = true;          // 连击数字 + Combo 词弹窗
 	@:keep public var lessBotLag:Bool = false;          // 自动游玩只计分不弹窗（JS 引擎 lessBotLag）
+	// 【GC 呼吸阀】大块内存守护：进曲时设 GC 最低空余水位 + 每 20s 强制一次全量回收。
+	// 用途：墙谱游玩期 hxcpp 大块池只增不还（僵尸缓冲等不到 major），物理内存耗尽冻结。
+	// 代价：每次全量回收约 20-80ms 顿挫。默认关闭（零行为变化）。
+	@:keep public var gcBreathing:Bool = false;
 	@:keep public var noHitFuncs:Bool = false;          // 关闭 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调
 	@:keep public var iconFlyOverflow:Bool = false;     // 血条溢出图标飞出（JS 引擎同款：>100% 时图标沿填充方向滑出条外，不封顶）
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式

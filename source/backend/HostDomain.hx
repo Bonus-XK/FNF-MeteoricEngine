@@ -1321,6 +1321,14 @@ class HostDomain
 	}
 
 	/** 原 PlayState.update（作用域分析：零遮蔽，241 处成员引用已限定）。 */
+	// 【GC 呼吸阀】大块内存守护（ClientPrefs.data.gcBreathing，默认关，零行为变化）：
+	// 墙谱游玩期实测（10/18 profile 行）：GC 存活数恒 ~320mb 平、reserved 池以 ~15-38MB/s 无限膨胀
+	//（nps=0 的行照样涨 → 每帧即生即死的大块垃圾等 major 才有析构机会，而 GC 压力低时 major 几乎
+	// 不触发），最后提交内存耗尽全进程楔死。开启后：进曲设最低空余水位（池空余跌破自动 major，
+	// 气球封顶）+ 每 20s 强制一次全量回收兜底。代价：每次回收约 20-80ms 顿挫（时间换内存）。
+	// 刻意不用 compact()：压缩或移动堆内对象，与 lime 原生侧持有的指针交互存在不确定性。
+	static var _gcBreathLast:Float = 0;
+
 	public static function update(ps:PlayState, elapsed:Float)
 	{
 		#if METEORIC_PROFILE
@@ -1336,6 +1344,24 @@ class HostDomain
 		// 否则会访问已销毁的人物/判定线（Null Object Reference）
 		if (ps._visualsTorn)
 			return;
+
+		#if cpp
+		// 【GC 呼吸阀】首次进入设水位，之后每 20s 强制 major（落在本帧 update 内，profile 可见）
+		if (ClientPrefs.data.gcBreathing)
+		{
+			var nowBreath:Float = Sys.time();
+			if (_gcBreathLast <= 0.0)
+			{
+				_gcBreathLast = nowBreath;
+				try { cpp.vm.Gc.setMinimumFreeSpace(256 * 1024 * 1024); } catch (eG:Dynamic) {}
+			}
+			else if (nowBreath - _gcBreathLast >= 20.0)
+			{
+				_gcBreathLast = nowBreath;
+				try { cpp.vm.Gc.run(true); } catch (eG:Dynamic) {}
+			}
+		}
+		#end
 
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseBegin('scriptOnUpdate');

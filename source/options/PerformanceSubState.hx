@@ -180,6 +180,13 @@ class PerformanceSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		option = new Option(
+			backend.Lang.tOr('option.gcBreathing', 'GC 呼吸阀'),
+			backend.Lang.tOr('optionDesc.gcBreathing', '进曲时设置 GC 最低空余水位，并且游玩期间每 20 秒强制一次全量废品回收：内存不再持续上涨导致冻结。代价：每次回收可能有约 0.02~0.1 秒顿挫。默认关闭'),
+			'gcBreathing',
+			'bool');
+		addOption(option);
+
 		option = new Option('关闭命中回调',
 			'命中音符不再触发 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调；\n'
 			+ '依赖这些回调的模组（如计分/特效脚本）请保持开启',
