@@ -198,6 +198,20 @@ class PlayState extends MusicBeatState
 	var _deferredGC:Bool = false;
 	var _deferredGCTime:Float = 0;
 
+	// ===== 每帧脚本广播值缓存（HostDomain.update 的 scriptSetProps 值去重用） =====
+	// 六个引擎值没变就不重复进脚本引擎；任何脚本数组变化（加载/中途 loadScript）
+	// 时 scriptEpoch 自增 → 下一帧全量重推一次，新脚本/onCreate 能读到全部初值。
+	// 字段只服务这条路径，随实例销毁一并失效（快开 restart 不销毁实例 → 缓存继续成立）。
+	public var scriptEpoch:Int = 0;
+	var _ssCDecStep:Float = 0;
+	var _ssCDecBeat:Float = 0;
+	var _ssHealth:Float = 0;
+	var _ssEnding:Bool = false;
+	var _ssCurBeat:Int = 0;
+	var _ssCamForced:Bool = false;
+	var _ssReady:Bool = false;
+	var _ssEpoch:Int = -1;
+
 	// 结算拆卸锁（Meteoric Fix 续）：endSong 拆卸人物/判定线后置位；
 	// update() 立即早退（结算转场/关闭回调的窗口期 PlayState 仍会被驱动，
 	// 访问已销毁对象即 NRE）。重试/回退重开重建完成后复位。

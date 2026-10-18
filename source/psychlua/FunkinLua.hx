@@ -100,6 +100,7 @@ class FunkinLua {
 		this.scriptName = scriptName;
 		var game:PlayState = PlayState.instance;
 		game.luaArray.push(this);
+		game.scriptEpoch++; // 脚本集变化 → 下一帧 setOnScripts 全量重推（新脚本要能读到初值）
 
 		// 全局变量初始化（阶段 A 拆分：psychlua/functions/ScriptGlobals.hx）
 		ScriptGlobals.implement(this);

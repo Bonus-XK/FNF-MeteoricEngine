@@ -754,6 +754,7 @@ class HostDomain
 			}
 
 			ps.hscriptArray.push(newScript);
+			ps.scriptEpoch++; // 脚本集变化 → 下一帧 setOnScripts 全量重推（新脚本要能读到初值）
 			if(newScript.exists('onCreate'))
 			{
 				var callValue = newScript.call('onCreate');
@@ -1476,17 +1477,46 @@ class HostDomain
 			}
 		}
 
+		// ===== 每帧向脚本引擎广播 PlayState 关键值（Psych 0.7.3 setSpecialObject 等价物） =====
+		// 【值去重】脚本读的是引擎属性本身，值没变时重复 set 是零观察效果的动态调用
+		//（profile 实测 scriptSetProps 常态 5~17µs/帧，脚本多时更久，还会给 GC 喂食）。
+		// 逐键只在变化时推送；首次进入或脚本数组变化（scriptEpoch 自增：加载/中途
+		// loadScript）时全量重推一次，保证 onCreate/新脚本读到全部初值。
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseBegin('scriptSetProps');
 		#end
-		ps.setOnScripts('curDecStep', ps.curDecStep);
-		ps.setOnScripts('curDecBeat', ps.curDecBeat);
-
-		// 每帧刷新动态 PlayState 值（Psych 0.7.3 setSpecialObject 等价物）
-		ps.setOnScripts('health', ps.health);
-		ps.setOnScripts('endingSong', ps.endingSong);
-		ps.setOnScripts('curBeat', ps.curBeat);
-		ps.setOnScripts('isCameraOnForcedPos', ps.isCameraOnForcedPos);
+		if (!ps._ssReady || ps._ssEpoch != ps.scriptEpoch)
+		{
+			ps._ssReady = true;
+			ps._ssEpoch = ps.scriptEpoch;
+			ps._ssCDecStep = ps.curDecStep;
+			ps._ssCDecBeat = ps.curDecBeat;
+			ps._ssHealth = ps.health;
+			ps._ssEnding = ps.endingSong;
+			ps._ssCurBeat = ps.curBeat;
+			ps._ssCamForced = ps.isCameraOnForcedPos;
+			ps.setOnScripts('curDecStep', ps.curDecStep);
+			ps.setOnScripts('curDecBeat', ps.curDecBeat);
+			ps.setOnScripts('health', ps.health);
+			ps.setOnScripts('endingSong', ps.endingSong);
+			ps.setOnScripts('curBeat', ps.curBeat);
+			ps.setOnScripts('isCameraOnForcedPos', ps.isCameraOnForcedPos);
+		}
+		else
+		{
+			var ssV:Float = ps.curDecStep;
+			if (ssV != ps._ssCDecStep) { ps._ssCDecStep = ssV; ps.setOnScripts('curDecStep', ssV); }
+			ssV = ps.curDecBeat;
+			if (ssV != ps._ssCDecBeat) { ps._ssCDecBeat = ssV; ps.setOnScripts('curDecBeat', ssV); }
+			ssV = ps.health;
+			if (ssV != ps._ssHealth) { ps._ssHealth = ssV; ps.setOnScripts('health', ssV); }
+			var ssB:Bool = ps.endingSong;
+			if (ssB != ps._ssEnding) { ps._ssEnding = ssB; ps.setOnScripts('endingSong', ssB); }
+			var ssI:Int = ps.curBeat;
+			if (ssI != ps._ssCurBeat) { ps._ssCurBeat = ssI; ps.setOnScripts('curBeat', ssI); }
+			ssB = ps.isCameraOnForcedPos;
+			if (ssB != ps._ssCamForced) { ps._ssCamForced = ssB; ps.setOnScripts('isCameraOnForcedPos', ssB); }
+		}
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseEnd('scriptSetProps');
 		#end
