@@ -319,7 +319,7 @@ class FPS extends TextField
 		{
 			tok = StringTools.trim(tok);
 			if (tok.length == 0 || out.indexOf(tok) >= 0) continue;
-			if (tok == 'Mem' || tok == 'Peak' || tok == 'CPU' || tok == 'Ver') out.push(tok);
+			if (tok == 'Mem' || tok == 'Peak' || tok == 'CPU' || tok == 'Ver' || tok == 'Git') out.push(tok);
 		}
 		return out;
 	}
@@ -344,12 +344,11 @@ class FPS extends TextField
 				#if sys
 				out.push('${prefix}CPU: ${Math.round(_cpuPct)}%');
 				#end
-			case 'Ver':
+			case 'Ver': // 引擎版本信息行（commit/提交信息由 'Git' 项独立控制）
 				out.push('${prefix}Meteoric Engine v${Main.meVersion}');
-				// commit 数 / 短 hash / 分支名 + 未提交标记，编译期由 GitInfo 宏烘焙（运行时零开销）
+			case 'Git': // 提交信息行：commit 数 / 短 hash / 分支名 / 未提交标记，编译期由 GitInfo 烘焙（运行时零开销）
 				var gi:String = backend.GitInfo.summary();
-				if (gi != "-" && gi.length > 0) out.push(gi);
-				out.push('Psych Engine');
+				if (gi != "-" && gi.length > 0) out.push('${prefix}$gi');
 			default:
 		}
 		return out;
@@ -524,8 +523,8 @@ class FPS extends TextField
 		#if sys
 		buf.add(' | CPU: ${Math.round(_cpuPct)}%');
 		#end
-		// commit 信息跟随 Ver 显示项，与屏幕计数器口径一致（都是编译期烘焙，零开销）
-		if (isStatOn('Ver'))
+		// commit 信息跟随 Git 显示项，与屏幕计数器口径一致（都是编译期烘焙，零开销）
+		if (isStatOn('Git'))
 		{
 			var gi:String = backend.GitInfo.summary();
 			if (gi != "-" && gi.length > 0) buf.add(' | $gi');

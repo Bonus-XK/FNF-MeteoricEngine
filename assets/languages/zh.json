@@ -176,6 +176,7 @@
 	"fpsStatName.Peak": "峰值内存",
 	"fpsStatName.CPU": "CPU 占用",
 	"fpsStatName.Ver": "版本信息",
+	"fpsStatName.Git": "提交信息",
 	"fpsEditor.pinned": "固定主行",
 	"fpsEditor.hint": "上下选择，左右移动顺序，确认开关，Esc 返回；改动即时生效并自动保存",
 	"optionDesc.fpsStyle": "设置 FPS 计数器外观：方块为半透明方形徽章（85% 不透明深色圆角底）；经典为无底色多行文本",

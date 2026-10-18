@@ -56,8 +56,8 @@ class FPSStatsEditorState extends MusicBeatState
 	static final ARROW_UP_X:Float = ARROW_DOWN_X - ARROW_GAP - ARROW_W;
 
 	// 可编辑显示项（id 是存档 ASCII 令牌，绝不能改 —— 显示名走 fpsStatName.*）
-	static final EDITABLE:Array<String> = ['Mem', 'Peak', 'CPU', 'Ver'];
-	static final ROWS:Int = 5; // 行 0 = FPS 固定主行，行 1..4 = 清单行
+	static final EDITABLE:Array<String> = ['Mem', 'Peak', 'CPU', 'Ver', 'Git'];
+	static final ROWS:Int = 6; // 行 0 = FPS 固定主行，行 1..5 = 清单行
 
 	var selectorBar:FlxSprite;
 	var selectorTween:FlxTween = null;
@@ -196,6 +196,7 @@ class FPSStatsEditorState extends MusicBeatState
 			case 'Peak': Lang.tOr('fpsStatName.Peak', '峰值内存');
 			case 'CPU': Lang.tOr('fpsStatName.CPU', 'CPU 占用');
 			case 'Ver': Lang.tOr('fpsStatName.Ver', '版本信息');
+			case 'Git': Lang.tOr('fpsStatName.Git', '提交信息');
 			default: id;
 		}
 	}

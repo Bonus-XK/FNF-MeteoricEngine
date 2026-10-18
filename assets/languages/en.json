@@ -176,6 +176,7 @@
 	"fpsStatName.Peak": "Peak memory",
 	"fpsStatName.CPU": "CPU usage",
 	"fpsStatName.Ver": "Version info",
+	"fpsStatName.Git": "Git Info",
 	"fpsEditor.pinned": "Pinned main line",
 	"fpsEditor.hint": "Up/Down select, Left/Right reorder, Enter toggle, Esc back. Changes apply instantly and save automatically.",
 	"optionDesc.fpsStyle": "Choose the FPS counter look: Square = translucent square badge (85% opaque dark rounded base); Classic = plain multi-line text.",
