@@ -982,7 +982,7 @@ class PauseSubState extends MusicBeatSubstate
 		// 轻量签名先行（见字段注释）：秒数与百分比按**显示口径**取整比较，
 		// 否则与文本节拍对不上导致永远"变化"。未变 → 零分配返回。
 		var sigSec:Int = (Conductor.songPosition > 0) ? Std.int(Conductor.songPosition / 1000) : 0;
-		var sigPct:Int = CoolUtil.floorDecimal(st.ratingPercent * 100, 2);
+		var sigPct:Int = Std.int(CoolUtil.floorDecimal(st.ratingPercent * 100, 2));
 		var sigMLen:Int = (FlxG.sound.music != null) ? Std.int(FlxG.sound.music.length) : -1;
 		if (st.songScore == _sigScore && st.songMisses == _sigMisses && st.combo == _sigCombo
 			&& st.ratingName == _sigRatingName && st.ratingFC == _sigFC && sigPct == _sigPct
