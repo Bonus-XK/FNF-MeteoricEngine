@@ -62,6 +62,15 @@ class MeteoricProfile
 	static var _phT:Float = 0;
 	static var _phAcc:Map<String, Float> = new Map();
 	static var _phMax:Map<String, Float> = new Map();
+
+	// 【卡死看门狗】live phase 名与开启时刻：phaseBegin 置名（同名不改起点）、phaseEnd 清名。
+	// 看门狗线程每 2s 把「live phase + 已跑时长 + GC 堆 + OS 工作集」追加到 crash/watchdog.txt。
+	// 主线程若长卡在某段（例如某帧内部循环实际展开到分钟级，帧休止不落 profile 行），
+	// watchdog.txt 的尾部：最后一行 phase=X phT=NNNNNNms 后长时间无新行 → 卡点就在 X 段内。
+	static var _phLiveName:String = null;
+	static var _phLiveStart:Float = 0;
+	static var _wThreadOn:Bool = false;
+	static var _watchPath:String = null;
 	static var _phCnt:Map<String, Int> = new Map();
 
 	// 探针落盘（crash/profile.txt，追加）：release 双击运行时没有控制台，
@@ -247,6 +256,7 @@ class MeteoricProfile
 				var f = File.append(_profilePath, false);
 				f.writeString(line + '\n');
 				f.close();
+				startWatchdog(); // 【看门狗】profile 目录确定即拉起（与 profile.txt 同目录落 watchdog.txt）
 			}
 			catch (e:Dynamic) {}
 		}
@@ -285,6 +295,10 @@ class MeteoricProfile
 	public static inline function phaseBegin(name:String):Void
 	{
 		_phT = tick();
+		// live 状态：每次进入都重置起点；正常每帧进出的段 elapsed 始终很小，
+		// 卡死段（进入后从未 phaseEnd）elapsed 会一直涨到看门狗笔下。
+		_phLiveName = name;
+		_phLiveStart = tick();
 	}
 
 	public static inline function phaseEnd(name:String):Void
@@ -294,6 +308,7 @@ class MeteoricProfile
 		_phCnt.set(name, (_phCnt.exists(name) ? _phCnt.get(name) : 0) + 1);
 		var m:Float = _phMax.exists(name) ? _phMax.get(name) : 0;
 		if (d > m) _phMax.set(name, d);
+		if (_phLiveName == name) _phLiveName = null;
 	}
 
 	/**
@@ -312,6 +327,59 @@ class MeteoricProfile
 	public static inline function tickNow():Float
 	{
 		return tick();
+	}
+
+	// ===================== 【卡死看门狗（遥测）】 =====================
+	// 独立线程每 2s 追加一行到 <profile 同目录>/watchdog.txt。主线程只写三个 static
+	//（_phLiveName/_phLiveStart 由 update 线程写、这里读），单字引用读写无撕裂风险。
+	// startWatchdog 由 logToFile 首行落盘时拉起 —— 与 profile.txt 同目录自动成立。
+	static function startWatchdog():Void
+	{
+		if (_wThreadOn) return;
+		_wThreadOn = true;
+		#if (sys && cpp)
+		cpp.vm.Thread.create(watchdogLoop);
+		#end
+	}
+
+	static function watchdogPath():String
+	{
+		if (_watchPath == null)
+		{
+			if (_profilePath != null && _profilePath.indexOf('profile.txt') >= 0)
+				_watchPath = _profilePath.substr(0, _profilePath.length - 'profile.txt'.length) + 'watchdog.txt';
+			else
+				_watchPath = './crash/watchdog.txt';
+		}
+		return _watchPath;
+	}
+
+	static function watchdogLoop():Void
+	{
+		while (true)
+		{
+			try
+			{
+				var sb:StringBuf = new StringBuf();
+				sb.add('wdog phase=' + (_phLiveName == null ? 'none' : _phLiveName));
+				if (_phLiveName != null)
+					sb.add(' phT=' + Std.int((tick() - _phLiveStart) * 1000) + 'ms');
+				#if cpp
+				try
+				{
+					sb.add(' gc=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb');
+				}
+				catch (e2:Dynamic) {}
+				#end
+				var rss:Float = PerfProbe.processRSS(); // 主线程行已确保采样线程先起；竞态最坏 = 双采样器（无害）
+				if (rss >= 0) sb.add(' rss=' + Std.int(rss) + 'mb');
+				var f = File.append(watchdogPath(), false);
+				f.writeString(sb.toString() + '\n');
+				f.close();
+			}
+			catch (e:Dynamic) {}
+			Sys.sleep(2.0);
+		}
 	}
 
 	public static inline function end(tag:String):Void
@@ -339,6 +407,29 @@ class MeteoricProfile
 				var rss:Float = PerfProbe.processRSS();
 				sb.add(' ram=' + (rss >= 0 ? (Std.int(rss) + 'mb') : 'n/a'));
 			}
+			// 【位图账本】每秒盘点 flixel 位图缓存（唯一纹理型泄漏的直接探测）。
+			// 读法：bmpN/bmpMB 随秒涨 → 泄漏在缓存内（谁在每帧往缓存塞新 key）；两者平而 ram 涨
+			// → 泄漏在缓存外原生侧（OpenFL 像素缓冲/表面/驱动）。Reflect 读私有 _cache：运行期字段访问
+			// 无编译期权限约束，不需要 @:privateAccess。
+			#if cpp
+			{
+				var nC:Int = 0;
+				var pix:Float = 0;
+				try
+				{
+					var cache:Map<String, Dynamic> = Reflect.field(FlxG.bitmap, '_cache');
+					if (cache != null)
+						for (g in cache)
+							if (g != null && g.bitmap != null)
+							{
+								nC++;
+								pix += g.width * g.height * 4;
+							}
+				}
+				catch (eB:Dynamic) {}
+				if (nC > 0) sb.add(' bmpN=' + nC + ' bmpMB=' + Std.int(pix / 1048576));
+			}
+			#end
 			for (k in _phAcc.keys())
 			{
 				var c:Int = _phCnt.exists(k) ? _phCnt.get(k) : 1;
