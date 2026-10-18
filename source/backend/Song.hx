@@ -916,6 +916,10 @@ class Song
 		trace('[COMBO] loadCombo jsonInput=' + jsonInput + ' folder=' + Std.string(folder)
 			+ ' resolved=' + (partPaths == null ? "null" : Std.string(partPaths.length)));
 		if (partPaths == null) return null;
+		// 【内存遥测】组合谱（36 亿级）加载自动武装 PerfProbe：
+		// 每个 mark 自带 GC 堆量（mem=）与 OS 工作集（rss=），加载曲线落盘 crash/perf_probe.txt。
+		// AUTOSONG 环境变量之外，这是唯一覆到的常规入口 —— 用户正常双击选歌也能拿到数据。
+		PerfProbe.arm('combo:' + jsonInput, Std.string(partPaths.length));
 		#if (sys && !android)
 		// ---- 先查磁盘缓存：命中就完全跳过扫描（79GB 原始数据 → 几十 MB 簇缓存）----
 		if (ClientPrefs.data.partsCache)

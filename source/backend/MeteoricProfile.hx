@@ -334,6 +334,11 @@ class MeteoricProfile
 			#if cpp
 			try { sb.add(' mem=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb'); } catch (e:Dynamic) {}
 			#end
+			// 【OS 级占用】GC 数字不动而物理内存飙升 → 涨在原生侧（PerfProbe 采样线程，主循环零开销）
+			{
+				var rss:Float = PerfProbe.processRSS();
+				sb.add(' ram=' + (rss >= 0 ? (Std.int(rss) + 'mb') : 'n/a'));
+			}
 			for (k in _phAcc.keys())
 			{
 				var c:Int = _phCnt.exists(k) ? _phCnt.get(k) : 1;
