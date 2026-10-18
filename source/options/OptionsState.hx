@@ -495,14 +495,26 @@ class OptionsState extends MusicBeatState
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.begin();
 		#end
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('optsSuper');
+		#end
 		super.update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('optsSuper');
+		#end
 
 		FlxG.mouse.visible = true;
 
 		// 外部动态行（RenderModeSubState 的 ffmpeg 自动获取进度等）：
 		// 分区实例是 headless 构造、不进状态树，因而必须由宿主每帧 STEP 一次。
 		// 只在行文本实变时发生重绘（rowsDirty 消费一次），平时零开销。
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('optsExt');
+		#end
 		if (pane != null) pane.stepExternal();
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('optsExt');
+		#end
 
 		// 子界面（箭头配色/按键设置/移动触控/输入框）打开期间：本层冻结输入并隐藏移动端 A 键
 		if (subState != null)
@@ -560,7 +572,13 @@ class OptionsState extends MusicBeatState
 		}
 
 		// ---- 内容区输入（键盘仅在内容区有焦点时启用；鼠标/触控点击在任何焦点下都生效）----
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('optsInput');
+		#end
 		pane.updatePaneInput(elapsed, focus == FOCUS_CONTENT, focus == FOCUS_CONTENT);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('optsInput');
+		#end
 
 		// 画布分区（按键设置/箭头配色）：内容区输入归画布自己（它有绑定流程与自己的退出语义），
 		// 因此确认/重置/返回都不在这里重复处理，只保留"焦点在分区栏时的 Esc 退出设置"
@@ -583,6 +601,9 @@ class OptionsState extends MusicBeatState
 		#end
 
 		// ---- 鼠标：点击分区栏 = 切分区并进入内容区 ----
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('optsMouse');
+		#end
 		var clickPressed:Bool = FlxG.mouse.justPressed;
 		#if mobile
 		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
@@ -617,6 +638,9 @@ class OptionsState extends MusicBeatState
 			}
 		}
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('optsMouse');
+		#end
 		if (controls.BACK && !canvasHasFocus) goBack();
 
 		#if METEORIC_PROFILE

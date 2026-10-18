@@ -349,7 +349,13 @@ class MainMenuState extends MusicBeatState
 		if (!selectedSomethin)
 		{
 			FlxG.mouse.visible = true;
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.phaseBegin('menuMouse');
+			#end
 			updateMouseControl();
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.phaseEnd('menuMouse');
+			#end
 
 			if (controls.UI_UP_P)
 			{
@@ -521,7 +527,13 @@ class MainMenuState extends MusicBeatState
 			}
 		}
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('menuSuper');
+		#end
 		super.update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('menuSuper');
+		#end
 
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.end('MainMenuState.update');

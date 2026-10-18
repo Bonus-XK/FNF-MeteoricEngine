@@ -50,6 +50,14 @@ class MeteoricProfile
 		return 9;
 	}
 
+	// 【update 间隔 gap】上一次 end() 到下一次 begin() 之间的墙钟。探测脚本之外
+	// 的代价：GC 回收、文件 IO、合成器/OS 打盹都落在这。读法：gap_max 高而
+	// upd_max 不高 → 卡在两次 update 之间（探针落盘/驱动/OS）；两者同高 → 引擎内。
+	static var _lastEndT:Float = 0;
+	static var _gapAcc:Float = 0;
+	static var _gapMax:Float = 0;
+	static var _gapN:Int = 0;
+
 	// 子阶段累计
 	static var _phT:Float = 0;
 	static var _phAcc:Map<String, Float> = new Map();
@@ -261,7 +269,17 @@ class MeteoricProfile
 
 	public static inline function begin():Void
 	{
-		_t = tick();
+		var t:Float = tick();
+		// gap 统计（跨窗口保持 _lastEndT：上个窗口的最后一次 end 与本窗口首次 begin 之间的
+		// 间隔也计入，能捕捉到状态切换时刻的 IO/GC）
+		if (_lastEndT > 0)
+		{
+			var g:Float = t - _lastEndT;
+			_gapAcc += g;
+			_gapN++;
+			if (g > _gapMax) _gapMax = g;
+		}
+		_t = t;
 	}
 
 	public static inline function phaseBegin(name:String):Void
@@ -278,6 +296,24 @@ class MeteoricProfile
 		if (d > m) _phMax.set(name, d);
 	}
 
+	/**
+	 * 流式子阶段累计：**不占用 _phT 槽位**，可以安全嵌套在其他 phaseBegin/End 之内
+	 * 使用（例如「scriptOnUpdate」外层 phase 内逐脚本计时）。d 单位 = 秒。
+	 */
+	public static function phaseAdd(name:String, seconds:Float):Void
+	{
+		_phAcc.set(name, (_phAcc.exists(name) ? _phAcc.get(name) : 0) + seconds);
+		_phCnt.set(name, (_phCnt.exists(name) ? _phCnt.get(name) : 0) + 1);
+		var m:Float = _phMax.exists(name) ? _phMax.get(name) : 0;
+		if (seconds > m) _phMax.set(name, seconds);
+	}
+
+	/** 对外取当前探针时钟（秒）。供逐脚本计时这类需要自己拿两次 clock 的场合。 */
+	public static inline function tickNow():Float
+	{
+		return tick();
+	}
+
 	public static inline function end(tag:String):Void
 	{
 		var t:Float = tick();
@@ -290,6 +326,14 @@ class MeteoricProfile
 			var sb:StringBuf = new StringBuf();
 			sb.add('[PROFILE] ' + tag + ' update_avg=' + Math.round(_acc / _n * 1000000) + 'us update_max=' + Math.round(_max * 1000000)
 				+ 'us frame_avg=' + Math.round(_fAcc / _n * 1000000) + 'us frame_max=' + Math.round(_fMax * 1000000) + 'us n=' + _n);
+			// gap：update 之间的墙钟（含探针自身每秒落盘的代价——所以 gap 单独高不算引擎问题）
+			if (_gapN > 0)
+				sb.add(' gap_avg=' + Math.round(_gapAcc / _gapN * 1000000) + 'us gap_max=' + Math.round(_gapMax * 1000000) + 'us g=' + _gapN);
+			// 【GC 可见性】heap-in-use（含未回收垃圾，MEM_INFO_CURRENT），逐行看锯齿：
+			// 每秒涨多少 + 哪行之后掉回去 = 上一行的尖峰就是那次回收
+			#if cpp
+			try { sb.add(' mem=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb'); } catch (e:Dynamic) {}
+			#end
 			for (k in _phAcc.keys())
 			{
 				var c:Int = _phCnt.exists(k) ? _phCnt.get(k) : 1;
@@ -313,6 +357,7 @@ class MeteoricProfile
 			trace(sb.toString());
 			logToFile(sb.toString());
 			_acc = 0; _max = 0; _n = 0; _lastLog = t;
+			_gapAcc = 0; _gapMax = 0; _gapN = 0;
 			_fAcc = 0; _fMax = 0;
 			_fSamples.resize(0);
 			for (i in 0..._fBuckets.length) _fBuckets[i] = 0;

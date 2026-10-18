@@ -1047,7 +1047,14 @@ class HostDomain
 			var myValue:Dynamic = null;
 			try
 			{
+				#if METEORIC_PROFILE
+				var suT0:Float = backend.MeteoricProfile.tickNow();
+				#end
 				var callValue = script.call(funcToCall, args);
+				#if METEORIC_PROFILE
+				var suDelta:Float = backend.MeteoricProfile.tickNow() - suT0;
+				if (suDelta > 0.002) backend.MeteoricProfile.phaseAdd('hs:' + script.origin, suDelta); // >2ms 的单点才记，控制行宽
+				#end
 				if(!callValue.succeeded)
 				{
 					var e = callValue.exceptions[0];
@@ -1093,7 +1100,14 @@ class HostDomain
 				continue;
 			}
 
+			#if METEORIC_PROFILE
+			var suT0:Float = backend.MeteoricProfile.tickNow();
+			#end
 			var myValue:Dynamic = script.call(funcToCall, args);
+			#if METEORIC_PROFILE
+			var suDelta:Float = backend.MeteoricProfile.tickNow() - suT0;
+			if (suDelta > 0.002) backend.MeteoricProfile.phaseAdd('lua:' + script.scriptName, suDelta); // >2ms 的单点才记
+			#end
 			if((myValue == FunkinLua.Function_StopLua || myValue == FunkinLua.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
 			{
 				returnVal = myValue;

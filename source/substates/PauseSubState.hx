@@ -515,9 +515,27 @@ class PauseSubState extends MusicBeatSubstate
 		if (pauseMusic != null && pauseMusic.volume < 0.5)
 			pauseMusic.volume += 0.01 * elapsed;
 
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('pauseSuper');
+		#end
 		super.update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('pauseSuper');
+		#end
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('pauseStats');
+		#end
 		updateStats();
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('pauseStats');
+		#end
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseBegin('pauseSkip');
+		#end
 		updateSkipTextStuff();
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseEnd('pauseSkip');
+		#end
 
 		var upP = controls.UI_UP_P;
 		var downP = controls.UI_DOWN_P;
