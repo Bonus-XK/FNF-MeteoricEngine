@@ -482,7 +482,10 @@ class Main extends Sprite
 
 		// FPS 计数器：所有平台都创建，安卓/iOS 同样显示（标题栏模式仅在桌面端生效）
 		fpsVar = new FPS(10, 3, 0xFFFFFF);
+		// 方块底必须先于计数器文字 addChild（显示列表顺序 = 衬底在下）
+		if (fpsVar.bg != null) addChild(fpsVar.bg);
 		addChild(fpsVar);
+		if (fpsVar.subTxt != null) addChild(fpsVar.subTxt); // 副行（仅FPS 小标签 / FPS+Mem 内存行）
 		if(fpsVar.speedTxt != null) {
 			addChild(fpsVar.speedTxt);
 		}

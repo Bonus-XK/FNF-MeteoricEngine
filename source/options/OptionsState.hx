@@ -165,6 +165,13 @@ class OptionsState extends MusicBeatState
 		e.open = function() MusicBeatState.switchState(new options.HUDCustomizeState());
 		list.push(e);
 
+		e = new SectionEntry(Lang.tOr('options.category.fpsStats', 'FPS 显示项'), Lang.tOr('options.title.fpsStats', 'FPS 显示项编辑'));
+		e.external = true;
+		e.hint = Lang.tOr('options.hint.fpsStats',
+			'FPS 徽章显示项的开关与排序编辑器（整屏独立界面，改动即时生效并自动保存）。');
+		e.open = function() MusicBeatState.switchState(new options.FPSStatsEditorState());
+		list.push(e);
+
 		#if desktop
 		e = new SectionEntry(Lang.tOr('options.category.backup', '备份与迁移'), Lang.tOr('options.title.backup', '备份与迁移'));
 		e.external = true;

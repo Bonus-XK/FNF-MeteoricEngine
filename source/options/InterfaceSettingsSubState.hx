@@ -112,18 +112,20 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		option.onChange = onChangeFPSCounter;
 		#end
 		
-		var option:Option = new Option('FPS引擎版本',
-			'关闭后，帧数计数器下方的引擎版本将不会显示',
-			'showVer',
-			'bool');
-		addOption(option);
-
 		var option:Option = new Option('FPS显示颜色: ',
 		    '选择 FPS 计数器显示的颜色；"自动"模式会随帧率变色（高帧绿色、中帧黄色、低帧红色），"彩虹"模式为 KE 引擎风格的循环彩虹色',
 			'fpsColor',
 			'string',
 			['自动', '彩虹', '白色', '青色', '蓝色', '红色', '绿色', '黄色']);
 		addOption(option);
+
+		var option:Option = new Option('FPS样式: ',
+			'设置 FPS 计数器外观：方块为半透明方形徽章（85% 不透明深色圆角底）；经典为无底色多行文本',
+			'fpsStyle',
+			'string',
+			['方块', '经典']);
+		addOption(option);
+		option.onChange = onChangeFPSStyle;
 
 		var option:Option = new Option('显示滚动速度',
 			'开启后，FPS 计数器下方显示当前音符滚动速度，颜色随速度变化（慢速绿色、中速黄色、快速红色）',
@@ -198,4 +200,11 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			Main.fpsVar.applyDisplayMode();
 	}
 	#end
+
+	/** FPS 样式 / 方块档位切换：立即按新设置重排（下一帧 100ms tick 落地）。 */
+	function onChangeFPSStyle()
+	{
+		if (Main.fpsVar != null)
+			Main.fpsVar.applyDisplayMode();
+	}
 }

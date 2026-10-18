@@ -17,6 +17,12 @@ class SaveVariables {
 	@:keep public var showVer:Bool = true;
 	@:keep public var fpsInTitleBar:Bool = false;
 	@:keep public var fpsColor:String = '自动';
+	// FPS 显示样式：'方块'（半透明方形徽章，默认）| '经典'（无底色多行文本）
+	// 存档值即中文档位名（与 fpsColor 同规范，显示层翻译走 optionValue.fpsStyle.*）
+	@:keep public var fpsStyle:String = '方块';
+	// FPS 计数器显示项与顺序（CSV）：'Mem'/'Peak'/'CPU'/'Ver' 的子集排列；FPS 数字固定主行，不在清单内。
+	// 由 options.FPSStatsEditorState 编辑；方块/经典两种样式共用同一张清单。空串 = 只显示 FPS 本体。
+	@:keep public var fpsStatsList:String = 'Mem,Peak,CPU,Ver';
 	// 帧率上限档位：120/240/480/无上限（移动端默认 120 防过热）
 	// ⚠ 桌面端默认值按平台分：macOS = 无上限（构建后恢复 tools/lime.ndll.wallclock 保证补丁在位）；
 	//   Windows = 120 —— 交付包历史上是没打墙钟补丁的 64 位 lime.ndll，存档默认给 100000 会
@@ -699,6 +705,17 @@ class ClientPrefs {
 		// （旧版只有「移动 / 淡入淡出」两项；新版扩为「移动 / 陨星 / 星辉 / 分段」，
 		//   '淡入淡出' 对应的就是新的星辉样式。不迁移会命中 switch 的 default → 被静默改成「移动」）
 		if (data.CustomFade == '淡入淡出') data.CustomFade = '星辉';
+
+		// FPS 版本行旧值迁移：「FPS引擎版本」选项已由 FPS 显示项编辑器的 Ver 项取代。
+		// 旧存档 showVer=false → 从 fpsStatsList 剥离 'Ver' 一次，并把 showVer 翻回 true
+		// （翻回 true 保证本段只对旧存档生效一次；该字段此后不再参与任何显示判断）
+		if (!data.showVer)
+		{
+			var fpsArr:Array<String> = data.fpsStatsList.split(',');
+			fpsArr.remove('Ver');
+			data.fpsStatsList = fpsArr.join(',');
+			data.showVer = true;
+		}
 
 		// 帧率档位旧值迁移（2026-09-11 事故的临时处置）已**撤销**：
 		// 当时非 macOS 上没有「无上限」档位，于是把存档里遗留的 '无上限' 收回 '120'。
