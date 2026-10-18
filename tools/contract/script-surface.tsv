@@ -4,7 +4,7 @@
 # columns: kind<TAB>name<TAB>source_location
 # counts: lua_unique=227 hscript_unique=187 lua_ui_unique=73 pairs_unique=487 bare_name_unique=435 registrations=488 dynamic_sites=4
 # 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（同一裸名可同时属于多个 kind，属独立契约）
-# dynamic_sites: source/psychlua/FunkinLua.hx:112, source/psychlua/FunkinLua.hx:397, source/psychlua/HScript.hx:512, source/psychlua/MenuScript.hx:203
+# dynamic_sites: source/psychlua/FunkinLua.hx:113, source/psychlua/FunkinLua.hx:398, source/psychlua/HScript.hx:512, source/psychlua/MenuScript.hx:203
 # 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。
 # multi_site: lua.noteTweenAngle
 # kind=lua    : source/** 下 Lua_helper.add_callback 的字符串字面量
@@ -227,8 +227,8 @@ lua	cameraSetTarget	source/psychlua/functions/CameraCommands.hx:16
 lua	cameraShake	source/psychlua/functions/CameraCommands.hx:25
 lua	cancelTimer	source/psychlua/functions/MiscCommands.hx:60
 lua	cancelTween	source/psychlua/functions/ScriptTweens.hx:93
-lua	changeDiscordClientID	source/psychlua/FunkinLua.hx:119
-lua	changeDiscordPresence	source/psychlua/FunkinLua.hx:118
+lua	changeDiscordClientID	source/psychlua/FunkinLua.hx:120
+lua	changeDiscordPresence	source/psychlua/FunkinLua.hx:119
 lua	characterDance	source/psychlua/functions/CharacterCommands.hx:81
 lua	characterPlayAnim	source/psychlua/DeprecatedFunctions.hx:42
 lua	checkFileExists	source/psychlua/ExtraFunctions.hx:170
