@@ -370,6 +370,7 @@ class MeteoricProfile
 				{
 					sb.add(' gc=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb');
 					sb.add(' gcR=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED) / 1048576) + 'mb');
+					sb.add(' gcL=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_LARGE) / 1048576) + 'mb');
 				}
 				catch (e2:Dynamic) {}
 				#end
@@ -437,6 +438,9 @@ class MeteoricProfile
 			// 原生缓冲（位图像素/音频等）等 GC 析构函数排队，池只增不还（低 GC 压力下 major 极少跑）。
 			#if cpp
 			try { sb.add(' memR=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED) / 1048576) + 'mb'); } catch (eR:Dynamic) {}
+			// ===== memL=：MEM_INFO_LARGE 大块池（大 ByteArray/Array 的独立池）。decisive：
+			// memL= 随 ram 涨 → 僵尸在大块池（逐帧大分配等 major）；memL= 平而 memR= 涨 → 小块池膨胀。
+			try { sb.add(' memL=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_LARGE) / 1048576) + 'mb'); } catch (eL:Dynamic) {}
 			#end
 			// 【声音通道账本】FlxG.sound.list = FlxSound 复用池。正常应为小常数；
 			// 若随秒线性涨 = 逐命中播放的通道未回收（音频缓冲泄漏的直接读数）。
