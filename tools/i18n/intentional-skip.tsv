@@ -54,6 +54,7 @@ source/backend/ClientPrefs.hx	KE 判定	1	存档值字面量：改了会静默�
 source/backend/ClientPrefs.hx	PE 判定	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
 source/backend/ClientPrefs.hx	剩余时间	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
 source/backend/ClientPrefs.hx	新版	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
+source/backend/ClientPrefs.hx	方块	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
 source/backend/ClientPrefs.hx	无上限	2	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
 source/backend/ClientPrefs.hx	旧判定	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
 source/backend/ClientPrefs.hx	星辉	1	存档值字面量：改了会静默失效（显示由 optionValue.* 负责）
@@ -554,6 +555,7 @@ source/luagraph/LuaGraphTemplates.hx	脚本已销毁，补间已清理	1	misc_pr
 source/luagraph/LuaGraphTemplates.hx	镜头缩放模板已启动	1	misc_print 默认文本会写进用户生成的 .lua
 source/objects/Note.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
 source/openfl/display/FPS.hx	彩虹	1	存档值比较（FPS 配色档位）
+source/openfl/display/FPS.hx	方块	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
 source/openfl/display/FPS.hx	红色	1	存档值比较（FPS 配色档位）
 source/openfl/display/FPS.hx	绿色	1	存档值比较（FPS 配色档位）
 source/openfl/display/FPS.hx	自动	1	存档值比较（FPS 配色档位）
@@ -561,8 +563,6 @@ source/openfl/display/FPS.hx	蓝色	1	存档值比较（FPS 配色档位）
 source/openfl/display/FPS.hx	青色	1	存档值比较（FPS 配色档位）
 source/openfl/display/FPS.hx	黄色	1	存档值比较（FPS 配色档位）
 source/options/ControlsPane.hx	恢复默认按键	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/EffectsSubState.hx	Discord在线状态	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/EffectsSubState.hx	关闭后，Discord 的“正在游玩”状态将不再显示本应用，避免意外泄露	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	关闭后，将不再显示过场动画的引擎版本与事件指示器	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	关闭后，检测到新版本时不再弹出更新界面（仍会继续检查更新）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	关闭后，游戏将不会出现频闪效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -572,7 +572,6 @@ source/options/EffectsSubState.hx	开启后，主菜单/故事模式/自由游�
 source/options/EffectsSubState.hx	开启后，自动检查引擎是否有新版本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	换段或事件切换时镜头移动的平滑程度：迅捷=0.3 秒到位（最接近原版切换手感）；标准=0.5 秒；平滑=0.8 秒（滑行感最明显）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/EffectsSubState.hx	效果设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	无	2	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	暂停界面音乐:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	更新提示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -587,6 +586,8 @@ source/options/EffectsSubState.hx	选择进入暂停界面时播放的音乐：	
 source/options/EffectsSubState.hx	镜头缓动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	镜头缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	频闪效果	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/FPSStatsEditorState.hx	↑	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/options/FPSStatsEditorState.hx	↓	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/options/GameplaySettingsSubState.hx	中间滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	关闭后，对手的箭头将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	向下滚动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -613,7 +614,6 @@ source/options/GameplaySettingsSubState.hx	新版血量条	1	Option 兜底原文
 source/options/GameplaySettingsSubState.hx	旧版血量条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	极简血条	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	玩法	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GameplaySettingsSubState.hx	玩法设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	禁用重置键	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	自动暂停	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GameplaySettingsSubState.hx	自动游玩模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -634,7 +634,6 @@ source/options/GraphicsSettingsSubState.hx	关闭后，禁用抗锯齿，画面�
 source/options/GraphicsSettingsSubState.hx	压扁	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	命中长条时在判定线上显示按压覆盖动画（QT 模组 NoteHoldCover 原生移植，可关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	图像设置	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GraphicsSettingsSubState.hx	图像设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	坠落	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	帧率上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，使用 GPU 缓存纹理，可减少内存占用（显卡性能较差时建议关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -655,16 +654,15 @@ source/options/GraphicsSettingsSubState.hx	运行时贴图密排列	1	Option 兜
 source/options/GraphicsSettingsSubState.hx	长条按压覆盖	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	高清渲染	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	Combo堆叠	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	FPS引擎版本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	FPS显示到窗口标题	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	FPS显示颜色: 	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	FPS样式: 	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	FPS计数器	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	Score栏格式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	\\n改动即时生效：本页当前观感马上更新，其余界面在下次进入时应用新配色。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	\\n青·蓝·紫·品红·橙·金·绿·青绿·红·粉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	两种时间条样式均受此开关控制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	主题色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	关闭后，帧数计数器下方的引擎版本将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	关闭后，帧数计数器（FPS）将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	关闭后，评级与 Combo 数字将不再堆叠，节省系统内存，读谱也更清晰	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	判定计数侧边栏	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -684,6 +682,7 @@ source/options/InterfaceSettingsSubState.hx	开启后，时间条填充色跟随
 source/options/InterfaceSettingsSubState.hx	开启后，血量条等界面元素将不会显示	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	彩虹	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	新时间条样式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	方块	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	时间条:	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	时间条颜色跟随对方	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	显示NPS	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -691,10 +690,10 @@ source/options/InterfaceSettingsSubState.hx	显示滚动速度	1	Option 兜底�
 source/options/InterfaceSettingsSubState.hx	歌曲名称	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	点击查看	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	界面	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/InterfaceSettingsSubState.hx	界面设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	白色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	禁用	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	红色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	经典	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	绿色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	自动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	自定义 Score 栏文本格式。可用变量：{score} {misses} {rank} {accuracy} {nps} {maxnps} {fc} {combo} {health}。按确认键打开输入框	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -704,6 +703,7 @@ source/options/InterfaceSettingsSubState.hx	血条上限仍为 100%，仅显示�
 source/options/InterfaceSettingsSubState.hx	血条溢出图标飞出	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	血条透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	计分文字字体: 	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	设置 FPS 计数器外观：方块为半透明方形徽章（85% 不透明深色圆角底）；经典为无底色多行文本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	调整血量条的透明度	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	选择 FPS 计数器显示的颜色；"自动"模式会随帧率变色（高帧绿色、中帧黄色、低帧红色），"彩虹"模式为 KE 引擎风格的循环彩虹色	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/InterfaceSettingsSubState.hx	选择时间条的显示样式：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -736,7 +736,6 @@ source/options/JudgmentSettingsSubState.hx	关闭时评级与改动前完全一�
 source/options/JudgmentSettingsSubState.hx	准确率 =（Sick/Marvelous + Good×0.65）÷ 谱面音符总数。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	准确率（ACC）换用 Phigros 的算法：（Sick/Marvelous + Good×0.65）÷ 总音符。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	判定	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/JudgmentSettingsSubState.hx	判定设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	只把**评级**换成 Phigros 的档位：φ / V（全连）/ S / A / B / C / F，分档依据是准确率。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	安全帧数	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	开启后，最高判定（Sick/45ms）显示为 Marvelous 贴图（KE 1.8 风格）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -801,7 +800,6 @@ source/options/PerformanceSubState.hx	开启：合并后按箭头数量计分/�
 source/options/PerformanceSubState.hx	弹出窗 = 帧步长 + 余量。必须 ≥ 回收窗，否则先杀后弹造成漏命中；\n帧率越低建议越大 = 可测帧步长（1000/FPS）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	快速跳谱（二分）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/PerformanceSubState.hx	性能设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	手动命中/按下时玩家 strum 是否高亮；关闭省绘制	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	排期弹出余量（毫秒）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	有界化时每个簇保留多少个时间偏移（生成期最多只用 12 个，超过无意义）。\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -828,17 +826,13 @@ source/options/ProgrammingSettingsSubState.hx	Psych 0.6.3 兼容模式	1	Option 
 source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨兵按 Psych Engine 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	编程设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/RenderModeSubState.hx	ffmpeg 未安装	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	libx264 兼容性最好，通用首选；\\nlibx265 同画质体积更小但编码慢；\\n其它编码器可用性取决于你的 ffmpeg 构建	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	不需要额外的录屏软件。录像期间会有轻微帧率开销\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	开启后，进曲时自动开始录像，录完整首直到结算，\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	录像	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/RenderModeSubState.hx	录像功能需要 ffmpeg。装好后重启引擎即可使用：\\n\\nbrew install ffmpeg	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	录像文件的输出子目录（相对于 Meteoric.app 所在目录）。\\n默认落在 app 旁边，不会写进 bundle 内部	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	录像模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	录像的目标帧率。与游戏实际帧率解耦 ——\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/RenderModeSubState.hx	录像设置菜单	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	游戏跑再快也只按这个帧率抓帧，避免白白拖慢自己	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	码率越高画质越好、文件越大。\\n1080p60 建议 8-16，720p60 建议 4-8	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	视频帧率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
