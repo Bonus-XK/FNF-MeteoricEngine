@@ -2213,6 +2213,19 @@ class PlayState extends MusicBeatState
 		// maxVis 由 noteSpawn 按"2s 窗口簇数"动态预算（场上精灵总额控制）
 		var maxVis:Int = clusterVisCap; // 动态视觉预算（见 noteSpawn）
 		if (maxVis < 1) maxVis = 12;
+		// 【视觉折叠】visualFold > 0 时按比例缩减每簇视觉采样数（只影响视觉副本，不参与判定）
+		if (ClientPrefs.data.visualFold > 0)
+		{
+			var foldFactor:Float = switch (ClientPrefs.data.visualFold)
+			{
+				case 1: 0.75;  // 轻度：75%
+				case 2: 0.5;   // 中度：50%
+				case 3: 0.25;  // 重度：25%
+				default: 1.0;
+			};
+			maxVis = Std.int(maxVis * foldFactor);
+			if (maxVis < 1) maxVis = 1; // 至少保留 1 个视觉副本
+		}
 
 		// 【有界偏移还原·O(maxVis)】boundedOffs 开启时 offs 只存了前 KEEP 个（+ lastOff），
 		// 真实数量记在 offsKeep —— 多 Part 组合谱里单个簇可达 **190 万颗**（66 Part 同刻叠加；

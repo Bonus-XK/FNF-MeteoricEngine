@@ -728,7 +728,11 @@ class NoteChartDomain
 		if (ps.botHitQueue.length == 0) return;
 		if (ps.rewinding) { ps.botHitQueue.resize(0); return; }
 		ps.botHitBatch = true;
-		ps.botBatchSeenSeq = new Map<Int, Bool>(); // 批内按 chartSeq 去重：同帧池化复活对象不二次计分
+		// 【Map 复用】reuseBotBatchMap 开启时复用成员变量（clear() 而非 new），减少 GC。
+		if (!ClientPrefs.data.reuseBotBatchMap)
+			ps.botBatchSeenSeq = new Map<Int, Bool>();
+		else
+			ps.botBatchSeenSeq.clear();
 		ps.notes.beginBatchKill(); // 【密集批·延迟移除】命中击杀登记，帧末一次 O(n) 清扫
 		for (note in ps.botHitQueue)
 		{

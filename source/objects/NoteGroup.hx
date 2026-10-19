@@ -3,6 +3,7 @@ package objects;
 import haxe.ds.ArraySort;
 import objects.Note.CastNote;
 import backend.ClientPrefs;
+import backend.Conductor;
 
 /**
  * H-Slice 移植：音符对象池 + 批处理组。
@@ -53,6 +54,8 @@ class NoteGroup extends FlxTypedGroup<Note>
 		members.push(n);
 		length++;
 		aliveObjectCount++;
+		if (ClientPrefs.data.incrementalCountLiving)
+			_livingCount += Std.int(n.density);
 		return n.recycleNote(target);
 	}
 
@@ -62,6 +65,8 @@ class NoteGroup extends FlxTypedGroup<Note>
 		members.push(n);
 		length++;
 		aliveObjectCount++;
+		if (ClientPrefs.data.incrementalCountLiving)
+			_livingCount += Std.int(n.density);
 	}
 
 	// 池化回收：击杀 + 移出组 + 回池（所有"杀音符"路径统一走这里，禁止直接 destroy）
@@ -78,6 +83,8 @@ class NoteGroup extends FlxTypedGroup<Note>
 			batchKillCount++;
 		}
 		if (aliveObjectCount > 0) aliveObjectCount--;
+		if (ClientPrefs.data.incrementalCountLiving)
+			_livingCount -= Std.int(n.density);
 		n.botQueued = false; // 死亡即解除排期保护（池中恢复可复用；队列条目由 !alive 跳过）
 		n.botSched = false;
 		n.invalidatePooled();
@@ -131,6 +138,24 @@ class NoteGroup extends FlxTypedGroup<Note>
 		if (PlayState.instance != null && PlayState.instance.cpuControlled
 			&& !PlayState.instance.replayMode && PlayState.instance.botplayPlan != null)
 			return;
+		// 【时间窗口优化】noteGroupUpdateWindow > 0 时只更新判定窗口内的音符，
+		// 跳过远端音符的 update（动画/位置仍由 draw() 处理，视觉不变）。
+		if (ClientPrefs.data.noteGroupUpdateWindow > 0 && PlayState.instance != null)
+		{
+			var windowMs:Float = ClientPrefs.data.noteGroupUpdateWindow;
+			var songPos:Float = Conductor.songPosition;
+			for (basic in members)
+			{
+				if (basic != null && basic.exists && basic.alive)
+				{
+					var dt:Float = basic.strumTime - songPos;
+					if (dt > windowMs || dt < -windowMs)
+						continue; // 远端音符跳过 update
+					basic.update(elapsed);
+				}
+			}
+			return;
+		}
 		super.update(elapsed);
 	}
 
@@ -169,8 +194,13 @@ class NoteGroup extends FlxTypedGroup<Note>
 
 	// 场上存活音符数（density 合并计数一并计入，供 limitNotes 上限判断）
 	var _living:Int = 0;
+	// 【增量计数】incrementalCountLiving 开启时由 spawnNote/addNoteObject/invalidateNote 自维护，
+	// countLiving() 直接返回，避免每帧全量遍历 members（大谱面下 O(n) → O(1)）。
+	var _livingCount:Int = 0;
 	override public function countLiving():Int
 	{
+		if (ClientPrefs.data.incrementalCountLiving)
+			return _livingCount;
 		_living = 0;
 		for (basic in members)
 		{

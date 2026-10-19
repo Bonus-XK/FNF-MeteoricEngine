@@ -201,6 +201,51 @@ class PerformanceSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		// ===== 大谱面运行时优化（全部默认开启，关闭后行为与旧版一致） =====
+		option = new Option(
+			backend.Lang.tOr('option.incrementalCountLiving', '增量计数 countLiving'),
+			backend.Lang.tOr('optionDesc.incrementalCountLiving', '开启后 NoteGroup.countLiving() 由 spawn/kill 增量维护，避免每帧全量遍历 members（大谱面下 O(n)→O(1)）；\n关闭则回退每帧全量遍历（旧行为，结果完全一致）'),
+			'incrementalCountLiving',
+			'bool');
+		addOption(option);
+
+		option = new Option(
+			backend.Lang.tOr('option.reuseBotBatchMap', '复用批处理 Map'),
+			backend.Lang.tOr('optionDesc.reuseBotBatchMap', '开启后 processBotHits 复用 Map（clear() 而非 new），减少每帧 GC 压力；\n关闭则每帧 new Map（旧行为）'),
+			'reuseBotBatchMap',
+			'bool');
+		addOption(option);
+
+		option = new Option(
+			backend.Lang.tOr('option.noteUpdateWindow', '音符更新窗口（毫秒）'),
+			backend.Lang.tOr('optionDesc.noteUpdateWindow', '只更新判定窗口内的音符（canBeHit/tooLate 计算），跳过远端音符；\n0 = 关闭（更新所有音符，旧行为）。动画/位置仍正常更新，视觉不变'),
+			'noteUpdateWindow',
+			'int');
+		option.changeValue = 50;
+		option.minValue = 0;
+		option.maxValue = 1000;
+		addOption(option);
+
+		option = new Option(
+			backend.Lang.tOr('option.noteGroupUpdateWindow', '音符组更新窗口（毫秒）'),
+			backend.Lang.tOr('optionDesc.noteGroupUpdateWindow', '只更新判定窗口内的音符（NoteGroup.update 遍历），跳过远端音符的 update；\n0 = 关闭（更新所有音符，旧行为）。动画/位置仍正常更新，视觉不变'),
+			'noteGroupUpdateWindow',
+			'int');
+		option.changeValue = 50;
+		option.minValue = 0;
+		option.maxValue = 1000;
+		addOption(option);
+
+		option = new Option(
+			backend.Lang.tOr('option.visualFold', '视觉折叠'),
+			backend.Lang.tOr('optionDesc.visualFold', '让谱面上的音符视觉上变稀（只影响视觉副本，不参与判定，判定/计分完全不变）。\n0=关闭 | 1=轻度(75%) | 2=中度(50%) | 3=重度(25%)'),
+			'visualFold',
+			'int');
+		option.changeValue = 1;
+		option.minValue = 0;
+		option.maxValue = 3;
+		addOption(option);
+
 		super();
 	}
 }

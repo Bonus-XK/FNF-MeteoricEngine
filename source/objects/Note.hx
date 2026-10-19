@@ -1519,6 +1519,20 @@ class Note extends FlxSprite
 		if (blockHit && ignoreNote && density == 1)
 			return;
 
+		// 【时间窗口优化】noteUpdateWindow > 0 时跳过远端音符的 canBeHit/tooLate 计算。
+		// 动画/位置仍由 super.update() 处理，视觉不变；只省判定窗口计算。
+		if (ClientPrefs.data.noteUpdateWindow > 0 && PlayState.instance != null)
+		{
+			var windowMs:Float = ClientPrefs.data.noteUpdateWindow;
+			var songPos:Float = Conductor.songPosition;
+			var dt:Float = strumTime - songPos;
+			if (dt > windowMs || dt < -windowMs)
+			{
+				super.update(elapsed); // 仍需更新动画/位置
+				return; // 但跳过 canBeHit/tooLate
+			}
+		}
+
 		super.update(elapsed);
 
 		if (mustPress)

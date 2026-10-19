@@ -238,6 +238,14 @@ class SaveVariables {
 	// 代价：每次全量回收约 20-80ms 顿挫。默认关闭（零行为变化）。
 	@:keep public var gcBreathing:Bool = false;
 	@:keep public var noHitFuncs:Bool = false;          // 关闭 goodNoteHit/opponentNoteHit 的 Lua/Hscript 回调
+	// ===== 大谱面运行时优化（全部默认开启，关闭后行为与旧版一致） =====
+	@:keep public var incrementalCountLiving:Bool = true; // 增量维护 countLiving()（避免每帧全量遍历 NoteGroup.members）
+	@:keep public var reuseBotBatchMap:Bool = true;       // 复用 processBotHits 的 Map（减少每帧 new Map 的 GC 压力）
+	@:keep public var noteUpdateWindow:Int = 200;         // Note.update() 时间窗口（毫秒）：只更新判定窗口内的音符，跳过远端音符的 canBeHit/tooLate 计算
+	@:keep public var noteGroupUpdateWindow:Int = 200;    // NoteGroup.update() 时间窗口（毫秒）：只更新判定窗口内的音符，跳过远端音符的 update
+	// 视觉折叠：让谱面上的音符视觉上变稀（只影响视觉副本，不参与判定，判定/计分完全不变）。
+	// 0=关闭 | 1=轻度(75%) | 2=中度(50%) | 3=重度(25%)
+	@:keep public var visualFold:Int = 0;
 	@:keep public var iconFlyOverflow:Bool = false;     // 血条溢出图标飞出（JS 引擎同款：>100% 时图标沿填充方向滑出条外，不封顶）
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
 	// Lua 0.6.3 兼容：Psych 0.6.3 的脚本停止哨兵是数字（Function_Continue=0 / Function_Stop=1 /
