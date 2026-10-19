@@ -134,10 +134,18 @@ class NoteGroup extends FlxTypedGroup<Note>
 
 	override function update(elapsed:Float)
 	{
+		#if METEORIC_PROFILE
+		var _ngT0:Float = backend.MeteoricProfile.tickNow();
+		#end
 		// 自动游玩捷径：预演模式下各音符 update 由 PlayState 统一处理（跳过整组逐音符开销）
 		if (PlayState.instance != null && PlayState.instance.cpuControlled
 			&& !PlayState.instance.replayMode && PlayState.instance.botplayPlan != null)
+		{
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.phaseAdd('noteGroup', backend.MeteoricProfile.tickNow() - _ngT0);
+			#end
 			return;
+		}
 		// 【时间窗口优化】noteGroupUpdateWindow > 0 时只更新判定窗口内的音符，
 		// 跳过远端音符的 update（动画/位置仍由 draw() 处理，视觉不变）。
 		if (ClientPrefs.data.noteGroupUpdateWindow > 0 && PlayState.instance != null)
@@ -154,9 +162,15 @@ class NoteGroup extends FlxTypedGroup<Note>
 					basic.update(elapsed);
 				}
 			}
+			#if METEORIC_PROFILE
+			backend.MeteoricProfile.phaseAdd('noteGroup', backend.MeteoricProfile.tickNow() - _ngT0);
+			#end
 			return;
 		}
 		super.update(elapsed);
+		#if METEORIC_PROFILE
+		backend.MeteoricProfile.phaseAdd('noteGroup', backend.MeteoricProfile.tickNow() - _ngT0);
+		#end
 	}
 
 	public function fasterSort(reverse:Bool = false)

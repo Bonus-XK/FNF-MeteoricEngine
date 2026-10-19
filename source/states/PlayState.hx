@@ -2345,6 +2345,16 @@ class PlayState extends MusicBeatState
 
 	@:noCompletion public function meteoSuper_update(elapsed:Float) return super.update(elapsed);
 
+	#if METEORIC_PROFILE
+	/** 绘制总耗时探针：看到 PlayState 的 render 段占整帧多少（不在 update 内）。 */
+	override public function draw():Void
+	{
+		var _dT0:Float = backend.MeteoricProfile.tickNow();
+		super.draw();
+		backend.MeteoricProfile.phaseAdd('draw', backend.MeteoricProfile.tickNow() - _dT0);
+	}
+	#end
+
 	#if mobile
 	/** 游玩中按返回键 / 左上角 X：暂停游戏而不是退出（菜单里仍是退出到桌面） */
 	override public function onAndroidBack():Bool

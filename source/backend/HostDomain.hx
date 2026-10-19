@@ -1350,6 +1350,7 @@ class HostDomain
 		// 【GC 呼吸阀】首次进入设水位，之后每 20s 强制 major（落在本帧 update 内，profile 可见）
 		if (ClientPrefs.data.gcBreathing)
 		{
+			var gcT0:Float = backend.MeteoricProfile.tickNow();
 			var nowBreath:Float = Sys.time();
 			if (_gcBreathLast <= 0.0)
 			{
@@ -1361,6 +1362,7 @@ class HostDomain
 				_gcBreathLast = nowBreath;
 				try { cpp.vm.Gc.run(true); } catch (eG:Dynamic) {}
 			}
+			backend.MeteoricProfile.phaseAdd('gcBreath', backend.MeteoricProfile.tickNow() - gcT0);
 		}
 		#end
 
@@ -1374,7 +1376,11 @@ class HostDomain
 
 		// 原生长条按压覆盖：每帧同步判定线位置
 		if (ps.holdCoverHandler != null)
+		{
+			backend.MeteoricProfile.phaseBegin('holdCover');
 			ps.holdCoverHandler.syncPositions(ps.playerStrums, ps.opponentStrums);
+			backend.MeteoricProfile.phaseEnd('holdCover');
+		}
 
 		// 角色自愈：mod 脚本 / createInstance / 事件竞态可能把 dad/boyfriend/gf 置空
 		// （blissful-erect 接箭头闪退现场）——按谱面默认配置逐个重建缺失角色，绝不闪退
@@ -1389,6 +1395,7 @@ class HostDomain
 		// 延迟 GC（一次）：进曲 0.5s 后回收已剥离的谱面 DOM/解析暂存（倒计时期间，无音符生成）
 		if (ps._deferredGC)
 		{
+			backend.MeteoricProfile.phaseBegin('deferredGC');
 			ps._deferredGCTime += elapsed;
 			if (ps._deferredGCTime >= 0.5)
 			{
@@ -1397,6 +1404,7 @@ class HostDomain
 				openfl.system.System.gc();
 				#end
 			}
+			backend.MeteoricProfile.phaseEnd('deferredGC');
 		}
 
 		// NPS 滚动窗口：每满 1 秒把计数滚到显示值并清零，同时刷新 Score 栏
@@ -1587,7 +1595,11 @@ class HostDomain
 			ps.openCharacterEditor();
 
 		if (ps.startedCountdown && !ps.paused && !ps.rewinding)
+		{
+			backend.MeteoricProfile.phaseBegin('conductor');
 			Conductor.advance(FlxG.elapsed * 1000 * ps.playbackRate);
+			backend.MeteoricProfile.phaseEnd('conductor');
+		}
 
 		if (ps.startingSong)
 		{
@@ -1637,16 +1649,22 @@ class HostDomain
 			ps.health = 0;
 			trace("RESET = True");
 		}
+		backend.MeteoricProfile.phaseBegin('death');
 		ps.doDeathCheck();
+		backend.MeteoricProfile.phaseEnd('death');
 
+		backend.MeteoricProfile.phaseBegin('spawn');
 		ps.noteSpawn();
+		backend.MeteoricProfile.phaseEnd('spawn');
 
 		if (ps.generatedMusic)
 		{
 			if(!ps.inCutscene)
 			{
 				if(!ps.rewinding && !ps.cpuControlled && !ps.replayMode) {
+					backend.MeteoricProfile.phaseBegin('keys');
 					ps.keysCheck();
+					backend.MeteoricProfile.phaseEnd('keys');
 				} else {
 					// 回放 v2：按录制时间注入按键（走正常判定路径），并处理长按子段
 					if (ps.replayMode && ps.replayV2) ps.updateReplayInputs();
@@ -1827,7 +1845,9 @@ class HostDomain
 						}
 						ps._oppHitSeqs = null;
 					}
+					var bhT0:Float = backend.MeteoricProfile.tickNow();
 					ps.processBotHits();
+					backend.MeteoricProfile.phaseAdd('botHits', backend.MeteoricProfile.tickNow() - bhT0);
 				#if METEORIC_PROFILE
 				backend.MeteoricProfile.phaseEnd('notes');
 				#end
@@ -1844,7 +1864,9 @@ class HostDomain
 					}
 				}
 			}
+			backend.MeteoricProfile.phaseBegin('events');
 			ps.checkEventNote();
+			backend.MeteoricProfile.phaseEnd('events');
 		}
 
 		#if debug

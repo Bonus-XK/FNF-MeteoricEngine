@@ -35,7 +35,7 @@ class MeteoricProfile
 	// （frame_avg/max 只说两头，直方图能区分双峰=合成器节拍 vs 长尾=单帧尖峰）
 	static var _fSamples:Array<Float> = [];
 	static inline var _fLabel0:String = '<0.5';
-	static var _fBuckets:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+	static var _fBuckets:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 	static inline function _fBucketOf(ms:Float):Int
 	{
 		if (ms < 0.5) return 0;
@@ -47,7 +47,9 @@ class MeteoricProfile
 		if (ms < 3.0) return 6;
 		if (ms < 5.0) return 7;
 		if (ms < 10.0) return 8;
-		return 9;
+		if (ms < 16.7) return 9; // 60fps 一帧预算内但已明显偏慢
+		if (ms < 33.4) return 10; // 掉 1 拍
+		return 11; // 掉 ≥2 拍
 	}
 
 	// 【update 间隔 gap】上一次 end() 到下一次 begin() 之间的墙钟。探测脚本之外
@@ -460,7 +462,34 @@ class MeteoricProfile
 					if (cls != null)
 					{
 						var inst = Reflect.field(cls, 'instance');
-						if (inst != null) hitsF = I64.toFloat(cast Reflect.field(inst, 'songHits'));
+						if (inst != null)
+						{
+							hitsF = I64.toFloat(cast Reflect.field(inst, 'songHits'));
+							// 【PlayState 探针读数】场上对象 / 未生成游标 / 密集档预算：把耗时曲线对回谱面结构与
+							// 生成管线状态（判定无关，纯读数；任何一项取不到就跳过，不影响日志）。
+							try
+							{
+								var notes = Reflect.field(inst, 'notes');
+								if (notes != null)
+								{
+									var members:Array<Dynamic> = Reflect.field(notes, 'members');
+									var alive:Int = Reflect.field(notes, 'aliveObjectCount');
+									if (members != null) sb.add(' obj=' + alive + '/' + members.length);
+								}
+								var unspawn:Array<Dynamic> = Reflect.field(inst, 'unspawnNotes');
+								if (unspawn != null) sb.add(' unsp=' + unspawn.length);
+								var hitQ:Array<Dynamic> = Reflect.field(inst, 'botHitQueue');
+								if (hitQ != null) sb.add(' q=' + hitQ.length);
+								sb.add(' cur=' + Std.string(Reflect.field(inst, 'currentSpawnId')));
+								sb.add(' cap=' + Std.string(Reflect.field(inst, 'perfObjCap')));
+								sb.add(' vis=' + Std.string(Reflect.field(inst, 'clusterVisCap')));
+								var dense:Dynamic = Reflect.field(cls, 'densePerfMode');
+								if (dense != null) sb.add(' dense=' + ((dense == true) ? 1 : 0));
+								if (ClientPrefs.data != null)
+									sb.add(' win=' + ClientPrefs.data.noteUpdateWindow + '/' + ClientPrefs.data.noteGroupUpdateWindow + ' fold=' + ClientPrefs.data.visualFold);
+							}
+							catch (eN:Dynamic) {}
+						}
 					}
 				}
 				catch (eH:Dynamic) {}
@@ -485,7 +514,7 @@ class MeteoricProfile
 				var p90:Float = _fSamples[Std.int(_fSamples.length * 0.90)];
 				var p99:Float = _fSamples[Std.int(_fSamples.length * 0.99)];
 				sb.add(' frame_p50=' + Math.round(p50 * 1000) + 'us p90=' + Math.round(p90 * 1000) + 'us p99=' + Math.round(p99 * 1000) + 'us');
-				var labels:Array<String> = [_fLabel0, '0.5-0.75', '0.75-1.0', '1.0-1.25', '1.25-1.5', '1.5-2', '2-3', '3-5', '5-10', '10+'];
+				var labels:Array<String> = [_fLabel0, '0.5-0.75', '0.75-1.0', '1.0-1.25', '1.25-1.5', '1.5-2', '2-3', '3-5', '5-10', '10-16.7', '16.7-33', '33+'];
 				sb.add(' hist=[');
 				for (i in 0..._fBuckets.length)
 					sb.add(labels[i] + ':' + _fBuckets[i] + (i == _fBuckets.length - 1 ? '' : ','));
@@ -510,5 +539,8 @@ class MeteoricProfile
 	public static inline function frameTick():Void {}
 	public static inline function phaseBegin(name:String):Void {}
 	public static inline function phaseEnd(name:String):Void {}
+	// 供「不能占用 phaseBegin/End 槽位」的流式计量（嵌套在其它 phase 内）与普通构建零开销调用
+	public static inline function phaseAdd(name:String, seconds:Float):Void {}
+	public static inline function tickNow():Float return 0;
 }
 #end
