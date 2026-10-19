@@ -183,6 +183,10 @@ class NoteChartDomain
 				// 【500 帧补丁】密集谱视觉预算收窄：总预算 1800→(1200→)700，单簇下限 3→(2→)1：
 				// 场上精灵数与主循环/回收量同步下降；纯渲染采样，不参与判定/计分，视觉仍是原版"簇"形态。
 				var visBudget:Int = PlayState.densePerfMode ? 700 : PlayState.VISUAL_BUDGET;
+				// 【视觉折叠】同步压缩全局视觉预算（0=关时系数 1.0，行为不变）
+				if (ClientPrefs.data.visualFold > 0)
+					visBudget = Std.int(visBudget * ClientPrefs.visualFoldFactor());
+				if (visBudget < 1) visBudget = 1;
 				var visMin:Int = PlayState.densePerfMode ? 1 : 3;
 				var visMax:Int = PlayState.densePerfMode ? 8 : 12;
 				ps.clusterVisCap = Std.int(visBudget / castsInWin);
@@ -246,6 +250,15 @@ class NoteChartDomain
 		else
 			spawnBudget = ps.perfLimitNotes > 0 ? limitNotes + 512 : 8192;
 
+		// 【视觉折叠】全局对象硬上限按折叠系数压缩（判定零影响：60ms 内到线的箭头仍必生成）。
+		// 不压缩时折叠只改每簇副本数，而对象数仍被 800 上限回填 → 帧率不变。
+		var objCap:Int = ps.perfObjCap;
+		if (objCap > 0 && ClientPrefs.data.visualFold > 0)
+		{
+			objCap = Std.int(objCap * ClientPrefs.visualFoldFactor());
+			if (objCap < 1) objCap = 1;
+		}
+
 		var processed:Int = 0;
 		while (ps.currentSpawnId < ps.unspawnNotes.length && processed < spawnBudget)
 		{
@@ -263,7 +276,7 @@ class NoteChartDomain
 			// 【密集对象硬上限】场上精灵对象数达到上限时，距判定线仍 > DENSE_OBJ_LATE_MS
 			// 的箭头延迟进场（光标不退、时间推进后自然放行；到窗口内即使超限也生成，
 			// 判定/计分/排期命中零影响）。仅视觉上"墙更贴线"，与用户拍板的预期一致。
-			if (ps.perfObjCap > 0 && ps.notes.aliveObjectCount >= ps.perfObjCap)
+			if (objCap > 0 && ps.notes.aliveObjectCount >= objCap)
 			{
 				var lateWin:Float = PlayState.DENSE_OBJ_LATE_MS * ps.playbackRate;
 				if (ps.songSpeed < 1) lateWin /= ps.songSpeed;
@@ -345,6 +358,13 @@ class NoteChartDomain
 		if (PlayState.spamNotes.length < 1) return;
 		var fixedPosition:Float = Conductor.songPosition - ClientPrefs.data.noteOffset;
 		var spawnBPM:Float = PlayState.SONG != null ? PlayState.SONG.bpm : 100;
+		// 【视觉折叠】与 noteSpawn 同口径：对象硬上限按折叠系数压缩（判定零影响）
+		var objCap:Int = ps.perfObjCap;
+		if (objCap > 0 && ClientPrefs.data.visualFold > 0)
+		{
+			objCap = Std.int(objCap * ClientPrefs.visualFoldFactor());
+			if (objCap < 1) objCap = 1;
+		}
 
 		for (spam in PlayState.spamNotes)
 		{
@@ -357,7 +377,7 @@ class NoteChartDomain
 			{
 				guard++;
 				// 【密集对象硬上限】spam 展开同样受 perfObjCap 约束（与 noteSpawn 同口径）
-				if (ps.perfObjCap > 0 && ps.notes.aliveObjectCount >= ps.perfObjCap)
+				if (objCap > 0 && ps.notes.aliveObjectCount >= objCap)
 				{
 					var lateWin:Float = PlayState.DENSE_OBJ_LATE_MS * ps.playbackRate;
 					if (ps.songSpeed < 1) lateWin /= ps.songSpeed;

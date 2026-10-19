@@ -1635,7 +1635,7 @@
 	"option.noteGroupUpdateWindow": "音符组更新窗口（毫秒）",
 	"optionDesc.noteGroupUpdateWindow": "只更新判定窗口内的音符（NoteGroup.update 遍历），跳过远端音符的 update；\n0 = 关闭（更新所有音符，旧行为）。动画/位置仍正常更新，视觉不变",
 	"option.visualFold": "视觉折叠",
-	"optionDesc.visualFold": "让谱面上的音符视觉上变稀（只影响视觉副本，不参与判定，判定/计分完全不变）。\n0=关闭 | 1=轻度(75%) | 2=中度(50%) | 3=重度(25%)",
+	"optionDesc.visualFold": "让谱面上的音符视觉上变稀：按比例缩减每簇视觉副本，并同步压缩场上对象预算（远处箭头更贴近判定线才进场；判定/计分完全不变）。\n0=关闭 | 1=轻度(75%) | 2=中度(50%) | 3=重度(25%)",
 	"options.category.backup": "备份与迁移",
 	"options.title.backup": "备份与迁移",
 	"options.hint.backup": "备份与迁移是独立整屏界面（磨砂面板 + 卡片行）：携带模式开关、打包项勾选、以及 zip / msb / json 三种备份格式的导出与还原。\n点左侧分区栏即直接打开（键盘选中后按 Enter 同样直达）。",

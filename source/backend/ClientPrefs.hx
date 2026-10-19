@@ -595,6 +595,19 @@ class ClientPrefs {
 	 * 探测不到就把档位压回安全上限：宁可跑不出极限帧率，也绝不启动死循环。
 	 */
 	static var _wallclockFrameLoopProbe:Int = -1;
+	/** 视觉折叠系数：0=1.0（关）/ 1=0.75 / 2=0.5 / 3=0.25。仅视觉路径可用，判定/计分禁用。 */
+	public static function visualFoldFactor():Float
+	{
+		if (data == null) return 1.0;
+		return switch (data.visualFold)
+		{
+			case 1: 0.75;
+			case 2: 0.5;
+			case 3: 0.25;
+			default: 1.0;
+		}
+	}
+
 	public static function hasWallclockFrameLoop():Bool
 	{
 		// ⚠ 每次进入都无条件重置哨兵，不能依赖字段初始化器 `= -1`：hxcpp 把静态字段初值

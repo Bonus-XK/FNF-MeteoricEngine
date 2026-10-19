@@ -1635,7 +1635,7 @@
 	"option.noteGroupUpdateWindow": "Note Group Update Window (ms)",
 	"optionDesc.noteGroupUpdateWindow": "Only update notes within the judgment window (NoteGroup.update traversal), skipping distant notes' update;\n0 = disabled (updates all notes, old behavior). Animation/position still update normally, visuals unchanged",
 	"option.visualFold": "Visual Fold",
-	"optionDesc.visualFold": "Make notes visually sparser on screen (only affects visual copies, does not participate in judgment, scoring completely unchanged).\n0=off | 1=light(75%) | 2=medium(50%) | 3=heavy(25%)",
+	"optionDesc.visualFold": "Make notes visually sparser: scales per-cluster visual copies and shrinks the live object budget (distant arrows enter closer to the judgement line; judgement/scoring completely unchanged).\n0=off | 1=light(75%) | 2=medium(50%) | 3=heavy(25%)",
 	"options.category.backup": "Backup & Migration",
 	"options.title.backup": "Backup & Migration",
 	"options.hint.backup": "Backup & Migration is a full-screen page (frosted panel + card rows): portable mode, what to pack, and export/restore in zip / msb / json formats.\nClicking the section in the left rail opens it directly (Enter does too when selected).",
