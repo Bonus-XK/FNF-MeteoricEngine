@@ -1917,8 +1917,8 @@ class PlayState extends MusicBeatState
 	//   - offs    ：簇内偏移数组，挂到 CastNote.offs 供生成期视觉展开
 	//   - gfNote / noteType / multSpeed：扫描期已写入簇，直接搬运
 	//   - 长条    ：与主路径同口径计入 botLaneCounts / botplayLanes
-	// ⚠ 主路径的 DENSE_FORCE_MERGE 强制合并在扫描期已由 doMerge 覆盖，
-	//   此处不再判断 rawNoteCount（packed 路径的 raw 数必然远超阈值）。
+	// ⚠ 主路径的 DENSE_FORCE_MERGE 强制合并在扫描期已由 doMerge 覆盖，此处不再合并；
+	//   但 densePerfMode（密集自动档）判定必须补上——见下方 packedRawF。
 	static function buildFromPacked(song:SwagSong, botplayPlan:Array<Array<Float>>, stepCrochet:Float):PreGenResult
 	{
 		CastNote.resetPacked();
@@ -1928,6 +1928,13 @@ class PlayState extends MusicBeatState
 		//   2,147,483,647；再多两个 Part 就会溢出成负数，而 totalNotes 是 HUD「Hits: x / y」
 		//   与命中倍率判定的基准，负数会让判定全部失效。返回前夹到 Int 范围内。
 		var totalNotesF:Float = 0;
+		// 【密集谱判定补位】packed 路径此前**从未赋值 densePerfMode**（设计缺口，经
+		// 36 亿谱面实测确认：dense=0、cap=0，密集栈全部护栏对墙谱整层失效）。此处按
+		// 与主路径同口径重建「原始音符总数」：单簇取 max(density, offsKeep+1) ——
+		// ghostDensity=1 时 density=簇内原始数；=0 时 density=1 而 offsKeep 记录合并数；
+		// 缓存加载路径 offsKeep←density（PackedCache.load），≥4M 的墙谱两种口径都过阈值。
+		// Float 累加防 Int32 溢出（66 Part 实测 Σ ≈ 38.5 亿 > 2^31）。
+		var packedRawF:Float = 0;
 		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
 		var botplayLanes:Array<Array<Float>> = botplayPlan != null ? [[], [], [], []] : null;
 		var unspawnNotes:Array<CastNote> = [];
@@ -1951,6 +1958,9 @@ class PlayState extends MusicBeatState
 			n.offs = c.offs;
 			n.offsKeep = c.offsKeep;
 			n.lastOffset = c.lastOffset;
+
+			if (c.offsKeep + 1 > c.density) packedRawF += c.offsKeep + 1;
+			else packedRawF += c.density;
 
 			if (c.noteType != null && !noteTypes.contains(c.noteType)) noteTypes.push(c.noteType);
 
@@ -1980,18 +1990,26 @@ class PlayState extends MusicBeatState
 
 		var totalNotes:Int = (totalNotesF > 2147483000) ? 2147483000 : Std.int(totalNotesF);
 
+		// 【密集自动档·补位赋值】与主路径 `densePerfMode = forceDenseMerge` 同口径：
+		// 原始音符总数 ≥ DENSE_FORCE_MERGE 才启用（已验证的 2.26M 级 packed 谱面不触发，
+		// 行为与旧版一致）；每次进入本函数都显式赋值，杜绝静态量跨曲残留。
+		densePerfMode = packedRawF >= DENSE_FORCE_MERGE;
+		if (densePerfMode)
+			trace('[DenseChart] packed raw≈' + Std.int(Math.min(packedRawF, 2147483000))
+				+ ' 触发密集自动档（对象上限/对象池/自适应预算/安静命中生效）');
+
 		trace('[PACKEDBUILD] clusters=' + clusters.length + ' totalNotes=' + totalNotes
 			+ ' sections=' + (song.packedSectionCount != null ? song.packedSectionCount : -1));
 
-		// 【内存遥测】packed 构建完成快照：dense 标志的真实态（packed 分支从未赋值，
-		// 若实测 dense=false 则密集栈护栏对墙谱整层失效，属设计缺口待数据确认）+
-		// botplayLanes 条目数（buildFromPacked 1970 起按「箭头数×段数」展开，
+		// 【内存遥测】packed 构建完成快照：dense 标志的真实态 + raw≈（Σ 每簇原始数的 Float 观测值）
+		// + botplayLanes 条目数（buildFromPacked 按「箭头数×段数」展开，
 		// preRenderNotes 开启时是 O(原始音符数) 的潜在内存炸弹，墙簇 density 190 万起步）。
 		var _laneEntries:Int = 0;
 		if (botplayLanes != null)
 			for (l in 0...4)
 				if (botplayLanes[l] != null) _laneEntries += botplayLanes[l].length;
 		PerfProbe.mark('packedbuild: done clusters=' + clusters.length
+			+ ' raw=' + Std.int(Math.min(packedRawF, 2147483000))
 			+ ' dense=' + densePerfMode + ' lanes=' + (botplayLanes == null ? 'off' : Std.string(_laneEntries)));
 
 		return {

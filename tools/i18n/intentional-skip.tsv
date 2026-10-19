@@ -857,6 +857,7 @@ source/states/MainMenuState.hx	[CRASH-TEST] 触发原生段错误	1	诊断日志
 source/states/MainMenuState.hx	[CRASH-TEST] 输入 crash，弹出崩溃模式选择	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/states/ModsMenuState.hx	…	4	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/OutdatedState.hx	→	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/states/PlayState.hx	 触发密集自动档（对象上限/对象池/自适应预算/安静命中生效）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/states/PlayState.hx	 触发超密集谱面自动合并（skipGhostNotes 被强制开启）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/states/PlayState.hx	KE 判定	1	存档值比较（改了会静默失效；显示由 optionValue.* 负责）
 source/states/PlayState.hx	[Audio] song 名与谱面目录不一致，已改用目录音频：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
