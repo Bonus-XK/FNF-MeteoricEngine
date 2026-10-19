@@ -491,6 +491,17 @@ class Note extends FlxSprite
 
 	public function defaultRGB()
 	{
+		// 【防串色·共享调色板污染】rgbShader 禁用时 set_r/g/b **不会克隆**私有调色板
+		// （RGBShaderReference.set_r 的克隆仅在 enabled=true 时发生），而是把颜色直接
+		// 写进 parent —— 即 Note.globalRgbShaders[n] 的共享 shader uniform。strumline /
+		// NoteSplash 等直接用同一共享调色板渲染的元素会被染成"最近一次写入的轨道色"。
+		// 密集自动档（densePerfMode）下音符 RGB 全禁用 + 池化模板恒为 lane0：
+		// recycleNote 每生成一颗任意轨道音符都会把该轨道颜色写进 palette 0，
+		// 实测左 strum 颜色随池化音符的轨道乱跳（调色板串色）。
+		// 禁用态本就不参与 RGB 渲染（063 预染色贴图 / 烘焙 / 关着色器 / disableNoteRGB），
+		// 这里的写入纯属污染 → 直接跳过。
+		if (rgbShader == null || !rgbShader.enabled) return;
+
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
 
@@ -519,8 +530,10 @@ class Note extends FlxSprite
 					//but i've changed it to something more optimized with the implementation of RGBPalette:
 
 					// note colors（沿用上游 Psych 调色板；实机验证：改走 HURTNOTE_assets 独立贴图
-					// 在密集谱下会变成一大块黑，故撤回。rgbShader 判空见下。）
-					if (rgbShader != null)
+					// 在密集谱下会变成一大块黑，故撤回。rgbShader 判空见下。
+					// 【防串色·共享调色板污染】禁用态（密集档/063/烘焙等）写 r/g/b 会绕过
+					// 克隆直写共享调色板，污染 strumline —— 与 defaultRGB 同因，同样跳过。
+					if (rgbShader != null && rgbShader.enabled)
 					{
 						rgbShader.r = 0xFF101010;
 						rgbShader.g = 0xFFFF0000;
@@ -895,14 +908,20 @@ class Note extends FlxSprite
 	static var _lpPixel:Bool = false;
 	static var _lpSustain:Bool = false;
 	static var _lpPath:String = null;
+	// 皮肤路径解析结果依赖 densePerfMode（默认皮肤在密集档会被换成 063 预染色贴图），
+	// 缓存键必须带上它：跨曲切换（密集曲→普通曲）时不带会出现"上一曲的 063 路径"
+	// 泄漏到普通曲（预染色贴图再叠 RGB 着色器 → 配色异常/串色），反向则密集曲拿不到 063。
+	static var _lpDense:Bool = false;
 	static function getNoteSkinLoadPathCached(texture:String, postfix:String, pixelStage:Bool, isSustain:Bool):String
 	{
-		if (texture == _lpTex && postfix == _lpPost && pixelStage == _lpPixel && isSustain == _lpSustain && _lpPath != null)
+		if (texture == _lpTex && postfix == _lpPost && pixelStage == _lpPixel && isSustain == _lpSustain
+			&& _lpPath != null && _lpDense == PlayState.densePerfMode)
 			return _lpPath;
 		_lpTex = texture;
 		_lpPost = postfix;
 		_lpPixel = pixelStage;
 		_lpSustain = isSustain;
+		_lpDense = PlayState.densePerfMode;
 		return _lpPath = getNoteSkinLoadPath(texture, postfix, pixelStage, isSustain);
 	}
 

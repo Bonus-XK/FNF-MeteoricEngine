@@ -79,11 +79,17 @@ class NoteSplash extends FlxSprite
 			// If Note RGB is enabled:
 			if(note != null && !note.noteSplashData.useGlobalShader)
 			{
-				
-				if(note.noteSplashData.r != -1) note.rgbShader.r = note.noteSplashData.r;
-				if(note.noteSplashData.g != -1) note.rgbShader.g = note.noteSplashData.g;
-				if(note.noteSplashData.b != -1) note.rgbShader.b = note.noteSplashData.b;
-				tempShader = note.rgbShader.parent;
+				// 【防串色·共享调色板污染】音符 RGB 禁用时（密集档/063/烘焙等）写 r/g/b
+				// 会绕过克隆直写共享调色板，污染 strumline；且池化模板恒为 lane0，
+				// note.rgbShader.parent 指向 palette 0，取色本就不对。此时回退按方向取全局调色板。
+				if(note.rgbShader != null && note.rgbShader.enabled)
+				{
+					if(note.noteSplashData.r != -1) note.rgbShader.r = note.noteSplashData.r;
+					if(note.noteSplashData.g != -1) note.rgbShader.g = note.noteSplashData.g;
+					if(note.noteSplashData.b != -1) note.rgbShader.b = note.noteSplashData.b;
+					tempShader = note.rgbShader.parent;
+				}
+				else tempShader = Note.globalRgbShaders[direction];
 			}
 			else tempShader = Note.globalRgbShaders[direction];
 		}
