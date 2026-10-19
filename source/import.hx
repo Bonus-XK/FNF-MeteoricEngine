@@ -17,6 +17,7 @@ import backend.Conductor;
 import backend.BaseStage;
 import backend.Difficulty;
 import backend.Mods;
+import backend.I64;
 
 import objects.MenuText;
 import objects.Alphabet;

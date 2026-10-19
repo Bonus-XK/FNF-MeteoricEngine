@@ -210,7 +210,7 @@ class ResultsSubState extends MusicBeatSubstate
 			}
 			judgeItems.push({name: rating.name.toUpperCase(), count: rating.hits, color: c});
 		}
-		judgeItems.push({name: 'MISS', count: st.songMisses, color: 0xFFFF6B6B});
+		judgeItems.push({name: 'MISS', count: haxe.Int64.toInt(st.songMisses), color: 0xFFFF6B6B});
 		if (ClientPrefs.data.botMode == 'destroy' && st.usedAutoplay)
 			judgeItems.push({name: 'DESTROYED', count: st.destroyedNotes, color: 0xFFFFB347});
 		var judgeRows:Int = Std.int(Math.ceil(judgeItems.length / 2));
@@ -448,7 +448,7 @@ class ResultsSubState extends MusicBeatSubstate
 		add(statTitle);
 		flyIn(statTitle, FLY_RIGHT, 0.16);
 
-		var bestScore:Int = Highscore.getScore(PlayState.SONG.song, PlayState.storyDifficulty);
+		var bestScore:haxe.Int64 = Highscore.getScore(PlayState.SONG.song, PlayState.storyDifficulty);
 		// 比较必须用同一口径（Phigros 模式下存档里是 100 万制）
 		if (!invalidResult && st.songScore >= bestScore && st.songScore > 0)
 		{
@@ -470,8 +470,8 @@ class ResultsSubState extends MusicBeatSubstate
 			if (accRes != null) accDisplay = accRes.accuracy;
 		}
 		var statVals:Array<String> = [
-			FlxStringUtil.formatMoney(st.songScore),
-			FlxStringUtil.formatMoney(bestScore),
+			FlxStringUtil.formatMoney(I64.toFloat(st.songScore)),
+			FlxStringUtil.formatMoney(I64.toFloat(bestScore)),
 			Std.string(st.maxCombo),
 			Std.string(st.songMisses),
 			Std.string(st.songHits) + ' / ' + Std.string(st.totalNotes),

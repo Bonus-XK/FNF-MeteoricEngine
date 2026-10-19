@@ -408,7 +408,7 @@ class PlayState extends MusicBeatState
 	public var pendingFlySpikePct:Float = 0;
 	public var combo:Int = 0;
 	// KE 结算界面：本局最高连击（命中后取峰值；Miss 重置 combo 不影响该值）
-	public var maxCombo:Int = 0;
+	public var maxCombo:haxe.Int64 = 0;
 
 	// PF 移植：全 SICK/Marvelous（零失误、无低评）时 Combo 文字使用金色贴图
 	public var allSicks:Bool = true;
@@ -502,9 +502,9 @@ class PlayState extends MusicBeatState
 	}
 
 
-	public var songScore:Int = 0;
-	public var songHits:Int = 0;
-	public var songMisses:Int = 0;
+	public var songScore:haxe.Int64 = 0;
+	public var songHits:haxe.Int64 = 0;
+	public var songMisses:haxe.Int64 = 0;
 	public var usedAutoplay:Bool = false;   // 本局是否用过自动游玩（用于判断成绩是否有效）
 	public var destroyedNotes:Int = 0;        // 销毁模式：音符到判定线即销毁的累计数（含长条段/堆叠 density）
 	public var usedGodMode:Bool = false;    // 本局是否用过上帝模式（用于判断成绩是否有效）
@@ -532,8 +532,8 @@ class PlayState extends MusicBeatState
 	// scoreTxt 已应用的 setFormat 参数签名（与 CameraHudDomain.updateScore 配合，避免每次重复 setFormat）
 	var _scoreTxtFmtKey:String = '';
 
-	public static var campaignScore:Int = 0;
-	public static var campaignMisses:Int = 0;
+	public static var campaignScore:haxe.Int64 = 0;
+	public static var campaignMisses:haxe.Int64 = 0;
 	public static var seenCutscene:Bool = false;
 	public static var deathCounter:Int = 0;
 
@@ -2814,7 +2814,7 @@ class PlayState extends MusicBeatState
 	public var rewindMinDuration:Float = 0.7;  // 回溯时长下限（秒）
 	public var rewindMaxDuration:Float = 4.0;  // 回溯时长上限（秒）
 
-	public var totalPlayed:Int = 0;
+	public var totalPlayed:haxe.Int64 = 0;
 	public var totalNotes:Int = 0;
 	public var totalNotesHit:Float = 0.0;
 
@@ -3760,7 +3760,7 @@ class GameHUD
 
 		// 行内容（Marvelous 判定未开启时不包含 Marvelous 行，其余行紧凑排列）
 		// 命中数按结算页口径钳制（与 clampGameplayTotals 同源），并同步显示总音符数
-		var hitsDisp:Int = st.songHits;
+		var hitsDisp:Int = I64.toIntSafe(st.songHits);
 		if (st.totalNotes > 0 && hitsDisp > st.totalNotes) hitsDisp = st.totalNotes;
 		// 评级计数与 Combo 同源（density 累加），把批次去重噪声一并钳到命中数以内：
 		// 从最高评级开始扣减超量，保证 Marvelous+…+Shit == Hits、Combo ≤ Hits
@@ -3790,7 +3790,7 @@ class GameHUD
 			&& bad == _lastJudgBad && shit == _lastJudgShit
 			&& st.totalNotes == _lastJudgTotal && ClientPrefs.data.marvelousJudgement == _lastJudgMarv)
 			return;
-		_lastJudgHits = hitsDisp; _lastJudgCombo = comboDisp; _lastJudgMisses = st.songMisses;
+		_lastJudgHits = hitsDisp; _lastJudgCombo = comboDisp; _lastJudgMisses = I64.toIntSafe(st.songMisses);
 		_lastJudgMv = mv; _lastJudgSick = sick; _lastJudgGood = good; _lastJudgBad = bad; _lastJudgShit = shit;
 		_lastJudgTotal = st.totalNotes; _lastJudgMarv = ClientPrefs.data.marvelousJudgement;
 

@@ -535,12 +535,12 @@ class StoryMenuState extends MusicBeatState
 		lastDifficultyName = diff;
 
 		#if !switch
-		intendedScore = Highscore.getWeekScore(loadedWeeks[curWeek].fileName, curDifficulty);
+		intendedScore = I64.toFloat(Highscore.getWeekScore(loadedWeeks[curWeek].fileName, curDifficulty));
 		#end
 	}
 
-	var lerpScore:Int = 0;
-	var intendedScore:Int = 0;
+	var lerpScore:Float = 0;
+	var intendedScore:Float = 0; // Int64 分数在 lerp 动画边界转 Float（Double 精确到 2^53）
 
 	function changeWeek(change:Int = 0):Void
 	{
@@ -684,7 +684,7 @@ class StoryMenuState extends MusicBeatState
 		txtTracklist.x -= FlxG.width * 0.35;
 
 		#if !switch
-		intendedScore = Highscore.getWeekScore(loadedWeeks[curWeek].fileName, curDifficulty);
+		intendedScore = I64.toFloat(Highscore.getWeekScore(loadedWeeks[curWeek].fileName, curDifficulty));
 		#end
 	}
 

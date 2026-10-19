@@ -223,6 +223,6 @@ class PhigrosRating
 				}
 			}
 		}
-		return compute(perfect, good, bad, ps.songMisses, ps.maxCombo, ps.totalNotes);
+		return compute(perfect, good, bad, I64.toIntSafe(ps.songMisses), I64.toIntSafe(ps.maxCombo), ps.totalNotes);
 	}
 }

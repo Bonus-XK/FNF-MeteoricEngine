@@ -124,8 +124,9 @@ class HostDomain
 			{
 				// 游玩期 SONG.notes 已被剥离，指纹用 create 期记录值（内容与完整谱面一致）
 				ps.currentReplay.fingerprint = PlayState.recordedChartFingerprint;
-				ps.currentReplay.score = ps.songScore;
-				ps.currentReplay.misses = ps.songMisses;
+				// Replay 文件格式保持 Int（JSON 往返 + 兼容旧档不重做）；超高分的元数据在此钳到 Int32 上限
+				ps.currentReplay.score = I64.toIntSafe(ps.songScore);
+				ps.currentReplay.misses = I64.toIntSafe(ps.songMisses);
 				ps.currentReplay.percent = Math.isNaN(ps.ratingPercent) ? 0 : ps.ratingPercent;
 				ps.currentReplay.save();
 				replayForResults = ps.currentReplay;

@@ -71,7 +71,7 @@ class MeteoricProfile
 	static var _phLiveStart:Float = 0;
 	static var _wThreadOn:Bool = false;
 	static var _watchPath:String = null;
-	static var _lastHits:Int = -1; // 上一 帧·秒 命中数（songHits 增量 → nps=）
+	static var _lastHits:haxe.Int64 = -1; // 上一 帧·秒 命中数（songHits 增量 → nps=）
 	static var _phCnt:Map<String, Int> = new Map();
 
 	// 探针落盘（crash/profile.txt，追加）：release 双击运行时没有控制台，
@@ -450,7 +450,9 @@ class MeteoricProfile
 			// 【命中速率】songHits 增量/秒 ≈ 实际 NPS：验证泄漏速率与命中率的相关性
 			//（PlayState 在 states 包，经 Type/Reflect 取静态 instance，避免 backend→states 静态依赖）。
 			{
-				var hits:Int = -1;
+				// 【反射边界】songHits 已是 haxe.Int64，Dynamic 层不能直接当 Int 用（hxcpp 会按
+				// 原生 Int64Struct 传值），统一转 Float 中转（Double 精确到 2^53，够用）
+				var hitsF:Float = -1;
 				try
 				{
 					var cls = Type.resolveClass('PlayState');
@@ -458,14 +460,15 @@ class MeteoricProfile
 					if (cls != null)
 					{
 						var inst = Reflect.field(cls, 'instance');
-						if (inst != null) hits = Reflect.field(inst, 'songHits');
+						if (inst != null) hitsF = I64.toFloat(cast Reflect.field(inst, 'songHits'));
 					}
 				}
 				catch (eH:Dynamic) {}
-				if (hits >= 0)
+				if (hitsF >= 0)
 				{
-					if (_lastHits >= 0 && hits >= _lastHits) sb.add(' nps=' + (hits - _lastHits));
-					_lastHits = hits;
+					var lastF:Float = I64.toFloat(_lastHits);
+					if (_lastHits >= 0 && hitsF >= lastF) sb.add(' nps=' + Math.floor(hitsF - lastF));
+					_lastHits = haxe.Int64.fromFloat(hitsF);
 				}
 			}
 			for (k in _phAcc.keys())

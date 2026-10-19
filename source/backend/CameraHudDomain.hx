@@ -223,7 +223,7 @@ class CameraHudDomain
 			if(ps.totalPlayed != 0) //Prevent divide by 0
 			{
 				// Rating Percent
-				ps.ratingPercent = Math.min(1, Math.max(0, ps.totalNotesHit / ps.totalPlayed));
+				ps.ratingPercent = Math.min(1, Math.max(0, ps.totalNotesHit / I64.toFloat(ps.totalPlayed)));
 				//trace((totalNotesHit / totalPlayed) + ', Total: ' + totalPlayed + ', notes hit: ' + totalNotesHit);
 
 				// Rating Name

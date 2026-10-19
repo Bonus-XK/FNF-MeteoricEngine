@@ -121,13 +121,13 @@ class PauseSubState extends MusicBeatSubstate
 	// 【分配削减】updateStats 的轻量签名：暂停期间绝大多数帧这些底值不变，
 	// 此时直接 return，不再每帧 formatTime/formatMoney/7 字符串数组分配
 	//（暂停里每秒一次 GC 尖峰的喂食源就用这里切断）。初始值 = 必然不相等的哨兵。
-	var _sigScore:Int = 0x7fffffff;
-	var _sigMisses:Int = 0x7fffffff;
+	var _sigScore:haxe.Int64 = 0x7fffffff;
+	var _sigMisses:haxe.Int64 = 0x7fffffff;
 	var _sigCombo:Int = 0x7fffffff;
 	var _sigRatingName:String = null;
 	var _sigFC:String = null;
 	var _sigPct:Int = 0x7fffffff;
-	var _sigHits:Int = 0x7fffffff;
+	var _sigHits:haxe.Int64 = 0x7fffffff;
 	var _sigTotal:Int = 0x7fffffff;
 	var _sigSec:Int = 0x7fffffff;
 	var _sigMLen:Int = 0x7fffffff;
@@ -995,7 +995,7 @@ class PauseSubState extends MusicBeatSubstate
 
 		var totalT:String = (FlxG.sound.music != null) ? FlxStringUtil.formatTime(Math.max(0, Math.floor(FlxG.sound.music.length / 1000)), false) : '--:--';
 		var vals:Array<String> = [
-			FlxStringUtil.formatMoney(st.songScore),
+			FlxStringUtil.formatMoney(I64.toFloat(st.songScore)),
 			Std.string(st.songMisses),
 			Std.string(st.combo),
 			st.ratingName + fcText(st.ratingFC),

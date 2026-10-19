@@ -810,7 +810,7 @@ class NoteChartDomain
 		if (ps.totalNotes > 0)
 		{
 			if (ps.songHits >= ps.totalNotes) hitMult = 0;
-			else if (ps.songHits + hitMult > ps.totalNotes) hitMult = Std.int(ps.totalNotes - ps.songHits);
+			else if (ps.songHits + hitMult > ps.totalNotes) hitMult = I64.toIntSafe((ps.totalNotes : haxe.Int64) - ps.songHits);
 		}
 		if (hitMult <= 0) return;
 
@@ -1011,7 +1011,7 @@ class NoteChartDomain
 			if (ps.totalNotes > 0)
 			{
 				if (ps.songHits >= ps.totalNotes) hitMult = 0;
-				else if (ps.songHits + hitMult > ps.totalNotes) hitMult = Std.int(ps.totalNotes - ps.songHits);
+				else if (ps.songHits + hitMult > ps.totalNotes) hitMult = I64.toIntSafe((ps.totalNotes : haxe.Int64) - ps.songHits);
 			}
 			// NPS 统计：每个音符（含长条）只计一次，只计独立音符（堆叠合并按 density 计）
 			if (!note.isSustainNote) ps._npsCount += hitMult;
