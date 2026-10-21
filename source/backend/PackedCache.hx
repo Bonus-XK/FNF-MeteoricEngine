@@ -129,6 +129,30 @@ class PackedCache
 		return t;
 	}
 
+	/**
+	 * 校验缓存 meta 与当前扫描设置是否一致。
+	 *
+	 * ⚠ 缓存键只覆盖 Part 的路径/大小/mtime，**不包含合并参数**。只改
+	 * `ghostRange` / `ghostDensity` / `boundedOffsKeep` / `skipGhostNotes` 时
+	 * 键不变；若不校验就直接复用旧簇，计分密度与视觉会静默沿用旧语义
+	 * （例如合并窗口 15→30ms 后仍读旧簇）。返回 false 时调用方按未命中处理，
+	 * 重新扫描并由 `save()` 覆盖同一键的旧文件。
+	 *
+	 * 旧缓存没有 `merge` 字段：历史默认 `skipGhostNotes=true`，按 true 兼容；
+	 * 当前为 false 时才强制重扫。其余字段缺失一律视为不可信（重扫）。
+	 */
+	public static function metaMatches(meta:Dynamic, expectParts:Int, ghostRange:Float, ghostDensity:Bool, keepLimit:Int, doMerge:Bool):Bool
+	{
+		if (meta == null) return false;
+		if (expectParts > 0 && meta.parts != null && Std.int(meta.parts) != expectParts) return false;
+		if (meta.ghostRange == null || Math.abs((cast meta.ghostRange : Float) - ghostRange) > 0.0001) return false;
+		if (meta.ghostDensity == null || (meta.ghostDensity == true) != ghostDensity) return false;
+		if (meta.keep == null || Std.int(meta.keep) != keepLimit) return false;
+		var cachedMerge:Bool = (meta.merge == null) ? true : (meta.merge == true);
+		if (cachedMerge != doMerge) return false;
+		return true;
+	}
+
 	/** 读缓存 → 命中返回簇数组，失败返回 null */
 	/** 最近一次 load() 读出的缓存 meta（调用方据此补齐 packedSectionCount 等扫描路径字段）。 */
 	public static var lastMeta:Dynamic = null;

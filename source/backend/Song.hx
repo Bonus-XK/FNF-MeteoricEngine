@@ -929,6 +929,19 @@ class Song
 			{
 				PerfProbe.mark('parts: cache probe ' + ck);
 				var hit:Array<PackedChart> = PackedCache.load(ck, partPaths.length);
+				// 缓存键不含合并参数：设置改过就必须重扫，否则计分/视觉会静默沿用旧簇。
+				var cacheGhostRange:Float = ClientPrefs.data.ghostRange;
+				var cacheGhostDensity:Bool = ClientPrefs.data.ghostDensity;
+				var cacheKeep:Int = ClientPrefs.data.boundedOffs ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
+				var cacheDoMerge:Bool = ClientPrefs.data.skipGhostNotes;
+				if (hit != null && !PackedCache.metaMatches(PackedCache.lastMeta, partPaths.length,
+					cacheGhostRange, cacheGhostDensity, cacheKeep, cacheDoMerge))
+				{
+					trace('[PACKEDPARTS] CACHE STALE settings changed (ghostRange=' + cacheGhostRange
+						+ ' ghostDensity=' + cacheGhostDensity + ' keep=' + cacheKeep
+						+ ' merge=' + cacheDoMerge + '); rescan');
+					hit = null;
+				}
 				if (hit != null)
 				{
 					trace('[PACKEDPARTS] CACHE HIT parts=' + partPaths.length + ' clusters=' + hit.length);
@@ -1058,6 +1071,7 @@ class Song
 				ghostRange: ghostRange,
 				ghostDensity: ghostDensity,
 				keep: keepLimit,
+				merge: doMerge,
 				version: 1
 			});
 			PerfProbe.mark('parts: cache save done');
