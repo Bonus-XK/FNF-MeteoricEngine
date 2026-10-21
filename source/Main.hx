@@ -384,24 +384,6 @@ class Main extends Sprite
 		var flxGame = new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen);
 		addChild(flxGame);
 
-		// ---- 自动进歌（性能实测用，仅在设置环境变量时生效）----
-		// METEORIC_AUTOSONG=stupid-griefer / METEORIC_AUTOPART=3
-		// 目的是让加载耗时可被自动化测量，不依赖人工点选。
-		#if sys
-		var autoSong:String = null;
-		var autoPart:String = null;
-		try
-		{
-			autoSong = Sys.getEnv("METEORIC_AUTOSONG");
-			autoPart = Sys.getEnv("METEORIC_AUTOPART");
-		}
-		catch (e:Dynamic) {}
-		if (autoSong != null && autoSong.length > 0)
-		{
-			PerfProbe.arm(autoSong, (autoPart != null && autoPart.length > 0) ? autoPart : null);
-		}
-		#end
-
 		#if sys
 		// ---- 拖入 zip / 文件夹安装 mod（SDL 拖放 → lime window.onDropFile → ModInstaller） ----
 		// 闭包存字段（_dropHandler）：lime C++ 事件持有时 Haxe 侧无引用会被 GC 回收 → 悬垂 free 崩溃
