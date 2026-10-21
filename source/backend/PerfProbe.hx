@@ -89,19 +89,24 @@ class PerfProbe
 			}
 			return (best >= 0) ? (best / 1024.0) : -1; // KB → MB
 			#elseif mac
-			// ps -axo rss=,%c 逐行 "123456 Meteoric"（%c 可能截短进程名，按包含匹配）
-			var pr = new sys.io.Process('ps', ['-axo', 'rss=,%c']);
+			// ps -axo rss=,comm 逐行 "123456 /path/to/Meteoric"。
+			// ⚠ macOS 的 ps 不支持 Linux 的 %c 关键字（实测报 "ps: %c: keyword not found"，
+			//    stdout 为空 → 旧实现永远返回 -1，profile 里一直是 ram=n/a）。
+			// comm 是完整路径，取最后一段与当前可执行文件名比较；多开时取最大 RSS。
+			var pr = new sys.io.Process('ps', ['-axo', 'rss=,comm']);
 			var out:String = pr.stdout.readAll().toString();
 			pr.close();
-			var base:String = haxe.io.Path.withoutDirectory(Sys.programPath());
+			var base:String = haxe.io.Path.withoutDirectory(Sys.programPath()).toLowerCase();
 			var best:Float = -1;
 			for (line in out.split('\n'))
 			{
-				var k:Int = line.lastIndexOf(','); // %c 默认逗号分隔
-				if (k <= 0) continue;
-				var nm:String = StringTools.trim(line.substr(k + 1));
-				if (nm.length <= 0 || base.indexOf(nm) < 0) continue;
-				var rss:Float = Std.parseFloat(StringTools.trim(line.substr(0, k)));
+				var s:String = StringTools.trim(line);
+				if (s.length == 0) continue;
+				var sp:Int = s.indexOf(' ');
+				if (sp <= 0) continue;
+				var nm:String = StringTools.trim(s.substr(sp + 1));
+				if (nm.length <= 0 || haxe.io.Path.withoutDirectory(nm).toLowerCase() != base) continue;
+				var rss:Float = Std.parseFloat(s.substr(0, sp));
 				if (Math.isFinite(rss) && rss > best) best = rss;
 			}
 			return (best >= 0) ? (best / 1024.0) : -1;

@@ -88,8 +88,31 @@ class FPS extends TextField
 	// 彩虹模式：色相轮循环角度
 	var _rainbowHue:Float = 0;
 
-	// 峰值内存：与 Mem 同一口径（totalMemory），取运行以来的最大值
+	// 峰值内存：与 Mem 同一口径（OS RSS，取不到时回退 GC 堆），取运行以来的最大值
 	var _peakMem:Float = 0;
+
+	/**
+	 * 计数器显示的“内存”。
+	 *
+	 * ⚠ 不能再用 `openfl.system.System.totalMemory` 单独当总内存：cpp 下它是
+	 * `__hxcpp_gc_used_bytes()`，只统计 Haxe GC 堆（通常几十 MB），完全不含
+	 * `FlxG.bitmap` 位图、OpenFL 纹理、GPU/显存与音频等原生侧占用。大谱面实测
+	 * 引擎显示 ~100MB、Activity Monitor 却能到数 GB，就是这个口径差。
+	 *
+	 * 优先用 OS 级 RSS（PerfProbe 每 2s 在子线程采样一次，主线程只读 static）；
+	 * 取不到（采样线程刚起/平台不支持）才回退 GC 堆。这样 Mem 至少是进程真实
+	 * 常驻内存；显存部分仍只能由 Activity Monitor / Instruments 观察。
+	 */
+	static function currentMemoryBytes():Float
+	{
+		#if sys
+		var rssMB:Float = backend.PerfProbe.processRSS();
+		if (rssMB >= 0) return rssMB * 1048576.0;
+		#end
+		var mem:Float = openfl.system.System.totalMemory;
+		if (mem < 0) mem += 4294967296; // totalMemory 是 Int，超过 2GB 会溢出为负数
+		return mem;
+	}
 
 	// 窗口标题栏模式：原始窗口标题（开启标题显示时拼接统计信息，关闭时恢复）
 	var _baseTitle:String = null;
@@ -277,8 +300,7 @@ class FPS extends TextField
 
 	dynamic function updateText():Void
 	{
-		var mem:Float = openfl.system.System.totalMemory;
-		if (mem < 0) mem += 4294967296; // totalMemory 是 Int，超过 2GB 会溢出为负数，这里还原为真实字节数
+		var mem:Float = currentMemoryBytes();
 		if (mem > _peakMem) _peakMem = mem;
 
 		#if sys
@@ -502,8 +524,7 @@ class FPS extends TextField
 			// 以当前窗口标题为基准（引擎刚设置的菜单/歌曲/暂停上下文）
 			var w:Window = lime.app.Application.current.window;
 			if (w != null) _baseTitle = w.title;
-			var mem:Float = openfl.system.System.totalMemory;
-			if (mem < 0) mem += 4294967296;
+			var mem:Float = currentMemoryBytes();
 			if (mem > _peakMem) _peakMem = mem;
 			updateWindowTitle(mem);
 		}
