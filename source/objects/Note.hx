@@ -339,6 +339,11 @@ class Note extends FlxSprite
 
 	// 大谱面优化：同一音符皮肤只解析一次图集/贴图，全部音符共享
 	static var noteFramesCache:Map<String, FlxAtlasFrames> = [];
+	// 大谱面优化（Seiun 动画帧缓存移植）：同一皮肤/前缀的帧索引只扫描排序一次。
+	// addByPrefix 每次都遍历整张图集并排序；密集谱 6 万音符 × 3 条动画会重复做
+	// 完全相同的工作。缓存的是「帧索引数组」，每个 Note 仍各自 copy 一份给
+	// FlxAnimation（动画状态互不共享，视觉/行为与逐次 addByPrefix 完全一致）。
+	static var noteAnimIndicesCache:Map<String, Array<Int>> = [];
 	// 烘焙专用 CPU 位图/图集缓存（cacheOnGPU 开启时引擎位图不可读，需从资产库重新读取一次并复用）
 	static var bakeBitmapCache:Map<String, BitmapData> = [];
 	static var bakeAtlasCache:Map<String, FlxAtlasFrames> = [];
@@ -361,6 +366,7 @@ class Note extends FlxSprite
 	public static function clearNoteCaches()
 	{
 		noteFramesCache = [];
+		noteAnimIndicesCache = [];
 		bakeBitmapCache = [];
 		bakeAtlasCache = [];
 		bakedNoteGraphics = [];
@@ -372,6 +378,7 @@ class Note extends FlxSprite
 	public static function clearRuntimeAtlasCache()
 	{
 		noteFramesCache = [];
+		noteAnimIndicesCache = [];
 	}
 
 	// 懒加载：大部分音符（尤其大谱面未击打音符）不需要特效数据，构造时不分配
@@ -842,7 +849,7 @@ class Note extends FlxSprite
 			else
 			{
 				frames = atlas;
-				loadNoteAnims();
+				loadNoteAnims(loadPath);
 				if(!isSustainNote)
 				{
 					centerOffsets();
@@ -1446,14 +1453,35 @@ class Note extends FlxSprite
 		bmp.setPixels(bmp.rect, pixels);
 	}
 
-	function loadNoteAnims() {
+	/**
+	 * addByPrefix 的缓存版：帧索引按 (图集路径|动画名|前缀|帧率|循环) 只在第一次
+	 * 扫描排序，之后直接 animation.add 同一份索引的拷贝。动画对象仍逐 Note 创建，
+	 * 因此每颗音符的播放状态、回调、视觉结果与旧路径一致。
+	 */
+	function addCachedNoteAnim(cacheKey:String, name:String, prefix:String, frameRate:Int, loop:Bool):Void
+	{
+		var key:String = cacheKey + '|' + name + '|' + prefix + '|' + frameRate + '|' + (loop ? 1 : 0);
+		var indices:Array<Int> = noteAnimIndicesCache.get(key);
+		if (indices != null)
+		{
+			animation.add(name, indices.copy(), frameRate, loop);
+			return;
+		}
+		animation.addByPrefix(name, prefix, frameRate, loop);
+		@:privateAccess
+		var anim = animation._animations.get(name);
+		if (anim != null && anim.frames != null && anim.frames.length > 0)
+			noteAnimIndicesCache.set(key, anim.frames.copy());
+	}
+
+	function loadNoteAnims(cacheKey:String) {
 		if (isSustainNote)
 		{
-			animation.addByPrefix('purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
-			animation.addByPrefix(colArray[noteData] + 'holdend', colArray[noteData] + ' hold end', 24, true);
-			animation.addByPrefix(colArray[noteData] + 'hold', colArray[noteData] + ' hold piece', 24, true);
+			addCachedNoteAnim(cacheKey, 'purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
+			addCachedNoteAnim(cacheKey, colArray[noteData] + 'holdend', colArray[noteData] + ' hold end', 24, true);
+			addCachedNoteAnim(cacheKey, colArray[noteData] + 'hold', colArray[noteData] + ' hold piece', 24, true);
 		}
-		else animation.addByPrefix(colArray[noteData] + 'Scroll', colArray[noteData] + '0');
+		else addCachedNoteAnim(cacheKey, colArray[noteData] + 'Scroll', colArray[noteData] + '0', 30, true);
 
 		setGraphicSize(Std.int(width * 0.7));
 		updateHitbox();
