@@ -2,6 +2,11 @@ package backend;
 
 import flixel.FlxSubState;
 
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptGroup;
+import scripting.Scripting;
+#end
+
 class MusicBeatSubstate extends FlxSubState
 {
 	#if LUA_ALLOWED
@@ -9,11 +14,20 @@ class MusicBeatSubstate extends FlxSubState
 	public var uiScripts:Array<psychlua.MenuScript> = [];
 	#end
 
+	#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+	/** Meteoric 脚本系统：本子界面的状态脚本组（mods/<mod>/scripting/states/<界面名>.hx）。
+	 *  总开关关闭时恒为 null —— 引擎其余部分照旧。 */
+	public var scriptingGroup:ScriptGroup = null;
+	#end
 
 	override function create()
 	{
 		super.create();
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：装载本子界面的状态脚本（总开关关闭时立即返回，零行为变化）
+		Scripting.onSubStateCreate(this);
+		#end
 	}
 
 	public function new()
@@ -98,6 +112,11 @@ class MusicBeatSubstate extends FlxSubState
 			script.update(elapsed);
 		#end
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：状态脚本的 update 回调
+		Scripting.onSubStateUpdate(this, elapsed);
+		#end
+
 	}
 
 	/**
@@ -139,6 +158,10 @@ class MusicBeatSubstate extends FlxSubState
 		uiScripts = [];
 		#end
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：状态脚本收 destroy 回调（脚本须自己清理创建的对象）
+		Scripting.onSubStateDestroy(this);
+		#end
 
 		super.destroy();
 	}

@@ -4,11 +4,22 @@ import flixel.addons.ui.FlxUIState;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxState;
 
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptGroup;
+import scripting.Scripting;
+#end
+
 class MusicBeatState extends FlxUIState
 {
 	#if LUA_ALLOWED
 	// 界面脚本系统：该界面上运行的自定义 Lua 脚本（menus/<界面名>.lua）
 	public var uiScripts:Array<psychlua.MenuScript> = [];
+	#end
+
+	#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+	/** Meteoric 脚本系统：本界面的状态脚本组（mods/<mod>/scripting/states/<界面名>.hx）。
+	 *  总开关关闭时恒为 null —— 引擎其余部分照旧。 */
+	public var scriptingGroup:ScriptGroup = null;
 	#end
 
 
@@ -69,6 +80,10 @@ class MusicBeatState extends FlxUIState
 		FlxTransitionableState.skipNextTransOut = false;
 		timePassedOnState = 0;
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：装载本界面的状态脚本（总开关关闭时立即返回，零行为变化）
+		Scripting.onStateCreate(this);
+		#end
 	}
 
 	public static var timePassedOnState:Float = 0;
@@ -141,6 +156,11 @@ class MusicBeatState extends FlxUIState
 			script.update(elapsed);
 		#end
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：状态脚本的 update 回调
+		Scripting.onStateUpdate(this, elapsed);
+		#end
+
 	}
 
 	/**
@@ -181,6 +201,12 @@ class MusicBeatState extends FlxUIState
 			script.destroy();
 		uiScripts = [];
 		#end
+
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：状态脚本收 destroy 回调（脚本须自己清理创建的对象）
+		Scripting.onStateDestroy(this);
+		#end
+
 		super.destroy();
 	}
 
@@ -307,6 +333,10 @@ class MusicBeatState extends FlxUIState
 			stage.stepHit();
 		});
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：步点回调（全局脚本 + 本界面的状态脚本）
+		Scripting.onStepHit(curStep);
+		#end
 
 		if (curStep % 4 == 0)
 			beatHit();
@@ -322,6 +352,10 @@ class MusicBeatState extends FlxUIState
 			stage.beatHit();
 		});
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：节拍回调（全局脚本 + 本界面的状态脚本）
+		Scripting.onBeatHit(curBeat);
+		#end
 	}
 
 	/**

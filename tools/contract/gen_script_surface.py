@@ -53,12 +53,24 @@ def scan_lua():
 
 
 def scan_hscript():
+    """HScript 可见名：psychlua/HScript.hx 的 preset + 编程层（source/scripting）注入的宿主变量。
+
+    编程层（source/scripting/*.hx）也会用 set('name', ...) 往脚本注入变量
+    （state / game / scripting），这些同样是脚本可见名，必须一起冻结在基线里。
+    """
     rows = []
-    rel = os.path.relpath(HSX_FILE, ROOT)
-    with open(HSX_FILE, encoding="utf-8", errors="replace") as fh:
-        for i, line in enumerate(fh, 1):
-            for m in RE_HSX.finditer(line):
-                rows.append(("hscript", m.group(1), "%s:%d" % (rel, i)))
+    files = [HSX_FILE]
+    scripting_dir = os.path.join(SRC, "scripting")
+    if os.path.isdir(scripting_dir):
+        for fn in sorted(os.listdir(scripting_dir)):
+            if fn.endswith(".hx"):
+                files.append(os.path.join(scripting_dir, fn))
+    for path in files:
+        rel = os.path.relpath(path, ROOT)
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for i, line in enumerate(fh, 1):
+                for m in RE_HSX.finditer(line):
+                    rows.append(("hscript", m.group(1), "%s:%d" % (rel, i)))
     return rows
 
 

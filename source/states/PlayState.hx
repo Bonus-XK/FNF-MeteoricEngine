@@ -84,6 +84,13 @@ import objects.NoteHitGraph.NoteHitEntry;
 import objects.*;
 import states.stages.objects.*;
 
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptLifecycleEvent;
+import scripting.ScriptNoteEvent;
+import scripting.ScriptRatingEvent;
+import scripting.Scripting;
+#end
+
 #if LUA_ALLOWED
 import psychlua.*;
 #else
@@ -2311,6 +2318,23 @@ class PlayState extends MusicBeatState
 
 		var dunceNote:Note = notes.spawnNote(target);
 
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：音符创建事件 —— 脚本可改这根音符（类型 / 贴图 / 血量 / 判定 …）；
+		// event.cancel() = 这根音符不参与判定与计分（仍然显示，但不打、不计分）。
+		if (Scripting.eventsEnabled())
+		{
+			var ev:ScriptNoteEvent = new ScriptNoteEvent('creation', dunceNote);
+			ev.noteData = dunceNote.noteData;
+			ev.mustPress = dunceNote.mustPress;
+			ev.sustain = dunceNote.isSustainNote;
+			if (Scripting.dispatch('onNoteCreation', ev))
+			{
+				dunceNote.ignoreNote = true;
+				dunceNote.blockHit = true;
+			}
+		}
+		#end
+
 		// botplay 命中排期（架构修复）：生成即登记，到时间由 noteSpawn 直接入队，
 		// 不依赖 alive-loop 逐帧访问（密集段下 forEachAlive 因击杀移除会饿死入队哨兵）
 		if (PlayState.instance != null && PlayState.instance.cpuControlled
@@ -2398,6 +2422,21 @@ class PlayState extends MusicBeatState
 	function doDeathCheck(?skipHealthCheck:Bool = false) {
 		if (((skipHealthCheck && instakillOnMiss) || health <= 0) && !practiceMode && !isDead)
 		{
+			#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+			// Meteoric 脚本系统：死亡事件 —— event.cancel() = 不死。
+			// 取消时把血量拉回 0 以上（否则下一帧的死亡检查会再次触发，形成死循环）。
+			if (Scripting.eventsEnabled())
+			{
+				var ev:ScriptLifecycleEvent = new ScriptLifecycleEvent('gameOver');
+				ev.health = health;
+				if (Scripting.dispatch('onGameOver', ev))
+				{
+					health = ev.health > 0 ? ev.health : 0.01;
+					return false; // 返回 false = 没死（调用方据此走「未死亡」分支）
+				}
+			}
+			#end
+
 			// 联机：不死于 GameOver，直接进入双端成绩对比（先发送本方 FINISH）
 
 			var ret:Dynamic = callOnScripts('onGameOver', null, true);
@@ -2964,6 +3003,27 @@ class PlayState extends MusicBeatState
 			&& !(ClientPrefs.data.botMode == 'destroy' && cpuControlled); // 销毁模式：只保留数字计数弹窗，不弹 Sick/评级条
 		var showComboPop:Bool = showCombo && ClientPrefs.data.comboPopups;
 		var showComboNumPop:Bool = showComboNum && ClientPrefs.data.comboPopups;
+
+		// Meteoric 脚本系统：评级事件 —— 脚本可换评级贴图 / 关掉评级弹窗。
+		// 放在提前 return **之前**：脚本才有机会强制显示评级（ev.visible = true）。
+		// 覆盖变量在 #if 外声明：非脚本平台它恒为 null，行为与改动前完全一致。
+		var ratingImgOverride:String = null;
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		if (Scripting.eventsEnabled())
+		{
+			var ev:ScriptRatingEvent = new ScriptRatingEvent(daRating.image, daRating.name, combo);
+			if (Scripting.dispatch('onRatingShown', ev))
+			{
+				showRatingPop = false;
+			}
+			else
+			{
+				ratingImgOverride = ev.ratingImage;
+				showRatingPop = ev.visible;
+			}
+		}
+		#end
+
 		if (!showRatingPop && !showComboPop) return;
 
 		var uiPrefix:String = "";
@@ -2980,7 +3040,7 @@ class PlayState extends MusicBeatState
 		if (showRatingPop)
 		{
 			rating = new FlxSprite();
-			var ratingImg:String = daRating.image;
+			var ratingImg:String = ratingImgOverride != null ? ratingImgOverride : daRating.image;
 			// Marvelous 无像素版贴图，像素关卡回退 sick
 			if (ratingImg == 'marvelous' && PlayState.isPixelStage) ratingImg = 'sick';
 			// PF 移植：Early/Late 指示器——偏早/偏晚命中优先用 -early/-late 评级图，

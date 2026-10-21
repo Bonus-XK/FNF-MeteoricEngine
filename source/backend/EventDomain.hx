@@ -14,6 +14,11 @@ import psychlua.FunkinLua;
 import objects.Character;
 import psychlua.LuaUtils;
 
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptChartEvent;
+import scripting.Scripting;
+#end
+
 /** 事件调度域（C4 首批迁出，7 个零遮蔽函数中的 5 个）。
  *  PlayState 保留同签名转发入口，全仓调用点零改动。
  *  可见性说明：原 eventPushed / onStageDeactivate / onStageActivate 为 private，跨模块调用在本类放宽为 public。 */
@@ -178,6 +183,24 @@ class EventDomain
 	/** 原 PlayState.triggerEvent（作用域分析：零遮蔽，92 处成员引用已限定）。 */
 	public static function triggerEvent(ps:PlayState, eventName:String, value1:String, value2:String, strumTime:Float)
 	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：谱面事件 —— 脚本可改参数，也可 event.cancel() 接管这一条事件。
+		// 放在参数解析之前：脚本改的是字符串参数，后续解析与默认处理都用改后的值。
+		if (Scripting.eventsEnabled())
+		{
+			var ev:ScriptChartEvent = new ScriptChartEvent(eventName, value1, value2, strumTime);
+			if (Scripting.dispatch('onChartEvent', ev))
+			{
+				// 脚本接管：跳过默认处理，保留舞台回调与旧脚本回调（不破坏既有契约）。
+				ps.stagesFunc(function(stage:BaseStage) stage.eventCalled(eventName, ev.value1, ev.value2, null, null, strumTime));
+				ps.callOnScripts('onEvent', [eventName, ev.value1, ev.value2, strumTime]);
+				return;
+			}
+			value1 = ev.value1;
+			value2 = ev.value2;
+		}
+		#end
+
 		var flValue1:Null<Float> = Std.parseFloat(value1);
 		var flValue2:Null<Float> = Std.parseFloat(value2);
 		if(Math.isNaN(flValue1)) flValue1 = null;

@@ -250,9 +250,9 @@
 	"optionDesc.comboPopups": "Whether combo numbers and the Combo word are created on hits; when off combo still counts normally.",
 	"option.lessBotLag": "Botplay Resource Saver",
 	"optionDesc.lessBotLag": "During botplay, only score/rate without creating rating and combo popups (fewer sprite creations and less GC pressure).",
-		"option.gcBreathing": "GC Breathing Valve",
+	"option.gcBreathing": "GC Breathing Valve",
 	"optionDesc.gcBreathing": "Sets a GC free-space floor when entering a song and forces a full garbage collection every 20s during gameplay: memory stops climbing instead of freezing. Cost: a ~20-100ms hitch per collection. Off by default.",
-"option.noHitFuncs": "Disable Hit Callbacks",
+	"option.noHitFuncs": "Disable Hit Callbacks",
 	"optionDesc.noHitFuncs": "Hitting notes no longer fires the Lua/Hscript goodNoteHit/opponentNoteHit callbacks;\nkeep it on for mods that rely on these callbacks (such as scoring or effect scripts).",
 	"option.psych063Mode": "Psych 0.6.3 Compatibility",
 	"optionDesc.psych063Mode": "When on, disables forced note baking to match the arrow texture format of Psych Engine 0.6.3 mods (try this if arrows are invisible).",
@@ -1658,5 +1658,15 @@
 	"backup.noBackup": "No backup file in the output folder",
 	"backup.restored": "Restored",
 	"backup.files": " files",
-	"backup.hint": "↑ ↓ select · ← → toggle · Enter run / toggle · mouse click and wheel work too · ESC back"
+	"backup.hint": "↑ ↓ select · ← → toggle · Enter run / toggle · mouse click and wheel work too · ESC back",
+	"option.scriptingEnabled": "Scripting (master switch)",
+	"optionDesc.scriptingEnabled": "Enable the Meteoric scripting system: write HScript to change gameplay and UI.\nScripts live in a mod's scripting/ folder; press F5 to apply changes without restarting the game.\nWhen off, the engine behaves exactly as if the feature did not exist.",
+	"option.scriptingGlobalScripts": "Global scripts",
+	"optionDesc.scriptingGlobalScripts": "Loads scripting/global/*.hx: these scripts stay alive across every screen (they receive beats, state switches, focus and window resize events).\nRequires the master switch to be on.",
+	"option.scriptingStateScripts": "State scripts (override screens)",
+	"optionDesc.scriptingStateScripts": "Loads scripting/states/<ScreenName>.hx: lets a script take over a screen (menus, pause, options...) and change its widgets and behaviour.\nRequires the master switch to be on.",
+	"option.scriptingHotReload": "Script hot reload",
+	"optionDesc.scriptingHotReload": "When on: F5 rebuilds the current screen's state scripts, Shift+F5 rebuilds the global scripts.\nObjects a script creates must be cleaned up in destroy(), otherwise they linger.\nRequires the master switch to be on.",
+	"option.scriptingEvents": "Cancellable events",
+	"optionDesc.scriptingEvents": "Lets scripts intercept the engine's key decision points (note creation, hits, ratings, chart events, results...):\nscripts can change parameters, or call event.cancel() to take over the default behaviour.\nRequires the master switch to be on."
 }

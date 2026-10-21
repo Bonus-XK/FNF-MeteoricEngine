@@ -16,6 +16,11 @@ import backend.CoolUtil;
 import flixel.text.FlxText.FlxTextBorderStyle;
 import backend.Rating;
 
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptCameraEvent;
+import scripting.Scripting;
+#end
+
 /** 相机与 HUD 域（C3 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，全仓 `PlayState.*` 调用点零改动。
  *  本批按用户裁定 A 只迁出 6 个**零冲突**函数（46 行）：它们引用的字段名不与本函数内局部变量/参数同名，
@@ -282,6 +287,13 @@ class CameraHudDomain
 	/** 原 PlayState.moveCamera（作用域分析：零遮蔽，23 处成员引用已限定）。 */
 	public static function moveCamera(ps:PlayState, isDad:Bool)
 	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：相机事件 —— 移动**之后**派发，脚本可改落点；
+		// event.cancel() = 这一次不移动（回到移动前的位置）。
+		var prevCamX:Float = ps.camFollow.x;
+		var prevCamY:Float = ps.camFollow.y;
+		#end
+
 		if(isDad)
 		{
 			ps.camFollow.setPosition(ps.dad.getMidpoint().x + 150, ps.dad.getMidpoint().y - 100);
@@ -305,6 +317,24 @@ class CameraHudDomain
 				});
 			}
 		}
+
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		if (Scripting.eventsEnabled())
+		{
+			var ev:ScriptCameraEvent = new ScriptCameraEvent(isDad ? 'dad' : 'boyfriend', ps.camFollow.x, ps.camFollow.y);
+			if (Scripting.dispatch('onCameraMove', ev))
+			{
+				ps.camFollow.x = prevCamX;
+				ps.camFollow.y = prevCamY;
+			}
+			else
+			{
+				ps.camFollow.x = ev.x;
+				ps.camFollow.y = ev.y;
+				if (ev.zoom != null) FlxG.camera.zoom = ev.zoom;
+			}
+		}
+		#end
 	}
 
 	/** 原 PlayState.moveCameraSection（作用域分析：零遮蔽，19 处成员引用已限定）。 */

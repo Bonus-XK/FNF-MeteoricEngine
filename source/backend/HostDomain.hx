@@ -30,6 +30,11 @@ import substates.PauseSubState;
 import psychlua.HScript;
 import backend.TurboDensity;
 import backend.TurboDensity.TurboZone;
+
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.ScriptLifecycleEvent;
+import scripting.Scripting;
+#end
 import flixel.addons.display.FlxRuntimeShader;
 import backend.BaseStage;
 import psychlua.DebugLuaText;
@@ -52,6 +57,17 @@ class HostDomain
 	/** 原 PlayState.endSong（作用域分析：零遮蔽，73 处成员引用已限定）。 */
 	public static function endSong(ps:PlayState):Bool
 	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：结算事件 —— event.cancel() = 不结算（停在游玩界面）。
+		// 放在最前面：此时还没改任何状态，取消后引擎状态与调用前完全一致。
+		if (Scripting.eventsEnabled())
+		{
+			var ev:ScriptLifecycleEvent = new ScriptLifecycleEvent('songEnd');
+			ev.songName = ps.songName;
+			if (Scripting.dispatch('onSongEnd', ev)) return false;
+		}
+		#end
+
 		//Should kill you if you tried to cheat
 		if(!ps.startingSong) {
 			ps.notes.forEach(function(daNote:Note) {

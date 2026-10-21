@@ -27,6 +27,10 @@ import states.MainMenuState;
 #if MODS_ALLOWED
 import sys.FileSystem;
 import sys.io.File;
+
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.Scripting;
+#end
 #end
 
 typedef TitleData =
@@ -108,6 +112,13 @@ class TitleState extends MusicBeatState
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 
 		ClientPrefs.loadPrefs();
+
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		// Meteoric 脚本系统：启动编程层（必须在 loadPrefs 之后 —— 开关存在存档里）。
+		// 注意：super.create() 里已经调过一次 onStateCreate，那次存档还没加载、开关读不到，
+		// 所以这里由 init() 补装载当前界面的状态脚本。
+		Scripting.init();
+		#end
 
 
 		// 【帧率档位启动诊断】仅调试构建启用（编译脚本加 -debug / METEORIC_DEBUG=1 时定义

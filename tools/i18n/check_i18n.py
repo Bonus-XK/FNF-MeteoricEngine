@@ -378,6 +378,7 @@ SKIP_REASONS = [
     ("source/openfl/", "存档值比较（FPS 配色档位）"),
     ("source/cne/", "CNE 兼容层的转换日志（log()，非界面文案）"),
     ("source/backend/Song.hx", "CNE 谱面转换日志（log()，非界面文案）"),
+    ("source/scripting/", "Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）"),
 ]
 
 
