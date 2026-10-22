@@ -891,6 +891,10 @@ source/scripting/Scripting.hx	状态跳转失败：找不到界面类 	1	Meteori
 source/scripting/Scripting.hx	状态跳转：已改写目标为 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	编程层已启动	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	（	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/scripting/ScriptingApi.hx	当前平台不支持手动 GC	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/ScriptingApi.hx	性能旋钮已改：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/ScriptingApi.hx	性能旋钮未改：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/ScriptingApi.hx	（不在白名单 / 值不可用）	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/states/ContainersMenuState.hx	  ·  	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/ContainersMenuState.hx	」…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/states/CreditsState.hx	…	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）

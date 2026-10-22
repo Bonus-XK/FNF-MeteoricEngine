@@ -99,6 +99,53 @@ class ScriptingApi
 		obj.screenCenter(axes);
 	}
 
+	// ===== 性能面 =====
+
+	/**
+	 * 性能快照（只读）。
+	 *
+	 * 返回的是**匿名结构体**（不是 Map —— 脚本反射拿不到 Map 的方法）：
+	 * `fps`（绘制帧率）、`elapsed`（上一帧耗时）、`rssMB`（进程常驻内存，取不到时 -1）、
+	 * 以及 4 个受控旋钮的当前值（`gcBreathing` / `visualFold` / `perfMode` / `runtimePack`）。
+	 * 读法：`var st = scripting.getPerfStats(); trace(st.fps);`
+	 */
+	@:keep
+	public function getPerfStats():Dynamic
+	{
+		return PerfControl.stats();
+	}
+
+	/**
+	 * 改一个受控的性能旋钮。
+	 *
+	 * 白名单：`gcBreathing`(bool) / `visualFold`(int 0..3) / `perfMode`(bool) /
+	 * `runtimePack`(bool)。
+	 * 不在白名单里的一律拒绝（返回值 false）—— 例如**降采样相关项刻意不开放**。
+	 *
+	 * 生效时机：`visualFold` 只影响之后生成的音符，`runtimePack` 只影响之后加载的贴图。
+	 */
+	@:keep
+	public function setPerfOption(name:String, value:Dynamic):Bool
+	{
+		var ok:Bool = PerfControl.setOption(name, value);
+		if (ok) log('性能旋钮已改：' + name + ' = ' + Std.string(value));
+		else logError('性能旋钮未改：' + name + '（不在白名单 / 值不可用）');
+		return ok;
+	}
+
+	/**
+	 * 立刻触发一次全量 GC（回收内存）。
+	 *
+	 * 代价：一次 20~80ms 的顿挫。
+	 */
+	@:keep
+	public function collectGarbage():Bool
+	{
+		var ok:Bool = PerfControl.collectGarbage();
+		if (!ok) logError('当前平台不支持手动 GC');
+		return ok;
+	}
+
 	// ===== 调试 =====
 
 	/** 打一条日志到终端（前缀 `[Scripting]`）。 */

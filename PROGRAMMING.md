@@ -47,9 +47,16 @@ mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个�
 |---|---|
 | `state` | 当前界面对象（`TitleState` / `MainMenuState` / `PlayState` …）；状态脚本里固定是自己的宿主，全局脚本里随界面切换刷新 |
 | `game` | PlayState 实例（非游玩界面为 null） |
-| `scripting` | 编程层 API（`scripting.ScriptingApi` 实例）：`openState` / `openSubState` / `closeSubState` / `backToMainMenu` / `center` / `centerAxes` / `log` / `logError` / `reloadGlobalScripts` / `reloadCurrentStateScripts`（完整清单见 `source/scripting/ScriptingApi.hx`）|
+| `scripting` | 编程层 API（`scripting.ScriptingApi` 实例）：`openState` / `openSubState` / `closeSubState` / `backToMainMenu` / `center` / `centerAxes` / `getPerfStats` / `setPerfOption` / `collectGarbage` / `log` / `logError` / `reloadGlobalScripts` / `reloadCurrentStateScripts`（完整清单见 `source/scripting/ScriptingApi.hx`）|
 | `data` | 仅脚本界面：打开界面时传入的数据（脚本界面里也有 `state.data`，两者同值）|
 
+- **脚本可以直接 `import` 引擎类**（SScript 4.0.1 没有 import 白名单，走 `Type.resolveClass`）：
+  ```haxe
+  import flixel.group.FlxTypedGroup;
+  import states.FreeplayState;
+  import objects.Character;
+  ```
+  ⚠ 被 `--dce full` 裁掉的类解析不到（`Type.resolveClass` 返回 null）—— 引擎内被 Haxe 引用过的类都在。
 - 多语言：`Lang`（整个类）、`tr(key[, args])`、`trOr(key, fallback)`、`getLanguage()`。
   模组脚本里推荐 `trOr(key, '自带的原文')` —— 玩家语言包没这个 key 时自动显示原文，不会露出裸 key。
 
@@ -162,6 +169,26 @@ release 构建开 `--dce full`：只被**脚本反射调用**、Haxe 侧没有�
 `Null Function Pointer`。所以脚本里要写 `scripting.center(sprite)`（Haxe 侧包装），
 不能写 `sprite.screenCenter()`。`scripting.centerAxes(sprite, axes)` 是带轴向的版本
 （flixel 5.x 的 `screenCenter` 收 `FlxAxes`，不是摄像机）。
+
+## 7.2 性能面（脚本读性能 / 改受控旋钮）
+
+```haxe
+var st = scripting.getPerfStats();
+trace(st.fps);        // 绘制帧率
+trace(st.rssMB);      // 进程常驻内存（MB；采样线程每 2s 问一次 OS，首次调用后约 2s 才有值）
+trace(st.visualFold); // 当前视觉折叠档
+
+scripting.setPerfOption('visualFold', 2);   // 0=关 1=75% 2=50% 3=25%（只影响视觉副本，不参与判定）
+scripting.setPerfOption('gcBreathing', true);// GC 呼吸阀：进曲设最低空余水位 + 每 20s 强制全量回收
+scripting.collectGarbage();                  // 立刻来一次全量 GC（约 20~80ms 顿挫）
+```
+
+- **旋钮白名单**（不在名单里的一律拒绝，返回 `false`）：
+  `gcBreathing`(bool) / `visualFold`(int 0..3) / `perfMode`(bool) / `runtimePack`(bool)。
+- 这 4 个在设置页（性能页 / 图像页）里都能看到，脚本改的就是用户改的那份值。
+- **降采样相关项刻意不开放**（`textureScale` / `characterTextureScale` / `backgroundScale`）——
+  脚本调它们一律返回 `false`。
+- 生效时机：`visualFold` 只影响之后生成的音符，`runtimePack` 只影响之后加载的贴图。
 
 ## 8. 热重载语义
 
