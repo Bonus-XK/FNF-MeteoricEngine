@@ -291,8 +291,8 @@ trace('fps=' + st.fps + ' rss=' + st.rssMB);
 - 脚本内不能定义 `class`（SScript EX 模式未开启），也**不支持 map 字面量** `{...}`
   （SScript 4.0.1 的限制，CNE 的 hscript-improved 才支持）—— 传数据用数组或 `__newMap()`。
 - 未在 Android / Windows 实机验证（只在本机 macOS 跑过）。
-- **脚本管理器 UI 层（列表显示 / → 打开脚本界面）未做实机截图验证** —— 数据源
-  （`Scripting.listInstalledScripts()`）已实机验证返回正确结果，但界面交互未人工走一遍。
+- 脚本管理器的**列表显示**已实机验证（全局 / 界面两类脚本都正确列出，类型标记、开关状态、
+  提示文案都对）；但 **→ 打开脚本界面**这一步未做实机按键验证（自动化按键没送达游戏窗口）。
 - REPL 目前只在**当前界面**生效：跨界面的变量（全局脚本里的 var）不在 REPL 的作用域内，
   REPL 的变量也只活在这一次 REPL 会话里（关掉即销毁）。
 - 本系统是 **Meteoric 自研**，与 Codename Engine 无关：既不兼容 CNE 格式的 mod，
