@@ -47,7 +47,7 @@ mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个�
 |---|---|
 | `state` | 当前界面对象（`TitleState` / `MainMenuState` / `PlayState` …）；状态脚本里固定是自己的宿主，全局脚本里随界面切换刷新 |
 | `game` | PlayState 实例（非游玩界面为 null） |
-| `scripting` | 编程层 API（`scripting.ScriptingApi` 实例）：`openState` / `openSubState` / `closeSubState` / `backToMainMenu` / `center` / `centerAxes` / `getPerfStats` / `setPerfOption` / `collectGarbage` / `log` / `logError` / `reloadGlobalScripts` / `reloadCurrentStateScripts`（完整清单见 `source/scripting/ScriptingApi.hx`）|
+| `scripting` | 编程层 API（`scripting.ScriptingApi` 实例）：`openState` / `openSubState` / `closeSubState` / `backToMainMenu` / `center` / `centerAxes` / `getPerfStats` / `setPerfOption` / `collectGarbage` / `openRepl` / `log` / `logError` / `reloadGlobalScripts` / `reloadCurrentStateScripts`（完整清单见 `source/scripting/ScriptingApi.hx`）|
 | `data` | 仅脚本界面：打开界面时传入的数据（脚本界面里也有 `state.data`，两者同值）|
 
 - **脚本可以直接 `import` 引擎类**（SScript 4.0.1 没有 import 白名单，走 `Type.resolveClass`）：
@@ -220,6 +220,67 @@ scripting.collectGarbage();                  // 立刻来一次全量 GC（约 2
   启动游戏必须走终端才能看到：`cd "…/Meteoric.app/Contents/MacOS" && ./Meteoric > /tmp/meteoric_debug.log 2>&1 &`。
 - 脚本解析失败不会影响引擎，只跳过这一个脚本并在终端报出首行错误。
 
+## 9.1 游戏内 REPL（F2）
+
+游戏内实时执行 HScript —— **改一行立刻生效，不用重开游戏、不用重开歌曲**。
+
+| 操作 | 效果 |
+|---|---|
+| **F2** | 打开 / 关闭 REPL |
+| 回车 | 执行当前输入 |
+| ↑ ↓ | 滚动输出区 |
+| ESC | 关闭 REPL |
+| 鼠标滚轮 | 滚动输出区 |
+
+- **总开关关闭时 F2 无效**（与本层其它能力一致）。
+- REPL 是**盖在当前界面上的覆盖层**，不是子状态：游戏照常运行，改一个变量立刻能看到效果。
+- 界面里能拿到的东西和脚本**完全一样**（同一套 preset + `state` / `game` / `scripting` / `data`），
+  所以「在脚本里能写的东西，在 REPL 里也能试」。
+- 输入框用引擎的 `objects.UIInputBox`（原生 TextField，系统输入法可用）。
+- REPL 打开期间会屏蔽游戏输入（打字不会被当成按键 —— 游玩时方向键 = 音符）。
+- 脚本也可以开 REPL：`scripting.openRepl()`。
+
+```haxe
+// 例子：改一个当前界面的属性
+state.alpha = 0.5;
+// 例子：看性能快照
+var st = scripting.getPerfStats();
+trace('fps=' + st.fps + ' rss=' + st.rssMB);
+```
+
+**变量跨行保留**：
+
+```
+> var x = 41
+> x + 1
+42
+```
+
+> 这一条是**特意实现**的：SScript 4.0.1 的 `Interp.execute()` 每次调用都会重建 locals 表，
+> 顶层 `var` 在语句块结束时还会被撤销 —— 直接用它做 REPL 只能当一次性沙盒。
+> 引擎改走 `Interp.exprReturn()` 并逐条执行顶层语句，locals 不重置，变量跨行可见。
+
+## 9.2 脚本管理器（暂停菜单 / 自由选歌）
+
+「设置 → 暂停」里的**脚本管理**，现在同时管三类脚本：
+
+| 类型 | 位置 | 标记 |
+|---|---|---|
+| 旧玩法脚本 | `mods/<mod>/scripts/*.lua` / `*.hx` | 无标记 |
+| 全局常驻脚本 | `mods/<mod>/scripting/global/*.hx` | `全局 ·` |
+| 状态脚本 | `mods/<mod>/scripting/states/*.hx` | `界面 ·` |
+
+| 操作 | 效果 |
+|---|---|
+| ↑ ↓ | 选择 |
+| 回车 | 开关脚本（关闭 = 文件名加 `.disabled` 后缀） |
+| **→** | 把选中的**状态脚本**作为脚本界面打开（`scripting.openState`） |
+| ESC | 返回 |
+
+- 列表里的脚本来自**与引擎同一份「已启用的 mod」列表**（`Scripting.listInstalledScripts()`），
+  所以列出来的就是引擎真的会加载的，不会「列了但不生效」。
+- `.disabled` 后缀的脚本也会列出（标成「关」）；引擎侧天然跳过它们（只认 `.hx` 结尾）。
+
 ## 10. 当前限制
 
 - **脚本写界面还缺引擎级控件**：脚本能加 `FlxSprite` / `FlxText` / `MenuText`，
@@ -230,6 +291,10 @@ scripting.collectGarbage();                  // 立刻来一次全量 GC（约 2
 - 脚本内不能定义 `class`（SScript EX 模式未开启），也**不支持 map 字面量** `{...}`
   （SScript 4.0.1 的限制，CNE 的 hscript-improved 才支持）—— 传数据用数组或 `__newMap()`。
 - 未在 Android / Windows 实机验证（只在本机 macOS 跑过）。
+- **脚本管理器 UI 层（列表显示 / → 打开脚本界面）未做实机截图验证** —— 数据源
+  （`Scripting.listInstalledScripts()`）已实机验证返回正确结果，但界面交互未人工走一遍。
+- REPL 目前只在**当前界面**生效：跨界面的变量（全局脚本里的 var）不在 REPL 的作用域内，
+  REPL 的变量也只活在这一次 REPL 会话里（关掉即销毁）。
 - 本系统是 **Meteoric 自研**，与 Codename Engine 无关：既不兼容 CNE 格式的 mod，
   也不使用 CNE 的脚本实现或目录约定（历史上那套已于 2026-10-05 移除，理由见
   `source/backend/CneModProbe.hx` 的类头注释）。
