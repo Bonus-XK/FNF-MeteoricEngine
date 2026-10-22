@@ -165,11 +165,22 @@ class Scripting
 
 		reloadGlobalScripts();
 
-		// F2 开关 REPL：放在 KEYDOWN 监听器里（与按键事件同步），避免 postUpdate 里
-		// checkStatus() 帧对齐竞态导致偶尔漏按。
+		// F2 开关 REPL / F5 热重载：挂在 KEYDOWN 监听器上（与按键事件同步）。
+		//
+		// ⚠ 为什么不用 postUpdate + checkStatus()：功能键（F2/F5…）的 justPressed 标志
+		// 在 postUpdate 阶段读不到 —— 实测按键事件确实到了（Flixel 侧 keyCode 正确），
+		// 但 postUpdate 时该标志已被上一帧的输入更新消费掉（帧对齐竞态），导致
+		// 「按了没反应」。改到 KEYDOWN 监听器里判断就稳定了。
+		// 修饰键状态用事件自带的 e.shiftKey，不用 FlxG.keys（此刻它还没更新）。
 		openfl.Lib.current.stage.addEventListener(openfl.events.KeyboardEvent.KEY_DOWN, function(e:openfl.events.KeyboardEvent)
 		{
-			if (e.keyCode == FlxKey.F2) checkReplToggle();
+			if (!isEnabled()) return;
+			if (e.keyCode == FlxKey.F2)
+			{
+				checkReplToggle();
+				return;
+			}
+			if (e.keyCode == FlxKey.F5) checkHotReload(e.shiftKey);
 		});
 
 		// 补装载当前界面的状态脚本：
@@ -389,12 +400,8 @@ class Scripting
 			globalGroup.call('postUpdate', [FlxG.elapsed]);
 		}
 
-		// 热重载放在 postUpdate：preUpdate 在 updateInput() **之前**派发，
-		// 那一刻 FlxG.keys 还是上一帧的陈旧值（见 source/flixel/FlxGame.hx 的 update 顺序）。
-		if (hotReloadEnabled()) checkHotReload();
-
-		// REPL 开关（F2）：同样放 postUpdate，理由同上。
-		checkReplToggle();
+		// 热重载（F5）与 REPL 开关（F2）都在 init() 里挂的 KEYDOWN 监听器里处理
+		// —— postUpdate 阶段读不到功能键的 justPressed 标志（帧对齐竞态）。
 	}
 
 	static function onPreStateSwitch():Void
@@ -502,15 +509,14 @@ class Scripting
 	 *
 	 * 重建是「先构建新组、成功才替换旧组」：构建失败保留旧组，
 	 * 避免一次写错文件就让整个界面的脚本消失。
+	 *
+	 * @param shift Shift+F5 = 重建全局脚本组（修饰键状态由 KEYDOWN 事件带入）。
 	 */
-	static function checkHotReload():Void
+	static function checkHotReload(shift:Bool = false):Void
 	{
-		if (FlxG.keys == null) return;
-		// REPL 打开时不处理 F5：那时用户可能在输入框里打字，F5 不该触发重建
-		if (repl != null) return;
-		if (!FlxG.keys.checkStatus(FlxKey.F5, FlxInputState.JUST_PRESSED)) return;
+		if (repl != null) return; // REPL 打开时不处理 F5（那时用户可能在输入框里打字）
 
-		if (FlxG.keys.checkStatus(FlxKey.SHIFT, FlxInputState.PRESSED))
+		if (shift)
 		{
 			reloadGlobalScripts();
 		}
