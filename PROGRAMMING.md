@@ -47,7 +47,8 @@ mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个�
 |---|---|
 | `state` | 当前界面对象（`TitleState` / `MainMenuState` / `PlayState` …）；状态脚本里固定是自己的宿主，全局脚本里随界面切换刷新 |
 | `game` | PlayState 实例（非游玩界面为 null） |
-| `scripting` | 编程层入口（静态类）：`scripting.reloadGlobalScripts()` / `scripting.reloadCurrentStateScripts()` / `scripting.log(msg)` |
+| `scripting` | 编程层 API（`scripting.ScriptingApi` 实例）：`openState` / `openSubState` / `closeSubState` / `backToMainMenu` / `center` / `centerAxes` / `log` / `logError` / `reloadGlobalScripts` / `reloadCurrentStateScripts`（完整清单见 `source/scripting/ScriptingApi.hx`）|
+| `data` | 仅脚本界面：打开界面时传入的数据（脚本界面里也有 `state.data`，两者同值）|
 
 - 多语言：`Lang`（整个类）、`tr(key[, args])`、`trOr(key, fallback)`、`getLanguage()`。
   模组脚本里推荐 `trOr(key, '自带的原文')` —— 玩家语言包没这个 key 时自动显示原文，不会露出裸 key。
@@ -119,7 +120,50 @@ function preStateSwitch() {
 - 解析不到 → 打日志并**保持原目标**（不改变引擎行为）。
 - 改写点：`FlxG.signals.preStateSwitch`（`FlxGame.switchState()` 在真正换 state 之前派发）。
 
-## 7. 热重载语义
+## 7. 脚本界面（用脚本写完整界面）
+
+除了「接管已有界面」（第 2 节的状态脚本），脚本还可以**自己写一个新界面**。
+
+```haxe
+// 在任意脚本里：
+scripting.openState('MyScreen');                  // 打开脚本界面
+scripting.openState('MyScreen', ['数据', 3]);      // 带数据（数组/任何 Dynamic）
+scripting.openSubState('MyPanel', ['数据']);       // 打开脚本子状态（盖在当前界面上）
+scripting.closeSubState();                        // 关闭当前子状态
+scripting.backToMainMenu();                       // 回主菜单
+```
+
+- 脚本文件位置：`mods/<mod>/scripting/states/MyScreen.hx`（与状态脚本同一目录约定）。
+- 脚本界面里能做什么：
+  - `state` —— 宿主（`ScriptState` / `ScriptSubState`）：`state.add(sprite)` 把控件加进界面；
+  - `state.data`（或直接用注入的 `data`）—— 打开时传入的数据；
+  - `create()` / `update(elapsed)` / `beatHit(beat)` / `stepHit(step)` / `destroy()` 回调；
+  - `MenuText` —— 引擎同款字体与描边的文本控件；`FlxSprite` / `FlxText` / `FlxCamera` 等照常可用；
+    主题色用 `DesignTokens.*`。
+- 生命周期：脚本的 `create()` 在界面初始化过程中执行（宿主 `create()` 末尾），
+  `destroy()` 在界面销毁 / F5 重建前执行 —— 脚本自己创建的对象要在 `destroy()` 里清理。
+- 界面跳转：`preStateSwitch` 里 return 界面名（见第 6 节）也能跳到脚本界面
+  （return 的是**脚本名**，不是类名）。
+
+## 7.1 写脚本必须知道的两个坑（引擎侧限制，不是脚本的错）
+
+**① 只被脚本调用的方法会被 release 构建裁掉**
+
+release 构建开 `--dce full`：只被**脚本反射调用**、Haxe 侧没有引用的方法会被裁掉，
+运行时反射拿到 null 方法引用 → 抛 `Null Function Pointer`（脚本表现为「这行一调就炸」）。
+
+- 本引擎的对策：脚本可见的 API 全部做成**实例方法**（`scripting.ScriptingApi`）并标 `@:keep`。
+  ⚠ `@:keep` 对 **static 方法无效**（实测：标了照样被裁），对实例方法有效。
+- 这条也解释了为什么 `scripting.log()` 一直好用：它同时被引擎侧调用，没被裁。
+
+**② Flixel 的 inline 方法不能被脚本直接调用**
+
+`FlxObject.screenCenter` 是 `inline` 方法，hxcpp 下没有真实函数体 → 反射调用同样抛
+`Null Function Pointer`。所以脚本里要写 `scripting.center(sprite)`（Haxe 侧包装），
+不能写 `sprite.screenCenter()`。`scripting.centerAxes(sprite, axes)` 是带轴向的版本
+（flixel 5.x 的 `screenCenter` 收 `FlxAxes`，不是摄像机）。
+
+## 8. 热重载语义
 
 - **F5**：原地重建**当前界面**的状态脚本组。
   - 旧脚本先收 `destroy()` 再释放实例，随后从磁盘重读并 `create()`。
@@ -151,11 +195,13 @@ function preStateSwitch() {
 
 ## 10. 当前限制
 
-- **脚本还不能自己写完整界面**（没有 `ModState` 那样的「脚本定义 State/SubState」机制）；
-  状态脚本目前是「接管已有界面」，不是「新增界面」。
+- **脚本写界面还缺引擎级控件**：脚本能加 `FlxSprite` / `FlxText` / `MenuText`，
+  但引擎自己的成套控件（`BackButton` 这类带主题/动效的组件）**没有暴露给脚本**，
+  脚本界面里的「返回按钮」得自己用 `FlxSprite` 拼。
 - 没有沙箱 / 权限分级：打开总开关即等于给了脚本完整引擎权限。
 - 脚本不能调 GC / 内存水位 / 加载管线 / 渲染批次这类**性能旋钮**（引擎内部硬编码）。
-- 脚本内不能定义 `class`（SScript EX 模式未开启）。
+- 脚本内不能定义 `class`（SScript EX 模式未开启），也**不支持 map 字面量** `{...}`
+  （SScript 4.0.1 的限制，CNE 的 hscript-improved 才支持）—— 传数据用数组或 `__newMap()`。
 - 未在 Android / Windows 实机验证（只在本机 macOS 跑过）。
 - 本系统是 **Meteoric 自研**，与 Codename Engine 无关：既不兼容 CNE 格式的 mod，
   也不使用 CNE 的脚本实现或目录约定（历史上那套已于 2026-10-05 移除，理由见

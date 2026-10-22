@@ -56,6 +56,9 @@ class Scripting
 	/** 是否已经注册过引擎信号（只注册一次）。 */
 	public static var initialized:Bool = false;
 
+	/** 注入给脚本的编程层 API 单例（实例方法，@:keep 防 DCE 裁掉）。 */
+	public static var api:ScriptingApi = ScriptingApi.getInstance();
+
 	/** 全局常驻脚本组（跨界面存活）。未开启时为 null。 */
 	public static var globalGroup:ScriptGroup = null;
 
@@ -65,30 +68,35 @@ class Scripting
 	// ==================== 开关 ====================
 
 	/** 总开关：编程层总闸。 */
+	@:keep
 	public static function isEnabled():Bool
 	{
 		return ClientPrefs.data != null && ClientPrefs.data.scriptingEnabled;
 	}
 
 	/** 全局常驻脚本。 */
+	@:keep
 	public static function globalScriptsEnabled():Bool
 	{
 		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingGlobalScripts;
 	}
 
 	/** 状态脚本（覆盖某个 State / SubState）。 */
+	@:keep
 	public static function stateScriptsEnabled():Bool
 	{
 		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingStateScripts;
 	}
 
 	/** 热重载（F5 / Shift+F5）。 */
+	@:keep
 	public static function hotReloadEnabled():Bool
 	{
 		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingHotReload;
 	}
 
 	/** 事件层（可取消事件）。 */
+	@:keep
 	public static function eventsEnabled():Bool
 	{
 		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingEvents;
@@ -100,6 +108,7 @@ class Scripting
 	 * 启动编程层：注册引擎级信号 + 装载全局脚本。
 	 * 由 TitleState.create 调用（此时存档已加载）。
 	 */
+	@:keep
 	public static function init():Void
 	{
 		if (initialized) return;
@@ -131,19 +140,21 @@ class Scripting
 	// ===== 状态脚本 =====
 
 	/** 状态创建：装载该 State 的状态脚本。 */
+	@:keep
 	public static function onStateCreate(state:MusicBeatState):Void
 	{
 		if (!stateScriptsEnabled()) return;
 		if (state == null) return;
 		if (state.scriptingGroup != null) return;
 
-		var group:ScriptGroup = buildStateGroup(state, stateNameOf(state));
+		var name:String = screenNameOf(state);
+		var group:ScriptGroup = buildStateGroup(state, name);
 		if (group != null && group.hasScripts())
 		{
 			state.scriptingGroup = group;
 			group.bindVars();
 			group.call('create');
-			log('状态脚本已装载：' + stateNameOf(state) + '（' + group.scripts.length + ' 个）');
+			log('状态脚本已装载：' + name + '（' + group.scripts.length + ' 个）');
 		}
 		else if (group != null)
 		{
@@ -152,19 +163,21 @@ class Scripting
 	}
 
 	/** 子状态创建：装载该 SubState 的状态脚本。 */
+	@:keep
 	public static function onSubStateCreate(state:MusicBeatSubstate):Void
 	{
 		if (!stateScriptsEnabled()) return;
 		if (state == null) return;
 		if (state.scriptingGroup != null) return;
 
-		var group:ScriptGroup = buildStateGroup(state, stateNameOf(state));
+		var name:String = screenNameOf(state);
+		var group:ScriptGroup = buildStateGroup(state, name);
 		if (group != null && group.hasScripts())
 		{
 			state.scriptingGroup = group;
 			group.bindVars();
 			group.call('create');
-			log('子状态脚本已装载：' + stateNameOf(state) + '（' + group.scripts.length + ' 个）');
+			log('子状态脚本已装载：' + name + '（' + group.scripts.length + ' 个）');
 		}
 		else if (group != null)
 		{
@@ -172,7 +185,87 @@ class Scripting
 		}
 	}
 
+	// ==================== 脚本界面 ====================
+
+	/**
+	 * 打开一个**脚本界面**：整个界面由 `scripting/states/<脚本名>.hx` 写出来。
+	 *
+	 * @param scriptName 脚本名（不含扩展名）。
+	 * @param data 传给界面的数据（脚本里通过 `state.data` 读）。
+	 */
+	@:keep
+	public static function openState(scriptName:String, ?data:Dynamic):Void
+	{
+		if (!stateScriptsEnabled())
+		{
+			logError('无法打开脚本界面：脚本系统或状态脚本开关未开启');
+			return;
+		}
+		if (scriptName == null || scriptName.length == 0) return;
+		log('打开脚本界面：' + scriptName);
+		var screen:ScriptState = new ScriptState(scriptName, data);
+		log('  脚本界面实例已创建');
+		MusicBeatState.switchState(screen);
+		log('  已请求切换到脚本界面');
+	}
+
+	/**
+	 * 打开一个**脚本子状态**：盖在当前界面上，由 `scripting/states/<脚本名>.hx` 写出来。
+	 *
+	 * @return true = 已请求打开。
+	 */
+	@:keep
+	public static function openSubState(scriptName:String, ?data:Dynamic):Bool
+	{
+		if (!stateScriptsEnabled())
+		{
+			logError('无法打开脚本子状态：脚本系统或状态脚本开关未开启');
+			return false;
+		}
+		if (scriptName == null || scriptName.length == 0) return false;
+		var host = FlxG.state;
+		if (host == null) return false;
+		log('打开脚本子状态：' + scriptName);
+		host.openSubState(new ScriptSubState(scriptName, data));
+		return true;
+	}
+
+	/** 关闭当前界面的子状态（脚本界面里做「返回」用）。 */
+	@:keep
+	public static function closeSubState():Void
+	{
+		var host = FlxG.state;
+		if (host == null) return;
+		host.closeSubState();
+	}
+
+	/**
+	 * 回到主菜单（脚本界面里做「返回」用）。
+	 *
+	 * 引擎主菜单类不存在时只打日志、不改变当前界面。
+	 */
+	@:keep
+	public static function backToMainMenu():Void
+	{
+		var cls:Dynamic = Type.resolveClass('states.MainMenuState');
+		if (cls == null)
+		{
+			logError('无法回到主菜单：找不到 states.MainMainState');
+			return;
+		}
+		try
+		{
+			MusicBeatState.switchState(cast Type.createInstance(cls, []));
+			log('已回到主菜单');
+		}
+		catch (e:Dynamic)
+		{
+			logError('回到主菜单失败：' + Std.string(e));
+		}
+	}
+
 	/** 状态每帧更新。 */
+	@:keep
 	public static function onStateUpdate(state:MusicBeatState, elapsed:Float):Void
 	{
 		if (!stateScriptsEnabled()) return;
@@ -181,6 +274,7 @@ class Scripting
 	}
 
 	/** 子状态每帧更新。 */
+	@:keep
 	public static function onSubStateUpdate(state:MusicBeatSubstate, elapsed:Float):Void
 	{
 		if (!stateScriptsEnabled()) return;
@@ -189,6 +283,7 @@ class Scripting
 	}
 
 	/** 状态销毁：脚本收 destroy 回调。 */
+	@:keep
 	public static function onStateDestroy(state:MusicBeatState):Void
 	{
 		if (state == null || state.scriptingGroup == null) return;
@@ -197,6 +292,7 @@ class Scripting
 	}
 
 	/** 子状态销毁：脚本收 destroy 回调。 */
+	@:keep
 	public static function onSubStateDestroy(state:MusicBeatSubstate):Void
 	{
 		if (state == null || state.scriptingGroup == null) return;
@@ -205,6 +301,7 @@ class Scripting
 	}
 
 	/** 步进（全局脚本 + 状态脚本都收 stepHit）。 */
+	@:keep
 	public static function onStepHit(step:Int):Void
 	{
 		if (!isEnabled()) return;
@@ -214,6 +311,7 @@ class Scripting
 	}
 
 	/** 节拍（全局脚本 + 状态脚本都收 beatHit）。 */
+	@:keep
 	public static function onBeatHit(beat:Int):Void
 	{
 		if (!isEnabled()) return;
@@ -372,6 +470,7 @@ class Scripting
 	}
 
 	/** 重建全局脚本组。 */
+	@:keep
 	public static function reloadGlobalScripts():Void
 	{
 		if (!globalScriptsEnabled()) return;
@@ -395,6 +494,7 @@ class Scripting
 	}
 
 	/** 重建当前界面的状态脚本组。 */
+	@:keep
 	public static function reloadCurrentStateScripts():Void
 	{
 		if (!stateScriptsEnabled()) return;
@@ -406,7 +506,7 @@ class Scripting
 			return;
 		}
 
-		var next:ScriptGroup = buildStateGroup(state, stateNameOf(state));
+		var next:ScriptGroup = buildStateGroup(state, screenNameOf(state));
 		if (next == null || !next.hasScripts())
 		{
 			if (next != null) next.destroy();
@@ -419,7 +519,7 @@ class Scripting
 		next.bindVars();
 		next.call('create');
 		if (old != null) old.destroy();
-		log('状态脚本已重载：' + stateNameOf(state));
+		log('状态脚本已重载：' + screenNameOf(state));
 	}
 
 	// ==================== 事件层 ====================
@@ -429,6 +529,7 @@ class Scripting
 	 *
 	 * @return true = 事件被某个脚本取消（引擎应跳过默认行为）；false = 未取消。
 	 */
+	@:keep
 	public static function dispatch(eventName:String, event:ScriptEvent):Bool
 	{
 		if (!eventsEnabled()) return false;
@@ -453,7 +554,7 @@ class Scripting
 			{
 				var result = script.call(eventName, [event]);
 				if (result != null && !result.succeeded && result.exceptions != null && result.exceptions.length > 0)
-					logError(eventName + ' 出错：' + ScriptGroup.firstLine(result.exceptions[0]));
+					logError(eventName + ' 出错：\n' + ScriptGroup.fullDetails(result.exceptions[0]));
 			}
 			catch (e:Dynamic)
 			{
@@ -530,15 +631,37 @@ class Scripting
 		return short;
 	}
 
+	/**
+	 * 界面对应的**脚本名**：
+	 *  - 脚本界面（`IScriptScreen`）用作者自己起的脚本名；
+	 *  - 引擎内建界面用类名短名（`MainMenuState` → `MainMenuState`）。
+	 */
+	static function screenNameOf(host:Dynamic):String
+	{
+		if (host != null && Std.isOfType(host, IScriptScreen))
+		{
+			// 字段用 Reflect 读（接口不带字段，理由见 IScriptScreen 的注释）
+			var name:Dynamic = Reflect.field(host, 'scriptName');
+			if (name != null)
+			{
+				var s:String = Std.string(name);
+				if (s.length > 0) return s;
+			}
+		}
+		return stateNameOf(host);
+	}
+
 	// ==================== 日志 ====================
 
 	/** 普通日志（终端可见）。 */
+	@:keep
 	public static function log(msg:String):Void
 	{
 		Sys.println('[Scripting] ' + msg);
 	}
 
 	/** 错误日志（终端可见）。 */
+	@:keep
 	public static function logError(msg:String):Void
 	{
 		Sys.println('[Scripting][错误] ' + msg);

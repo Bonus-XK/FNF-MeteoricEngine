@@ -194,6 +194,8 @@ class HScript extends SScript
 		set('BGSprite', objects.BGSprite);
 		set('AttachedSprite', objects.AttachedSprite);
 		set('Alphabet', objects.Alphabet);
+		// 脚本写界面用：引擎同款字体/描边的文本控件（MenuText 自带 future.ttf 与描边样式）
+		set('MenuText', objects.MenuText);
 		set('FlxGradient', flixel.util.FlxGradient);
 		set('Mods', backend.Mods);
 		set('MusicBeatState', backend.MusicBeatState);

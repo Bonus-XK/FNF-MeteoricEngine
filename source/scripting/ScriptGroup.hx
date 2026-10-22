@@ -79,7 +79,7 @@ class ScriptGroup
 			{
 				var result = script.call(func, args);
 				if (result != null && !result.succeeded && result.exceptions != null && result.exceptions.length > 0)
-					Scripting.logError('$func 出错 @ ' + scriptPath(script) + '：' + firstLine(result.exceptions[0]));
+					Scripting.logError('$func 出错 @ ' + scriptPath(script) + '：\n' + fullDetails(result.exceptions[0]));
 			}
 			catch (e:Dynamic)
 			{
@@ -129,7 +129,7 @@ class ScriptGroup
 		for (p in oldPaths) addPath(p);
 	}
 
-	/** 刷新每个脚本的宿主变量（`state` / `game` / `scripting`）。 */
+	/** 刷新每个脚本的宿主变量（`state` / `game` / `scripting`，脚本界面另有 `data`）。 */
 	public function bindVars():Void
 	{
 		for (script in scripts)
@@ -137,7 +137,12 @@ class ScriptGroup
 			if (script == null || !script.active) continue;
 			script.set('state', parent != null ? parent : FlxG.state);
 			script.set('game', PlayState.instance);
-			script.set('scripting', Scripting);
+			script.set('scripting', Scripting.api);
+			// 脚本界面：把打开时传入的数据也注入脚本（脚本里可直接用 `data`）
+			if (parent != null && Std.isOfType(parent, IScriptScreen))
+			{
+				script.set('data', Reflect.field(parent, 'data'));
+			}
 		}
 	}
 
@@ -251,5 +256,18 @@ class ScriptGroup
 		var msg:String = e.message != null ? e.message : Std.string(e);
 		var idx:Int = msg.indexOf('\n');
 		return idx > 0 ? msg.substr(0, idx) : msg;
+	}
+
+	/** 异常的完整信息（首行 + 堆栈）—— 排查脚本问题要用它，首行往往不够。 */
+	public static function fullDetails(e:haxe.Exception):String
+	{
+		if (e == null) return '(未知错误)';
+		try
+		{
+			var d:String = e.details();
+			if (d != null && d.length > 0) return d;
+		}
+		catch (ex:Dynamic) {}
+		return firstLine(e);
 	}
 }
