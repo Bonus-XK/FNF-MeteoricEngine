@@ -8,6 +8,9 @@ import flixel.math.FlxPoint;
 import flixel.math.FlxRect;
 import flixel.util.FlxSpriteUtil;
 import haxe.io.Path;
+#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+import scripting.Scripting;
+#end
 #if sys
 import sys.FileSystem;
 #end
@@ -18,6 +21,8 @@ typedef ScriptEntry =
 	var file:String; // 实际文件名（关闭时带 .disabled 后缀）
 	var display:String; // 显示名（去掉 .disabled）
 	var enabled:Bool;
+	var kind:Int; // 0 = 旧玩法脚本，1 = 全局脚本，2 = 状态脚本
+	var scriptName:String; // 状态脚本的界面名（可作为脚本界面打开）；其它为空
 }
 
 class ScriptManagerSubstate extends MusicBeatSubstate
@@ -129,7 +134,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		add(backBtn.spr);
 		add(backBtn.label);
 
-		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, Lang.tOr('scriptManager.hint', '↑ ↓ 选择 · 回车 开关脚本（含当前谱面脚本，关闭后加 .disabled 后缀，重启歌曲生效）· ESC 返回'), 18);
+		var hintText:FlxText = new FlxText(0, HINT_Y, FlxG.width, Lang.tOr('scriptManager.hint', '↑ ↓ 选择 · 回车 开关脚本（关闭后加 .disabled 后缀）· → 打开界面脚本 · ESC 返回'), 18);
 		hintText.scrollFactor.set();
 		hintText.setFormat(Paths.font('future.ttf'), 18, 0xFFA9A9B8, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hintText.borderSize = 1.5;
@@ -138,17 +143,45 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 		loadScripts();
 		refreshList();
+
 		FlxG.mouse.visible = true;
 	}
 
 	// 扫描所有脚本目录（与引擎加载顺序一致）：assets/scripts、全局 mod、mods/scripts、当前 mod，
 	// 以及当前曲目的谱面根目录 data/<songName>/（与 PlayState 加载歌曲脚本一致）
+	// 另外扫描**新脚本系统**的目录（scripting/global、scripting/states）——
+	// 列表与引擎实际加载的 mod 列表同源（Scripting.listInstalledScripts）。
 	function loadScripts():Void
 	{
 		scriptList = [];
 		#if sys
 		var folders:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/');
-		addScriptsFromFolders(folders);
+		addScriptsFromFolders(folders, 0);
+
+		// 新脚本系统：全局常驻脚本 + 状态脚本
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		for (f in Scripting.listInstalledScripts())
+		{
+			var lower2:String = f.file.toLowerCase();
+			var enabled2:Bool = true;
+			var base2:String = f.file;
+			if (lower2.endsWith('.disabled'))
+			{
+				enabled2 = false;
+				base2 = f.file.substr(0, f.file.length - '.disabled'.length);
+				lower2 = base2.toLowerCase();
+			}
+			if (!lower2.endsWith('.hx')) continue;
+			scriptList.push({
+				folder: f.folder,
+				file: f.file,
+				display: base2,
+				enabled: enabled2,
+				kind: f.kind,
+				scriptName: f.scriptName
+			});
+		}
+		#end
 
 		var songName:Null<String> = null;
 		if (songContext != null && songContext.length > 0)
@@ -159,12 +192,12 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		if (songName != null)
 		{
 			folders = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/');
-			addScriptsFromFolders(folders);
+			addScriptsFromFolders(folders, 0);
 		}
 		#end
 	}
 
-	function addScriptsFromFolders(folders:Array<String>):Void
+	function addScriptsFromFolders(folders:Array<String>, kind:Int):Void
 	{
 		#if sys
 		for (folder in folders)
@@ -193,7 +226,14 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 				if (!lower.endsWith('.lua') && !lower.endsWith('.hx')) continue;
 
 				// 只显示文件名，不显示文件夹前缀
-				scriptList.push({folder: folder, file: file, display: base, enabled: enabled});
+				scriptList.push({
+					folder: folder,
+					file: file,
+					display: base,
+					enabled: enabled,
+					kind: kind,
+					scriptName: null
+				});
 			}
 		}
 		#end
@@ -230,7 +270,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 				var lbl:FlxText = grpLabels[i];
 				lbl.visible = true;
-				lbl.text = entry.display; // autoSize 下 OpenFL 自动按文字宽度生成位图，完整绘制
+				lbl.text = kindPrefix(entry.kind) + entry.display; // autoSize 下 OpenFL 自动按文字宽度生成位图，完整绘制
 				lbl.color = (idx == curSelected) ? FlxColor.WHITE : (entry.enabled ? 0xFF9A9AA8 : 0xFF666677);
 
 				grpValues[i].visible = true;
@@ -246,6 +286,21 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 		if (emptyText != null)
 			emptyText.visible = (scriptList.length == 0);
+	}
+
+	/** 类型标记前缀：让玩家一眼分出「玩法脚本 / 全局脚本 / 界面脚本」。 */
+	function kindPrefix(kind:Int):String
+	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		return switch (kind)
+		{
+			case Scripting.KIND_GLOBAL: return Lang.tOr('scriptManager.kindGlobal', '全局 ') + '· ';
+			case Scripting.KIND_STATE: return Lang.tOr('scriptManager.kindState', '界面 ') + '· ';
+			default: return '';
+		}
+		#else
+		return '';
+		#end
 	}
 
 	function changeSelection(change:Int):Void
@@ -400,6 +455,27 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 		if (nextAccept <= 0 && controls.ACCEPT)
 			toggleSelected();
 		if (nextAccept > 0) nextAccept -= 1;
+
+		// → 打开选中的状态脚本（作为脚本界面启动）
+		if (controls.UI_RIGHT_P) openSelectedScriptState();
+	}
+
+	/**
+	 * 把选中的**状态脚本**作为脚本界面打开（`scripting.openState`）。
+	 * 非状态脚本 / 没选中 → 什么都不做。
+	 */
+	function openSelectedScriptState():Void
+	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		if (scriptList.length == 0) return;
+		var entry:ScriptEntry = scriptList[curSelected];
+		if (entry.kind != Scripting.KIND_STATE) return;
+		if (entry.scriptName == null || entry.scriptName.length == 0) return;
+		if (!entry.enabled) return;
+		FlxG.sound.play(Paths.sound('confirmMenu'), 0.5);
+		close();
+		Scripting.openState(entry.scriptName);
+		#end
 	}
 
 	#if mobile

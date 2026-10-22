@@ -87,6 +87,7 @@ class Controls
 	public var gamepadBinds:Map<String, Array<FlxGamepadInputID>>;
 	public function justPressed(key:String)
 	{
+		if (inputBlocked) return false;
 		var result:Bool = (FlxG.keys.anyJustPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
@@ -108,6 +109,7 @@ class Controls
 
 	public function pressed(key:String)
 	{
+		if (inputBlocked) return false;
 		var result:Bool = (FlxG.keys.anyPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
@@ -124,6 +126,7 @@ class Controls
 
 	public function justReleased(key:String)
 	{
+		if (inputBlocked) return false;
 		var result:Bool = (FlxG.keys.anyJustReleased(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
@@ -195,6 +198,18 @@ class Controls
 
 	// IGNORE THESE
 	public static var instance:Controls;
+
+	/**
+	 * 全局输入阻断：置 true 后 `justPressed` / `pressed` / `justReleased` 一律返回 false。
+	 *
+	 * 用法：游戏内文本输入层（脚本 REPL）拿到系统焦点时，Flixel 仍会收到键盘事件 ——
+	 * 游戏会把「打字」当成按键操作（游玩里方向键 = 音符）。打开这类输入层时置 true，
+	 * 关掉时必须**复位**（副作用成对）。
+	 *
+	 * 默认 false = 引擎行为与没有这个开关时完全一致。
+	 */
+	public static var inputBlocked:Bool = false;
+
 	public function new()
 	{
 		keyboardBinds = ClientPrefs.keyBinds;

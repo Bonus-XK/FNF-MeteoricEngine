@@ -148,6 +148,18 @@ class ScriptingApi
 
 	// ===== 调试 =====
 
+	/**
+	 * 打开游戏内 HScript REPL（等同按 F2）。
+	 *
+	 * REPL 是盖在当前界面上的覆盖层，游戏照常运行 —— 脚本可以在这里改玩法 / 界面 / 性能。
+	 * @return true = 已打开。
+	 */
+	@:keep
+	public function openRepl():Bool
+	{
+		return Scripting.openRepl();
+	}
+
 	/** 打一条日志到终端（前缀 `[Scripting]`）。 */
 	@:keep
 	public function log(msg:String):Void

@@ -866,20 +866,28 @@ source/scripting/ScriptGroup.hx	脚本内容为空 @ 	1	Meteoric 脚本层的诊
 source/scripting/ScriptGroup.hx	解析失败 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	：	9	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/ScriptGroup.hx	：\\n	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/ScriptRepl.hx	  ·  	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/scripting/ScriptRepl.hx	…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/scripting/ScriptRepl.hx	：	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/Scripting.hx	  已请求切换到脚本界面	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	  脚本界面实例已创建	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	 个）	3	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	 出错：\\n	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/Scripting.hx	 抛出异常：	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	REPL 已关闭	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/Scripting.hx	REPL 已打开	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	[Scripting][错误] 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	全局脚本已重载（	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	全局脚本重载：无脚本，保留旧组	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	回到主菜单失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	子状态脚本已装载：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	已回到主菜单	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/Scripting.hx	打开 REPL 失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	打开脚本子状态：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	打开脚本界面：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	无法回到主菜单：找不到 states.MainMainState	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	无法打开 REPL：当前没有界面	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	无法打开 REPL：脚本系统总开关未开启	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/Scripting.hx	无法打开脚本子状态：脚本系统或状态脚本开关未开启	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	无法打开脚本界面：脚本系统或状态脚本开关未开启	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/Scripting.hx	状态脚本已装载：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
@@ -941,4 +949,5 @@ source/substates/ReplaySubState.hx	   ·   	1	分隔符/标点片段（连接已
 source/substates/ReplaySubState.hx	%   ·   	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ResultsSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/substates/ScriptManagerSubstate.hx	· 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）

@@ -9,6 +9,28 @@ import flixel.input.keyboard.FlxKey;
 import psychlua.HScript;
 import sys.FileSystem;
 
+/** 脚本日志条目（脚本管理器与 REPL 共用）。 */
+typedef ScriptLogLine =
+{
+	/** 日志正文。 */
+	var text:String;
+	/** true = 错误日志。 */
+	var isError:Bool;
+}
+
+/** 脚本系统里已安装的一个脚本文件。 */
+typedef ScriptingScriptFile =
+{
+	/** 所在目录（以 / 结尾）。 */
+	var folder:String;
+	/** 文件名（关闭时带 .disabled 后缀）。 */
+	var file:String;
+	/** 类型：{@link Scripting.KIND_GLOBAL} 或 {@link Scripting.KIND_STATE}。 */
+	var kind:Int;
+	/** 状态脚本的界面名（= 文件名去扩展名）；全局脚本为 null。 */
+	var scriptName:String;
+}
+
 #if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
 /**
  * Meteoric 脚本系统（编程层）总入口。
@@ -61,6 +83,21 @@ class Scripting
 
 	/** 全局常驻脚本组（跨界面存活）。未开启时为 null。 */
 	public static var globalGroup:ScriptGroup = null;
+
+	/** 当前打开的 REPL 覆盖层（没有时为 null）。 */
+	public static var repl:ScriptRepl = null;
+
+	/** 脚本日志缓冲（供脚本管理器显示）。上限 {@link LOG_MAX} 条。 */
+	public static var logLines:Array<ScriptLogLine> = [];
+
+	/** 日志缓冲上限（超出丢最旧的）。 */
+	public static inline var LOG_MAX:Int = 200;
+
+	/** 脚本类型：全局常驻脚本。 */
+	public static inline var KIND_GLOBAL:Int = 1;
+
+	/** 脚本类型：状态脚本（接管某个界面 / 可作为脚本界面打开）。 */
+	public static inline var KIND_STATE:Int = 2;
 
 	/** 上一次绑定宿主变量时的 State（变了才重绑，避免每帧写变量表）。 */
 	static var lastBoundState:Dynamic = null;
@@ -127,6 +164,13 @@ class Scripting
 		FlxG.signals.postGameStart.add(onPostGameStart);
 
 		reloadGlobalScripts();
+
+		// F2 开关 REPL：放在 KEYDOWN 监听器里（与按键事件同步），避免 postUpdate 里
+		// checkStatus() 帧对齐竞态导致偶尔漏按。
+		openfl.Lib.current.stage.addEventListener(openfl.events.KeyboardEvent.KEY_DOWN, function(e:openfl.events.KeyboardEvent)
+		{
+			if (e.keyCode == FlxKey.F2) checkReplToggle();
+		});
 
 		// 补装载当前界面的状态脚本：
 		// MusicBeatState.create() 里已经调过一次 onStateCreate，但那一刻存档还没加载
@@ -348,6 +392,9 @@ class Scripting
 		// 热重载放在 postUpdate：preUpdate 在 updateInput() **之前**派发，
 		// 那一刻 FlxG.keys 还是上一帧的陈旧值（见 source/flixel/FlxGame.hx 的 update 顺序）。
 		if (hotReloadEnabled()) checkHotReload();
+
+		// REPL 开关（F2）：同样放 postUpdate，理由同上。
+		checkReplToggle();
 	}
 
 	static function onPreStateSwitch():Void
@@ -400,6 +447,8 @@ class Scripting
 
 	static function onPostStateSwitch():Void
 	{
+		// REPL 覆盖层挂在旧界面上，界面一换就被连带销毁 → 这里显式收摊（并复位输入阻断）
+		if (repl != null) closeRepl();
 		if (!isEnabled() || globalGroup == null) return;
 		globalGroup.call('postStateSwitch', []);
 	}
@@ -457,6 +506,8 @@ class Scripting
 	static function checkHotReload():Void
 	{
 		if (FlxG.keys == null) return;
+		// REPL 打开时不处理 F5：那时用户可能在输入框里打字，F5 不该触发重建
+		if (repl != null) return;
 		if (!FlxG.keys.checkStatus(FlxKey.F5, FlxInputState.JUST_PRESSED)) return;
 
 		if (FlxG.keys.checkStatus(FlxKey.SHIFT, FlxInputState.PRESSED))
@@ -522,6 +573,73 @@ class Scripting
 		log('状态脚本已重载：' + screenNameOf(state));
 	}
 
+	// ==================== REPL ====================
+
+	/**
+	 * 打开游戏内 HScript REPL（F2）。
+	 *
+	 * REPL 是盖在当前界面上的覆盖层：游戏照常跑，改一个变量立刻能看到效果。
+	 * 总开关关闭时拒绝打开（与本层其它能力一致）。
+	 *
+	 * @return true = 已打开（此前已打开也算）。
+	 */
+	@:keep
+	public static function openRepl():Bool
+	{
+		if (!isEnabled())
+		{
+			logError('无法打开 REPL：脚本系统总开关未开启');
+			return false;
+		}
+		if (repl != null) return true;
+		var host = FlxG.state;
+		if (host == null)
+		{
+			logError('无法打开 REPL：当前没有界面');
+			return false;
+		}
+		try
+		{
+			var overlay:ScriptRepl = new ScriptRepl();
+			host.add(overlay);
+			repl = overlay;
+			// 文本输入层拿到系统焦点期间，游戏不能再吃键盘输入（否则打字=按键）
+			Controls.inputBlocked = true;
+			log('REPL 已打开');
+			return true;
+		}
+		catch (e:Dynamic)
+		{
+			logError('打开 REPL 失败：' + Std.string(e));
+			return false;
+		}
+	}
+
+	/** 关闭 REPL（没有打开时什么都不做）。 */
+	@:keep
+	public static function closeRepl():Void
+	{
+		if (repl == null) return;
+		var overlay:ScriptRepl = repl;
+		repl = null;
+		Controls.inputBlocked = false;
+		// 从宿主界面摘掉再销毁（留在父组里会变成一个死成员）
+		var host = FlxG.state;
+		if (host != null) host.remove(overlay);
+		overlay.destroy();
+		log('REPL 已关闭');
+	}
+
+	/** F2 开关 REPL。 */
+	static function checkReplToggle():Void
+	{
+		if (!isEnabled()) return;
+		if (FlxG.keys == null) return;
+		if (!FlxG.keys.checkStatus(FlxKey.F2, FlxInputState.JUST_PRESSED)) return;
+		if (repl != null) closeRepl();
+		else openRepl();
+	}
+
 	// ==================== 事件层 ====================
 
 	/**
@@ -564,6 +682,71 @@ class Scripting
 	}
 
 	// ==================== 构建 ====================
+
+	/**
+	 * 列出**已启用的 mod** 里安装的脚本文件（`scripting/global/` 与 `scripting/states/`）。
+	 *
+	 * 与引擎加载逻辑同源（都用 {@link activeMods()} 的启用列表），所以这里列出来的
+	 * 就是引擎真的会加载的那些文件 —— 脚本管理器据此显示，避免「列了但不生效」。
+	 *
+	 * 关闭的脚本（文件名带 `.disabled` 后缀）**也会列出**，由调用方自己判断启用状态。
+	 */
+	@:keep
+	public static function listInstalledScripts():Array<ScriptingScriptFile>
+	{
+		var out:Array<ScriptingScriptFile> = [];
+		#if sys
+		for (mod in activeMods())
+		{
+			var gdir:String = Paths.mods(mod + '/scripting/global');
+			for (f in sortedFiles(gdir))
+			{
+				out.push({folder: gdir, file: f, kind: KIND_GLOBAL, scriptName: null});
+			}
+			var sdir:String = Paths.mods(mod + '/scripting/states');
+			for (f in sortedFiles(sdir))
+			{
+				out.push({
+					folder: sdir,
+					file: f,
+					kind: KIND_STATE,
+					scriptName: stateScriptName(f)
+				});
+			}
+		}
+		#end
+		return out;
+	}
+
+	/** 目录下的文件名（按小写排序）；目录不存在或读不到返回空数组。 */
+	static function sortedFiles(dir:String):Array<String>
+	{
+		var files:Array<String> = null;
+		#if sys
+		try
+		{
+			if (!FileSystem.exists(dir) || !FileSystem.isDirectory(dir)) return [];
+			files = FileSystem.readDirectory(dir);
+		}
+		catch (e:Dynamic)
+		{
+			files = [];
+		}
+		#end
+		if (files == null) return [];
+		files.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
+		return files;
+	}
+
+	/** 状态脚本的界面名：`MainMenuState.hx` → `MainMenuState`（去掉 .disabled 与 .hx）。 */
+	static function stateScriptName(file:String):String
+	{
+		if (file == null) return null;
+		var name:String = file;
+		if (name.toLowerCase().endsWith('.disabled')) name = name.substr(0, name.length - '.disabled'.length);
+		if (name.toLowerCase().endsWith('.hx')) name = name.substr(0, name.length - '.hx'.length);
+		return name;
+	}
 
 	/** 构建全局脚本组：各启用 mod 的 `scripting/global/` 目录下的 .hx。 */
 	static function buildGlobalGroup():ScriptGroup
@@ -657,6 +840,7 @@ class Scripting
 	@:keep
 	public static function log(msg:String):Void
 	{
+		pushLog(msg, false);
 		Sys.println('[Scripting] ' + msg);
 	}
 
@@ -664,7 +848,21 @@ class Scripting
 	@:keep
 	public static function logError(msg:String):Void
 	{
+		pushLog(msg, true);
 		Sys.println('[Scripting][错误] ' + msg);
+	}
+
+	/**
+	 * 写一条脚本日志（进日志缓冲，脚本管理器里能看到）。
+	 *
+	 * 缓冲只留最近 {@link LOG_MAX} 条，超出丢最旧的 —— 长时间运行不会把内存吃光。
+	 */
+	@:keep
+	public static function pushLog(msg:String, isError:Bool = false):Void
+	{
+		if (msg == null) return;
+		logLines.push({text: msg, isError: isError});
+		while (logLines.length > LOG_MAX) logLines.shift();
 	}
 }
 #end
