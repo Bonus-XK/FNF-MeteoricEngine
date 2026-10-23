@@ -10,8 +10,8 @@ package backend;
  */
 class GitInfoData
 {
-	public static var commitNumber:Int = 143;
-	public static var commitHash:String = "bc95da4";
+	public static var commitNumber:Int = 144;
+	public static var commitHash:String = "6e53b34";
 	public static var branchName:String = "master";
 	public static var dirty:Bool = true;
 }

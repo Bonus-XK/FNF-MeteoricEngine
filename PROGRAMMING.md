@@ -317,6 +317,15 @@ trace('fps=' + st.fps + ' rss=' + st.rssMB);
 - 脚本不能调 GC / 内存水位 / 加载管线 / 渲染批次这类**性能旋钮**（引擎内部硬编码）。
 - 脚本内不能定义 `class`（SScript EX 模式未开启），也**不支持 map 字面量** `{...}`
   （SScript 4.0.1 的限制，CNE 的 hscript-improved 才支持）—— 传数据用数组或 `__newMap()`。
+- **mod 内 `source/` 的 Haxe `class` 不能直接 `import`**：普通解释器只在解析期解析
+  **已编译进引擎**的类（SScript `hscriptBase/Parser.hx` 的 `Type.resolveClass`），
+  `mods/<mod>/source/.../*.hx` 不在编译产物里；EX 模式（`classSupport=true`）又只允许
+  `class` / `package` / `import`，不能与普通脚本语句混用，普通解释器的 `new` 也走
+  `Type.createInstance`（`hscriptBase/Interp.hx`），无法实例化 EX 脚本类。
+  - 共享逻辑请写成**脚本库**（`scripting/libs/` + `importScript`，见 §2.1）；
+  - 强类型 / 高性能工具类请编译进引擎（`source/`）后在脚本里 `import`；
+  - 运行期加载 mod 类需要改 SScript 的 `Interp.cnew` / EX 桥接层
+    （「爆改 lib」，有维护成本，需单独立项评估）。
 - 未在 Android / Windows 实机验证（只在本机 macOS 跑过）。
 - 脚本管理器的**列表显示**已实机验证（全局 / 界面两类脚本都正确列出，类型标记、开关状态、
   提示文案都对）；但 **→ 打开脚本界面**这一步未做实机按键验证（自动化按键没送达游戏窗口）。
