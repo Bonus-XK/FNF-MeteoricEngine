@@ -727,7 +727,7 @@ class HostDomain
 	}
 
 	/** 原 PlayState.initHScript（作用域分析：零遮蔽，15 处成员引用已限定）。 */
-	public static function initHScript(ps:PlayState, file:String)
+	public static function initHScript(ps:PlayState, file:String, ?extraVars:Map<String, Dynamic>)
 	{
 		// 回放模式不加载 HScript（与 Lua 同理：避免脚本修改箭头显示影响回放）
 		if (ps.replayMode) return;
@@ -758,6 +758,12 @@ class HostDomain
 			// 兼容 66mod 舞台脚本（home.hx 等直接访问 camFollow/camHUD）
 			newScript.set('camFollow', ps.camFollow);
 			newScript.set('camHUD', ps.camHUD);
+			// 资源同名脚本：在 execute 前注入 stage / character / noteType / eventName。
+			if (extraVars != null)
+			{
+				for (key in extraVars.keys())
+					newScript.set(key, extraVars.get(key));
+			}
 			try newScript.execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
 			@:privateAccess
 			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)

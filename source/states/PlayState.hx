@@ -882,6 +882,12 @@ class PlayState extends MusicBeatState
 		setOnScripts('gf', gf);
 		setOnScripts('camGame', camGame);
 
+		// Meteoric 资源同名脚本：角色（scripting/characters/<curCharacter>.hx）。
+		// 必须在 dad/boyfriend/gf 字段赋值后加载，脚本的 onCreate 才能拿到完整引用。
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		scripting.ResourceScripts.loadCharacters(this);
+		#end
+
 		// STAGE SCRIPTS（在角色创建后加载，使 onCreate 可访问 dad/boyfriend/gf）
 		// JS Engine 移植：只显示 HUD 时跳过舞台脚本（舞台已不渲染，脚本多为视觉/相机效果）
 		if (showBgChars)
@@ -892,6 +898,10 @@ class PlayState extends MusicBeatState
 
 		#if HSCRIPT_ALLOWED
 			startHScriptsNamed('stages/' + curStage + '.hx');
+		#end
+
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+			scripting.ResourceScripts.loadStage(this, curStage);
 		#end
 		}
 
@@ -1026,6 +1036,12 @@ class PlayState extends MusicBeatState
 		for (event in eventsPushed)
 			startHScriptsNamed('custom_events/' + event + '.hx');
 		#end
+
+		// Meteoric 资源同名脚本：音符类型 / 事件（每个类型只加载一次；必须在数组清空前）。
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		scripting.ResourceScripts.loadNoteTypesAndEvents(this, noteTypes, eventsPushed);
+		#end
+
 		noteTypes = null;
 		eventsPushed = null;
 
@@ -3380,7 +3396,7 @@ class PlayState extends MusicBeatState
 	#if HSCRIPT_ALLOWED
 	public function startHScriptsNamed(scriptFile:String):Bool return HostDomain.startHScriptsNamed(this, scriptFile);
 
-	public function initHScript(file:String) HostDomain.initHScript(this, file);
+	public function initHScript(file:String, ?extraVars:Map<String, Dynamic>) HostDomain.initHScript(this, file, extraVars);
 	#end
 
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {

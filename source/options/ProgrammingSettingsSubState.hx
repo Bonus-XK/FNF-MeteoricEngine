@@ -4,7 +4,7 @@ package options;
  * 「编程」分区（系统域）。
  *
  * 本分区现有两组东西：
- *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 6 个分项开关。
+ *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 7 个分项开关。
  *     脚本本体是 HScript，放在模组的 `scripting/` 目录里，规范见 `PROGRAMMING.md`。
  *  ② 两项 PE 0.6.3 兼容开关（原先放在「音符」分区，集中到这里）。
  *
@@ -82,6 +82,12 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('状态重定向',
 			'读取 scripting/redirects.txt：把引擎界面声明式改跳到另一个引擎界面或 scripting/states/ 下的脚本界面。\n格式：源界面 = 目标；脚本界面加 script: 前缀。脚本在 preStateSwitch 返回的目标优先于配置。\n需要先打开「脚本系统（总开关）」与「状态脚本」。',
 			'scriptingStateRedirects',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('资源同名脚本',
+			'按资源名加载同名脚本：scripting/stages/<舞台名>.hx、scripting/characters/<角色名>.hx、scripting/notes/<音符类型>.hx、scripting/events/<事件名>.hx。\n每个资源名随对局只加载一次；脚本可获得 stage / character / noteType / eventName 变量。\n需要先打开「脚本系统（总开关）」。',
+			'scriptingResourceScripts',
 			'bool');
 		addOption(option);
 

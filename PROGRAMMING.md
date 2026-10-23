@@ -20,6 +20,7 @@
 | 可取消事件 | `scriptingEvents` | 开 | 允许脚本拦截引擎决策点（见第 5 节） |
 | 全曲 / 单曲脚本 | `scriptingSongScripts` | 开 | 允许 `scripting/songs/` 自动发现（见第 11 节） |
 | 状态重定向 | `scriptingStateRedirects` | 开 | 允许 `scripting/redirects.txt` 声明式改跳转（见第 12 节） |
+| 资源同名脚本 | `scriptingResourceScripts` | 开 | 按舞台/角色/音符类型/事件名加载同名脚本（见第 13 节） |
 
 > 分项开关只在总开关打开时才有意义；分项在总开关关闭时仍然可见，靠说明文字提示（不引入新的禁用态样式）。
 >
@@ -35,6 +36,10 @@ mods/<mod>/scripting/libs/<任意名>.hx          # 共享脚本库（importScri
 mods/<mod>/scripting/songs/<任意名>.hx         # 全曲脚本（每首歌都加载）
 mods/<mod>/scripting/songs/<歌曲名>/<任意名>.hx # 单曲脚本（只在该曲目加载）
 mods/<mod>/scripting/redirects.txt             # 状态重定向配置
+mods/<mod>/scripting/stages/<舞台名>.hx        # 舞台同名脚本
+mods/<mod>/scripting/characters/<角色名>.hx    # 角色同名脚本
+mods/<mod>/scripting/notes/<音符类型>.hx       # 音符类型同名脚本
+mods/<mod>/scripting/events/<事件名>.hx        # 事件同名脚本
 ```
 
 - 扩展名：`.hx`（`.hscript` / `.hsc` / `.hxs` 亦可）。
@@ -395,4 +400,33 @@ OptionsState = states.OptionsState
   状态脚本开关关闭时，`script:` 目标会解析失败（不会打开一个没有脚本的空界面）。
 - 开关：`scriptingStateRedirects`。Shift+F5 重载全局脚本时会一并重读所有
   `redirects.txt`；普通 F5 不重读配置。配置文件不存在 = 没有规则。
+
+## 13. 资源同名脚本（`scripting/stages|characters|notes|events/`）
+
+按资源名自动配对同名 HScript：
+
+```
+mods/<mod>/scripting/stages/<舞台名>.hx       # 当前歌曲的 SONG.stage（PlayState.curStage）
+mods/<mod>/scripting/characters/<角色名>.hx   # gf / dad / bf 的 curCharacter
+mods/<mod>/scripting/notes/<音符类型>.hx      # 谱面里用到的 noteType
+mods/<mod>/scripting/events/<事件名>.hx       # 谱面里用到的事件名
+```
+
+- 加载时机：`PlayState.create` 期间，每个资源名**只加载一次**（不是每个音符 / 每次事件
+  各加载一次；音符数量大，逐实例加载会拖垮进曲）。
+- 脚本注入的变量：
+  - 舞台脚本：`stage`（本局第一个舞台实例）；
+  - 角色脚本：`character`（该角色实例；同名角色只加载一次，变量指向首个实例）；
+  - 音符类型脚本：`noteType`（字符串）；
+  - 事件脚本：`eventName`（字符串）。
+  其余变量与普通游玩脚本一致（`game` / `dad` / `boyfriend` / `gf` / `camGame` …）。
+- 覆盖本局初始的 `gf` / `dad` / `bf` 与 `curStage` 构造出的第一个舞台。脚本后续
+  `new Character(...)` / `new 舞台类(...)` 出来的对象不会自动配对；需要时在舞台/全局
+  脚本里调用 `game.initHScript(path)` 手动加载。
+- 与 Psych 风格的 `stages/<名>.hx`、`characters/<名>.hx`、`custom_notetypes/<名>.hx`、
+  `custom_events/<名>.hx` 是**两套独立目录**：都放会各加载一次。要避免重复行为，
+  只选一套。
+- 回放模式不加载；`hudOnly` / TuoboLoad=2 跳过舞台构造时，舞台脚本也不会加载
+  （没有舞台实例可绑）；角色脚本仍按实际构造出的角色加载。
+- 开关：`scriptingResourceScripts`。F5 不会重建资源脚本；改完请重新进曲。
 
