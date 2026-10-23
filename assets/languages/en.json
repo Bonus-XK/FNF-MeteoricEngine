@@ -1671,6 +1671,8 @@
 	"optionDesc.scriptingEvents": "Lets scripts intercept the engine's key decision points (note creation, hits, ratings, chart events, results...):\nscripts can change parameters, or call event.cancel() to take over the default behaviour.\nRequires the master switch to be on.",
 	"option.scriptingSongScripts": "All-song / per-song scripts",
 	"optionDesc.scriptingSongScripts": "Loads scripting/songs/*.hx (all songs) and scripting/songs/<song>/*.hx (one song; chart folder first, then SONG.song).\nAll-song scripts load first, per-song scripts after; both receive onCreate / onUpdate / onStepHit / onBeatHit.\nRequires the master switch to be on.",
+	"option.scriptingStateRedirects": "State redirects",
+	"optionDesc.scriptingStateRedirects": "Reads scripting/redirects.txt: redirects an engine screen to another engine screen or a scripting/states/ screen, declaratively.\nFormat: source = target; prefix a script screen with script:. A target returned by preStateSwitch wins over this config.\nRequires the master switch and State scripts to be on.",
 	"repl.title": "Script REPL",
 	"repl.currentState": "Current screen",
 	"repl.noState": "(none)",

@@ -4,7 +4,7 @@ package options;
  * 「编程」分区（系统域）。
  *
  * 本分区现有两组东西：
- *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 5 个分项开关。
+ *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 6 个分项开关。
  *     脚本本体是 HScript，放在模组的 `scripting/` 目录里，规范见 `PROGRAMMING.md`。
  *  ② 两项 PE 0.6.3 兼容开关（原先放在「音符」分区，集中到这里）。
  *
@@ -76,6 +76,12 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('全曲 / 单曲脚本',
 			'加载 scripting/songs/*.hx（全曲）与 scripting/songs/<歌曲名>/*.hx（单曲；优先谱面目录名，回退 SONG.song）。\n全曲脚本先加载，单曲脚本后加载；二者都能收到 onCreate / onUpdate / onStepHit / onBeatHit。\n需要先打开「脚本系统（总开关）」。',
 			'scriptingSongScripts',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('状态重定向',
+			'读取 scripting/redirects.txt：把引擎界面声明式改跳到另一个引擎界面或 scripting/states/ 下的脚本界面。\n格式：源界面 = 目标；脚本界面加 script: 前缀。脚本在 preStateSwitch 返回的目标优先于配置。\n需要先打开「脚本系统（总开关）」与「状态脚本」。',
+			'scriptingStateRedirects',
 			'bool');
 		addOption(option);
 

@@ -50,6 +50,7 @@ class SaveVariables {
 	@:keep public var scriptingHotReload:Bool = true; // 热重载（F5 重建当前界面脚本 / Shift+F5 重建全局脚本）
 	@:keep public var scriptingEvents:Bool = true; // 可取消事件层（脚本能拦截引擎决策点）
 	@:keep public var scriptingSongScripts:Bool = true; // 全曲 / 单曲脚本（scripting/songs/ 自动发现）
+	@:keep public var scriptingStateRedirects:Bool = true; // 状态重定向（scripting/redirects.txt）
 	@:keep public var noteSkin:String = 'Default';
 	@:keep public var splashSkin:String = 'Psych';
 	@:keep public var splashAlpha:Float = 0.6;

@@ -19,6 +19,7 @@
 | 脚本热重载 | `scriptingHotReload` | 开 | F5 重建当前界面脚本；Shift+F5 重建全局脚本 |
 | 可取消事件 | `scriptingEvents` | 开 | 允许脚本拦截引擎决策点（见第 5 节） |
 | 全曲 / 单曲脚本 | `scriptingSongScripts` | 开 | 允许 `scripting/songs/` 自动发现（见第 11 节） |
+| 状态重定向 | `scriptingStateRedirects` | 开 | 允许 `scripting/redirects.txt` 声明式改跳转（见第 12 节） |
 
 > 分项开关只在总开关打开时才有意义；分项在总开关关闭时仍然可见，靠说明文字提示（不引入新的禁用态样式）。
 >
@@ -33,6 +34,7 @@ mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个�
 mods/<mod>/scripting/libs/<任意名>.hx          # 共享脚本库（importScript 加载）
 mods/<mod>/scripting/songs/<任意名>.hx         # 全曲脚本（每首歌都加载）
 mods/<mod>/scripting/songs/<歌曲名>/<任意名>.hx # 单曲脚本（只在该曲目加载）
+mods/<mod>/scripting/redirects.txt             # 状态重定向配置
 ```
 
 - 扩展名：`.hx`（`.hscript` / `.hsc` / `.hxs` 亦可）。
@@ -368,4 +370,29 @@ mods/<mod>/scripting/songs/<歌曲名>/<任意名>.hx   # 单曲脚本：只在�
   引擎不会去重；同一个脚本不要在两处各放一份，否则会加载两次。
 - 开关：`scriptingSongScripts`（总开关关时整体无效）。歌曲脚本在 `PlayState.create`
   时装载，F5 不会重建；改完请重新进曲。
+
+## 12. 状态重定向（`scripting/redirects.txt`）
+
+把引擎的某个界面**声明式**地改跳到另一个界面，不用写 `preStateSwitch` 脚本。
+每个启用中的 mod 可提供 `mods/<mod>/scripting/redirects.txt`：
+
+```ini
+# 源界面 = 目标界面
+MainMenuState = MyMenu
+FreeplayState = script:MyFreeplay
+OptionsState = states.OptionsState
+```
+
+- 左侧：要拦截的界面类名（短名，如 `MainMenuState`；也接受完整类名）。
+- 右侧：目标界面。解析顺序：
+  1. 以 `script:` 开头 → 强制找 `scripting/states/<名字>.hx` 脚本界面；
+  2. 否则先找引擎类（短名按 `states.<名>`，完整类名按原样），找不到再找脚本界面。
+- 多个 mod 提供同名规则时，**后加载的 mod 覆盖先加载的**（按 mod 启用顺序）。
+- 生效时机：`preStateSwitch`。脚本自己 `return` 的目标**优先于**配置（脚本是动态的，
+  配置是兜底）；脚本没有返回目标时，配置按本次**请求切换到的界面**匹配。
+- 目标解析失败只打日志，不改变本次跳转（不会把玩家卡在空界面）。
+- 解析脚本界面时使用 `scripting/states/<名字>.hx`；脚本界面的语义见 §7。
+  状态脚本开关关闭时，`script:` 目标会解析失败（不会打开一个没有脚本的空界面）。
+- 开关：`scriptingStateRedirects`。Shift+F5 重载全局脚本时会一并重读所有
+  `redirects.txt`；普通 F5 不重读配置。配置文件不存在 = 没有规则。
 

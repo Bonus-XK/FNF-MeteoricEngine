@@ -834,10 +834,12 @@ source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨
 source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后：F5 = 重建当前界面的状态脚本，Shift+F5 = 重建全局脚本。\\n脚本自己创建的对象要在 destroy() 里清理，否则会残留。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	状态脚本（覆盖界面）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	状态重定向	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	脚本热重载	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	脚本系统（总开关）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	让脚本能拦截引擎的关键决策点（音符生成、命中、评级、谱面事件、结算……）：\\n脚本可以改参数，也可以 event.cancel() 接管默认行为。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	读取 scripting/redirects.txt：把引擎界面声明式改跳到另一个引擎界面或 scripting/states/ 下的脚本界面。\\n格式：源界面 = 目标；脚本界面加 script: 前缀。脚本在 preStateSwitch 返回的目标优先于配置。\\n需要先打开「脚本系统（总开关）」与「状态脚本」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	libx264 兼容性最好，通用首选；\\nlibx265 同画质体积更小但编码慢；\\n其它编码器可用性取决于你的 ffmpeg 构建	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	不需要额外的录屏软件。录像期间会有轻微帧率开销\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	开启后，进曲时自动开始录像，录完整首直到结算，\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -882,9 +884,11 @@ source/scripting/ScriptRepl.hx	…	1	分隔符/标点片段（连接已翻译文
 source/scripting/ScriptRepl.hx	：	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/Scripting.hx	  已请求切换到脚本界面	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	  脚本界面实例已创建	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/Scripting.hx	 → 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/Scripting.hx	 个）	3	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	 出错：\\n	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/Scripting.hx	 抛出异常：	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	 条	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	REPL 已关闭	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	REPL 已打开	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	[Scripting][错误] 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
@@ -906,8 +910,14 @@ source/scripting/Scripting.hx	状态脚本已重载：	1	诊断日志（trace / 
 source/scripting/Scripting.hx	状态脚本重载：当前界面没有状态脚本	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	状态脚本重载：无脚本，保留旧组	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	状态跳转失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/scripting/Scripting.hx	状态跳转失败：找不到界面类 	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	状态跳转失败：找不到界面类或脚本界面 	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	状态跳转失败：脚本界面 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	状态跳转：已改写目标为 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/Scripting.hx	状态跳转：已改写目标为脚本界面 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/scripting/Scripting.hx	状态重定向格式错误（源或目标为空）：	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	状态重定向格式错误（缺少 =）：	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	状态重定向读取失败：	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
+source/scripting/Scripting.hx	状态重定向：已加载 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	编程层已启动	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/Scripting.hx	（	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/ScriptingApi.hx	当前平台不支持手动 GC	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）

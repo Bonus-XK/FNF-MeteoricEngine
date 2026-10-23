@@ -9,6 +9,7 @@ import flixel.input.keyboard.FlxKey;
 import psychlua.HScript;
 import scripting.ScriptOrder.ScriptOrderEntry;
 import sys.FileSystem;
+import sys.io.File;
 
 /** 脚本日志条目（脚本管理器与 REPL 共用）。 */
 typedef ScriptLogLine =
@@ -106,6 +107,9 @@ class Scripting
 	/** 上一次绑定宿主变量时的 State（变了才重绑，避免每帧写变量表）。 */
 	static var lastBoundState:Dynamic = null;
 
+	/** 状态重定向表：源界面类名（短名或完整名）→ 目标（引擎类名 / `script:<脚本名>`）。 */
+	static var stateRedirects:Map<String, String> = new Map();
+
 	// ==================== 开关 ====================
 
 	/** 总开关：编程层总闸。 */
@@ -127,6 +131,13 @@ class Scripting
 	public static function stateScriptsEnabled():Bool
 	{
 		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingStateScripts;
+	}
+
+	/** 状态重定向（`scripting/redirects.txt`）。 */
+	@:keep
+	public static function stateRedirectsEnabled():Bool
+	{
+		return isEnabled() && ClientPrefs.data != null && ClientPrefs.data.scriptingStateRedirects;
 	}
 
 	/** 热重载（F5 / Shift+F5）。 */
@@ -417,11 +428,28 @@ class Scripting
 		var stateTarget:Dynamic = null;
 		if (old != null && old.scriptingGroup != null) stateTarget = old.scriptingGroup.callResult('preStateSwitch', []);
 
-		if (globalGroup == null) return;
-		var target:Dynamic = globalGroup.callResult('preStateSwitch', []);
+		// 脚本返回的目标优先；没有脚本目标时再看声明式配置。
+		var target:Dynamic = null;
+		if (globalGroup != null) target = globalGroup.callResult('preStateSwitch', []);
 		if (target == null) target = stateTarget;
+		if (target == null && stateRedirectsEnabled()) target = redirectForRequested();
 		if (target == null) return;
 		redirectState(target);
+	}
+
+	/** 按本次请求切换到的界面类名查 `redirects.txt`。 */
+	static function redirectForRequested():String
+	{
+		var requested:Dynamic = null;
+		try requested = @:privateAccess FlxG.game._requestedState catch (e:Dynamic) requested = null;
+		if (requested == null) return null;
+
+		var shortName:String = stateNameOf(requested);
+		if (shortName != null && stateRedirects.exists(shortName)) return stateRedirects.get(shortName);
+
+		var fullName:String = Type.getClassName(Type.getClass(requested));
+		if (fullName != null && stateRedirects.exists(fullName)) return stateRedirects.get(fullName);
+		return null;
 	}
 
 	/**
@@ -430,6 +458,8 @@ class Scripting
 	 * 脚本在 `preStateSwitch` 里 **return 一个界面名** 即可改跳转目标：
 	 *  - `'MainMenuState'` → 引擎内建界面（按 `states.<名>` 解析）；
 	 *  - `'options.OptionsState'` → 带包名的完整类名；
+	 *  - `'script:MyMenu'` → 强制 `scripting/states/MyMenu.hx` 脚本界面；
+	 *  - 普通名字在引擎类不存在时，也会回退到同名脚本界面；
 	 *  - 解析不到 → 打日志并保持原目标（不改变引擎行为）。
 	 */
 	static function redirectState(target:Dynamic):Void
@@ -438,13 +468,41 @@ class Scripting
 		var name:String = Std.string(target).trim();
 		if (name.length == 0) return;
 
-		var cls:Dynamic = Type.resolveClass(name);
-		if (cls == null) cls = Type.resolveClass('states.' + name);
+		var forceScript:Bool = false;
+		if (name.startsWith('script:'))
+		{
+			forceScript = true;
+			name = name.substr('script:'.length).trim();
+		}
+		if (name.length == 0) return;
+
+		var cls:Dynamic = null;
+		if (!forceScript)
+		{
+			cls = Type.resolveClass(name);
+			if (cls == null) cls = Type.resolveClass('states.' + name);
+		}
+
 		if (cls == null)
 		{
-			logError('状态跳转失败：找不到界面类 ' + name);
+			var screen:ScriptState = findScriptState(name);
+			if (screen == null)
+			{
+				logError('状态跳转失败：找不到界面类或脚本界面 ' + name);
+				return;
+			}
+			try
+			{
+				@:privateAccess FlxG.game._requestedState = screen;
+				log('状态跳转：已改写目标为脚本界面 ' + name);
+			}
+			catch (e:Dynamic)
+			{
+				logError('状态跳转失败：脚本界面 ' + name + ' —— ' + Std.string(e));
+			}
 			return;
 		}
+
 		try
 		{
 			@:privateAccess FlxG.game._requestedState = Type.createInstance(cls, []);
@@ -454,6 +512,76 @@ class Scripting
 		{
 			logError('状态跳转失败：' + name + ' —— ' + Std.string(e));
 		}
+	}
+
+	/** 在启用中的 mod 里找 `scripting/states/<name>.hx`；状态脚本开关关闭时返回 null。 */
+	static function findScriptState(name:String):ScriptState
+	{
+		if (!stateScriptsEnabled() || name == null || name.length == 0) return null;
+		// 脚本名是文件名，不接受路径分隔符（避免 ../ 之类的意外路径）。
+		if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf('..') >= 0) return null;
+		for (mod in activeMods())
+		{
+			var path:String = Paths.mods(mod + '/scripting/states/' + name + '.hx');
+			if (FileSystem.exists(path)) return new ScriptState(name, null);
+		}
+		return null;
+	}
+
+	/**
+	 * 读取所有启用 mod 的 `scripting/redirects.txt`。
+	 *
+	 * 格式（`#` 开头为整行注释）：
+	 * ```
+	 * MainMenuState = MyMenu
+	 * FreeplayState = script:MyFreeplay
+	 * states.OptionsState = options.OptionsState
+	 * ```
+	 * 后加载的 mod 覆盖先加载的；配置文件不存在 = 没有规则。
+	 */
+	static function loadStateRedirects():Void
+	{
+		stateRedirects = new Map();
+		if (!isEnabled()) return;
+
+		var count:Int = 0;
+		for (mod in activeMods())
+		{
+			var path:String = Paths.mods(mod + '/scripting/redirects.txt');
+			if (!FileSystem.exists(path)) continue;
+
+			var text:String = null;
+			try text = File.getContent(path) catch (e:Dynamic)
+			{
+				logError('状态重定向读取失败：' + path + ' —— ' + Std.string(e));
+				continue;
+			}
+			if (text == null) continue;
+
+			for (raw in text.split('\n'))
+			{
+				var line:String = raw.trim();
+				if (line.length > 0 && line.charCodeAt(0) == 0xFEFF) line = line.substr(1).trim();
+				if (line.length == 0 || line.startsWith('#')) continue;
+
+				var eq:Int = line.indexOf('=');
+				if (eq <= 0)
+				{
+					logError('状态重定向格式错误（缺少 =）：' + path + ' → ' + line);
+					continue;
+				}
+				var from:String = line.substr(0, eq).trim();
+				var to:String = line.substr(eq + 1).trim();
+				if (from.length == 0 || to.length == 0)
+				{
+					logError('状态重定向格式错误（源或目标为空）：' + path + ' → ' + line);
+					continue;
+				}
+				stateRedirects.set(from, to);
+				count++;
+			}
+		}
+		if (count > 0) log('状态重定向：已加载 ' + count + ' 条');
 	}
 
 	static function onPostStateSwitch():Void
@@ -534,6 +662,8 @@ class Scripting
 	@:keep
 	public static function reloadGlobalScripts():Void
 	{
+		// Shift+F5 重载全局脚本时一并重读重定向配置（总开关关闭时只清空、不读盘）。
+		loadStateRedirects();
 		if (!globalScriptsEnabled()) return;
 
 		var next:ScriptGroup = buildGlobalGroup();
