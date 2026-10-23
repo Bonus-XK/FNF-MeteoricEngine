@@ -42,13 +42,14 @@ class SaveVariables {
 	@:keep public var runtimePack:Bool = false; // 运行时贴图密排列（≤160px 小贴图打包进共享图集，减少纹理/绘制批次；实验性，默认关闭）
 
 	// ===== Meteoric 脚本系统（编程层）=====
-	// 总开关 + 4 个分项开关。全部默认关闭 —— 关闭时引擎行为与本层落地前完全一致。
+	// 总开关 + 分项开关。总开关默认关闭 —— 关闭时引擎行为与本层落地前完全一致。
 	// 分项开关只在总开关打开时才有意义。
 	@:keep public var scriptingEnabled:Bool = false; // 脚本系统总闸
 	@:keep public var scriptingGlobalScripts:Bool = true; // 全局常驻脚本（scripting/global/ 下的 .hx）
 	@:keep public var scriptingStateScripts:Bool = true; // 状态脚本（scripting/states/<界面名>.hx）
 	@:keep public var scriptingHotReload:Bool = true; // 热重载（F5 重建当前界面脚本 / Shift+F5 重建全局脚本）
 	@:keep public var scriptingEvents:Bool = true; // 可取消事件层（脚本能拦截引擎决策点）
+	@:keep public var scriptingSongScripts:Bool = true; // 全曲 / 单曲脚本（scripting/songs/ 自动发现）
 	@:keep public var noteSkin:String = 'Default';
 	@:keep public var splashSkin:String = 'Psych';
 	@:keep public var splashAlpha:Float = 0.6;

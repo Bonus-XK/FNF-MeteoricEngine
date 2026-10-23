@@ -1669,6 +1669,8 @@
 	"optionDesc.scriptingHotReload": "开启后：F5 = 重建当前界面的状态脚本，Shift+F5 = 重建全局脚本。\n脚本自己创建的对象要在 destroy() 里清理，否则会残留。\n需要先打开「脚本系统（总开关）」。",
 	"option.scriptingEvents": "可取消事件",
 	"optionDesc.scriptingEvents": "让脚本能拦截引擎的关键决策点（音符生成、命中、评级、谱面事件、结算……）：\n脚本可以改参数，也可以 event.cancel() 接管默认行为。\n需要先打开「脚本系统（总开关）」。",
+	"option.scriptingSongScripts": "全曲 / 单曲脚本",
+	"optionDesc.scriptingSongScripts": "加载 scripting/songs/*.hx（全曲）与 scripting/songs/<歌曲名>/*.hx（单曲；优先谱面目录名，回退 SONG.song）。\n全曲脚本先加载，单曲脚本后加载；二者都能收到 onCreate / onUpdate / onStepHit / onBeatHit。\n需要先打开「脚本系统（总开关）」。",
 	"repl.title": "脚本 REPL",
 	"repl.currentState": "当前界面",
 	"repl.noState": "（无）",

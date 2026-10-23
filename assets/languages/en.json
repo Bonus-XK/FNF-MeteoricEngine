@@ -1669,6 +1669,8 @@
 	"optionDesc.scriptingHotReload": "When on: F5 rebuilds the current screen's state scripts, Shift+F5 rebuilds the global scripts.\nObjects a script creates must be cleaned up in destroy(), otherwise they linger.\nRequires the master switch to be on.",
 	"option.scriptingEvents": "Cancellable events",
 	"optionDesc.scriptingEvents": "Lets scripts intercept the engine's key decision points (note creation, hits, ratings, chart events, results...):\nscripts can change parameters, or call event.cancel() to take over the default behaviour.\nRequires the master switch to be on.",
+	"option.scriptingSongScripts": "All-song / per-song scripts",
+	"optionDesc.scriptingSongScripts": "Loads scripting/songs/*.hx (all songs) and scripting/songs/<song>/*.hx (one song; chart folder first, then SONG.song).\nAll-song scripts load first, per-song scripts after; both receive onCreate / onUpdate / onStepHit / onBeatHit.\nRequires the master switch to be on.",
 	"repl.title": "Script REPL",
 	"repl.currentState": "Current screen",
 	"repl.noState": "(none)",

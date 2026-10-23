@@ -4,7 +4,7 @@ package options;
  * 「编程」分区（系统域）。
  *
  * 本分区现有两组东西：
- *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 4 个分项开关。
+ *  ① **Meteoric 脚本系统**（编程层）：1 个总开关 + 5 个分项开关。
  *     脚本本体是 HScript，放在模组的 `scripting/` 目录里，规范见 `PROGRAMMING.md`。
  *  ② 两项 PE 0.6.3 兼容开关（原先放在「音符」分区，集中到这里）。
  *
@@ -70,6 +70,12 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('可取消事件',
 			'让脚本能拦截引擎的关键决策点（音符生成、命中、评级、谱面事件、结算……）：\n脚本可以改参数，也可以 event.cancel() 接管默认行为。\n需要先打开「脚本系统（总开关）」。',
 			'scriptingEvents',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('全曲 / 单曲脚本',
+			'加载 scripting/songs/*.hx（全曲）与 scripting/songs/<歌曲名>/*.hx（单曲；优先谱面目录名，回退 SONG.song）。\n全曲脚本先加载，单曲脚本后加载；二者都能收到 onCreate / onUpdate / onStepHit / onBeatHit。\n需要先打开「脚本系统（总开关）」。',
+			'scriptingSongScripts',
 			'bool');
 		addOption(option);
 

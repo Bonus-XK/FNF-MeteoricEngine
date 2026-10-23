@@ -18,6 +18,7 @@
 | 状态脚本（覆盖界面） | `scriptingStateScripts` | 开 | 允许 `scripting/states/<界面名>.hx` |
 | 脚本热重载 | `scriptingHotReload` | 开 | F5 重建当前界面脚本；Shift+F5 重建全局脚本 |
 | 可取消事件 | `scriptingEvents` | 开 | 允许脚本拦截引擎决策点（见第 5 节） |
+| 全曲 / 单曲脚本 | `scriptingSongScripts` | 开 | 允许 `scripting/songs/` 自动发现（见第 11 节） |
 
 > 分项开关只在总开关打开时才有意义；分项在总开关关闭时仍然可见，靠说明文字提示（不引入新的禁用态样式）。
 >
@@ -30,6 +31,8 @@
 mods/<mod>/scripting/global/<任意名>.hx        # 全局常驻脚本（跨所有界面）
 mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个界面）
 mods/<mod>/scripting/libs/<任意名>.hx          # 共享脚本库（importScript 加载）
+mods/<mod>/scripting/songs/<任意名>.hx         # 全曲脚本（每首歌都加载）
+mods/<mod>/scripting/songs/<歌曲名>/<任意名>.hx # 单曲脚本（只在该曲目加载）
 ```
 
 - 扩展名：`.hx`（`.hscript` / `.hsc` / `.hxs` 亦可）。
@@ -334,3 +337,35 @@ trace('fps=' + st.fps + ' rss=' + st.rssMB);
 - 本系统是 **Meteoric 自研**，与 Codename Engine 无关：既不兼容 CNE 格式的 mod，
   也不使用 CNE 的脚本实现或目录约定（历史上那套已于 2026-10-05 移除，理由见
   `source/backend/CneModProbe.hx` 的类头注释）。
+
+## 11. 全曲 / 单曲脚本（`scripting/songs/`）
+
+除了「全局常驻」和「状态脚本」，还有**按歌曲自动发现**的一层：进入 `PlayState` 时，
+引擎会扫描启用中的 mod：
+
+```
+mods/<mod>/scripting/songs/<任意名>.hx           # 全曲脚本：每首歌都加载
+mods/<mod>/scripting/songs/<歌曲名>/<任意名>.hx   # 单曲脚本：只在该曲目加载
+```
+
+- **单曲目录优先用谱面目录名**（`PlayState.chartFolder`，与 `data/<目录名>/` 同一套），
+  该候选在所有启用 mod 里都没有脚本时，回退到 `Paths.formatToSongPath(SONG.song)`
+  （`PlayState.songName`，即 JSON 的 `song` 字段格式化后的名字）。
+  例：`data/Obsolescence-spam/` 的谱面里 `song="Obsolescence"` 时，先找
+  `scripting/songs/Obsolescence-spam/`，没有再找 `scripting/songs/obsolescence/`。
+  两个候选只会加载一个，避免同一脚本放两处被加载两次。
+- 全曲层只认 `songs/` 的**直属** `.hx`；子目录一律当单曲目录，所以
+  `songs/foo.hx`（全曲）与 `songs/foo/`（曲目 `foo` 的单曲脚本）可以同时存在。
+- **顺序**：先全曲、后单曲；每一层都按「文件名前缀 → mod 启用顺序 → 文件名」排序，
+  规则与 §2 的脚本前缀一致（`00_`…`999_`、`z_`、无前缀 500）。
+- 加载进 `PlayState` 的 HScript 脚本数组，与其它游玩脚本同一套回调：
+  `onCreate` / `onCreatePost` / `onUpdate` / `onStepHit` / `onBeatHit` / `onDestroy`。
+  脚本里可直接用 `PlayState` / `game` / `dad` / `boyfriend` / `gf` / `camGame` 等
+  既有游玩脚本变量（见 `HostDomain.initHScript`）。
+- **回放模式不加载**（`initHScript` 的 `replayMode` 拦截），与既有
+  `data/<歌曲名>/` 脚本一致。
+- 与 Psych 风格的 `mods/<mod>/data/<歌曲名>/*.hx` 是**两条独立的线**：目录不同，
+  引擎不会去重；同一个脚本不要在两处各放一份，否则会加载两次。
+- 开关：`scriptingSongScripts`（总开关关时整体无效）。歌曲脚本在 `PlayState.create`
+  时装载，F5 不会重建；改完请重新进曲。
+

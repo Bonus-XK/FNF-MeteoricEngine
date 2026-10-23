@@ -824,7 +824,9 @@ source/options/PerformanceSubState.hx	默认关闭以保持与旧版完全一致
 source/options/ProgrammingSettingsSubState.hx	Lua 0.6.3 兼容	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	Psych 0.6.3 兼容模式	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	全局常驻脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	全曲 / 单曲脚本	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	加载 scripting/global/*.hx：这些脚本跨所有界面常驻运行（能收到节拍、状态切换、焦点、窗口尺寸等引擎级事件）。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	加载 scripting/songs/*.hx（全曲）与 scripting/songs/<歌曲名>/*.hx（单曲；优先谱面目录名，回退 SONG.song）。\\n全曲脚本先加载，单曲脚本后加载；二者都能收到 onCreate / onUpdate / onStepHit / onBeatHit。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	加载 scripting/states/<界面名>.hx：让脚本接管某个界面（菜单、暂停、设置……），可改它的控件与行为。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	可取消事件	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启 Meteoric 脚本系统：允许用 HScript 写脚本改玩法 / 界面。\\n脚本放在模组的 scripting/ 目录里，改完按 F5 立即生效，不用重开游戏。\\n关闭时引擎行为与没有这个功能完全一致。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue

@@ -1052,6 +1052,13 @@ class PlayState extends MusicBeatState
 		}
 		#end
 
+		// Meteoric 全曲 / 单曲脚本（scripting/songs/*.hx 与 scripting/songs/<歌曲名>/*.hx）。
+		// 与上面 Psych 风格的 data/<歌曲名>/ 脚本是两条独立的线：目录不同，互不重复。
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
+		if (!replayMode)
+			scripting.SongScripts.load(this, songName, chartFolder);
+		#end
+
 		// 大纹理显存预提交 + CPU 副本释放（SeiunEngine GfxPolicy 移植）：
 		// 把本局所有 ≥2048px 的大图集在这一刻推上显存并丢掉 CPU 副本 ——
 		// 之后游玩中不再有任何纹理上传（消除进曲后头几秒的卡顿），CPU 内存立减一份。
