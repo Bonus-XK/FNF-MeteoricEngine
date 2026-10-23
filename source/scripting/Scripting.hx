@@ -7,6 +7,7 @@ import flixel.FlxG;
 import flixel.input.FlxInput.FlxInputState;
 import flixel.input.keyboard.FlxKey;
 import psychlua.HScript;
+import scripting.ScriptOrder.ScriptOrderEntry;
 import sys.FileSystem;
 
 /** 脚本日志条目（脚本管理器与 REPL 共用）。 */
@@ -46,6 +47,9 @@ typedef ScriptingScriptFile =
  * ```
  *
  * 状态脚本的文件名 = 目标界面的类名短名（`MainMenuState` / `PauseSubState` …）。
+ *
+ * 同一组内的执行顺序可用**文件名前缀**显式控制：`00_`…`999_` 数字越小越先，
+ * `z_` 固定最后，无前缀默认 500（与加约定前顺序一致）。见 {@link ScriptOrder}。
  *
  * ## 脚本能拿到什么
  *
@@ -702,24 +706,31 @@ class Scripting
 	{
 		var out:Array<ScriptingScriptFile> = [];
 		#if sys
-		for (mod in activeMods())
+		var mods:Array<String> = activeMods();
+
+		// 全局脚本：与 buildGlobalGroup 同序（优先级 → mod 启用顺序 → 文件名）
+		var globalEntries:Array<ScriptOrderEntry> = [];
+		for (i in 0...mods.length)
 		{
-			var gdir:String = Paths.mods(mod + '/scripting/global');
+			var gdir:String = Paths.mods(mods[i] + '/scripting/global');
 			for (f in sortedFiles(gdir))
-			{
-				out.push({folder: gdir, file: f, kind: KIND_GLOBAL, scriptName: null});
-			}
-			var sdir:String = Paths.mods(mod + '/scripting/states');
-			for (f in sortedFiles(sdir))
-			{
-				out.push({
-					folder: sdir,
-					file: f,
-					kind: KIND_STATE,
-					scriptName: stateScriptName(f)
-				});
-			}
+				globalEntries.push({path: gdir, file: f, priority: ScriptOrder.priorityOf(f), modIndex: i});
 		}
+		ScriptOrder.sortEntries(globalEntries);
+		for (e in globalEntries)
+			out.push({folder: e.path, file: e.file, kind: KIND_GLOBAL, scriptName: null});
+
+		// 状态脚本：同一套排序规则（列表顺序与人类预期一致，加载本身按 mod 顺序）
+		var stateEntries:Array<ScriptOrderEntry> = [];
+		for (i in 0...mods.length)
+		{
+			var sdir:String = Paths.mods(mods[i] + '/scripting/states');
+			for (f in sortedFiles(sdir))
+				stateEntries.push({path: sdir, file: f, priority: ScriptOrder.priorityOf(f), modIndex: i});
+		}
+		ScriptOrder.sortEntries(stateEntries);
+		for (e in stateEntries)
+			out.push({folder: e.path, file: e.file, kind: KIND_STATE, scriptName: stateScriptName(e.file)});
 		#end
 		return out;
 	}
@@ -758,20 +769,24 @@ class Scripting
 	static function buildGlobalGroup():ScriptGroup
 	{
 		var group:ScriptGroup = new ScriptGroup(null);
-		for (mod in activeMods())
+		var entries:Array<ScriptOrderEntry> = [];
+		var mods:Array<String> = activeMods();
+		for (i in 0...mods.length)
 		{
-			var dir:String = Paths.mods(mod + '/scripting/global');
+			var dir:String = Paths.mods(mods[i] + '/scripting/global');
 			if (!FileSystem.exists(dir) || !FileSystem.isDirectory(dir)) continue;
 			var files:Array<String> = null;
 			try files = FileSystem.readDirectory(dir) catch (e:Dynamic) files = [];
 			if (files == null) continue;
-			files.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
 			for (f in files)
 			{
 				if (f == null || !f.toLowerCase().endsWith('.hx')) continue;
-				group.addPath(dir + '/' + f);
+				entries.push({path: dir + '/' + f, file: f, priority: ScriptOrder.priorityOf(f), modIndex: i});
 			}
 		}
+		// 无前缀脚本的排序键退化为 (500, modIndex, 文件名)，与加约定前逐项一致。
+		ScriptOrder.sortEntries(entries);
+		for (e in entries) group.addPath(e.path);
 		return group;
 	}
 
