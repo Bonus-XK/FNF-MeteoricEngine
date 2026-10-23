@@ -7,6 +7,7 @@ import psychlua.CustomSubstate;
 
 #if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
 import tea.SScript;
+import scripting.ModClassLoader;
 #if sys
 import sys.FileSystem;
 #end
@@ -81,6 +82,7 @@ class HScript extends SScript
 			origin = parent.scriptName;
 		if (scriptFile != null && scriptFile.length > 0)
 			origin = scriptFile;
+		installModClassInterp();
 		preset();
 		// SScript 4.0.1 的 execute() 解析失败会抛异常（runHaxeCode 首段代码语法错时避免 lua panic）
 		// executeNow=false：先构造并注入 state 变量，再由调用方 execute()（见 HostDomain.initHScript）。
@@ -88,6 +90,28 @@ class HScript extends SScript
 		{
 			try execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
 		}
+	}
+
+	/**
+	 * 可选：把 SScript 默认的 hscriptBase.Interp 换成支持模组类的 ex.InterpEx。
+	 * 关闭「脚本类库」时完全不执行，行为与旧版一致。
+	 */
+	function installModClassInterp():Void
+	{
+		// ensureLoaded() 在开关关闭时会清掉旧注册表和 Parser 钩子；
+		// 不能先 return，否则玩家把「模组类库」关掉后旧钩子仍会留在全局 Parser 上。
+		ModClassLoader.ensureLoaded();
+		if (!ModClassLoader.isEnabled()) return;
+
+		var mi = new ex.InterpEx(null, false);
+		mi.classProvider = ModClassLoader.createProvider(mi);
+		@:privateAccess mi.typecheck = typeCheck;
+		@:privateAccess mi.origin = origin;
+		mi.setScr(this);
+
+		@:privateAccess interp = mi;
+		@:privateAccess parser.setIntrp(mi);
+		mi.setPsr(parser);
 	}
 
 	override function preset()

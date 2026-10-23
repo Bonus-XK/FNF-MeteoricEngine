@@ -974,3 +974,5 @@ source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻�
 source/substates/ResultsSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	· 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/options/ProgrammingSettingsSubState.hx	扫描已启用模组的 source/ 目录，把其中的 class 注册给 HScript：脚本可以 import 后 new，或调用实例 / 静态成员。\\n只支持普通 class；import 必须写在脚本顶部。\\n默认关闭；关闭时脚本行为与旧版完全一致。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	模组类库（source/）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue

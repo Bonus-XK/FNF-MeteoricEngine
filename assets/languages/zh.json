@@ -1675,6 +1675,8 @@
 	"optionDesc.scriptingStateRedirects": "读取 scripting/redirects.txt：把引擎界面声明式改跳到另一个引擎界面或 scripting/states/ 下的脚本界面。\n格式：源界面 = 目标；脚本界面加 script: 前缀。脚本在 preStateSwitch 返回的目标优先于配置。\n需要先打开「脚本系统（总开关）」与「状态脚本」。",
 	"option.scriptingResourceScripts": "资源同名脚本",
 	"optionDesc.scriptingResourceScripts": "按资源名加载同名脚本：scripting/stages/<舞台名>.hx、scripting/characters/<角色名>.hx、scripting/notes/<音符类型>.hx、scripting/events/<事件名>.hx。\n每个资源名随对局只加载一次；脚本可获得 stage / character / noteType / eventName 变量。\n需要先打开「脚本系统（总开关）」。",
+	"option.scriptingModClasses": "模组类库（source/）",
+	"optionDesc.scriptingModClasses": "扫描已启用模组的 source/ 目录，把其中的 class 注册给 HScript：脚本可以 import 后 new，或调用实例 / 静态成员。\n只支持普通 class；import 必须写在脚本顶部。\n默认关闭；关闭时脚本行为与旧版完全一致。\n需要先打开「脚本系统（总开关）」。",
 	"repl.title": "脚本 REPL",
 	"repl.currentState": "当前界面",
 	"repl.noState": "（无）",

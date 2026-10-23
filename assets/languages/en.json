@@ -1675,6 +1675,8 @@
 	"optionDesc.scriptingStateRedirects": "Reads scripting/redirects.txt: redirects an engine screen to another engine screen or a scripting/states/ screen, declaratively.\nFormat: source = target; prefix a script screen with script:. A target returned by preStateSwitch wins over this config.\nRequires the master switch and State scripts to be on.",
 	"option.scriptingResourceScripts": "Resource scripts",
 	"optionDesc.scriptingResourceScripts": "Loads same-named scripts by resource: scripting/stages/<stage>.hx, scripting/characters/<character>.hx, scripting/notes/<noteType>.hx, scripting/events/<event>.hx.\nEach resource name loads once per song; the script receives a stage / character / noteType / eventName variable.\nRequires the master switch to be on.",
+	"option.scriptingModClasses": "Mod class library (source/)",
+	"optionDesc.scriptingModClasses": "Scans enabled mods' source/ directories and registers their classes for HScript: scripts can import then new them, or call instance / static members.\nOnly plain classes are supported; imports must be at the top of the script.\nOff by default; when off, script behavior is identical to previous versions.\nRequires the master switch to be on.",
 	"repl.title": "Script REPL",
 	"repl.currentState": "Current screen",
 	"repl.noState": "(none)",

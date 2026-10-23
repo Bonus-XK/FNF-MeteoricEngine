@@ -51,6 +51,12 @@ enum Token {
 @:access(tea.SScript)
 class Parser {
 
+	/**
+	 * Meteoric：`import` 在 Type.resolveClass / resolveEnum 都失败后的 mod 类解析钩子。
+	 * 返回 ex.ModClassRef 或 null；null 时保持 SScript 原行为。
+	 */
+	public static var modClassResolver:String->Dynamic = null;
+
 	// config / variables
 	public var line : Int = 0;
 	public var opChars : String;
@@ -1138,6 +1144,8 @@ class Parser {
 				{
 					eclass = Type.resolveClass(anPath[0]);
 					if(eclass==null)eclass=Type.resolveEnum(anPath[0]);
+					if(eclass==null && modClassResolver != null)
+						eclass = modClassResolver(anPath[0]);
 					cl = nulls[nulls.length - 1];
 					if(maybe&&''+asIdent!="null")
 						cl=asIdent;

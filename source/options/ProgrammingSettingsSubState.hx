@@ -42,7 +42,7 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		// ===== Meteoric 脚本系统（编程层）=====
-		// 总开关 + 4 个分项开关。全部默认关闭 —— 关闭时引擎行为与该功能落地前完全一致。
+		// 总开关 + 分项开关。全部默认关闭 —— 关闭时引擎行为与该功能落地前完全一致。
 		var option:Option = new Option('脚本系统（总开关）',
 			'开启 Meteoric 脚本系统：允许用 HScript 写脚本改玩法 / 界面。\n脚本放在模组的 scripting/ 目录里，改完按 F5 立即生效，不用重开游戏。\n关闭时引擎行为与没有这个功能完全一致。',
 			'scriptingEnabled',
@@ -88,6 +88,12 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('资源同名脚本',
 			'按资源名加载同名脚本：scripting/stages/<舞台名>.hx、scripting/characters/<角色名>.hx、scripting/notes/<音符类型>.hx、scripting/events/<事件名>.hx。\n每个资源名随对局只加载一次；脚本可获得 stage / character / noteType / eventName 变量。\n需要先打开「脚本系统（总开关）」。',
 			'scriptingResourceScripts',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('模组类库（source/）',
+			'扫描已启用模组的 source/ 目录，把其中的 class 注册给 HScript：脚本可以 import 后 new，或调用实例 / 静态成员。\n只支持普通 class；import 必须写在脚本顶部。\n默认关闭；关闭时脚本行为与旧版完全一致。\n需要先打开「脚本系统（总开关）」。',
+			'scriptingModClasses',
 			'bool');
 		addOption(option);
 

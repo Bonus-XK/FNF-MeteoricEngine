@@ -21,6 +21,7 @@
 | 全曲 / 单曲脚本 | `scriptingSongScripts` | 开 | 允许 `scripting/songs/` 自动发现（见第 11 节） |
 | 状态重定向 | `scriptingStateRedirects` | 开 | 允许 `scripting/redirects.txt` 声明式改跳转（见第 12 节） |
 | 资源同名脚本 | `scriptingResourceScripts` | 开 | 按舞台/角色/音符类型/事件名加载同名脚本（见第 13 节） |
+| 模组类库（source/） | `scriptingModClasses` | **关** | 注册 `mods/<mod>/source/` 下的 class，脚本可 `import` / `new`（见第 14 节） |
 
 > 分项开关只在总开关打开时才有意义；分项在总开关关闭时仍然可见，靠说明文字提示（不引入新的禁用态样式）。
 >
@@ -325,17 +326,13 @@ trace('fps=' + st.fps + ' rss=' + st.rssMB);
   脚本界面里的「返回按钮」得自己用 `FlxSprite` 拼。
 - 没有沙箱 / 权限分级：打开总开关即等于给了脚本完整引擎权限。
 - 脚本不能调 GC / 内存水位 / 加载管线 / 渲染批次这类**性能旋钮**（引擎内部硬编码）。
-- 脚本内不能定义 `class`（SScript EX 模式未开启），也**不支持 map 字面量** `{...}`
-  （SScript 4.0.1 的限制，CNE 的 hscript-improved 才支持）—— 传数据用数组或 `__newMap()`。
-- **mod 内 `source/` 的 Haxe `class` 不能直接 `import`**：普通解释器只在解析期解析
-  **已编译进引擎**的类（SScript `hscriptBase/Parser.hx` 的 `Type.resolveClass`），
-  `mods/<mod>/source/.../*.hx` 不在编译产物里；EX 模式（`classSupport=true`）又只允许
-  `class` / `package` / `import`，不能与普通脚本语句混用，普通解释器的 `new` 也走
-  `Type.createInstance`（`hscriptBase/Interp.hx`），无法实例化 EX 脚本类。
-  - 共享逻辑请写成**脚本库**（`scripting/libs/` + `importScript`，见 §2.1）；
-  - 强类型 / 高性能工具类请编译进引擎（`source/`）后在脚本里 `import`；
-  - 运行期加载 mod 类需要改 SScript 的 `Interp.cnew` / EX 桥接层
-    （「爆改 lib」，有维护成本，需单独立项评估）。
+- 普通脚本内不能直接定义 `class`；需要类请放到模组的 `source/` 并打开「模组类库」
+  （见第 14 节）。也**不支持 map 字面量** `{...}`（SScript 4.0.1 的限制）——
+  传数据用数组或 `__newMap()`。
+- 模组类库不是完整 Haxe：只解释普通 `class`（含 `extends` / 实例与静态成员）。
+  `typedef` / `enum` / `abstract` / 宏 / 接口默认实现 / 泛型约束不保证支持；
+  `import` 必须写在脚本顶部（SScript `execute` 的限制）。共享逻辑仍可写成
+  **脚本库**（`scripting/libs/` + `importScript`，见 §2.1）。
 - 未在 Android / Windows 实机验证（只在本机 macOS 跑过）。
 - 脚本管理器的**列表显示**已实机验证（全局 / 界面两类脚本都正确列出，类型标记、开关状态、
   提示文案都对）；但 **→ 打开脚本界面**这一步未做实机按键验证（自动化按键没送达游戏窗口）。
@@ -429,4 +426,68 @@ mods/<mod>/scripting/events/<事件名>.hx       # 谱面里用到的事件名
 - 回放模式不加载；`hudOnly` / TuoboLoad=2 跳过舞台构造时，舞台脚本也不会加载
   （没有舞台实例可绑）；角色脚本仍按实际构造出的角色加载。
 - 开关：`scriptingResourceScripts`。F5 不会重建资源脚本；改完请重新进曲。
+
+## 14. 模组 Haxe 类库（`mods/<mod>/source/`）
+
+打开「脚本系统（总开关）」+「模组类库（source/）」后，引擎会扫描所有**已启用模组**的
+`source/` 目录，把其中的普通 `class` 注册给 HScript。脚本可以像普通 Haxe 一样
+`import`、`new`、读/写实例字段、调用实例方法与静态成员。
+
+```
+mods/<mod>/source/mymod/Foo.hx
+```
+
+```haxe
+package mymod;
+
+class Foo
+{
+	public var x:Int;
+
+	public function new(x:Int)
+	{
+		this.x = x;
+	}
+
+	public function bar():Int
+	{
+		return x * 2;
+	}
+
+	public static function hello():String
+	{
+		return 'hi';
+	}
+}
+```
+
+脚本：
+
+```haxe
+import mymod.Foo;
+
+var f = new Foo(5);
+trace(f.x);          // 5
+trace(f.bar());      // 10
+trace(Foo.hello());  // hi
+```
+
+- 只注册普通 `class`；`typedef` / `enum` / `abstract` / 宏不注册。类可以 `extends`
+  另一个模组类或引擎类；`super(...)` 可用，但当前实现最多接收 4 个构造参数
+  （`ScriptClass.superConstructor` 的绑定上限；普通方法参数不受此限制）。
+- 类代码可以读取宿主脚本的变量（`game` / `FlxG` / `dad` …）以及宿主脚本顶层的 `var`，
+  因为找不到的标识符会回退到创建它的脚本变量表 / 局部变量表。静态变量按**每个 HScript
+  实例**隔离，不会跨脚本共享。
+- 短名只有在**全局唯一**时才可直接用；有重名时请用完整包名或 `import ... as ...`。
+- `import` 必须写在脚本顶部（SScript `execute` 的硬限制）；`new 完整包名.Foo(...)`
+  不需要 import。**不支持**直接写 `完整包名.类名.静态成员()`（第一段包名会被当成变量）；
+  静态成员请先 `import` 再用短名。
+- 部分 HScript 写法只在类方法里可用，例如直接读写继承字段；离开类上下文仍按普通
+  HScript 规则处理。
+- 目录只读 `source/`，不读取 `scripting/` 里的类；两者用途不同：`scripting/` 放脚本，
+  `source/` 放可被脚本实例化的类。
+- 热重载：F5 / Shift+F5 重建脚本前会重扫类库；改类文件后按 F5 即可。类定义变化不会
+  自动重建已经在运行的旧脚本实例。
+- 关闭「模组类库」时：不再扫盘，新创建 / 重载的脚本不安装 `ex.InterpEx`；已经运行的
+  脚本实例不会被自动销毁，重载或重启后完全回到旧行为。
 

@@ -648,6 +648,10 @@ class Scripting
 	{
 		if (repl != null) return; // REPL 打开时不处理 F5（那时用户可能在输入框里打字）
 
+		// 类库也按 F5 重扫；关闭「模组类库」时 reload() 只清空，不会读盘。
+		if (ClientPrefs.data != null)
+			ModClassLoader.reload();
+
 		if (shift)
 		{
 			reloadGlobalScripts();

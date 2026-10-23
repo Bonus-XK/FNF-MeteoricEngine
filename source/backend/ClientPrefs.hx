@@ -52,6 +52,7 @@ class SaveVariables {
 	@:keep public var scriptingSongScripts:Bool = true; // 全曲 / 单曲脚本（scripting/songs/ 自动发现）
 	@:keep public var scriptingStateRedirects:Bool = true; // 状态重定向（scripting/redirects.txt）
 	@:keep public var scriptingResourceScripts:Bool = true; // 资源同名脚本（scripting/stages|characters|notes|events/）
+	@:keep public var scriptingModClasses:Bool = false; // 模组 Haxe 类库（mods/<mod>/source/，默认关闭）
 	@:keep public var noteSkin:String = 'Default';
 	@:keep public var splashSkin:String = 'Psych';
 	@:keep public var splashAlpha:Float = 0.6;
