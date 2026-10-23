@@ -7,9 +7,21 @@ import psychlua.CustomSubstate;
 
 #if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
 import tea.SScript;
+#if sys
+import sys.FileSystem;
+#end
 class HScript extends SScript
 {
 	public var parentLua:FunkinLua;
+
+	/**
+	 * 所属脚本组（由 `ScriptGroup` 在 execute 前注入；`runHaxeCode` 等无组场景为 null）。
+	 * 类型用 Dynamic 避免 psychlua → scripting 的模块环。
+	 */
+	public var group:Dynamic = null;
+
+	/** 无组场景下通过 `importScript` 加载的库脚本（随本脚本一起销毁）。 */
+	public var standaloneLibraries:Array<HScript> = [];
 	
 	public static function initHaxeModule(parent:FunkinLua)
 	{
@@ -565,6 +577,227 @@ class HScript extends SScript
 		set('insert', function(pos:Int, obj:FlxBasic) PlayState.instance.insert(pos, obj));
 		set('remove', function(obj:FlxBasic, splice:Bool = false) PlayState.instance.remove(obj, splice));
 		#end
+
+		// 脚本库复用：importScript('util') 加载同 mod 的 scripting/libs/util.hx，
+		// 库的顶层函数/变量并入当前脚本作用域，生命周期回调由所属脚本组广播。
+		set('importScript', function(path:String):Dynamic {
+			return importScript(path);
+		});
+	}
+
+	/**
+	 * 加载一个脚本库并返回其实例（脚本内 `importScript(path)` 的落地实现）。
+	 *
+	 * 路径解析（见 {@link resolveImportPath}）：
+	 *  1. `mods/...` 开头 → 按仓库根解析（Android 走 `Paths.mods`）；
+	 *  2. `./` / `../` 开头 → 相对当前脚本所在目录；
+	 *  3. 其它 → 同 mod 的 `scripting/libs/<path>.hx` 优先，其次相对当前脚本目录。
+	 *
+	 * 语义：
+	 *  - 库脚本加入**当前脚本组**，`create/update/...` 生命周期回调自动广播；
+	 *  - 库的顶层函数/变量并入当前脚本作用域（**不覆盖**当前脚本已有名字）；
+	 *  - 返回库的 HScript 实例：`lib.active = false` 停用、`lib.invoke('fn', [args])`
+	 *    取原始返回值、`lib.get/set` 读写变量；
+	 *  - 无脚本组（如 Lua `runHaxeCode`）时独立加载，随本脚本销毁。
+	 *
+	 * @return 库脚本实例；找不到/加载失败返回 null（已打日志）。
+	 */
+	@:keep public function importScript(path:String):Dynamic
+	{
+		var resolved:String = resolveImportPath(path);
+		if (resolved == null)
+		{
+			trace('[HScript] importScript 找不到脚本库：' + path + '（来源：' + origin + '）');
+			return null;
+		}
+
+		var lib:HScript = null;
+		if (group != null)
+		{
+			// ScriptGroup.importLibrary 负责挂组、绑定宿主变量；Dynamic 调用避免模块环。
+			try
+			{
+				lib = cast group.importLibrary(resolved);
+			}
+			catch (e:Dynamic)
+			{
+				trace('[HScript] importScript 挂组失败：' + resolved + ' —— ' + Std.string(e));
+				lib = null;
+			}
+		}
+		else
+		{
+			lib = loadStandaloneLibrary(resolved);
+		}
+		if (lib == null) return null;
+
+		mergeLibraryScope(lib);
+		return lib;
+	}
+
+	/**
+	 * 调用库脚本里的函数并返回**原始返回值**（失败返回 null 并打日志）。
+	 * 等价于 `call(...).returnValue`，但少一层 SCall 解包。
+	 */
+	@:keep public function invoke(func:String, ?args:Array<Dynamic>):Dynamic
+	{
+		if (func == null) return null;
+		var r:Dynamic = call(func, args);
+		if (r == null) return null;
+		if (!r.succeeded && r.exceptions != null && r.exceptions.length > 0)
+		{
+			trace('[HScript] ' + func + ' 调用失败 @ ' + origin + '：' + Std.string(r.exceptions[0]));
+			return null;
+		}
+		return r.returnValue;
+	}
+
+	/**
+	 * 解析 `importScript` 的路径，返回实际存在的文件路径；找不到返回 null。
+	 * 只读探盘，不加载。
+	 */
+	public function resolveImportPath(path:String):String
+	{
+		#if sys
+		if (path == null) return null;
+		var p:String = StringTools.replace(path.trim(), '\\', '/');
+		if (p.length == 0) return null;
+
+		var exts:Array<String> = ~/\.(hx|hscript|hsc|hxs)$/i.match(p)
+			? ['']
+			: ['.hx', '.hscript', '.hsc', '.hxs'];
+		var candidates:Array<String> = [];
+
+		if (isAbsolutePath(p) || p.startsWith('mods/'))
+		{
+			var base:String = p.startsWith('mods/') ? Paths.mods(p.substr(5)) : p;
+			for (ext in exts) candidates.push(base + ext);
+		}
+		else if (p.startsWith('./') || p.startsWith('../'))
+		{
+			var dir:String = scriptDirectory();
+			if (dir != null)
+				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
+		}
+		else
+		{
+			var modRoot:String = modRootOf(origin);
+			if (modRoot != null)
+				for (ext in exts) candidates.push(modRoot + '/scripting/libs/' + p + ext);
+			var dir:String = scriptDirectory();
+			if (dir != null)
+				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
+		}
+
+		for (c in candidates)
+		{
+			try
+			{
+				if (FileSystem.exists(c) && !FileSystem.isDirectory(c)) return c;
+			}
+			catch (e:Dynamic) {}
+		}
+		#end
+		return null;
+	}
+
+	/** 当前脚本所在目录；无 origin 或 origin 不是路径时返回 null。 */
+	function scriptDirectory():String
+	{
+		if (origin == null || origin.length == 0) return null;
+		var p:String = StringTools.replace(origin, '\\', '/');
+		var i:Int = p.lastIndexOf('/');
+		return i > 0 ? p.substr(0, i) : null;
+	}
+
+	/** 从脚本路径推出 mod 根目录（`mods/<mod>`）。 */
+	static function modRootOf(from:String):String
+	{
+		if (from == null) return null;
+		var p:String = StringTools.replace(from, '\\', '/');
+		var i:Int = p.indexOf('/scripting/');
+		if (i >= 0) return p.substr(0, i);
+		var m:Int = p.indexOf('mods/');
+		if (m >= 0)
+		{
+			var rest:String = p.substr(m + 5);
+			var slash:Int = rest.indexOf('/');
+			return slash > 0 ? p.substr(0, m + 5 + slash) : p;
+		}
+		return null;
+	}
+
+	static inline function isAbsolutePath(p:String):Bool
+	{
+		return p.length > 0 && (p.charAt(0) == '/' || (p.length > 2 && p.charAt(1) == ':' && p.charAt(2) == '/'));
+	}
+
+	/** 无脚本组时的独立加载：执行、绑宿主变量、记入 standaloneLibraries。 */
+	function loadStandaloneLibrary(path:String):HScript
+	{
+		var lib:HScript = null;
+		try
+		{
+			lib = new HScript(null, path, false);
+			lib.origin = path;
+			try lib.execute() catch (e:Dynamic)
+			{
+				trace('[HScript] 脚本库执行失败 ' + path + '：' + Std.string(e));
+				lib.destroy();
+				return null;
+			}
+			var errs:Array<haxe.Exception> = @:privateAccess lib.parsingExceptions;
+			if (errs != null && errs.length > 0)
+			{
+				trace('[HScript] 脚本库解析失败 ' + path + '：' + Std.string(errs[0]));
+				lib.destroy();
+				return null;
+			}
+		}
+		catch (e:Dynamic)
+		{
+			trace('[HScript] 脚本库加载失败 ' + path + '：' + Std.string(e));
+			if (lib != null) lib.destroy();
+			return null;
+		}
+
+		// 与调用方共享宿主变量（runHaxeCode 场景没有 ScriptGroup.bindVars，这里手动补齐）
+		var hostState:Dynamic = get('state');
+		var hostGame:Dynamic = get('game');
+		var hostApi:Dynamic = get('scripting');
+		lib.set('state', hostState != null ? hostState : flixel.FlxG.state);
+		lib.set('game', hostGame != null ? hostGame : PlayState.instance);
+		if (hostApi != null) lib.set('scripting', hostApi);
+		standaloneLibraries.push(lib);
+		return lib;
+	}
+
+	/**
+	 * 生命周期回调名：由 `ScriptGroup` 广播给库脚本**自身**，不再并入主脚本作用域，
+	 * 否则主脚本没定义时会把库的 `update` 当自己的、与库广播叠加成双重调用。
+	 */
+	static final LIFECYCLE_NAMES:Array<String> = [
+		'create', 'destroy', 'update', 'postUpdate', 'preUpdate',
+		'stepHit', 'beatHit', 'sectionHit',
+		'preStateSwitch', 'postStateSwitch',
+		'postDraw', 'preDraw', 'postGameStart', 'preGameStart',
+		'focusGained', 'focusLost', 'gameResized',
+		'onCreate', 'onDestroy'
+	];
+
+	/** 把库的顶层函数/变量并入当前脚本作用域（已有名字不覆盖，宿主变量/生命周期回调不并）。 */
+	function mergeLibraryScope(lib:HScript):Void
+	{
+		if (lib == null) return;
+		var target:Map<String, Dynamic> = @:privateAccess interp.variables;
+		var source:Map<String, Dynamic> = @:privateAccess lib.interp.variables;
+		if (target == null || source == null) return;
+		for (key in source.keys())
+		{
+			if (key == null || key == 'state' || key == 'game' || key == 'scripting' || key == 'this') continue;
+			if (LIFECYCLE_NAMES.contains(key)) continue;
+			if (!target.exists(key)) target.set(key, source.get(key));
+		}
 	}
 
 	public function executeCode(?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):SCall
@@ -691,14 +924,30 @@ class HScript extends SScript
 	#if (SScript >= "3.0.3")
 	override public function destroy()
 	{
+		for (lib in standaloneLibraries)
+		{
+			if (lib == null) continue;
+			try lib.destroy() catch (e:Dynamic) {}
+		}
+		standaloneLibraries = [];
+
 		origin = null;
 		parentLua = null;
+		group = null;
 
 		super.destroy();
 	}
 	#else
 	public function destroy()
 	{
+		for (lib in standaloneLibraries)
+		{
+			if (lib == null) continue;
+			try lib.destroy() catch (e:Dynamic) {}
+		}
+		standaloneLibraries = [];
+
+		group = null;
 		active = false;
 	}
 	#end

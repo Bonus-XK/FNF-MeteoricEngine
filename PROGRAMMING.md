@@ -29,6 +29,7 @@
 ```
 mods/<mod>/scripting/global/<任意名>.hx        # 全局常驻脚本（跨所有界面）
 mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个界面）
+mods/<mod>/scripting/libs/<任意名>.hx          # 共享脚本库（importScript 加载）
 ```
 
 - 扩展名：`.hx`（`.hscript` / `.hsc` / `.hxs` 亦可）。
@@ -39,9 +40,32 @@ mods/<mod>/scripting/states/<界面名>.hx        # 状态脚本（接管某个�
   无前缀默认 500）。同优先级按 mod 启用顺序、再按文件名。**全部不带前缀时顺序与旧版完全一致**。
   例：`00_input.hx` → `50_ui.hx` → `z_debug.hx`。
 
+### 2.1 脚本库复用（importScript）
+
+把可复用逻辑放 `mods/<mod>/scripting/libs/`，脚本里直接加载：
+
+```haxe
+var util = importScript('util');        // → mods/<mod>/scripting/libs/util.hx
+var helper = importScript('./helper');  // → 当前脚本同目录的 helper.hx
+```
+
+- **路径解析**（不写扩展名时自动试 `.hx` / `.hscript` / `.hsc` / `.hxs`）：
+  1. `mods/` 开头 → 按仓库根解析（Android 走 `Paths.mods`）；
+  2. `./` / `../` 开头 → 相对当前脚本所在目录；
+  3. 其它 → 同 mod 的 `scripting/libs/<路径>` 优先，其次相对当前脚本目录。
+- **作用域**：库的顶层函数/变量会并入当前脚本（当前脚本已有的名字优先），
+  所以直接写 `helper(...)` 即可，不必 `util.helper(...)`。
+- **生命周期**：库脚本挂在当前脚本组里，`create` / `update` / `stepHit` / `destroy` 等回调
+  与主脚本一样被自动广播（每个库实例各跑一次，不会双重调用）。
+- **控制库**：`importScript` 返回库的 `HScript` 实例 —— `lib.active = false` 停用、
+  `lib.invoke('fn', [args])` 取原始返回值、`lib.get('x')` / `lib.set('x', v)` 读写变量。
+- 同一个库被不同脚本 import 会各得一份独立实例（不共享状态）；要共享状态请只 import 一次，
+  再把返回对象传给其它脚本。
+- 无脚本组场景（Lua `runHaxeCode`）也能用：库独立加载，随调用方脚本一起销毁。
+
 ## 3. 脚本能拿到什么
 
-- `psychlua.HScript` 的 **187 项 preset**（引擎类 `PlayState` / `Paths` / `FlxSprite` / `Character` /
+- `psychlua.HScript` 的 **189 项 preset**（引擎类 `PlayState` / `Paths` / `FlxSprite` / `Character` /
   `Note` / `Mods` / `DesignTokens` / `Lang`、Flixel 类、`Reflect` / `Type` 反射、`sys` 文件系统 …）——
   与既有 mod 脚本同一套 API。
 - 编程层额外注入三个变量：

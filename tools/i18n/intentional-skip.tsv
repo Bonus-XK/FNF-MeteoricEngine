@@ -851,6 +851,15 @@ source/options/RenderModeSubState.hx	视频编码器	1	Option 兜底原文：Opt
 source/options/RenderModeSubState.hx	输出到「输出目录」下的 .mp4。\\n\\n	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	输出目录	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/RenderModeSubState.hx	（每帧要把画面从显卡读回内存），介意的话录完记得关掉	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/psychlua/HScript.hx	 调用失败 @ 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	[HScript] importScript 找不到脚本库：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	[HScript] importScript 挂组失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	[HScript] 脚本库加载失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	[HScript] 脚本库执行失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	[HScript] 脚本库解析失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	（来源：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/HScript.hx	）	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/psychlua/HScript.hx	：	4	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/psychlua/LuaClass.hx	    -- Enemy.isInstanceOf(instance) 与 instance:isInstanceOf(Enemy) 均可用\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类部分），否则创建新实例。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本
