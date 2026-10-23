@@ -6,7 +6,7 @@
 |---|---|
 | 生成脚本 | `tools/contract/gen_script_surface.py` |
 | 快照文件 | `tools/contract/script-surface.tsv`（确定性，可重复生成） |
-| 生成时 commit | `bc95da438a24b96b8ac612b876679634bc60534c` |
+| 生成时 commit | `abc45a39ffeaaa318649000315cdca77badf4a0a` |
 | Lua 唯一名 | 227 |
 | HScript 唯一名 | 192 |
 | 契约条目数（唯一 kind+name 对） | 492 |
