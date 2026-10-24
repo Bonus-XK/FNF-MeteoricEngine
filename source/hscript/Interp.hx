@@ -46,6 +46,10 @@ class Interp {
 	public var usingPrefixes : Array<Array<String>>; // using 前缀列表（using a.b / import a.b.*）
 	public var currentPackage : Null<Array<String>>; // 当前 package 声明
 
+	// Meteoric: 脚本类壳实例支持（移植自 hscript-improved CustomClassHandler）
+	public var errorHandler : Error -> Void; // error() 触发时的回调（hscriptPos 下为包装类 Error），默认 null = 零行为变化
+	public var scriptObject : Dynamic;                                           // 壳实例反向引用（interp 所属对象）
+
 	#if hscriptPos
 	var curExpr : Expr;
 	#end
@@ -250,7 +254,7 @@ class Interp {
 		return exprReturn(expr);
 	}
 
-	function exprReturn(e) : Dynamic {
+	public function exprReturn(e) : Dynamic {
 		try {
 			return expr(e);
 		} catch( e : Stop ) {
@@ -266,7 +270,7 @@ class Interp {
 		return null;
 	}
 
-	function duplicate<T>( h : Map<String,T> ) {
+	public function duplicate<T>( h : Map<String,T> ) {
 		var h2 = new Map();
 		for( k in h.keys() )
 			h2.set(k,h.get(k));
@@ -282,6 +286,8 @@ class Interp {
 
 	inline function error(e : #if hscriptPos ErrorDef #else Error #end, rethrow=false ) : Dynamic {
 		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
+		// Meteoric: errorHandler 回调（脚本类壳实例等外部使用方注册）；为 null 时零行为变化
+		if (errorHandler != null) errorHandler(e);
 		if( rethrow ) this.rethrow(e) else throw e;
 		return null;
 	}

@@ -289,10 +289,17 @@ fi
 echo "$TARGET_ARCH" > "$ARCH_STAMP"
 echo "[pre-build] 目标架构 $TARGET_ARCH（ndll: $NDLL_SRC）"
 
+# Meteoric: 脚本类 extends 引擎类（壳类宏）—— 默认关闭，METEORIC_CUSTOM_CLASSES=1 开启
+CUSTOM_CLASSES_FLAG=""
+if [ "${METEORIC_CUSTOM_CLASSES:-0}" = "1" ]; then
+  CUSTOM_CLASSES_FLAG="-DCUSTOM_CLASSES"
+  echo "[compile] CUSTOM_CLASSES：启用脚本类 extends 引擎类（壳类白名单见 hscript-macros/hscript/macros/ClassExtendMacro.hx）"
+fi
+
 if [ "$1" = "test" ]; then
-  haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS
+  haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
 else
-  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS
+  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
 fi
 
 # ---- 构建后处理：恢复墙钟版 lime.ndll ----

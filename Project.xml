@@ -162,6 +162,12 @@
 	<haxedef name="openflPos" />
 	<haxedef name="hscriptPos" />
 
+	<!-- Meteoric: 脚本类 extends 引擎类（壳类机制，移植自 hscript-improved ClassExtendMacro）。
+	     默认关闭：METEORIC_CUSTOM_CLASSES=1 构建时才定义 CUSTOM_CLASSES 并挂载宏 classpath。
+	     壳类只对白名单（hscript-macros/hscript/macros/ClassExtendMacro.hx allowedClasses）生成。 -->
+	<classpath name="hscript-macros" if="CUSTOM_CLASSES" />
+	<haxeflag name="--macro" value="hscript.macros.ClassExtendMacro.init()" if="CUSTOM_CLASSES" />
+
 	<!-- Enables a terminal log prompt on debug builds -->
 	<haxelib name="hxcpp-debug-server" if="debug"/>
 	<haxedef name="HXC_LIBVLC_LOGGING" if="VIDEOS_ALLOWED debug" />
