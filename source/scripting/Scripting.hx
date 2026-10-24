@@ -116,7 +116,9 @@ class Scripting
 	@:keep
 	public static function isEnabled():Bool
 	{
-		return ClientPrefs.data != null && ClientPrefs.data.scriptingEnabled;
+		// 按用户要求保持脚本系统开启（临时测试配置；正式发布前应恢复存档开关判断）。
+		return true;
+		// return ClientPrefs.data != null && ClientPrefs.data.scriptingEnabled;
 	}
 
 	/** 全局常驻脚本。 */

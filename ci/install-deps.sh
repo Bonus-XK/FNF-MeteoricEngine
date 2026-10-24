@@ -29,7 +29,11 @@ install hxcpp 4.3.2
 install SScript 4.0.1
 install hxCodec 3.0.2
 install tjson 1.4.0
-install hscript 2.6.0
+# hscript：project.xml 声明 <haxelib name="hscript"/>，但引擎实际编译用的是源码树内嵌的
+# source/hscript/（基于 hscript 2.7.0 的 Meteoric 定制版，支持顶层 public/static、~/.../i 正则、
+# 字符串插值）。source/ 目录在 classpath 中优先，遮蔽 haxelib 版本 —— 此处的 haxelib 安装
+# 仅满足依赖解析，版本不参与实际编译；与 source/hscript/ 基线版本对齐取 2.7.0。
+install hscript 2.7.0
 install actuate 1.9.0
 install flxanimate 4.0.0  # 本机激活版本（PsychFlxAnimate 引用 flxanimate.frames/data/FlxAnimate API）
 # extension-androidtools：安卓原生工具（Toast/权限/外部存储目录），Project.xml if=android
@@ -48,4 +52,4 @@ haxelib git linc_luajit https://github.com/superpowers04/linc_luajit main 2>/dev
   haxelib git linc_luajit https://github.com/superpowers04/linc_luajit
 
 echo "==> 依赖安装完成"
-haxelib list | grep -E "^(flixel|openfl|lime|hxcpp|SScript|hxCodec|discord_rpc|linc_luajit|tjson)" | head -12
+haxelib list | grep -E "^(flixel|openfl|lime|hxcpp|SScript|hscript|hxCodec|discord_rpc|linc_luajit|tjson)" | head -14
