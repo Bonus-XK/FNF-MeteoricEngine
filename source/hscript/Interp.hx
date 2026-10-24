@@ -94,6 +94,8 @@ class Interp {
 		binops.set(">",function(e1,e2) return me.expr(e1) > me.expr(e2));
 		binops.set("<",function(e1,e2) return me.expr(e1) < me.expr(e2));
 		binops.set("||",function(e1,e2) return me.expr(e1) == true || me.expr(e2) == true);
+		// Meteoric: null 合并 a ?? b —— 左侧非 null 取左侧，否则求右侧
+		binops.set("??",function(e1,e2) { var v = me.expr(e1); return v == null ? me.expr(e2) : v; });
 		binops.set("&&",function(e1,e2) return me.expr(e1) == true && me.expr(e2) == true);
 		binops.set("=",assign);
 		binops.set("...",function(e1,e2) return new IntIterator(me.expr(e1),me.expr(e2)));
@@ -109,6 +111,8 @@ class Interp {
 		assignOp("<<=",function(v1,v2) return v1 << v2);
 		assignOp(">>=",function(v1,v2) return v1 >> v2);
 		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
+		// Meteoric: null 合并赋值 a ??= b —— a 为 null 时才赋 b
+		assignOp("??=",function(v1:Dynamic,v2:Dynamic) return v1 == null ? v2 : v1);
 	}
 
 	function setVar( name : String, v : Dynamic ) {
@@ -310,6 +314,16 @@ class Interp {
 			declared.push({ n : n, old : locals.get(n) });
 			locals.set(n,{ r : (e == null)?null:expr(e) });
 			return null;
+		case EVars(tmp, vars, src):
+			// Meteoric: 解构声明 var [a,b] = arr —— 源只求值一次，N 个变量按片段取值
+			var sv = src == null ? null : expr(src);
+			declared.push({ n : tmp, old : locals.get(tmp) });
+			locals.set(tmp, { r : sv });
+			for( v in vars ) {
+				declared.push({ n : v.name, old : locals.get(v.name) });
+				locals.set(v.name, { r : expr(v.e) });
+			}
+			return null;
 		case EParent(e):
 			return expr(e);
 		case EBlock(exprs):
@@ -342,8 +356,19 @@ class Interp {
 			}
 		case ECall(e,params):
 			var args = new Array();
-			for( p in params )
-				args.push(expr(p));
+			for( p in params ) {
+				// Meteoric: spread 调用 f(...arr) —— EUnop("...",...) 展开可迭代对象
+				switch( Tools.expr(p) ) {
+				case EUnop("...", _, inner):
+					var spread:Dynamic = expr(inner);
+					if( spread != null ) {
+						var sit = makeIterator(spread);
+						while( sit.hasNext() ) args.push(sit.next());
+					}
+				default:
+					args.push(expr(p));
+				}
+			}
 
 			switch( Tools.expr(e) ) {
 			case EField(e,f):
@@ -387,21 +412,31 @@ class Interp {
 			var capturedLocals = duplicate(locals);
 			var me = this;
 			var hasOpt = false, minParams = 0;
-			for( p in params )
-				if( p.opt )
-					hasOpt = true;
-				else
-					minParams++;
+			// Meteoric: rest 参数 function f(a, ...rest) —— 收集剩余参数为数组
+			var restIdx = -1;
+			for( i in 0...params.length ) {
+				var p = params[i];
+				if( p.rest ) { restIdx = i; continue; }
+				if( p.opt ) hasOpt = true; else minParams++;
+			}
+			var fixedCount = restIdx >= 0 ? restIdx : params.length;
 			var f = function(args:Array<Dynamic>) {
-				if( ( (args == null) ? 0 : args.length ) != params.length ) {
-					if( args.length < minParams ) {
-						var str = "Invalid number of parameters. Got " + args.length + ", required " + minParams;
+				var argCount = (args == null) ? 0 : args.length;
+				if( restIdx >= 0 ) {
+					if( argCount < fixedCount ) {
+						var str = "Invalid number of parameters. Got " + argCount + ", required " + fixedCount;
+						if( name != null ) str += " for function '" + name+"'";
+						error(ECustom(str));
+					}
+				} else if( argCount != params.length ) {
+					if( argCount < minParams ) {
+						var str = "Invalid number of parameters. Got " + argCount + ", required " + minParams;
 						if( name != null ) str += " for function '" + name+"'";
 						error(ECustom(str));
 					}
 					// make sure mandatory args are forced
 					var args2 = [];
-					var extraParams = args.length - minParams;
+					var extraParams = argCount - minParams;
 					var pos = 0;
 					for( p in params )
 						if( p.opt ) {
@@ -417,8 +452,17 @@ class Interp {
 				var old = me.locals, depth = me.depth;
 				me.depth++;
 				me.locals = me.duplicate(capturedLocals);
-				for( i in 0...params.length )
-					me.locals.set(params[i].name,{ r : args[i] });
+				if( restIdx >= 0 ) {
+					for( i in 0...fixedCount )
+						me.locals.set(params[i].name,{ r : args[i] });
+					var restArr:Array<Dynamic> = [];
+					var pos = fixedCount;
+					while( pos < argCount ) restArr.push(args[pos++]);
+					me.locals.set(params[restIdx].name,{ r : restArr });
+				} else {
+					for( i in 0...params.length )
+						me.locals.set(params[i].name,{ r : args[i] });
+				}
 				var r = null;
 				var oldDecl = declared.length;
 				if( inTry )
@@ -527,7 +571,9 @@ class Interp {
 			for( c in cases ) {
 				for( v in c.values )
 					if( expr(v) == val ) {
-						match = true;
+						// Meteoric: switch 守卫 case v if (cond): —— guard 失败则尝试下一个 case
+						if( c.guard == null || expr(c.guard) == true )
+							match = true;
 						break;
 					}
 				if( match ) {
@@ -576,6 +622,13 @@ class Interp {
 			return (v : Array<Dynamic>).iterator();
 		if( v.iterator != null ) v = v.iterator();
 		#else
+		// Meteoric: hxcpp 下 Dynamic.iterator() 动态调用不稳定，集合类型显式分支
+		#if cpp
+		if( v is Array ) return (cast v : Array<Dynamic>).iterator();
+		if( v is haxe.ds.StringMap ) return (cast v : haxe.ds.StringMap<Dynamic>).iterator();
+		if( v is haxe.ds.IntMap ) return (cast v : haxe.ds.IntMap<Dynamic>).iterator();
+		if( v is haxe.ds.ObjectMap ) return (cast v : haxe.ds.ObjectMap<Dynamic,Dynamic>).iterator();
+		#end
 		#if (cpp) if ( v.iterator != null ) #end
 			try v = v.iterator() catch( e : Dynamic ) {};
 		#end
@@ -590,6 +643,13 @@ class Interp {
 			return (v : Array<Dynamic>).keyValueIterator();
 		if( v.keyValueIterator != null ) v = v.keyValueIterator();
 		#else
+		// Meteoric: hxcpp 下 Dynamic.keyValueIterator() 动态调用不稳定，集合类型显式分支
+		#if cpp
+		if( v is Array ) return (cast v : Array<Dynamic>).keyValueIterator();
+		if( v is haxe.ds.StringMap ) return (cast v : haxe.ds.StringMap<Dynamic>).keyValueIterator();
+		if( v is haxe.ds.IntMap ) return (cast v : haxe.ds.IntMap<Dynamic>).keyValueIterator();
+		if( v is haxe.ds.ObjectMap ) return (cast v : haxe.ds.ObjectMap<Dynamic,Dynamic>).keyValueIterator();
+		#end
 		try v = v.keyValueIterator() catch( e : Dynamic ) {};
 		#end
 		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));

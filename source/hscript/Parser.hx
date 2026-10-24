@@ -117,7 +117,9 @@ class Parser {
 			["..."],
 			["&&"],
 			["||"],
-			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
+			// Meteoric: null 合并（右结合，优先级低于 ||、高于赋值）
+			["??"],
+			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","??=","=>"],
 			["->"],
 			["in","is"]
 		];
@@ -126,7 +128,7 @@ class Parser {
 		for( i in 0...priorities.length )
 			for( x in priorities[i] ) {
 				opPriority.set(x, i);
-				if( i == 9 ) opRightAssoc.set(x, true);
+				if( i == 10 || x == "??" ) opRightAssoc.set(x, true);
 			}
 		for( x in ["!", "++", "--", "~"] ) // unary "-" handled in parser directly!
 			opPriority.set(x, x == "++" || x == "--" ? -1 : -2);
@@ -308,8 +310,9 @@ class Parser {
 		while( true ) {
 			var tk = token();
 			var id = null;
+			var wasIdent = false;
 			switch( tk ) {
-			case TId(i): id = i;
+			case TId(i): id = i; wasIdent = true;
 			case TConst(c):
 				if( !allowJSON )
 					unexpected(tk);
@@ -323,15 +326,22 @@ class Parser {
 				unexpected(tk);
 				break;
 			}
-			ensure(TDoubleDot);
-			fl.push({ name : id, e : parseExpr() });
-			tk = token();
-			switch( tk ) {
+			// Meteoric: 对象简写 {x} = {x: x}（Haxe 4 语法；仅标识符键支持简写）
+			var tk2 = token();
+			if( Type.enumEq(tk2, TDoubleDot) ) {
+				fl.push({ name : id, e : parseExpr() });
+				tk2 = token();
+			} else if( wasIdent ) {
+				fl.push({ name : id, e : mk(EIdent(id), tokenMin, tokenMax) });
+			} else {
+				unexpected(tk2);
+			}
+			switch( tk2 ) {
 			case TBrClose:
 				break;
 			case TComma:
 			default:
-				unexpected(tk);
+				unexpected(tk2);
 			}
 		}
 		return parseExprNext(mk(EObject(fl),p1));
@@ -503,6 +513,9 @@ class Parser {
 				push(tk);
 				switch( tk2 ) {
 				case TDoubleDot:
+					return parseExprNext(parseObject(p1));
+				case TBrClose, TComma:
+					// Meteoric: 对象简写 {x} / {x, y: 1} —— 标识符后直接 } 或 , 也走对象解析
 					return parseExprNext(parseObject(p1));
 				default:
 				}
@@ -758,6 +771,76 @@ class Parser {
 		}
 	}
 
+	/**
+	 * Meteoric: 解构声明 var [a,b] = arr / var {x,y} = obj —— 生成 EVars
+	 * （源只求值一次；临时变量 __d_N 供取值片段引用，Interp 原生求值）。
+	 * 支持：数组解构（含 ...rest 尾部 slice 收集）、对象解构（含 {k: target} 重命名）。
+	 */
+	function parseDestructure(openTk:Token, p1) : Expr {
+		var tmp = "__d_" + (uid++);
+		var vars:Array<{ name : String, e : Expr }> = [];
+		if( Type.enumEq(openTk, TBkOpen) ) {
+			// 数组解构 var [a, b, ...rest] = arr
+			var idx = 0;
+			while( true ) {
+				var tk = token();
+				if( Type.enumEq(tk, TBkClose) ) break;
+				if( Type.enumEq(tk, TOp("...")) ) {
+					// ...rest 收集剩余元素（slice）
+					var rn = getIdent();
+					var tmpE = mk(EIdent(tmp), tokenMin, tokenMax);
+					var sliceE = mk(EField(tmpE, "slice"), tokenMin, tokenMax);
+					var idxE = mk(EConst(CInt(idx)), tokenMin, tokenMax);
+					vars.push({ name : rn, e : mk(ECall(sliceE, [idxE]), tokenMin, tokenMax) });
+					ensure(TBkClose);
+					break;
+				}
+				switch( tk ) {
+				case TId(n):
+					var tmpE2 = mk(EIdent(tmp), tokenMin, tokenMax);
+					var idxE2 = mk(EConst(CInt(idx)), tokenMin, tokenMax);
+					vars.push({ name : n, e : mk(EArray(tmpE2, idxE2), tokenMin, tokenMax) });
+				default:
+					unexpected(tk);
+				}
+				idx++;
+				tk = token();
+				if( Type.enumEq(tk, TComma) ) continue;
+				if( Type.enumEq(tk, TBkClose) ) break;
+				unexpected(tk);
+			}
+		} else {
+			// 对象解构 var {x, y} = obj / var {x: z} = obj
+			while( true ) {
+				var tk = token();
+				if( Type.enumEq(tk, TBrClose) ) break;
+				var key:String = null;
+				switch( tk ) {
+				case TId(k): key = k;
+				default: unexpected(tk);
+				}
+				var tk2 = token();
+				if( Type.enumEq(tk2, TDoubleDot) ) {
+					// {k: target} 重命名
+					var target = getIdent();
+					var tmpE3 = mk(EIdent(tmp), tokenMin, tokenMax);
+					vars.push({ name : target, e : mk(EField(tmpE3, key), tokenMin, tokenMax) });
+					tk2 = token();
+				} else {
+					// {x} 简写
+					var tmpE4 = mk(EIdent(tmp), tokenMin, tokenMax);
+					vars.push({ name : key, e : mk(EField(tmpE4, key), tokenMin, tokenMax) });
+				}
+				if( Type.enumEq(tk2, TComma) ) continue;
+				if( Type.enumEq(tk2, TBrClose) ) break;
+				unexpected(tk2);
+			}
+		}
+		ensureToken(TOp("="));
+		var src = parseExpr();
+		return mk(EVars(tmp, vars, src), p1, pmax(src));
+	}
+
 	function parseStructure(id) {
 		#if hscriptPos
 		var p1 = tokenMin;
@@ -783,6 +866,12 @@ class Parser {
 			}
 			mk(EIf(cond,e1,e2),p1,(e2 == null) ? tokenMax : pmax(e2));
 		case "var", "final":
+			// Meteoric: 解构声明 var [a,b] = arr / var {x,y} = obj —— 生成 EVars
+			var tkD = token();
+			if( Type.enumEq(tkD, TBkOpen) || Type.enumEq(tkD, TBrOpen) ) {
+				return parseDestructure(tkD, p1);
+			}
+			push(tkD);
 			var ident = getIdent();
 			var tk = token();
 			var t = null;
@@ -871,6 +960,25 @@ class Parser {
 			case TId(id): name = id;
 			default: push(tk);
 			}
+			// Meteoric: 泛型函数 function f<T>(x:T):T —— 类型参数解析后丢弃（类型擦除）
+			if( name != null ) {
+				var tkG = token();
+				if( Type.enumEq(tkG, TOp("<")) ) {
+					var depth = 1;
+					while( depth > 0 ) {
+						var tG = token();
+						if( tG == TEof ) unexpected(tG);
+						switch( tG ) {
+						case TOp("<"): depth++;
+						case TOp(">"): depth--;
+						case TOp(">>"): depth -= 2; if( depth < 0 ) depth = 0;
+						default:
+						}
+					}
+				} else {
+					push(tkG);
+				}
+			}
 			var inf = parseFunctionDecl();
 			mk(EFunction(inf.args, inf.body, name, inf.ret),p1,pmax(inf.body));
 		case "return":
@@ -920,22 +1028,31 @@ class Parser {
 				var tk = token();
 				switch( tk ) {
 				case TId("case"):
-					var c = { values : [], expr : null };
-					cases.push(c);
-					while( true ) {
-						var e = parseExpr();
-						c.values.push(e);
-						tk = token();
-						switch( tk ) {
-						case TComma:
-							// next expr
-						case TDoubleDot:
-							break;
-						default:
-							unexpected(tk);
-							break;
-						}
+				var c = { values : [], expr : null, guard : null };
+				cases.push(c);
+				var vals = [];
+				while( true ) {
+					var e = parseExpr();
+					// Meteoric: 或模式 case 1 | 2: —— 顶层 EBinop("|") 拆成多个匹配值；
+					// case (1|2): 顶层是 EParent 位或，不拆（Haxe 4.2+ 语义）
+					splitOrPattern(e, vals);
+					tk = token();
+					switch( tk ) {
+					case TComma:
+						// next expr
+					case TDoubleDot:
+						break;
+					case TId("if"):
+						// Meteoric: switch 守卫 case v if (cond):
+						c.guard = parseExpr();
+						ensure(TDoubleDot);
+						break;
+					default:
+						unexpected(tk);
+						break;
 					}
+				}
+				c.values = vals;
 					var exprs = [];
 					while( true ) {
 						tk = token();
@@ -1075,6 +1192,20 @@ class Parser {
 					opt = true;
 					tk = token();
 				default:
+				}
+				// Meteoric: rest 参数 function f(a, ...rest) / function f(...rest)
+				if( Type.enumEq(tk, TOp("...")) ) {
+					tk = token();
+					switch( tk ) {
+					case TId(rid):
+						var rarg : Argument = { name : rid, rest : true };
+						args.push(rarg);
+						ensure(TPClose);
+						done = true;
+					default:
+						unexpected(tk);
+					}
+					continue;
 				}
 				switch( tk ) {
 				case TId(id): name = id;
@@ -1286,6 +1417,18 @@ class Parser {
 		}
 	}
 
+	// Meteoric: 或模式 case 1 | 2: —— 顶层 EBinop("|") 递归拆成叶子；
+	// case (1|2): 顶层是 EParent（位或），保持原样不拆。
+	function splitOrPattern(e:Expr, out:Array<Expr>) {
+		switch( expr(e) ) {
+		case EBinop("|", l, r):
+			splitOrPattern(l, out);
+			splitOrPattern(r, out);
+		default:
+			out.push(e);
+		}
+	}
+
 	function parseExprList( etk ) {
 		var args = new Array();
 		var tk = token();
@@ -1293,7 +1436,14 @@ class Parser {
 			return args;
 		push(tk);
 		while( true ) {
-			args.push(parseExpr());
+			// Meteoric: spread 参数 f(...arr) —— 编码为 EUnop("...", true, expr)
+			var tks = token();
+			if( Type.enumEq(tks, TOp("...")) ) {
+				args.push(mk(EUnop("...", true, parseExpr()), tokenMin, tokenMax));
+			} else {
+				push(tks);
+				args.push(parseExpr());
+			}
 			tk = token();
 			switch( tk ) {
 			case TComma:
@@ -1731,6 +1881,14 @@ class Parser {
 			case "'".code, '"'.code: return TConst( CString(readString(char), true) );
 			case "?".code:
 				char = readChar();
+				if( char == "?".code ) {
+					// Meteoric: null 合并 a ?? b / a ??= b
+					char = readChar();
+					if( char == "=".code )
+						return TOp("??=");
+					this.char = char;
+					return TOp("??");
+				}
 				if( char == ".".code )
 					return TQuestionDot;
 				this.char = char;

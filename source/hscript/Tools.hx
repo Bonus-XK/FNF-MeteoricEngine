@@ -59,6 +59,7 @@ class Tools {
 		case EMeta(name, args, e): if( args != null ) for( a in args ) f(a); f(e);
 		case ECheckType(e,_): f(e);
 		case ECast(e,_): f(e);
+		case EVars(_, vars, src): if( src != null ) f(src); for( v in vars ) if( v.e != null ) f(v.e);
 		}
 	}
 
@@ -90,6 +91,7 @@ class Tools {
 		case EMeta(name, args, e): EMeta(name, args == null ? null : [for( a in args ) f(a)], f(e));
 		case ECheckType(e,t): ECheckType(f(e), t);
 		case ECast(e,t): ECast(f(e),t);
+		case EVars(tmp, vars, src): EVars(tmp, [for( v in vars ) { name : v.name, e : if( v.e != null ) f(v.e) else null }], if( src != null ) f(src) else null);
 		}
 		return mk(edef, e);
 	}

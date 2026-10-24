@@ -343,6 +343,15 @@ class Printer {
 				addType(t);
 				add(")");
 			}
+		case EVars(tmp, vars, src):
+			// Meteoric: 解构声明 —— 打印 var a, b = src 简化形式
+			add("var ");
+			for( i in 0...vars.length ) {
+				if( i > 0 ) add(", ");
+				add(vars[i].name);
+			}
+			add(" = ");
+			expr(src);
 		}
 	}
 

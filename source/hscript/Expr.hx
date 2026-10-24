@@ -63,15 +63,16 @@ enum Expr {
 	ETry( e : Expr, v : String, t : Null<CType>, ecatch : Expr );
 	EObject( fl : Array<{ name : String, e : Expr }> );
 	ETernary( cond : Expr, e1 : Expr, e2 : Expr );
-	ESwitch( e : Expr, cases : Array<{ values : Array<Expr>, expr : Expr }>, ?defaultExpr : Expr);
+	ESwitch( e : Expr, cases : Array<{ values : Array<Expr>, expr : Expr, ?guard : Expr }>, ?defaultExpr : Expr);
 	EDoWhile( cond : Expr, e : Expr);
 	EMeta( name : String, args : Array<Expr>, e : Expr );
 	ECheckType( e : Expr, t : CType );
 	EForGen( it : Expr, e : Expr );
+	EVars( tmp : String, vars : Array<{ name : String, e : Expr }>, ?src : Expr );
 	ECast( e : Expr, ?t : CType );
 }
 
-typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
+typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr, ?rest : Bool };
 
 typedef Metadata = Array<{ name : String, params : Array<Expr> }>;
 
