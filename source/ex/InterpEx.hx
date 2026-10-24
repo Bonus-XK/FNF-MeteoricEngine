@@ -406,9 +406,17 @@ class InterpEx extends hscript.Interp
 					}
 					else
 						this.pkg = path[0];
-				case DImport(path, _, asIdent):
-					var last = path[path.length - 1];
-					imports.set(asIdent != null ? asIdent : last, path);
+				case DImport(path, star, asIdent):
+					// 注册到 Interp，供运行时 resolve() 查找
+					this.registerImport(path, star, asIdent);
+					if (!star && path != null && path.length > 0)
+					{
+						var last = path[path.length - 1];
+						imports.set(asIdent != null ? asIdent : last, path);
+					}
+				case DUsing(path):
+					// Meteoric: using pkg.Foo；记录前缀，供 resolve() 查找
+					this.registerUsing(path);
 				case DClass(c):
 					var extend = c.extend;
 					if (extend != null)

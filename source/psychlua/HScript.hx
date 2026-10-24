@@ -92,6 +92,17 @@ class HScript
 		parser = new Parser();
 		parser.allowJSON = parser.allowMetadata = parser.allowTypes = true;
 
+		// Meteoric: 导入/using/包回调，将导入信息注册到 Interp，供 resolve() 查找
+		parser.onImport = function(path:Array<String>, star:Bool, name:Null<String>) {
+			interp.registerImport(path, star, name);
+		};
+		parser.onUsing = function(path:Array<String>) {
+			interp.registerUsing(path);
+		};
+		parser.onPackage = function(path:Array<String>) {
+			interp.registerPackage(path);
+		};
+
 		preset();
 
 		if (executeNow && file != null && file.length > 0)

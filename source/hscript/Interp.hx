@@ -41,6 +41,11 @@ class Interp {
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 	var returnValue : Dynamic;
 
+	// Meteoric: import / using / package 支持
+	public var imports : Map<String, Dynamic>;       // 导入的符号名 -> 类/值（import a.b as c / import a.b）
+	public var usingPrefixes : Array<Array<String>>; // using 前缀列表（using a.b / import a.b.*）
+	public var currentPackage : Null<Array<String>>; // 当前 package 声明
+
 	#if hscriptPos
 	var curExpr : Expr;
 	#end
@@ -49,6 +54,9 @@ class Interp {
 		locals = new Map();
 		declared = new Array();
 		resetVariables();
+		imports = new Map<String, Dynamic>();
+		usingPrefixes = new Array<Array<String>>();
+		currentPackage = null;
 		initOps();
 	}
 
@@ -288,9 +296,48 @@ class Interp {
 
 	function resolve( id : String ) : Dynamic {
 		var v = variables.get(id);
-		if( v == null && !variables.exists(id) )
-			error(EUnknownVariable(id));
-		return v;
+		if( v != null || variables.exists(id) )
+			return v;
+		// Meteoric: 查导入的符号（import a.b / import a.b as c）
+		if( imports.exists(id) )
+			return imports.get(id);
+		// Meteoric: 查 using / 通配符导入的包前缀（using a.b / import a.b.*）
+		for( prefix in usingPrefixes ) {
+			var c = Type.resolveClass(prefix.join(".") + "." + id);
+			if( c != null ) return c;
+		}
+		error(EUnknownVariable(id));
+		return null;
+	}
+
+	// Meteoric: 注册 import 声明，供 resolve() 查找
+	public function registerImport( path : Array<String>, star : Bool, ?asName : Null<String> ) : Void {
+		if( path == null || path.length == 0 ) return;
+		if( star ) {
+			// import a.b.*：记录包前缀，resolve(id) 时尝试 a.b.id
+			usingPrefixes.push(path.copy());
+		} else if( asName != null ) {
+			// import a.b.c as x：绑定到别名 x
+			var c = Type.resolveClass(path.join("."));
+			imports.set(asName, c);
+		} else {
+			// import a.b.c：绑定到最后一个路径组件 c
+			var last = path[path.length - 1];
+			var c = Type.resolveClass(path.join("."));
+			imports.set(last, c);
+		}
+	}
+
+	// Meteoric: 注册 using 声明
+	public function registerUsing( path : Array<String> ) : Void {
+		if( path == null || path.length == 0 ) return;
+		usingPrefixes.push(path.copy());
+	}
+
+	// Meteoric: 注册 package 声明
+	public function registerPackage( path : Array<String> ) : Void {
+		if( path == null || path.length == 0 ) return;
+		currentPackage = path.copy();
 	}
 
 	public function expr( e : Expr ) : Dynamic {

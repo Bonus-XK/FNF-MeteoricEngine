@@ -77,6 +77,15 @@ class Parser {
 	**/
 	public var resumeErrors : Bool;
 
+	/**
+		Meteoric: 导入/包/using 回调，由持有 Parser 的 Interp/HScript 层设置，
+		在 parseString 的顶层遇到 import / using / package 声明时调用，
+		将导入信息注册到 Interp.variables/imports 中，供 resolve() 查找。
+	**/
+	public var onImport : Array<String> -> Bool -> Null<String> -> Void = function(_,_,_) {};
+	public var onUsing : Array<String> -> Void = function(_) {};
+	public var onPackage : Array<String> -> Void = function(_) {};
+
 	// implementation
 	var input : String;
 	var readPos : Int;
@@ -180,6 +189,31 @@ class Parser {
 		while( true ) {
 			var tk = token();
 			if( tk == TEof ) break;
+			// Meteoric: 顶层 import / using / package 声明——解析并注册到 Interp，不产生求值表达式
+			switch( tk ) {
+			case TId("import"):
+				push(tk);
+				switch( parseModuleDecl() ) {
+				case DImport(path, star, name): onImport(path, star, name);
+				default: // 不可能
+				}
+				continue;
+			case TId("using"):
+				push(tk);
+				switch( parseModuleDecl() ) {
+				case DUsing(path): onUsing(path);
+				default: // 不可能
+				}
+				continue;
+			case TId("package"):
+				push(tk);
+				switch( parseModuleDecl() ) {
+				case DPackage(path): onPackage(path);
+				default: // 不可能
+				}
+				continue;
+			default:
+			}
 			push(tk);
 			parseFullExpr(a);
 		}
@@ -1636,6 +1670,25 @@ class Parser {
 			}
 			ensure(TSemicolon);
 			return DImport(path, star, name);
+		case "using":
+			// Meteoric: using pkg.Foo; —— 记录前缀，供 resolve() 查找扩展方法/类
+			var path = [getIdent()];
+			while( true ) {
+				var t = token();
+				if( t != TDot ) {
+					push(t);
+					break;
+				}
+				t = token();
+				switch( t ) {
+				case TId(id):
+					path.push(id);
+				default:
+					unexpected(t);
+				}
+			}
+			ensure(TSemicolon);
+			return DUsing(path);
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
