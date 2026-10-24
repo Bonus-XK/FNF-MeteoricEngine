@@ -651,7 +651,16 @@ class Parser {
 			}
 			if( a.length == 1 && a[0] != null )
 				switch( expr(a[0]) ) {
-				case EFor(_), EWhile(_), EDoWhile(_):
+				case EForGen(_, _) if( isMapComprBody(a[0]) ):
+					// Meteoric: Map 推导式 [for (k => v in m) k => v]
+					var mtmp = "__m_" + (uid++);
+					var me = mk(EBlock([
+						mk(EVar(mtmp, null, mk(ENew("Map", []), p1)), p1),
+						mapComprSet(mtmp, a[0]),
+						mk(EIdent(mtmp),p1),
+					]),p1);
+					return parseExprNext(me);
+				case EFor(_), EForGen(_, _), EWhile(_), EDoWhile(_):
 					var tmp = "__a_" + (uid++);
 					var e = mk(EBlock([
 						mk(EVar(tmp, null, mk(EArrayDecl([]), p1)), p1),
@@ -741,6 +750,48 @@ class Parser {
 		return mk(edef, pmin(e), pmax(e));
 	}
 
+	/** Meteoric: Map 推导式 `[for (k => v in m) k => v]` —— 终态是否为 k => v。 */
+	function isMapComprBody( e : Expr ) : Bool {
+		if( e == null ) return false;
+		return switch( expr(e) ) {
+		case EFor(_, _, e2): isMapComprBody(e2);
+		case EForGen(_, e2): isMapComprBody(e2);
+		case EWhile(_, e2): isMapComprBody(e2);
+		case EDoWhile(_, e2): isMapComprBody(e2);
+		case EIf(_, e1, e2) if( e2 == null ): isMapComprBody(e1);
+		case EBlock([e2]): isMapComprBody(e2);
+		case EParent(e2): isMapComprBody(e2);
+		case EBinop("=>", _, _): true;
+		default: false;
+		}
+	}
+
+	/** 与 mapCompr 相同，但把 k => v 写成 map.set(k, v)。 */
+	function mapComprSet( tmp : String, e : Expr ) {
+		if( e == null ) return null;
+		var edef = switch( expr(e) ) {
+		case EFor(v, it, e2):
+			EFor(v, it, mapComprSet(tmp, e2));
+		case EForGen(it, e2):
+			EForGen(it, mapComprSet(tmp, e2));
+		case EWhile(cond, e2):
+			EWhile(cond, mapComprSet(tmp, e2));
+		case EDoWhile(cond, e2):
+			EDoWhile(cond, mapComprSet(tmp, e2));
+		case EIf(cond, e1, e2) if( e2 == null ):
+			EIf(cond, mapComprSet(tmp, e1), null);
+		case EBlock([e2]):
+			EBlock([mapComprSet(tmp, e2)]);
+		case EParent(e2):
+			EParent(mapComprSet(tmp, e2));
+		case EBinop("=>", k, v):
+			ECall( mk(EField(mk(EIdent(tmp), pmin(e), pmax(e)), "set"), pmin(e), pmax(e)), [k, v]);
+		default:
+			ECall( mk(EField(mk(EIdent(tmp), pmin(e), pmax(e)), "push"), pmin(e), pmax(e)), [e]);
+		}
+		return mk(edef, pmin(e), pmax(e));
+	}
+
 	function makeUnop( op, e ) {
 		if( e == null && resumeErrors )
 			return null;
@@ -774,71 +825,110 @@ class Parser {
 	/**
 	 * Meteoric: 解构声明 var [a,b] = arr / var {x,y} = obj —— 生成 EVars
 	 * （源只求值一次；临时变量 __d_N 供取值片段引用，Interp 原生求值）。
-	 * 支持：数组解构（含 ...rest 尾部 slice 收集）、对象解构（含 {k: target} 重命名）。
+	 * 支持：数组/对象解构、...rest、{k: target} 重命名、嵌套模式、默认值（值 == null 时生效）。
 	 */
 	function parseDestructure(openTk:Token, p1) : Expr {
 		var tmp = "__d_" + (uid++);
 		var vars:Array<{ name : String, e : Expr }> = [];
+		parseDestructurePattern(openTk, mk(EIdent(tmp), p1), vars);
+		ensureToken(TOp("="));
+		var src = parseExpr();
+		return mk(EVars(tmp, vars, src), p1, pmax(src));
+	}
+
+	function parseDestructurePattern(openTk:Token, access:Expr, vars:Array<{ name : String, e : Expr }>) : Void {
 		if( Type.enumEq(openTk, TBkOpen) ) {
-			// 数组解构 var [a, b, ...rest] = arr
+			// 数组解构 [a, b = 1, [c], ...rest]
 			var idx = 0;
 			while( true ) {
 				var tk = token();
-				if( Type.enumEq(tk, TBkClose) ) break;
-				if( Type.enumEq(tk, TOp("...")) ) {
-					// ...rest 收集剩余元素（slice）
+				switch( tk ) {
+				case TBkClose:
+					return;
+				case TComma:
+					idx++; // elided slot
+					continue;
+				case TOp("..."):
 					var rn = getIdent();
-					var tmpE = mk(EIdent(tmp), tokenMin, tokenMax);
-					var sliceE = mk(EField(tmpE, "slice"), tokenMin, tokenMax);
+					var sliceE = mk(EField(access, "slice"), tokenMin, tokenMax);
 					var idxE = mk(EConst(CInt(idx)), tokenMin, tokenMax);
 					vars.push({ name : rn, e : mk(ECall(sliceE, [idxE]), tokenMin, tokenMax) });
 					ensure(TBkClose);
-					break;
-				}
-				switch( tk ) {
+					return;
 				case TId(n):
-					var tmpE2 = mk(EIdent(tmp), tokenMin, tokenMax);
-					var idxE2 = mk(EConst(CInt(idx)), tokenMin, tokenMax);
-					vars.push({ name : n, e : mk(EArray(tmpE2, idxE2), tokenMin, tokenMax) });
+					var elem = mk(EArray(access, mk(EConst(CInt(idx)), tokenMin, tokenMax)), tokenMin, tokenMax);
+					var t2 = token();
+					if( Type.enumEq(t2, TOp("=")) )
+						bindDestructureDefault(n, elem, parseExpr(), vars);
+					else {
+						push(t2);
+						vars.push({ name : n, e : elem });
+					}
+				case TBkOpen, TBrOpen:
+					var nested = mk(EArray(access, mk(EConst(CInt(idx)), tokenMin, tokenMax)), tokenMin, tokenMax);
+					parseDestructurePattern(tk, nested, vars);
 				default:
 					unexpected(tk);
 				}
 				idx++;
-				tk = token();
-				if( Type.enumEq(tk, TComma) ) continue;
-				if( Type.enumEq(tk, TBkClose) ) break;
-				unexpected(tk);
+				var t3 = token();
+				switch( t3 ) {
+				case TBkClose: return;
+				case TComma:
+				default: unexpected(t3);
+				}
 			}
-		} else {
-			// 对象解构 var {x, y} = obj / var {x: z} = obj
+		} else if( Type.enumEq(openTk, TBrOpen) ) {
+			// 对象解构 {x, y: alias, z = 1, nested: {a}}
 			while( true ) {
 				var tk = token();
-				if( Type.enumEq(tk, TBrClose) ) break;
-				var key:String = null;
 				switch( tk ) {
-				case TId(k): key = k;
-				default: unexpected(tk);
+				case TBrClose:
+					return;
+				case TComma:
+					continue;
+				case TId(key):
+					var fieldAccess = mk(EField(access, key), tokenMin, tokenMax);
+					var t2 = token();
+					switch( t2 ) {
+					case TDoubleDot:
+						var t3 = token();
+						switch( t3 ) {
+						case TId(alias):
+							var t4 = token();
+							if( Type.enumEq(t4, TOp("=")) )
+								bindDestructureDefault(alias, fieldAccess, parseExpr(), vars);
+							else {
+								push(t4);
+								vars.push({ name : alias, e : fieldAccess });
+							}
+						case TBkOpen, TBrOpen:
+							parseDestructurePattern(t3, fieldAccess, vars);
+						default:
+							unexpected(t3);
+						}
+					case TOp("="):
+						bindDestructureDefault(key, fieldAccess, parseExpr(), vars);
+					default:
+						push(t2);
+						vars.push({ name : key, e : fieldAccess });
+					}
+				default:
+					unexpected(tk);
 				}
-				var tk2 = token();
-				if( Type.enumEq(tk2, TDoubleDot) ) {
-					// {k: target} 重命名
-					var target = getIdent();
-					var tmpE3 = mk(EIdent(tmp), tokenMin, tokenMax);
-					vars.push({ name : target, e : mk(EField(tmpE3, key), tokenMin, tokenMax) });
-					tk2 = token();
-				} else {
-					// {x} 简写
-					var tmpE4 = mk(EIdent(tmp), tokenMin, tokenMax);
-					vars.push({ name : key, e : mk(EField(tmpE4, key), tokenMin, tokenMax) });
-				}
-				if( Type.enumEq(tk2, TComma) ) continue;
-				if( Type.enumEq(tk2, TBrClose) ) break;
-				unexpected(tk2);
 			}
+		} else {
+			unexpected(openTk);
 		}
-		ensureToken(TOp("="));
-		var src = parseExpr();
-		return mk(EVars(tmp, vars, src), p1, pmax(src));
+	}
+
+	/** 默认值：先读入临时变量（源表达式只求值一次），null 时回退默认值。 */
+	function bindDestructureDefault(name:String, access:Expr, def:Expr, vars:Array<{ name : String, e : Expr }>) {
+		var tv = "__d_" + (uid++);
+		vars.push({ name : tv, e : access });
+		var isNull = mk(EBinop("==", mk(EIdent(tv), tokenMin, tokenMax), mk(EIdent("null"), tokenMin, tokenMax)), tokenMin, tokenMax);
+		var picked = mk(ETernary(isNull, def, mk(EIdent(tv), tokenMin, tokenMax)), tokenMin, tokenMax);
+		vars.push({ name : name, e : picked });
 	}
 
 	function parseStructure(id) {

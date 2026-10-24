@@ -625,6 +625,7 @@ class Interp {
 		// Meteoric: hxcpp 下 Dynamic.iterator() 动态调用不稳定，集合类型显式分支
 		#if cpp
 		if( v is Array ) return (cast v : Array<Dynamic>).iterator();
+		if( v is DynamicMap ) return (cast v : DynamicMap).iterator();
 		if( v is haxe.ds.StringMap ) return (cast v : haxe.ds.StringMap<Dynamic>).iterator();
 		if( v is haxe.ds.IntMap ) return (cast v : haxe.ds.IntMap<Dynamic>).iterator();
 		if( v is haxe.ds.ObjectMap ) return (cast v : haxe.ds.ObjectMap<Dynamic,Dynamic>).iterator();
@@ -646,6 +647,7 @@ class Interp {
 		// Meteoric: hxcpp 下 Dynamic.keyValueIterator() 动态调用不稳定，集合类型显式分支
 		#if cpp
 		if( v is Array ) return (cast v : Array<Dynamic>).keyValueIterator();
+		if( v is DynamicMap ) return (cast v : DynamicMap).keyValueIterator();
 		if( v is haxe.ds.StringMap ) return (cast v : haxe.ds.StringMap<Dynamic>).keyValueIterator();
 		if( v is haxe.ds.IntMap ) return (cast v : haxe.ds.IntMap<Dynamic>).keyValueIterator();
 		if( v is haxe.ds.ObjectMap ) return (cast v : haxe.ds.ObjectMap<Dynamic,Dynamic>).keyValueIterator();
@@ -797,6 +799,10 @@ class Interp {
 	}
 
 	function cnew( cl : String, args : Array<Dynamic> ) : Dynamic {
+		// Meteoric: `Map` 是抽象类，Type.resolveClass("Map") 为 null；脚本里的 `new Map()`
+		//（Map 推导式也生成它）用动态键 IMap 顶替。
+		if( cl == "Map" )
+			return new DynamicMap();
 		var c = Type.resolveClass(cl);
 		if( c == null ) c = resolve(cl);
 		return Type.createInstance(c,args);
