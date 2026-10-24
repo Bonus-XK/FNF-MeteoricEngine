@@ -19,7 +19,7 @@ import sys.io.File;
 import sys.FileSystem;
 import backend.Mods;
 import lime.utils.Assets;
-import tea.SScript;
+
 import objects.Character;
 import backend.StageData;
 import backend.StageData.StageFile;
@@ -353,7 +353,7 @@ class HostDomain
 
 		if(doPush)
 		{
-			if(SScript.global.exists(scriptFile))
+			if(HScript.globalScripts.exists(scriptFile))
 				doPush = false;
 
 			if(doPush) ps.initHScript(scriptFile);
@@ -764,19 +764,10 @@ class HostDomain
 				for (key in extraVars.keys())
 					newScript.set(key, extraVars.get(key));
 			}
-			try newScript.execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
-			@:privateAccess
-			if(newScript.parsingExceptions != null && newScript.parsingExceptions.length > 0)
-			{
-				@:privateAccess
-				for (e in newScript.parsingExceptions)
-					if(e != null)
-						ps.addTextToDebug('ERROR ON LOADING ($file): ${e.message.substr(0, e.message.indexOf('\n'))}', FlxColor.RED);
-				newScript.destroy();
-				return;
-			}
+			try newScript.executeCodeString(scriptCode, file) catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
 
 			ps.hscriptArray.push(newScript);
+			HScript.globalScripts.set(file, newScript);
 			ps.scriptEpoch++; // 脚本集变化 → 下一帧 setOnScripts 全量重推（新脚本要能读到初值）
 			if(newScript.exists('onCreate'))
 			{
@@ -801,7 +792,7 @@ class HostDomain
 		catch(e)
 		{
 			ps.addTextToDebug('ERROR ($file) - ' + e.message.substr(0, e.message.indexOf('\n')), FlxColor.RED);
-			var newScript:HScript = cast (SScript.global.get(file), HScript);
+			var newScript:HScript = cast (HScript.globalScripts.get(file), HScript);
 			if(newScript != null)
 			{
 				newScript.destroy();
@@ -982,7 +973,7 @@ class HostDomain
 
 		if(FileSystem.exists(scriptToLoad))
 		{
-			if (SScript.global.exists(scriptToLoad)) return false;
+			if (HScript.globalScripts.exists(scriptToLoad)) return false;
 
 			ps.initHScript(scriptToLoad);
 			return true;

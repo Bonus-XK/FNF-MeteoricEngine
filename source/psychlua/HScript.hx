@@ -4,40 +4,58 @@ import flixel.FlxBasic;
 import objects.Character;
 import psychlua.FunkinLua;
 import psychlua.CustomSubstate;
-
-#if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
-import tea.SScript;
+import hscript.Interp;
+import hscript.Parser;
+import hscript.Expr;
+import hscript.Expr.Error;
 import scripting.ModClassLoader;
 #if sys
 import sys.FileSystem;
 #end
-class HScript extends SScript
+
+#if (HSCRIPT_ALLOWED)
+typedef SCall = {
+	var succeeded:Bool;
+	var exceptions:Array<Dynamic>;
+	var returnValue:Dynamic;
+	var calledFunction:String;
+}
+
+class HScript
 {
+	public var interp:Interp;
+	public var parser:Parser;
+	public var expr:Expr;
 	public var parentLua:FunkinLua;
 
-	/**
-	 * 所属脚本组（由 `ScriptGroup` 在 execute 前注入；`runHaxeCode` 等无组场景为 null）。
-	 * 类型用 Dynamic 避免 psychlua → scripting 的模块环。
-	 */
+	/** 所属脚本组（由 `ScriptGroup` 在 execute 前注入；`runHaxeCode` 等无组场景为 null）。 */
 	public var group:Dynamic = null;
 
 	/** 无组场景下通过 `importScript` 加载的库脚本（随本脚本一起销毁）。 */
 	public var standaloneLibraries:Array<HScript> = [];
-	
+
+	public var origin:String;
+
+	/** 全局脚本注册表：按文件路径缓存 HScript 实例（替代 SScript.global）。 */
+	public static var globalScripts:Map<String, HScript> = new Map();
+
+	/** 脚本是否处于激活状态。 */
+	public var active:Bool = true;
+
+	/** 最后一次执行的返回值。 */
+	public var returnValue:Dynamic = null;
+
 	public static function initHaxeModule(parent:FunkinLua)
 	{
-		#if (SScript >= "3.0.0")
 		if(parent.hscript == null)
 		{
 			trace('initializing haxe interp for: ${parent.scriptName}');
 			parent.hscript = new HScript(parent);
 		}
-		#end
 	}
 
 	public static function initHaxeModuleCode(parent:FunkinLua, code:String)
 	{
-		#if (SScript >= "3.0.0")
 		var hs:HScript = try parent.hscript catch (e) null;
 		var cleaned:String = preprocessScript(code);
 		if(hs == null)
@@ -47,78 +65,353 @@ class HScript extends SScript
 		}
 		else
 		{
-			// Psych 0.7.3 兼容：后续 runHaxeCode 每次都要执行代码（SScript 4.0.1 的 doString 内部有 try/catch，解析失败不抛）
-			hs.doString(cleaned);
+			hs.executeCodeString(cleaned);
 		}
-		#end
 	}
 
 	/**
-	 * Psych 0.7.3 模组兼容：SScript 4.0.1 的类型检查器不接受
-	 * `var x:Map<String, Dynamic> = [];`（报 Array should be Map），
-	 * 官方 PE 0.7.3 能跑这类写法。此处把「Map 类型变量用空数组初始化」改写为 `new Map()`。
+	 * Psych 0.7.3 模组兼容：把 `var x:Map<String, Dynamic> = [];` 改写为 `new Map()`。
+	 * hscript 的类型检查器对空数组初始化 Map 也有类似限制，保留此预处理。
 	 */
 	public static function preprocessScript(code:String):String
 	{
 		if (code == null || code.length == 0) return code;
-		// （字符串级替换，保留 var 名前缀；SScript 4.0.1 类型检查器/运行时均不认这种 Map 初始化）
-		// 泛型通配：`:Map<String, Dynamic> = [];` / `:Map<String, FlxBackdrop> = [];` 等
-		// 统一改写为「保留类型注解 + new Map()」——注意**不能**改成 `= __newMap();` 后丢掉注解，
-		// 那会让 `var x = __newMap();` 里的 __newMap 变成未知标识符（旧的 __newMap 方案即因此必然报错）。
 		var out:String = code;
 		out = ~/:[ \t]*Map[ \t]*<[^>]*>[ \t]*=[ \t]*\[\][ \t]*;/g.replace(out, ' = new Map();');
 		return out;
 	}
 
-	public var origin:String;
-	override public function new(?parent:FunkinLua, ?file:String, ?executeNow:Bool = true)
+	public function new(?parent:FunkinLua, ?file:String, ?executeNow:Bool = true)
 	{
-		if (file == null)
-			file = '';
-	
-		super(file, false, false);
+		if (file == null) file = '';
 		parentLua = parent;
-		if (parent != null)
-			origin = parent.scriptName;
-		if (scriptFile != null && scriptFile.length > 0)
-			origin = scriptFile;
-		installModClassInterp();
+		if (parent != null) origin = parent.scriptName;
+		if (file != null && file.length > 0) origin = file;
+
+		interp = new Interp();
+		parser = new Parser();
+		parser.allowJSON = parser.allowMetadata = parser.allowTypes = true;
+
 		preset();
-		// SScript 4.0.1 的 execute() 解析失败会抛异常（runHaxeCode 首段代码语法错时避免 lua panic）
-		// executeNow=false：先构造并注入 state 变量，再由调用方 execute()（见 HostDomain.initHScript）。
-		if (executeNow)
+
+		if (executeNow && file != null && file.length > 0)
 		{
-			try execute() catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
+			try executeFromFile(file) catch (e:Dynamic) { trace('HScript execute failed: ' + Std.string(e)); }
 		}
 	}
 
-	/**
-	 * 可选：把 SScript 默认的 hscriptBase.Interp 换成支持模组类的 ex.InterpEx。
-	 * 关闭「脚本类库」时完全不执行，行为与旧版一致。
-	 */
-	function installModClassInterp():Void
+	private function executeFromFile(path:String):Void
 	{
-		// ensureLoaded() 在开关关闭时会清掉旧注册表和 Parser 钩子；
-		// 不能先 return，否则玩家把「模组类库」关掉后旧钩子仍会留在全局 Parser 上。
-		ModClassLoader.ensureLoaded();
-		if (!ModClassLoader.isEnabled()) return;
-
-		var mi = new ex.InterpEx(null, false);
-		mi.classProvider = ModClassLoader.createProvider(mi);
-		@:privateAccess mi.typecheck = typeCheck;
-		@:privateAccess mi.origin = origin;
-		mi.setScr(this);
-
-		@:privateAccess interp = mi;
-		@:privateAccess parser.setIntrp(mi);
-		mi.setPsr(parser);
+		#if sys
+		var code:String = null;
+		try code = sys.io.File.getContent(path) catch(e) { trace('Error reading $path: ${Std.string(e)}'); return; }
+		executeCodeString(code, path);
+		#end
 	}
 
-	override function preset()
+	/** 从字符串执行 HScript 代码（解析 + 运行）。 */
+	public function executeCodeString(code:String, ?origin:String = null):Void
 	{
-		#if (SScript >= "3.0.0")
-		super.preset();
+		if (origin != null) this.origin = origin;
+		try {
+			var e:Expr = parser.parseString(code, this.origin);
+			interp.execute(e);
+		} catch(err:Dynamic) {
+			trace('HScript execute failed: ' + Std.string(err));
+		}
+	}
 
+	/** 执行先前解析的 expr（兼容旧 API）。 */
+	public function execute():Void
+	{
+		if (expr != null) {
+			try { interp.execute(expr); } catch(err:Dynamic) { trace('HScript execute failed: ' + Std.string(err)); }
+		}
+	}
+
+	public function set(name:String, value:Dynamic):Void
+	{
+		interp.variables.set(name, value);
+	}
+
+	public function get(name:String):Dynamic
+	{
+		return interp.variables.get(name);
+	}
+
+	public function exists(name:String):Bool
+	{
+		return interp.variables.exists(name) && Reflect.isFunction(interp.variables.get(name));
+	}
+
+	public function call(func:String, ?args:Array<Dynamic>):SCall
+	{
+		var result:SCall = { succeeded: false, exceptions: [], returnValue: null, calledFunction: func };
+		if (args == null) args = [];
+
+		var f:Dynamic = interp.variables.get(func);
+		if (f == null || !Reflect.isFunction(f)) {
+			result.exceptions.push('No function named: ' + func);
+			return result;
+		}
+
+		try {
+			result.returnValue = Reflect.callMethod(null, f, args);
+			result.succeeded = true;
+		} catch(err:Dynamic) {
+			result.exceptions.push(err);
+		}
+		return result;
+	}
+
+	public function destroy():Void
+	{
+		for (lib in standaloneLibraries) {
+			if (lib == null) continue;
+			try lib.destroy() catch(e:Dynamic) {}
+		}
+		standaloneLibraries = [];
+		origin = null;
+		parentLua = null;
+		group = null;
+		active = false;
+	}
+
+	@:keep public function importScript(path:String):Dynamic
+	{
+		var resolved:String = resolveImportPath(path);
+		if (resolved == null) {
+			trace('[HScript] importScript 找不到脚本库：' + path + '（来源：' + origin + '）');
+			return null;
+		}
+
+		var lib:HScript = null;
+		if (group != null) {
+			try {
+				lib = cast group.importLibrary(resolved);
+			} catch(e:Dynamic) {
+				trace('[HScript] importScript 挂组失败：' + resolved + ' —— ' + Std.string(e));
+				lib = null;
+			}
+		} else {
+			lib = loadStandaloneLibrary(resolved);
+		}
+		if (lib == null) return null;
+
+		mergeLibraryScope(lib);
+		return lib;
+	}
+
+	@:keep public function invoke(func:String, ?args:Array<Dynamic>):Dynamic
+	{
+		if (func == null) return null;
+		var r:Dynamic = call(func, args);
+		if (r == null) return null;
+		if (!r.succeeded && r.exceptions != null && r.exceptions.length > 0) {
+			trace('[HScript] ' + func + ' 调用失败 @ ' + origin + '：' + Std.string(r.exceptions[0]));
+			return null;
+		}
+		return r.returnValue;
+	}
+
+	public function resolveImportPath(path:String):String
+	{
+		#if sys
+		if (path == null) return null;
+		var p:String = StringTools.replace(path.trim(), '\\', '/');
+		if (p.length == 0) return null;
+
+		var exts:Array<String> = ~/\.(hx|hscript|hsc|hxs)$/i.match(p) ? [''] : ['.hx', '.hscript', '.hsc', '.hxs'];
+		var candidates:Array<String> = [];
+
+		if (isAbsolutePath(p) || p.startsWith('mods/')) {
+			var base:String = p.startsWith('mods/') ? Paths.mods(p.substr(5)) : p;
+			for (ext in exts) candidates.push(base + ext);
+		}
+		else if (p.startsWith('./') || p.startsWith('../')) {
+			var dir:String = scriptDirectory();
+			if (dir != null)
+				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
+		}
+		else {
+			var modRoot:String = modRootOf(origin);
+			if (modRoot != null)
+				for (ext in exts) candidates.push(modRoot + '/scripting/libs/' + p + ext);
+			var dir:String = scriptDirectory();
+			if (dir != null)
+				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
+		}
+
+		for (c in candidates) {
+			try {
+				if (FileSystem.exists(c) && !FileSystem.isDirectory(c)) return c;
+			} catch(e:Dynamic) {}
+		}
+		#end
+		return null;
+	}
+
+	/** 当前脚本所在目录；无 origin 或 origin 不是路径时返回 null。 */
+	function scriptDirectory():String
+	{
+		if (origin == null || origin.length == 0) return null;
+		var p:String = StringTools.replace(origin, '\\', '/');
+		var i:Int = p.lastIndexOf('/');
+		return i > 0 ? p.substr(0, i) : null;
+	}
+
+	/** 从脚本路径推出 mod 根目录（`mods/<mod>`）。 */
+	static function modRootOf(from:String):String
+	{
+		if (from == null) return null;
+		var p:String = StringTools.replace(from, '\\', '/');
+		var i:Int = p.indexOf('/scripting/');
+		if (i >= 0) return p.substr(0, i);
+		var m:Int = p.indexOf('mods/');
+		if (m >= 0)
+		{
+			var rest:String = p.substr(m + 5);
+			var slash:Int = rest.indexOf('/');
+			return slash > 0 ? p.substr(0, m + 5 + slash) : p;
+		}
+		return null;
+	}
+
+	static inline function isAbsolutePath(p:String):Bool
+	{
+		return p.length > 0 && (p.charAt(0) == '/' || (p.length > 2 && p.charAt(1) == ':' && p.charAt(2) == '/'));
+	}
+
+	/** 无脚本组时的独立加载：执行、绑宿主变量、记入 standaloneLibraries。 */
+	function loadStandaloneLibrary(path:String):HScript
+	{
+		var lib:HScript = null;
+		try {
+			lib = new HScript(null, path, false);
+			lib.origin = path;
+			var code:String = sys.io.File.getContent(path);
+			lib.executeCodeString(code, path);
+			// hscript Parser 解析失败会抛异常，能走到这里说明解析已通过
+		} catch(e:Dynamic) {
+			trace('[HScript] 脚本库加载失败 ' + path + '：' + Std.string(e));
+			if (lib != null) lib.destroy();
+			return null;
+		}
+
+		// 与调用方共享宿主变量（runHaxeCode 场景没有 ScriptGroup.bindVars，这里手动补齐）
+		var hostState:Dynamic = get('state');
+		var hostGame:Dynamic = get('game');
+		var hostApi:Dynamic = get('scripting');
+		lib.set('state', hostState != null ? hostState : flixel.FlxG.state);
+		lib.set('game', hostGame != null ? hostGame : PlayState.instance);
+		if (hostApi != null) lib.set('scripting', hostApi);
+		standaloneLibraries.push(lib);
+		return lib;
+	}
+
+	/** 生命周期回调名：由 `ScriptGroup` 广播给库脚本**自身**，不再并入主脚本作用域。 */
+	static final LIFECYCLE_NAMES:Array<String> = [
+		'create', 'destroy', 'update', 'postUpdate', 'preUpdate',
+		'stepHit', 'beatHit', 'sectionHit',
+		'preStateSwitch', 'postStateSwitch',
+		'postDraw', 'preDraw', 'postGameStart', 'preGameStart',
+		'focusGained', 'focusLost', 'gameResized',
+		'onCreate', 'onDestroy'
+	];
+
+	/** 把库的顶层函数/变量并入当前脚本作用域（已有名字不覆盖，宿主变量/生命周期回调不并）。 */
+	function mergeLibraryScope(lib:HScript):Void
+	{
+		if (lib == null) return;
+		var target:Map<String, Dynamic> = interp.variables;
+		var source:Map<String, Dynamic> = lib.interp.variables;
+		if (target == null || source == null) return;
+		for (key in source.keys()) {
+			if (key == null || key == 'state' || key == 'game' || key == 'scripting' || key == 'this') continue;
+			if (LIFECYCLE_NAMES.contains(key)) continue;
+			if (!target.exists(key)) target.set(key, source.get(key));
+		}
+	}
+
+	public function executeCode(?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):SCall
+	{
+		if (funcToRun == null) return null;
+		if(!exists(funcToRun)) {
+			FunkinLua.luaTrace(origin + ' - No HScript function named: $funcToRun', false, false, FlxColor.RED);
+			return null;
+		}
+		return call(funcToRun, funcArgs);
+	}
+
+	public function executeFunction(funcToRun:String = null, funcArgs:Array<Dynamic>):SCall
+	{
+		if (funcToRun == null) return null;
+		return call(funcToRun, funcArgs);
+	}
+
+	public static function implement(funk:FunkinLua)
+	{
+		#if LUA_ALLOWED
+		funk.addLocalCallback("runHaxeCode", function(codeToRun:String, ?varsToBring:Any = null, ?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):Dynamic {
+			var retVal:SCall = null;
+			if (codeToRun != null && codeToRun.indexOf('FlxBackdrop') >= 0)
+				trace('[RHX] FlxBackdrop code len=' + codeToRun.length + ' head=' + codeToRun.substr(0, 60).replace('\n', ' '));
+			initHaxeModuleCode(funk, codeToRun);
+			if(varsToBring != null) {
+				for (key in Reflect.fields(varsToBring)) {
+					funk.hscript.set(key, Reflect.field(varsToBring, key));
+				}
+			}
+			retVal = funk.hscript.executeCode(funcToRun, funcArgs);
+			if (retVal != null) {
+				if(retVal.succeeded)
+					return (retVal.returnValue == null || LuaUtils.isOfTypes(retVal.returnValue, [Bool, Int, Float, String, Array])) ? retVal.returnValue : null;
+				var e = retVal.exceptions[0];
+				if (e != null)
+					FunkinLua.luaTrace(funk.hscript.origin + ":" + funk.lastCalledFunction + " - " + e, false, false, FlxColor.RED);
+				return null;
+			}
+			else if (funk.hscript.returnValue != null)
+				return funk.hscript.returnValue;
+			return null;
+		});
+
+		funk.addLocalCallback("runHaxeFunction", function(funcToRun:String, ?funcArgs:Array<Dynamic> = null) {
+			var callValue = funk.hscript.executeFunction(funcToRun, funcArgs);
+			if (!callValue.succeeded) {
+				var e = callValue.exceptions[0];
+				if (e != null)
+					FunkinLua.luaTrace('ERROR (${funk.hscript.origin}: ${callValue.calledFunction}) - ' + e.message.substr(0, e.message.indexOf('\n')), false, false, FlxColor.RED);
+				return null;
+			}
+			else return callValue.returnValue;
+		});
+
+		funk.addLocalCallback("addHaxeLibrary", function(libName:String, ?libPackage:String = '') {
+			var str:String = '';
+			if(libPackage.length > 0) str = libPackage + '.';
+			else if(libName == null) libName = '';
+			var c = Type.resolveClass(str + libName);
+			if (funk.hscript != null) {
+				try {
+					if (c != null) funk.hscript.set(libName, c);
+				} catch(e:Dynamic) {
+					FunkinLua.luaTrace(funk.hscript.origin + ":" + funk.lastCalledFunction + " - " + e, false, false, FlxColor.RED);
+				}
+			}
+		});
+		#end
+	}
+
+	/**
+	 * 脚本可见的编程层 API 注入。
+	 *
+	 * 所有 `set('名', 值)` 落到 `interp.variables`，脚本里可直接用 `FlxG`、`Paths`、`FlxSprite` 等。
+	 * release 构建开 `--dce full` 时，只被脚本反射调用的方法会被裁掉，
+	 * 所以引擎类本身作为值注入（`set('FlxG', flixel.FlxG)`），不依赖 `@:keep`。
+	 */
+	public function preset():Void
+	{
 		// Some very commonly used classes
 		set('FlxG', flixel.FlxG);
 		set('FlxSprite', flixel.FlxSprite);
@@ -141,8 +434,7 @@ class HScript extends SScript
 		set('ShaderFilter', openfl.filters.ShaderFilter);
 		set('StringTools', StringTools);
 
-		// ── SeiunEngine 融合变量（来自 SeiunEngine getDefaultVariables，剔除 MeteoricEngine 缺失的类） ──
-		// Haxe std（Math 用代理对象：Math.PI 等 inline 常量反射不到，方法以值引用生成非内联拷贝）
+		// ── SeiunEngine 融合变量 ──
 		set('Math', {
 			PI: Math.PI,
 			NaN: Math.NaN,
@@ -185,7 +477,6 @@ class HScript extends SScript
 			stringify: function(value:Dynamic, ?replacer:Dynamic = null, ?space:String = null):String
 				return haxe.format.JsonPrinter.print(value, replacer, space)
 		});
-		// Flixel（FlxMath 用代理对象：fastCos/fastSin 等 inline 方法以值引用生成非内联拷贝，hscript 反射可用）
 		set('FlxMath', {
 			fastCos: flixel.math.FlxMath.fastCos,
 			fastSin: flixel.math.FlxMath.fastSin,
@@ -357,7 +648,6 @@ class HScript extends SScript
 		set('SecurityErrorEvent', openfl.events.SecurityErrorEvent);
 		set('ProgressEvent', openfl.events.ProgressEvent);
 		set('HTTPStatusEvent', openfl.events.HTTPStatusEvent);
-		// DataEvent / SampleDataEvent 因 OpenFL 9.2.1 C++ 生成 bug 无法引用，已剔除
 		// 工具函数（移植自 SeiunEngine）
 		set('loadModTextFile', function(path:String):String {
 			#if sys
@@ -396,9 +686,14 @@ class HScript extends SScript
 			return result;
 		});
 		set('version', '0.2.8');
-		set('hscriptVersion', 'SScript 4.0.1');
+		set('hscriptVersion', 'hscript 2.7.0');
 		set('screenWidth', FlxG.width);
 		set('screenHeight', FlxG.height);
+		// Meteoric HScript 增强：正则与状态切换
+		// `var reg = Reg('[A-Z0-9._%-]+', 'i');` —— 替代 SScript 不支持的 `~/.../i` 语法级正则。
+		set('Reg', function(pattern:String, ?flags:String) return new EReg(pattern, flags));
+		// `switchState(new FreeplayState())` —— 直接切换游戏状态，等价于 `MusicBeatState.switchState`。
+		set('switchState', function(state:Dynamic) backend.MusicBeatState.switchState(state));
 
 		// ── Psych 0.7.3 融合变量 ──
 		set('moveCamera', function(isDad:Bool) return PlayState.instance.moveCamera(isDad));
@@ -535,29 +830,24 @@ class HScript extends SScript
 		});
 
 		// For adding your own callbacks
-
-		// not very tested but should work
 		set('createGlobalCallback', function(name:String, func:Dynamic)
 		{
 			#if LUA_ALLOWED
 			for (script in PlayState.instance.luaArray)
 			{
 				if(script == null || script.lua == null || script.closed) continue;
-				// 防护：被污染的 lua 状态（栈下溢 gettop<0）会导致 lua_pushcclosure 原生崩溃，跳过之
 				var _gt:Int = 0;
 				try { _gt = Lua.gettop(script.lua); } catch (e:Dynamic) { continue; }
-				if (_gt < 0) continue; // 被污染的 lua 状态（栈下溢）跳过，防止 lua_pushcclosure 原生崩溃
+				if (_gt < 0) continue;
 				Lua_helper.add_callback(script.lua, name, func);
 			}
 			#end
 			FunkinLua.customFunctions.set(name, func);
 		});
 
-		// tested
-		set('createCallback', function(name:String, func:Dynamic, ?funk:FunkinLua = null)
-		{
+		set('createCallback', function(name:String, func:Dynamic, ?funk:FunkinLua = null) {
 			if(funk == null) funk = parentLua;
-			
+
 			if(parentLua != null) funk.addLocalCallback(name, func);
 			else FunkinLua.luaTrace('createCallback ($name): 3rd argument is null', false, false, FlxColor.RED);
 		});
@@ -565,15 +855,13 @@ class HScript extends SScript
 		set('addHaxeLibrary', function(libName:String, ?libPackage:String = '') {
 			try {
 				var str:String = '';
-				if(libPackage.length > 0)
-					str = libPackage + '.';
+				if(libPackage.length > 0) str = libPackage + '.';
 
 				set(libName, Type.resolveClass(str + libName));
 			}
 			catch (e:Dynamic) {
 				var msg:String = e.message.substr(0, e.message.indexOf('\n'));
-				if(parentLua != null)
-				{
+				if(parentLua != null) {
 					FunkinLua.lastCalledScript = parentLua;
 					msg = origin + ":" + parentLua.lastCalledFunction + " - " + msg;
 				}
@@ -590,392 +878,24 @@ class HScript extends SScript
 
 		set('Function_Stop', FunkinLua.Function_Stop);
 		set('Function_Continue', FunkinLua.Function_Continue);
-		set('Function_StopLua', FunkinLua.Function_StopLua); //doesnt do much cuz HScript has a lower priority than Lua
+		set('Function_StopLua', FunkinLua.Function_StopLua);
 		set('Function_StopHScript', FunkinLua.Function_StopHScript);
 		set('Function_StopAll', FunkinLua.Function_StopAll);
-		
+
 		set('add', function(obj:FlxBasic) PlayState.instance.add(obj));
 		set('addBehindGF', function(obj:FlxBasic) PlayState.instance.addBehindGF(obj));
 		set('addBehindDad', function(obj:FlxBasic) PlayState.instance.addBehindDad(obj));
 		set('addBehindBF', function(obj:FlxBasic) PlayState.instance.addBehindBF(obj));
 		set('insert', function(pos:Int, obj:FlxBasic) PlayState.instance.insert(pos, obj));
 		set('remove', function(obj:FlxBasic, splice:Bool = false) PlayState.instance.remove(obj, splice));
-		#end
 
-		// 脚本库复用：importScript('util') 加载同 mod 的 scripting/libs/util.hx，
-		// 库的顶层函数/变量并入当前脚本作用域，生命周期回调由所属脚本组广播。
+		// 脚本库复用：importScript('util') 加载同 mod 的 scripting/libs/util.hx
 		set('importScript', function(path:String):Dynamic {
 			return importScript(path);
 		});
 	}
-
-	/**
-	 * 加载一个脚本库并返回其实例（脚本内 `importScript(path)` 的落地实现）。
-	 *
-	 * 路径解析（见 {@link resolveImportPath}）：
-	 *  1. `mods/...` 开头 → 按仓库根解析（Android 走 `Paths.mods`）；
-	 *  2. `./` / `../` 开头 → 相对当前脚本所在目录；
-	 *  3. 其它 → 同 mod 的 `scripting/libs/<path>.hx` 优先，其次相对当前脚本目录。
-	 *
-	 * 语义：
-	 *  - 库脚本加入**当前脚本组**，`create/update/...` 生命周期回调自动广播；
-	 *  - 库的顶层函数/变量并入当前脚本作用域（**不覆盖**当前脚本已有名字）；
-	 *  - 返回库的 HScript 实例：`lib.active = false` 停用、`lib.invoke('fn', [args])`
-	 *    取原始返回值、`lib.get/set` 读写变量；
-	 *  - 无脚本组（如 Lua `runHaxeCode`）时独立加载，随本脚本销毁。
-	 *
-	 * @return 库脚本实例；找不到/加载失败返回 null（已打日志）。
-	 */
-	@:keep public function importScript(path:String):Dynamic
-	{
-		var resolved:String = resolveImportPath(path);
-		if (resolved == null)
-		{
-			trace('[HScript] importScript 找不到脚本库：' + path + '（来源：' + origin + '）');
-			return null;
-		}
-
-		var lib:HScript = null;
-		if (group != null)
-		{
-			// ScriptGroup.importLibrary 负责挂组、绑定宿主变量；Dynamic 调用避免模块环。
-			try
-			{
-				lib = cast group.importLibrary(resolved);
-			}
-			catch (e:Dynamic)
-			{
-				trace('[HScript] importScript 挂组失败：' + resolved + ' —— ' + Std.string(e));
-				lib = null;
-			}
-		}
-		else
-		{
-			lib = loadStandaloneLibrary(resolved);
-		}
-		if (lib == null) return null;
-
-		mergeLibraryScope(lib);
-		return lib;
-	}
-
-	/**
-	 * 调用库脚本里的函数并返回**原始返回值**（失败返回 null 并打日志）。
-	 * 等价于 `call(...).returnValue`，但少一层 SCall 解包。
-	 */
-	@:keep public function invoke(func:String, ?args:Array<Dynamic>):Dynamic
-	{
-		if (func == null) return null;
-		var r:Dynamic = call(func, args);
-		if (r == null) return null;
-		if (!r.succeeded && r.exceptions != null && r.exceptions.length > 0)
-		{
-			trace('[HScript] ' + func + ' 调用失败 @ ' + origin + '：' + Std.string(r.exceptions[0]));
-			return null;
-		}
-		return r.returnValue;
-	}
-
-	/**
-	 * 解析 `importScript` 的路径，返回实际存在的文件路径；找不到返回 null。
-	 * 只读探盘，不加载。
-	 */
-	public function resolveImportPath(path:String):String
-	{
-		#if sys
-		if (path == null) return null;
-		var p:String = StringTools.replace(path.trim(), '\\', '/');
-		if (p.length == 0) return null;
-
-		var exts:Array<String> = ~/\.(hx|hscript|hsc|hxs)$/i.match(p)
-			? ['']
-			: ['.hx', '.hscript', '.hsc', '.hxs'];
-		var candidates:Array<String> = [];
-
-		if (isAbsolutePath(p) || p.startsWith('mods/'))
-		{
-			var base:String = p.startsWith('mods/') ? Paths.mods(p.substr(5)) : p;
-			for (ext in exts) candidates.push(base + ext);
-		}
-		else if (p.startsWith('./') || p.startsWith('../'))
-		{
-			var dir:String = scriptDirectory();
-			if (dir != null)
-				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
-		}
-		else
-		{
-			var modRoot:String = modRootOf(origin);
-			if (modRoot != null)
-				for (ext in exts) candidates.push(modRoot + '/scripting/libs/' + p + ext);
-			var dir:String = scriptDirectory();
-			if (dir != null)
-				for (ext in exts) candidates.push(haxe.io.Path.normalize(dir + '/' + p + ext));
-		}
-
-		for (c in candidates)
-		{
-			try
-			{
-				if (FileSystem.exists(c) && !FileSystem.isDirectory(c)) return c;
-			}
-			catch (e:Dynamic) {}
-		}
-		#end
-		return null;
-	}
-
-	/** 当前脚本所在目录；无 origin 或 origin 不是路径时返回 null。 */
-	function scriptDirectory():String
-	{
-		if (origin == null || origin.length == 0) return null;
-		var p:String = StringTools.replace(origin, '\\', '/');
-		var i:Int = p.lastIndexOf('/');
-		return i > 0 ? p.substr(0, i) : null;
-	}
-
-	/** 从脚本路径推出 mod 根目录（`mods/<mod>`）。 */
-	static function modRootOf(from:String):String
-	{
-		if (from == null) return null;
-		var p:String = StringTools.replace(from, '\\', '/');
-		var i:Int = p.indexOf('/scripting/');
-		if (i >= 0) return p.substr(0, i);
-		var m:Int = p.indexOf('mods/');
-		if (m >= 0)
-		{
-			var rest:String = p.substr(m + 5);
-			var slash:Int = rest.indexOf('/');
-			return slash > 0 ? p.substr(0, m + 5 + slash) : p;
-		}
-		return null;
-	}
-
-	static inline function isAbsolutePath(p:String):Bool
-	{
-		return p.length > 0 && (p.charAt(0) == '/' || (p.length > 2 && p.charAt(1) == ':' && p.charAt(2) == '/'));
-	}
-
-	/** 无脚本组时的独立加载：执行、绑宿主变量、记入 standaloneLibraries。 */
-	function loadStandaloneLibrary(path:String):HScript
-	{
-		var lib:HScript = null;
-		try
-		{
-			lib = new HScript(null, path, false);
-			lib.origin = path;
-			try lib.execute() catch (e:Dynamic)
-			{
-				trace('[HScript] 脚本库执行失败 ' + path + '：' + Std.string(e));
-				lib.destroy();
-				return null;
-			}
-			var errs:Array<haxe.Exception> = @:privateAccess lib.parsingExceptions;
-			if (errs != null && errs.length > 0)
-			{
-				trace('[HScript] 脚本库解析失败 ' + path + '：' + Std.string(errs[0]));
-				lib.destroy();
-				return null;
-			}
-		}
-		catch (e:Dynamic)
-		{
-			trace('[HScript] 脚本库加载失败 ' + path + '：' + Std.string(e));
-			if (lib != null) lib.destroy();
-			return null;
-		}
-
-		// 与调用方共享宿主变量（runHaxeCode 场景没有 ScriptGroup.bindVars，这里手动补齐）
-		var hostState:Dynamic = get('state');
-		var hostGame:Dynamic = get('game');
-		var hostApi:Dynamic = get('scripting');
-		lib.set('state', hostState != null ? hostState : flixel.FlxG.state);
-		lib.set('game', hostGame != null ? hostGame : PlayState.instance);
-		if (hostApi != null) lib.set('scripting', hostApi);
-		standaloneLibraries.push(lib);
-		return lib;
-	}
-
-	/**
-	 * 生命周期回调名：由 `ScriptGroup` 广播给库脚本**自身**，不再并入主脚本作用域，
-	 * 否则主脚本没定义时会把库的 `update` 当自己的、与库广播叠加成双重调用。
-	 */
-	static final LIFECYCLE_NAMES:Array<String> = [
-		'create', 'destroy', 'update', 'postUpdate', 'preUpdate',
-		'stepHit', 'beatHit', 'sectionHit',
-		'preStateSwitch', 'postStateSwitch',
-		'postDraw', 'preDraw', 'postGameStart', 'preGameStart',
-		'focusGained', 'focusLost', 'gameResized',
-		'onCreate', 'onDestroy'
-	];
-
-	/** 把库的顶层函数/变量并入当前脚本作用域（已有名字不覆盖，宿主变量/生命周期回调不并）。 */
-	function mergeLibraryScope(lib:HScript):Void
-	{
-		if (lib == null) return;
-		var target:Map<String, Dynamic> = @:privateAccess interp.variables;
-		var source:Map<String, Dynamic> = @:privateAccess lib.interp.variables;
-		if (target == null || source == null) return;
-		for (key in source.keys())
-		{
-			if (key == null || key == 'state' || key == 'game' || key == 'scripting' || key == 'this') continue;
-			if (LIFECYCLE_NAMES.contains(key)) continue;
-			if (!target.exists(key)) target.set(key, source.get(key));
-		}
-	}
-
-	public function executeCode(?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):SCall
-	{
-		if (funcToRun == null) return null;
-
-		if(!exists(funcToRun))
-		{
-			FunkinLua.luaTrace(origin + ' - No HScript function named: $funcToRun', false, false, FlxColor.RED);
-			return null;
-		}
-
-		var callValue = call(funcToRun, funcArgs);
-		if (!callValue.succeeded)
-		{
-			var e = callValue.exceptions[0];
-			if (e != null)
-			{
-				var msg:String = e.toString();
-				if(parentLua != null) msg = origin + ":" + parentLua.lastCalledFunction + " - " + msg;
-				else msg = '$origin - $msg';
-				FunkinLua.luaTrace(msg, parentLua == null, false, FlxColor.RED);
-			}
-			return null;
-		}
-		return callValue;
-	}
-
-	public function executeFunction(funcToRun:String = null, funcArgs:Array<Dynamic>):SCall
-	{
-		if (funcToRun == null)
-			return null;
-
-		return call(funcToRun, funcArgs);
-	}
-
-	public static function implement(funk:FunkinLua)
-	{
-		#if LUA_ALLOWED
-		funk.addLocalCallback("runHaxeCode", function(codeToRun:String, ?varsToBring:Any = null, ?funcToRun:String = null, ?funcArgs:Array<Dynamic> = null):Dynamic {
-			var retVal:SCall = null;
-			// TEMP-DIAG: FlxBackdrop 执行证据（验证后删）
-			if (codeToRun != null && codeToRun.indexOf('FlxBackdrop') >= 0)
-				trace('[RHX] FlxBackdrop code len=' + codeToRun.length + ' head=' + codeToRun.substr(0, 60).replace('
-', ' '));
-			#if (SScript >= "3.0.0")
-			initHaxeModuleCode(funk, codeToRun);
-			if(varsToBring != null)
-			{
-				for (key in Reflect.fields(varsToBring))
-				{
-					//trace('Key $key: ' + Reflect.field(varsToBring, key));
-					funk.hscript.set(key, Reflect.field(varsToBring, key));
-				}
-			}
-			retVal = funk.hscript.executeCode(funcToRun, funcArgs);
-			if (retVal != null)
-			{
-				if(retVal.succeeded)
-					return (retVal.returnValue == null || LuaUtils.isOfTypes(retVal.returnValue, [Bool, Int, Float, String, Array])) ? retVal.returnValue : null;
-
-				var e = retVal.exceptions[0];
-				if (e != null)
-					FunkinLua.luaTrace(funk.hscript.origin + ":" + funk.lastCalledFunction + " - " + e, false, false, FlxColor.RED);
-				return null;
-			}
-			else if (funk.hscript.returnValue != null)
-				return funk.hscript.returnValue;
-			#else
-			FunkinLua.luaTrace("runHaxeCode: HScript isn't supported on this platform!", false, false, FlxColor.RED);
-			#end
-			return null;
-		});
-		
-		funk.addLocalCallback("runHaxeFunction", function(funcToRun:String, ?funcArgs:Array<Dynamic> = null) {
-			#if (SScript >= "3.0.0")
-			var callValue = funk.hscript.executeFunction(funcToRun, funcArgs);
-			if (!callValue.succeeded)
-			{
-				var e = callValue.exceptions[0];
-				if (e != null)
-					FunkinLua.luaTrace('ERROR (${funk.hscript.origin}: ${callValue.calledFunction}) - ' + e.message.substr(0, e.message.indexOf('\n')), false, false, FlxColor.RED);
-				return null;
-			}
-			else
-				return callValue.returnValue;
-			#else
-			FunkinLua.luaTrace("runHaxeFunction: HScript isn't supported on this platform!", false, false, FlxColor.RED);
-			#end
-		});
-		// This function is unnecessary because import already exists in SScript as a native feature
-		funk.addLocalCallback("addHaxeLibrary", function(libName:String, ?libPackage:String = '') {
-			var str:String = '';
-			if(libPackage.length > 0)
-				str = libPackage + '.';
-			else if(libName == null)
-				libName = '';
-
-			var c = Type.resolveClass(str + libName);
-
-			#if (SScript >= "3.0.3")
-			if (c != null)
-				SScript.globalVariables[libName] = c;
-			#end
-
-			#if (SScript >= "3.0.0")
-			if (funk.hscript != null)
-			{
-				try {
-					if (c != null)
-						funk.hscript.set(libName, c);
-				}
-				catch (e:Dynamic) {
-					FunkinLua.luaTrace(funk.hscript.origin + ":" + funk.lastCalledFunction + " - " + e, false, false, FlxColor.RED);
-				}
-			}
-			#else
-			FunkinLua.luaTrace("addHaxeLibrary: HScript isn't supported on this platform!", false, false, FlxColor.RED);
-			#end
-		});
-		#end
-	}
-
-	#if (SScript >= "3.0.3")
-	override public function destroy()
-	{
-		for (lib in standaloneLibraries)
-		{
-			if (lib == null) continue;
-			try lib.destroy() catch (e:Dynamic) {}
-		}
-		standaloneLibraries = [];
-
-		origin = null;
-		parentLua = null;
-		group = null;
-
-		super.destroy();
-	}
-	#else
-	public function destroy()
-	{
-		for (lib in standaloneLibraries)
-		{
-			if (lib == null) continue;
-			try lib.destroy() catch (e:Dynamic) {}
-		}
-		standaloneLibraries = [];
-
-		group = null;
-		active = false;
-	}
-	#end
 }
+#end
 
 class CustomFlxColor
 {
@@ -1004,7 +924,6 @@ class CustomFlxColor
 	{	
 		return cast FlxColor.fromRGBFloat(Red, Green, Blue, Alpha);
 	}
-
 	public static function fromHSB(Hue:Float, Sat:Float, Brt:Float, Alpha:Float = 1):Int
 	{	
 		return cast FlxColor.fromHSB(Hue, Sat, Brt, Alpha);
@@ -1018,4 +937,3 @@ class CustomFlxColor
 		return cast FlxColor.fromString(str);
 	}
 }
-#end

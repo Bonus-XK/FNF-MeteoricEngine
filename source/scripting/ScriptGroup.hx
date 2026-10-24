@@ -259,37 +259,20 @@ class ScriptGroup
 	// ===== 内部 =====
 
 	/**
-	 * 路径形态加载：SScript 自己读文件（`global` 注册表按路径做 key，不留大字符串）。
+	 * 路径形态加载：hscript Parser 解析失败直接抛异常，由外层 try/catch 捕获。
+	 * 不再需要 parsingExceptions / script 字段检查。
 	 */
 	static function loadScript(path:String, ?owner:ScriptGroup):HScript
 	{
 		var script:HScript = null;
 		try
 		{
-			// executeNow=false：构造期只做 preset（注入引擎类），宿主变量随后注入再 execute。
+			var code:String = File.getContent(path);
+			// executeNow=false：构造期只做 preset（注入引擎类），宿主变量随后注入。
 			script = new HScript(null, path, false);
 			script.origin = path;
 			script.group = owner; // 必须在 execute 前：顶层 importScript 要挂到同组
-			try script.execute() catch (e:Dynamic)
-			{
-				Scripting.logError('执行失败 @ ' + path + '：' + Std.string(e));
-				script.destroy();
-				return null;
-			}
-			var errs:Array<haxe.Exception> = @:privateAccess script.parsingExceptions;
-			if (errs != null && errs.length > 0)
-			{
-				Scripting.logError('解析失败 @ ' + path + '：' + firstLine(errs[0]));
-				script.destroy();
-				return null;
-			}
-			// 文件读不到 / 内容为空时 SScript 会静默吞掉异常（script 为空串）→ 当作加载失败。
-			if (script.script == null || script.script.length == 0)
-			{
-				Scripting.logError('脚本内容为空 @ ' + path);
-				script.destroy();
-				return null;
-			}
+			script.executeCodeString(code, path);
 		}
 		catch (e:Dynamic)
 		{
@@ -301,7 +284,7 @@ class ScriptGroup
 	}
 
 	/**
-	 * 代码形态加载：读文件 → preprocessScript（Map 初始化兼容）→ 交给 SScript 当代码串。
+	 * 代码形态加载：读文件 → preprocessScript（Map 初始化兼容）→ executeCodeString 执行。
 	 * 只在路径形态失败时兜底使用。
 	 */
 	static function loadScriptCode(path:String, ?owner:ScriptGroup):HScript
@@ -313,19 +296,7 @@ class ScriptGroup
 			script = new HScript(null, code, false);
 			script.origin = path;
 			script.group = owner; // 必须在 execute 前：顶层 importScript 要挂到同组
-			try script.execute() catch (e:Dynamic)
-			{
-				Scripting.logError('执行失败 @ ' + path + '：' + Std.string(e));
-				script.destroy();
-				return null;
-			}
-			var errs:Array<haxe.Exception> = @:privateAccess script.parsingExceptions;
-			if (errs != null && errs.length > 0)
-			{
-				Scripting.logError('解析失败 @ ' + path + '：' + firstLine(errs[0]));
-				script.destroy();
-				return null;
-			}
+			script.executeCodeString(code, path);
 		}
 		catch (e:Dynamic)
 		{

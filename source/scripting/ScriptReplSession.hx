@@ -1,8 +1,9 @@
 package scripting;
 
 import backend.Lang;
-import hscriptBase.Expr;
-import hscriptBase.Tools;
+import hscript.Expr;
+import hscript.Tools;
+import hscript.Expr.ErrorDef;
 import psychlua.HScript;
 
 /** REPL 一次执行的结果。 */
@@ -19,13 +20,13 @@ typedef ScriptReplResult =
 /**
  * REPL 会话：一个**长期存活**的 HScript 解释器实例。
  *
- * ## 为什么不能直接用 SScript.execute()
+ * ## 为什么不能直接用 Interp.execute()
  *
- * SScript 4.0.1 的 `Interp.execute()` 每次调用开头都会 `locals = new Map()`（重置局部变量表），
- * 而且顶层语句块走 `EBlock` 分支时会在块结束时 `restore()` 撤销本块声明的 `var`。
+ * hscript.Interp.execute() 每次调用开头都会 `locals = new Map()`（重置局部变量表），
+ * 而且 EBlock 分支结束时会 `restore()` 撤销本块声明的 `var`。
  * 结果就是「上一行定义的变量」在下一行就消失了 —— 直接用它做 REPL 只能当一次性沙盒。
  *
- * 这里改走 `Interp.exprReturn()` 并**逐条执行顶层语句**：
+ * 这里改走 `Interp.expr()` 并**逐条执行顶层语句**：
  *  - 不重置 locals → 上一行的 `var` 变量下一行仍能读到（`resolve()` 先查 locals 再查 variables）；
  *  - 不进 EBlock 分支 → 语句块结束时不会 `restore()` 撤销变量；
  *  - `interp.variables`（preset 注入的引擎类、`set()` 设进去的值）本来就跨调用保留。
@@ -90,10 +91,10 @@ class ScriptReplSession
 		}
 	}
 
-	/** 执行单条语句。exprReturn 是 Interp 的私有方法，只能靠 @:privateAccess 调。 */
+	/** 执行单条语句。Interp.expr() 评估单个表达式并返回值，不重置 locals。 */
 	function runStatement(e:Expr):Dynamic
 	{
-		return @:privateAccess script.interp.exprReturn(e);
+		return script.interp.expr(e);
 	}
 
 	/** 销毁解释器。 */
@@ -110,7 +111,7 @@ class ScriptReplSession
 	 * 把 hscript 抛出的错误转成人能看懂的文字。
 	 *
 	 * 本项目编译时定义了 `hscriptPos`（Project.xml 的 `<haxedef name="hscriptPos" />`），
-	 * 所以 hscript 的 `Expr` 是带位置信息的结构体、`ExprDef` 才是枚举，错误对象是 `Error` 类
+	 * 所以 hscript 的 `Expr` 是带位置信息的结构体、`Error` 才是枚举，错误对象是 `Error` 类
 	 * （`Std.string` 会输出 "repl:1: Unknown variable: x" 这种带行列的原文）。
 	 * 这里按错误类型翻成中文，翻译不了就退回 hscript 原文。
 	 */
@@ -118,24 +119,19 @@ class ScriptReplSession
 	{
 		if (e == null) return Lang.tOr('repl.err.unknown', '（未知错误）');
 
-		if (Std.isOfType(e, Error))
+		if (Std.isOfType(e, ErrorDef))
 		{
-			var err:Error = cast e;
-			switch (err.e)
+			var err:ErrorDef = cast e;
+			switch (err)
 			{
 				case EUnknownVariable(v): return Lang.tOr('repl.err.unknownVariable', '未知变量：') + v;
-				case EUnknownIdentifier(v): return Lang.tOr('repl.err.unknownIdentifier', '未知标识符：') + v;
+				case EInvalidAccess(f): return Lang.tOr('repl.err.missingField', '不存在的字段：') + f;
 				case EInvalidOp(op): return Lang.tOr('repl.err.invalidOp', '非法运算符：') + op;
-				case EUnexistingField(f, f2): return Lang.tOr('repl.err.missingField', '不存在的字段：') + f2;
-				case EDuplicate(v): return Lang.tOr('repl.err.duplicate', '重复定义：') + v;
-				case EUnterminatedString: return Lang.tOr('repl.err.unterminatedString', '字符串没有闭合');
-				case EUnterminatedComment: return Lang.tOr('repl.err.unterminatedComment', '注释没有闭合');
-				case EInvalidChar(c): return Lang.tOr('repl.err.invalidChar', '非法字符：') + c;
-				case EUnexpected(s): return Lang.tOr('repl.err.unexpected', '意外的记号：') + s;
 				case ECustom(msg): return msg;
 				default:
 			}
 		}
+		// 解析阶段错误（Parser 抛出的 Error 也可能是 hscript.Expr.Error 的子类型或其他）
 		return Std.string(e);
 	}
 }
