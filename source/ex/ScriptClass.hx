@@ -1,20 +1,18 @@
 package ex;
 
-import hscriptBase.*;
-import hscriptBase.Expr;
-import hscriptBase.Expr.FieldDecl;
-import hscriptBase.Expr.FunctionDecl;
-import hscriptBase.Expr.VarDecl;
-import hscriptBase.Printer;
-
-import tea.SScript;
+import hscript.*;
+import hscript.Expr;
+import hscript.Expr.FieldDecl;
+import hscript.Expr.FunctionDecl;
+import hscript.Expr.VarDecl;
+import hscript.Printer;
+import ex.ClassDeclEx;
 
 enum Param
 {
 	Unused;
 }
 
-@:access(tea.SScript)
 class ScriptClass
 {
 	private var _c:ClassDeclEx;
@@ -49,7 +47,7 @@ class ScriptClass
 				callFunction("new", args);
 				if (superClass == null && _c.extend != null)
 				{
-					@:privateAccess _interp.error(ECustom("super() not called"));
+					_interp.reportError("super() not called");
 				}
 			}
 			else if (_c.extend != null)
@@ -111,7 +109,7 @@ class ScriptClass
 		{
 			superClass = Type.resolveClass(extendString);
 			if (superClass == null)
-				@:privateAccess _interp.error(ECustom("could not resolve super class: " + extendString));
+				_interp.reportError("could not resolve super class: " + extendString);
 		}
 	}
 
@@ -138,24 +136,15 @@ class ScriptClass
 			var c = Type.resolveClass(extendString);
 			if (c == null)
 			{
-				@:privateAccess _interp.error(ECustom("could not resolve super class: " + extendString));
+				_interp.reportError("could not resolve super class: " + extendString);
 			}
 			else
 			{
 				function createSuperClass():Void
 					superClass = Type.createInstance(c, args);
 
-				var instance:Dynamic = SScript.superClassInstances[extendString];
-				if (instance != null)
-				{
-					var cl:Class<Dynamic> = Type.getClass(instance);
-					if (cl != null && extendString == Type.getClassName(cl))
-						superClass = instance;
-					else
-						createSuperClass();
-				}
-				else
-					createSuperClass();
+				// hscript 没有 SScript.superClassInstances 缓存，直接创建实例
+				createSuperClass();
 			}
 		}
 	}
@@ -195,21 +184,19 @@ class ScriptClass
 			var fn = findFunction(name);
 			if (fn == null)
 			{
-				@:privateAccess _interp.error(ECustom('Field $name is not a function'));
+				_interp.reportError('Field $name is not a function');
 				return null;
 			}
 			var f = findField(name);
 			if (f != null)
 			{
-				@:privateAccess
-				if (name != "new" && !f.access.contains(AOverride))
+				if (name != "new" && !f.access.contains(FieldAccess.AOverride))
 				{
 					if (superClass != null && Reflect.getProperty(superClass, name) != null)
 						throw 'Field $name should be declared with \'override\' since it is inherited from superclass $className';
 					else
 					{
 						var className:String = null;
-						// JavaScript issues
 						if (superClass != null)
 							className = Type.getClassName(superClass);
 						if (className == null)
@@ -220,12 +207,12 @@ class ScriptClass
 							var e = expr;
 							return switch e
 							{
-								case EIdent(v, _):
+								case EIdent(v):
 									if (v == 'super') true; else false;
 								case EField(e, _):
 									switch Tools.expr(e)
 									{
-										case EIdent(v, _):
+										case EIdent(v):
 											if (v == 'super') true; else false;
 										case _:
 											false;
@@ -317,7 +304,7 @@ class ScriptClass
 
 	inline function isStaticField(f:FieldDecl):Bool
 	{
-		return f.access != null && f.access.contains(AStatic);
+		return f.access != null && f.access.contains(FieldAccess.AStatic);
 	}
 
 	inline function matchesMode(f:FieldDecl):Bool
@@ -377,6 +364,7 @@ class ScriptClass
 			if (f.name == name && matchesMode(f))
 				return f;
 		}
+
 		return null;
 	}
 

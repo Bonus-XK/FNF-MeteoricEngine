@@ -1,18 +1,23 @@
 package ex;
 
-import hscriptBase.Expr;
-import hscriptBase.*;
-
-import tea.backend.SScriptX;
+import hscript.Interp;
+import hscript.Expr;
+import hscript.Expr.ErrorDef;
+import hscript.Expr.ModuleDecl;
+import hscript.Expr.Argument;
+import hscript.Expr.CType;
+import hscript.Printer;
+import hscript.Tools;
+import ex.ClassDeclEx;
 
 @:access(ex.ScriptClass)
 @:access(ex.AbstractScriptClass)
-@:access(tea.backend.SScriptX)
-class InterpEx extends hscriptBase.Interp
+class InterpEx extends hscript.Interp
 {
-	var pkg(default, null):String;
+	public var pkg(default, null):String;
 
-	@:noPrivateAccess private static var interps:Array<InterpEx> = [];
+	/** SScript 库的 tea.SScript 需要跨类访问（原先通过 @:access(hscriptBase.Interp) 现失效）。 */
+	public static var interps:Array<InterpEx> = [];
 	private var _proxy:AbstractScriptClass = null;
 	var origin:String = "SScriptX";
 
@@ -42,9 +47,6 @@ class InterpEx extends hscriptBase.Interp
 		variables.set("Std", Std);
 		if (push)
 			interps.push(this);
-		for (i in SScriptX.variables.keys())
-			if (!variables.exists(i))
-				variables.set(i, SScriptX.variables.get(i));
 	}
 
 	override function posInfos() {
@@ -84,7 +86,7 @@ class InterpEx extends hscriptBase.Interp
 		return _scriptClassDescriptors.copy();
 	}
 
-	public static function findScriptClassDescriptor(name:String)
+	public static function findScriptClassDescriptor(name:String):ClassDeclEx
 	{
 		return _scriptClassDescriptors.get(name);
 	}
@@ -169,7 +171,7 @@ class InterpEx extends hscriptBase.Interp
 		if (o is ModClassRef)
 		{
 			var p = classProvider != null ? classProvider.getClassProxy((cast o:ModClassRef).name) : null;
-			if (p == null) error(EUnknownVariable(f));
+			if (p == null) error(ErrorDef.EUnknownVariable(f));
 			return fcall(p, f, args);
 		}
 		if ((o is ScriptClass))
@@ -196,11 +198,11 @@ class InterpEx extends hscriptBase.Interp
 	override function get(o:Dynamic, f:String):Dynamic
 	{
 		if (o == null)
-			error(EInvalidAccess(f));
+			error(ErrorDef.EInvalidAccess(f));
 		if (o is ModClassRef)
 		{
 			var p = classProvider != null ? classProvider.getClassProxy((cast o:ModClassRef).name) : null;
-			if (p == null) error(EUnknownVariable(f));
+			if (p == null) error(ErrorDef.EUnknownVariable(f));
 			return get(p, f);
 		}
 		if ((o is ScriptClass))
@@ -212,7 +214,7 @@ class InterpEx extends hscriptBase.Interp
 			{
 				if (proxy.superClass is ScriptClass)
 				{
-					var sc:ScriptClass = cast proxy.superClass;
+					var sc:ScriptClass = cast _proxy.superClass;
 					if (sc.hasField(f)) return sc.readField(f);
 				}
 				else if (Reflect.hasField(proxy.superClass, f))
@@ -224,7 +226,7 @@ class InterpEx extends hscriptBase.Interp
 				return ap.resolveField(f);
 			}
 			catch (e:Dynamic) {}
-			error(EUnknownVariable(f));
+			error(ErrorDef.EUnknownVariable(f));
 		}
 		return super.get(o, f);
 	}
@@ -232,11 +234,11 @@ class InterpEx extends hscriptBase.Interp
 	override function set(o:Dynamic, f:String, v:Dynamic):Dynamic
 	{
 		if (o == null)
-			error(EInvalidAccess(f));
+			error(ErrorDef.EInvalidAccess(f));
 		if (o is ModClassRef)
 		{
 			var p = classProvider != null ? classProvider.getClassProxy((cast o:ModClassRef).name) : null;
-			if (p == null) error(EUnknownVariable(f));
+			if (p == null) error(ErrorDef.EUnknownVariable(f));
 			return set(p, f, v);
 		}
 		if ((o is ScriptClass))
@@ -248,7 +250,7 @@ class InterpEx extends hscriptBase.Interp
 			{
 				if (proxy.superClass is ScriptClass)
 				{
-					var sc:ScriptClass = cast proxy.superClass;
+					var sc:ScriptClass = cast _proxy.superClass;
 					if (sc.writeField(f, v)) return v;
 				}
 				else if (Reflect.hasField(proxy.superClass, f))
@@ -257,7 +259,7 @@ class InterpEx extends hscriptBase.Interp
 					return v;
 				}
 			}
-			error(EUnknownVariable(f));
+			error(ErrorDef.EUnknownVariable(f));
 		}
 		return super.set(o, f, v);
 	}
@@ -359,8 +361,14 @@ class InterpEx extends hscriptBase.Interp
 			if (p != null) return p;
 		}
 
-		error(EUnknownVariable(id));
+		error(ErrorDef.EUnknownVariable(id));
 		return null;
+	}
+
+	/** 对外暴露的错误上报（供 ScriptClass 调用，hscript.Interp.error 可能不可见）。 */
+	public function reportError(msg:String):Void
+	{
+		error(ErrorDef.ECustom(msg));
 	}
 
 	public function addModule(moduleContents:String)
@@ -390,11 +398,11 @@ class InterpEx extends hscriptBase.Interp
 			{
 				case DPackage(path):
 					pkg = path;
-					var pkg = pkg.copy();
-					if (pkg.length > 1)
+					var pkgCopy = pkg.copy();
+					if (pkgCopy.length > 1)
 					{
-						var s = pkg.pop();
-						this.pkg = pkg.join('.') + '.$s';
+						var s = pkgCopy.pop();
+						this.pkg = pkgCopy.join('.') + '.$s';
 					}
 					else
 						this.pkg = path[0];
@@ -423,10 +431,10 @@ class InterpEx extends hscriptBase.Interp
 						params: c.params,
 						meta: c.meta,
 						isPrivate: c.isPrivate,
+						isExtern: c.isExtern,
 						extend: extend,
 						implement: c.implement,
-						fields: c.fields,
-						isExtern: c.isExtern
+						fields: c.fields
 					};
 					registerScriptClass(classDecl);
 				case DTypedef(_):

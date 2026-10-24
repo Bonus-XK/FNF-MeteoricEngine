@@ -1,15 +1,15 @@
 package scripting;
 
-#if (HSCRIPT_ALLOWED && SScript >= "3.0.0")
+#if HSCRIPT_ALLOWED
 import ex.ClassDeclEx;
 import ex.InterpEx;
 import ex.ModClassProvider;
 import ex.ModClassRef;
 import ex.ScriptClass;
-import hscriptBase.Expr;
-import hscriptBase.Expr.ModuleDecl;
-import hscriptBase.Parser;
-import hscriptBase.Printer;
+import ex.ParserEx;
+import hscript.Expr;
+import hscript.Expr.ModuleDecl;
+import hscript.Printer;
 #if sys
 import sys.FileSystem;
 import sys.io.File;
@@ -18,7 +18,7 @@ import sys.io.File;
 /**
  * 模组 Haxe 类库加载器（`mods/<mod>/source/` 下所有 `.hx`）。
  *
- * - 只在「脚本系统总开关 + 脚本类库」都开启时工作；关闭时 parser / interp 行为与旧版一致。
+ * - 只在「脚本系统总开关」开启时工作。
  * - 类描述符全局注册；静态成员代理按 HScript 实例隔离（见 `ModClassProviderImpl`）。
  * - 只支持普通 class（含 `extends` / `implements` 语法，但解释器只实现 extends）；
  *   typedef / enum / abstract 不注册，import 仍由 HScript 自己处理。
@@ -48,10 +48,7 @@ class ModClassLoader
 			return;
 		}
 		if (loaded)
-		{
-			Parser.modClassResolver = resolveImport;
 			return;
-		}
 		loaded = true;
 
 		#if sys
@@ -76,7 +73,6 @@ class ModClassLoader
 		}
 		#end
 
-		Parser.modClassResolver = resolveImport;
 		trace('[ModClasses] registered ' + classNames.length + ' mod classes');
 	}
 
@@ -95,7 +91,6 @@ class ModClassLoader
 		classNames = [];
 		classOrigins = new Map();
 		shortNames = new Map();
-		Parser.modClassResolver = null;
 		loaded = false;
 	}
 
@@ -165,7 +160,7 @@ class ModClassLoader
 		try
 		{
 			var code = File.getContent(path);
-			var parser = new ex.ParserEx();
+			var parser = new ParserEx();
 			var module = parser.parseModule(code, path);
 			registerModule(module, path);
 		}
@@ -213,10 +208,10 @@ class ModClassLoader
 						params: c.params,
 						meta: c.meta,
 						isPrivate: c.isPrivate,
+						isExtern: c.isExtern,
 						extend: extend,
 						implement: c.implement,
-						fields: c.fields,
-						isExtern: c.isExtern
+						fields: c.fields
 					};
 					var full = InterpEx.registerScriptClass(classDecl);
 					if (!classOrigins.exists(full))

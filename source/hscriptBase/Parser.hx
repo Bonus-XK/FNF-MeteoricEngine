@@ -48,12 +48,11 @@ enum Token {
 	TPrepro( s : String );
 }
 
-@:access(tea.SScript)
 class Parser {
 
 	/**
 	 * Meteoric：`import` 在 Type.resolveClass / resolveEnum 都失败后的 mod 类解析钩子。
-	 * 返回 ex.ModClassRef 或 null；null 时保持 SScript 原行为。
+	 * 返回 ex.ModClassRef 或 null；null 时保持原行为。
 	 */
 	public static var modClassResolver:String->Dynamic = null;
 
@@ -70,6 +69,9 @@ class Parser {
 	#end
 
 	public var script:tea.SScript;
+
+	/** Meteoric：预处理器定义表（替代 tea.SScript.defines，避免跨库私有字段访问）。 */
+	public static var defines:Map<String,Dynamic> = new Map();
 
 	@:noPrivateAccess var packaged : Bool = false;
 
@@ -545,6 +547,44 @@ class Parser {
 					return makeUnop(op,e);
 				}
 			}
+			if( op == "~" ) {
+				// Meteoric: 正则字面量 ~/pattern/flags —— 生成 EReg 实例
+				var nextChar:Int;
+				if (this.char >= 0) {
+					nextChar = this.char;
+					this.char = -1;
+				} else {
+					nextChar = readChar();
+				}
+				if (nextChar == 47) { // /
+					var start = readPos;
+					var inEsc = false;
+					while (true) {
+						var c = readChar();
+						if (StringTools.isEof(c)) invalidChar(c);
+						if (inEsc) { inEsc = false; continue; }
+						if (c == 92) { inEsc = true; continue; }
+						if (c == 47) break;
+					}
+					var pattern = input.substring(start, readPos - 1);
+					var flagsStart = readPos;
+					while (true) {
+						var c = readChar();
+						if (idents[c]) continue;
+						this.char = c;
+						break;
+					}
+					var end = readPos;
+					if (this.char >= 0) end = readPos - 1;
+					var flags = input.substring(flagsStart, end);
+					var patternExpr = mk(EConst(CString(pattern)));
+					var flagsExpr = mk(EConst(CString(flags)));
+					return mk(ENew("EReg", [patternExpr, flagsExpr]), p1);
+				} else {
+					this.char = nextChar;
+					return makeUnop("~", parseExpr());
+				}
+			}
 			if( opPriority.get(op) < 0 )
 				return makeUnop(op,parseExpr());
 			return unexpected(tk);
@@ -874,21 +914,20 @@ class Parser {
 					}
 			}
 		case "public":
-			var maybeID="inline";
-			var maybe=maybe(TId(maybeID));
-			
-			var maybes=["var","final","function"];
-			if(!maybe)
-			{
-				for(int in 0...maybes.length){
-					maybeID=maybes[int];
-					maybe=this.maybe(TId(maybeID));
-					if(maybe)
-						break;
-				}
-				if(!maybe)
-					unexpected(TId("public"));
+			// Meteoric: 脚本层无类封装，public/static 仅语法兼容，不影响运行时语义。
+			// 支持 `public var`、`public function`、`public static var`、`public static function`；
+			// 访问修饰符被解析后丢弃，脚本层不强制可见性。
+			var isStatic = maybe(TId("static"));
+			var maybeID : String = null;
+			var maybe : Bool = false;
+			var maybes = isStatic ? ["var","final","function"] : ["inline","var","final","function"];
+			for(i in 0...maybes.length){
+				maybeID = maybes[i];
+				maybe = this.maybe(TId(maybeID));
+				if(maybe) break;
 			}
+			if(!maybe) unexpected(TId("public"));
+			if(isStatic && maybeID == "inline") unexpected(TId("static"));
 			switch(maybeID){
 				case "inline":
 					var tk = token();
@@ -901,17 +940,14 @@ class Parser {
 						case "function":
 							parseStructure(t,{f:"inlineFunc",v:true,n:id});
 						case "var" | "final":
-							parseStructure(t,{f:t=="final"?"inlineFinal":"inlineVar",v:true,n:id});
+							var trk = {f:t=="final"?"inlineFinal":"inlineVar",v:true,n:id};
+							parseStructure(t,trk);
 						default:
 							unexpected(TId("public"));
 					}
-				default: 
-					if(!maybes.contains(maybeID))
-						unexpected(TId(maybeID));
-					else{
-						var e=parseStructure(maybeID,{f:"publicField",v:true,n:id});
-						e;
-					}
+				default:
+					var e = parseStructure(maybeID,{f:"publicField",v:true,n:id});
+					e;
 			}
 		case "inline":
 			if (maybe(TId("public")))
@@ -953,6 +989,20 @@ class Parser {
 		case "throw":
 			var e = parseExpr();
 			mk(EThrow(e),p1,pmax(e));
+		case "static":
+			// Meteoric: 脚本层无类封装，static 仅语法兼容，不影响运行时语义。
+			// 支持 `static var x = 1;`、`static function f() {}`、`static final c = 2;`。
+			var maybeID : String = null;
+			var maybe : Bool = false;
+			var maybes = ["var","final","function"];
+			for(i in 0...maybes.length){
+				maybeID = maybes[i];
+				maybe = this.maybe(TId(maybeID));
+				if(maybe) break;
+			}
+			if(!maybe) unexpected(TId("static"));
+			var e = parseStructure(maybeID,{f:"staticField",v:true,n:id});
+			e;
 		case "try":
 			var e = parseExpr();
 			ensureToken(TId("catch"));
@@ -2110,7 +2160,7 @@ class Parser {
 					}
 					if( id1!=null )
 					{
-						var definedValue:String = SScript.defines[id1];
+						var definedValue:String = defines[id1];
 						if(definedValue==null)
 							definedValue=id1;
 						if (definedValue!=null
@@ -2185,7 +2235,7 @@ class Parser {
 		var expr1 = expr(e);
 		switch( expr1 ) {
 		case EIdent(id,_):
-			return SScript.defines.exists(id);
+			return defines.exists(id);
 		case EUnop("!", _, e):
 			return !!!evalPreproCond(e);
 		case EParent(e):
