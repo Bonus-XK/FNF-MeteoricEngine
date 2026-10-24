@@ -31,6 +31,9 @@ class ScriptClass
 	/** Meteoric：实例/静态字段独立存储，避免与函数参数同名冲突。 */
 	var _fields:Map<String, Dynamic> = new Map();
 
+	/** Meteoric：脚本类静态字段跨实例共享（类全名 -> 字段名 -> 值）。 */
+	public static var staticFields:Map<String, Map<String, Dynamic>> = new Map();
+
 	public function new(c:ClassDeclEx, args:Array<Dynamic>, ?staticOnly:Bool = false, ?sourceInterp:InterpEx = null)
 	{
 		_c = c;
@@ -72,6 +75,24 @@ class ScriptClass
 		}
 		name += _c.name;
 		return name;
+	}
+
+	/** Meteoric：类的全名（package + 类名），用作静态字段共享存储的键。 */
+	private function getStaticKey():String
+	{
+		var name = _c.name;
+		if (_c.pkg != null)
+			name = _c.pkg.join(".") + "." + name;
+		return name;
+	}
+
+	/** Meteoric：查找字段声明（不受 staticOnly 模式过滤）。 */
+	private function findFieldDecl(name:String):FieldDecl
+	{
+		for (f in _c.fields) {
+			if (f.name == name) return f;
+		}
+		return null;
 	}
 
 	private function superConstructor(arg0:Dynamic = Unused, arg1:Dynamic = Unused, arg2:Dynamic = Unused, arg3:Dynamic = Unused)
@@ -370,11 +391,35 @@ class ScriptClass
 
 	public function hasField(name:String):Bool
 	{
-		return _fields.exists(name) || findVar(name) != null;
+		return _fields.exists(name) || findVar(name) != null || findFieldDecl(name) != null;
 	}
 
 	public function readField(name:String):Dynamic
 	{
+		// Meteoric: 静态字段跨实例共享（类全名作键）
+		var f = findFieldDecl(name);
+		if (f != null && isStaticField(f))
+		{
+			var key = getStaticKey();
+			var store = staticFields.get(key);
+			if (store == null)
+			{
+				store = new Map();
+				staticFields.set(key, store);
+			}
+			if (!store.exists(name))
+			{
+				switch (f.kind)
+				{
+					case KVar(v):
+						if (v.expr != null) store.set(name, _interp.expr(v.expr));
+						else store.set(name, null);
+					default: {}
+				}
+			}
+			return store.get(name);
+		}
+
 		if (_fields.exists(name)) return _fields.get(name);
 		var v = findVar(name);
 		if (v != null && v.expr != null)
@@ -388,6 +433,20 @@ class ScriptClass
 
 	public function writeField(name:String, value:Dynamic):Bool
 	{
+		// Meteoric: 静态字段写入共享存储
+		var f = findFieldDecl(name);
+		if (f != null && isStaticField(f))
+		{
+			var key = getStaticKey();
+			var store = staticFields.get(key);
+			if (store == null)
+			{
+				store = new Map();
+				staticFields.set(key, store);
+			}
+			store.set(name, value);
+			return true;
+		}
 		if (findVar(name) == null && !_fields.exists(name)) return false;
 		_fields.set(name, value);
 		return true;
@@ -416,7 +475,7 @@ class ScriptClass
 					_cachedFunctionDecls.set(f.name, fn);
 				case KVar(v):
 					_cachedVarDecls.set(f.name, v);
-					if (v.expr != null)
+					if (v.expr != null && !isStaticField(f))
 						_fields.set(f.name, this._interp.expr(v.expr));
 			}
 		}

@@ -9,6 +9,7 @@ import hscript.Parser;
 import hscript.Expr;
 import hscript.Expr.Error;
 import scripting.ModClassLoader;
+import ex.InterpEx;
 #if sys
 import sys.FileSystem;
 #end
@@ -23,7 +24,7 @@ typedef SCall = {
 
 class HScript
 {
-	public var interp:Interp;
+	public var interp:InterpEx;
 	public var parser:Parser;
 	public var expr:Expr;
 	public var parentLua:FunkinLua;
@@ -88,7 +89,7 @@ class HScript
 		if (parent != null) origin = parent.scriptName;
 		if (file != null && file.length > 0) origin = file;
 
-		interp = new Interp();
+		interp = new InterpEx(null, false);
 		parser = new Parser();
 		parser.allowJSON = parser.allowMetadata = parser.allowTypes = true;
 
@@ -101,6 +102,22 @@ class HScript
 		};
 		parser.onPackage = function(path:Array<String>) {
 			interp.registerPackage(path);
+		};
+		// Meteoric: 顶层 class 声明注册到全局脚本类表，供 new 实例化
+		parser.onClass = function(c:Dynamic) {
+			var decl = {
+				imports: new Map<String, Array<String>>(),
+				pkg: null,
+				name: c.name,
+				params: c.params,
+				meta: c.meta,
+				isPrivate: c.isPrivate,
+				isExtern: c.isExtern,
+				extend: c.extend,
+				implement: c.implement,
+				fields: c.fields
+			};
+			InterpEx.registerScriptClass(decl);
 		};
 
 		preset();

@@ -85,6 +85,7 @@ class Parser {
 	public var onImport : Array<String> -> Bool -> Null<String> -> Void = function(_,_,_) {};
 	public var onUsing : Array<String> -> Void = function(_) {};
 	public var onPackage : Array<String> -> Void = function(_) {};
+	public var onClass : Expr.ClassDecl -> Void = function(_) {};
 
 	// implementation
 	var input : String;
@@ -209,6 +210,14 @@ class Parser {
 				push(tk);
 				switch( parseModuleDecl() ) {
 				case DPackage(path): onPackage(path);
+				default: // 不可能
+				}
+				continue;
+			case TId("class"):
+				// Meteoric: 顶层 class 声明——注册到 Interp，不产生求值表达式
+				push(tk);
+				switch( parseModuleDecl() ) {
+				case DClass(c): onClass(c);
 				default: // 不可能
 				}
 				continue;
