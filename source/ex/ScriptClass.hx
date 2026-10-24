@@ -154,19 +154,101 @@ class ScriptClass
 		}
 		else
 		{
-			var c = Type.resolveClass(extendString);
-			if (c == null)
+			// Meteoric: 壳类优先（CUSTOM_CLASSES 白名单基类）——真继承，引擎 API 可接纳壳实例
+			trace('[SUP-DIAG] createSuper ext=' + extendString + ' descNull=' + (classDescriptor == null));
+			var shell = resolveShellClass(extendString);
+			trace('[SUP-DIAG] shell=' + (shell == null ? 'null' : Type.getClassName(shell)));
+			if (shell != null)
 			{
-				_interp.reportError("could not resolve super class: " + extendString);
+				var shellInstance = Type.createInstance(shell, args);
+				superClass = shellInstance;
+				bindShellMethods(shellInstance);
 			}
 			else
 			{
-				function createSuperClass():Void
-					superClass = Type.createInstance(c, args);
+				var c = Type.resolveClass(extendString);
+				if (c == null)
+				{
+					_interp.reportError("could not resolve super class: " + extendString);
+				}
+				else
+				{
+					function createSuperClass():Void
+						superClass = Type.createInstance(c, args);
 
-				// hscript 没有 SScript.superClassInstances 缓存，直接创建实例
-				createSuperClass();
+					// hscript 没有 SScript.superClassInstances 缓存，直接创建实例
+					createSuperClass();
+				}
 			}
+		}
+	}
+
+	/**
+	 * Meteoric: 解析基类对应的 _HSX 壳类。
+	 * 脚本里 extends 可写全名（flixel.FlxSprite）或短名（FlxSprite，经引擎 preset 注入的类值反查全名），
+	 * 也可走脚本 import 映射。找不到壳（非白名单基类）返回 null，回退组合式继承。
+	 */
+	private function resolveShellClass(extendString:String):Null<Class<Dynamic>>
+	{
+		var shell = Type.resolveClass(extendString + "_HSX");
+		if (shell != null) return shell;
+		var clsVal:Dynamic = _interp.variables.get(extendString);
+		var fbGet:Dynamic = _interp.fallbackVariables == null ? null : _interp.fallbackVariables.get(extendString);
+		if (clsVal == null && _interp.fallbackVariables != null)
+			clsVal = _interp.fallbackVariables.get(extendString);
+		if (clsVal != null)
+		{
+			var fullName:String = null;
+			try fullName = Type.getClassName(clsVal) catch (e:Dynamic) {}
+			if (fullName != null)
+			{
+				shell = Type.resolveClass(fullName + "_HSX");
+				if (shell != null) return shell;
+			}
+		}
+		// Meteoric: 白名单基类都在 flixel 包（第一期），短名直接拼包前缀兜底（不依赖变量表反查）
+		if (shell == null && extendString.indexOf(".") < 0)
+		{
+			shell = Type.resolveClass("flixel." + extendString + "_HSX");
+			if (shell != null) return shell;
+		}
+		if (_c.imports != null && _c.imports.exists(extendString))
+		{
+			var full = _c.imports.get(extendString).join(".");
+			shell = Type.resolveClass(full + "_HSX");
+			if (shell != null) return shell;
+		}
+		return null;
+	}
+
+	/**
+	 * Meteoric: 把壳实例的方法路由绑定到本 ScriptClass。
+	 * 壳的 override 查 __interp.variables[方法名]；这里为每个壳方法生成包装：
+	 * 脚本有同名声明 → 走 callFunction（脚本方法）；否则 → 调壳的 _HX_SUPER__ 原生转发。
+	 *（super.xxx 防递归由 InterpEx.get 的 _HX_SUPER__ 分支处理。）
+	 */
+	private function bindShellMethods(shell:Dynamic):Void
+	{
+		var si:Dynamic = Reflect.field(shell, "__interp");
+		if (si == null) return;
+		var vars:Map<String, Dynamic> = cast si.variables;
+		if (vars == null) return;
+		var me = this;
+		for (f in Type.getInstanceFields(Type.getClass(shell)))
+		{
+			if (StringTools.startsWith(f, "_HX_SUPER__") || f == "hget" || f == "hset" || f == "__interp")
+				continue;
+			var fn:Dynamic = Reflect.field(shell, f);
+			if (!Reflect.isFunction(fn)) continue;
+			vars.set(f, Reflect.makeVarArgs(function(a:Array<Dynamic>):Dynamic
+			{
+				if (me.findFunction(f) != null)
+					return me.callFunction(f, a);
+				var sup = Reflect.field(shell, "_HX_SUPER__" + f);
+				if (sup != null)
+					return Reflect.callMethod(shell, sup, a);
+				return me.callFunction(f, a);
+			}));
 		}
 	}
 

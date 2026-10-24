@@ -8,6 +8,7 @@ import hscript.Expr.Argument;
 import hscript.Expr.CType;
 import hscript.Printer;
 import hscript.Tools;
+import hscript.CustomClassHandler;
 import ex.ClassDeclEx;
 
 @:access(ex.ScriptClass)
@@ -109,7 +110,14 @@ class InterpEx extends hscript.Interp
 				decl = _scriptClassDescriptors.get(fullName);
 		}
 		if (decl != null)
+		{
+			// Meteoric: extends 目标有 _HSX 壳（CUSTOM_CLASSES 白名单基类）→ CNE 式壳实例路径：
+			// 脚本类实例就是壳实例本身（真引擎子类，引擎 API 可接纳），脚本方法经壳 override 路由。
+			var shell = findShellForDecl(decl);
+			if (shell != null)
+				return createShellInstance(decl, shell, args);
 			return new ScriptClass(decl, args, false, this);
+		}
 
 		if (_proxy != null)
 		{
@@ -228,6 +236,16 @@ class InterpEx extends hscript.Interp
 			catch (e:Dynamic) {}
 			error(ErrorDef.EUnknownVariable(f));
 		}
+		// Meteoric: 壳实例的动态访问（hscript-improved 同语义）：
+		// 1) _HX_SUPER__ 优先 —— this.method() 防递归（壳 override 查 variables 会路由回脚本）
+		// 2) hget 兜底 —— 脚本字段/方法从 __interp.variables 取（引擎字段由 hget 内部 Reflect 回落）
+		if ((o is hscript.IHScriptCustomBehaviour))
+		{
+			if (Reflect.hasField(o, "_HX_SUPER__" + f))
+				return Reflect.getProperty(o, "_HX_SUPER__" + f);
+			var beh:hscript.IHScriptCustomBehaviour = cast o;
+			return beh.hget(f);
+		}
 		return super.get(o, f);
 	}
 
@@ -260,6 +278,12 @@ class InterpEx extends hscript.Interp
 				}
 			}
 			error(ErrorDef.EUnknownVariable(f));
+		}
+		// Meteoric: 壳实例的动态写入（hset：脚本字段入 __interp.variables，引擎字段由 hset 内部 Reflect 回落）
+		if ((o is hscript.IHScriptCustomBehaviour))
+		{
+			var beh:hscript.IHScriptCustomBehaviour = cast o;
+			return beh.hset(f, v);
 		}
 		return super.set(o, f, v);
 	}
@@ -386,6 +410,80 @@ class InterpEx extends hscript.Interp
 		}
 		var r:AbstractScriptClass = cnew(className, args);
 		return r;
+	}
+
+	/**
+	 * Meteoric: 解析脚本类声明的 extends 目标对应的 _HSX 壳类；非白名单基类返回 null。
+	 */
+	function findShellForDecl(decl:ClassDeclEx):Null<Class<Dynamic>>
+	{
+		if (decl.extend == null) return null;
+		var extendString = new Printer().typeToString(decl.extend);
+		var shell = Type.resolveClass(extendString + "_HSX");
+		if (shell != null) return shell;
+		// 白名单基类都在 flixel 包（第一期），短名拼包前缀兜底
+		if (extendString.indexOf(".") < 0)
+		{
+			shell = Type.resolveClass("flixel." + extendString + "_HSX");
+			if (shell != null) return shell;
+		}
+		return null;
+	}
+
+	/**
+	 * Meteoric: CNE 式壳实例创建（CustomClassHandler.hnew 的 InterpEx 移植）。
+	 * 新建专属 interp 拷贝外层环境 → 执行脚本类体（方法/变量注册进 variables）→
+	 * 创建壳实例并绑定 __interp → 调脚本 new。返回值就是壳实例（真引擎子类）。
+	 */
+	function createShellInstance(decl:ClassDeclEx, shell:Class<Dynamic>, args:Array<Dynamic>):Dynamic
+	{
+		var interp = new InterpEx(null, false, null, this);
+		interp.errorHandler = errorHandler;
+
+		var capturedLocals = duplicate(locals);
+		var disallowCopy = Type.getInstanceFields(shell);
+
+		for (key => value in capturedLocals)
+		{
+			if (!disallowCopy.contains(key))
+				interp.locals.set(key, {r: value});
+		}
+		for (key => value in variables)
+		{
+			if (!disallowCopy.contains(key))
+				interp.variables.set(key, value);
+		}
+
+		// 脚本类体：var 字段直接求值入 variables（与引擎字段同名时让位）；
+		// function 字段**不过滤**——override 语义必须注册进 variables，壳 override 才能路由到脚本
+		for (f in decl.fields)
+		{
+			switch (f.kind)
+			{
+				case KVar(v):
+					if (disallowCopy.contains(f.name))
+						continue; // 与引擎字段同名：脚本字段让位给引擎字段（CNE 同语义）
+					var value:Dynamic = v.expr != null ? interp.exprReturn(v.expr) : null;
+					interp.variables.set(f.name, value);
+				case KFunction(fn):
+					var fexpr:hscript.Expr = Tools.mk(ExprDef.EFunction(fn.args, fn.expr, f.name, fn.ret), fn.expr);
+					interp.exprReturn(fexpr);
+			}
+		}
+
+		interp.variables.set("super", CustomClassHandler.staticHandler);
+		interp.variables.set("this", null); // 先占位，创建实例后回填
+
+		var inst = Type.createInstance(shell, args);
+		Reflect.setProperty(inst, "__interp", interp);
+		interp.scriptObject = inst;
+		interp.variables.set("this", inst);
+
+		var newFunc = interp.variables.get("new");
+		if (newFunc != null)
+			Reflect.callMethod(null, newFunc, args);
+
+		return inst;
 	}
 
 	public function registerModule(module:Array<ModuleDecl>)

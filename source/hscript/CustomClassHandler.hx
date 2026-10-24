@@ -43,9 +43,9 @@ class CustomClassHandler implements IHScriptCustomConstructor {
 		var cl = extend == null ? cast(TemplateClass, Class<Dynamic>) : Type.resolveClass('${extend}_HSX');
 		if (cl == null) {
 			#if hscriptPos
-			throw Expr.ErrorDef.ECustom('could not resolve custom class shell: ' + extend);
+			throw ErrorDef.ECustom('could not resolve custom class shell: ' + extend);
 			#else
-			throw Expr.Error.ECustom('could not resolve custom class shell: ' + extend);
+			throw Error.ECustom('could not resolve custom class shell: ' + extend);
 			#end
 		}
 
