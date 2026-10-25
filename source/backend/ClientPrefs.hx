@@ -739,6 +739,50 @@ class ClientPrefs {
 		normalizeLoadedKeys();
 		savedHideHud = data.hideHud;
 
+		var __saveSuspect:Bool = false;
+#if (sys && !android)
+		// ── 存档损坏防护（2026-10-25 实测事故）────────────────────────────────
+		// SharedObject 反序列化失败（截断/坏字节）是**静默**的：data 直接为空，
+		// loadPrefs 按默认值继续跑，随后下面的迁移逻辑 saveSettings() 会把默认值
+		// 无提示覆写回 sol —— 原档就此丢失（进程被 kill -9 时 sol 非原子写可被截断）。
+		// 防护：已知字段加载率 < 30% ⇒ 存档不可信 ⇒ 跳过本 boot 的全部迁移写盘，
+		// 并先把磁盘上的原 sol 复制为 funkin.sol.corrupt-<ts> 留证（用户仍可正常游玩，
+		// 之后改设置触发的保存是用户主动行为，不算覆写）。
+		var __loadedKnown:Int = 0;
+		var __totalKnown:Int = 0;
+		for (__key in Reflect.fields(data)) {
+			if (__key == 'gameplaySettings') continue;
+			__totalKnown++;
+			if (Reflect.hasField(FlxG.save.data, __key)) __loadedKnown++;
+		}
+		__saveSuspect = __totalKnown > 0 && __loadedKnown < Std.int(__totalKnown * 0.3);
+		if (__saveSuspect) {
+			// 留证：把磁盘上的残档先复制成 .corrupt-<ts>（openfl 的 sol 落点 =
+			// applicationStorageDirectory + '/' + localPath + '/'（SharedObject.hx __getPath），
+			// 但 appStorageDir 是否已含 localPath 段在不同 lime 版本有差异——两个候选都试，
+			// 拷没拷到都要在日志里说真话，不许静默）。
+			var __backedUp:Bool = false;
+			try {
+				var __base:String = lime.system.System.applicationStorageDirectory;
+				if (__base == null || __base.length == 0) __base = './';
+				if (__base.charAt(__base.length - 1) != '/') __base += '/';
+				var __cands:Array<String> = [__base + CoolUtil.getSavePath() + '/funkin.sol', __base + 'funkin.sol'];
+				for (__c in __cands) {
+					if (sys.FileSystem.exists(__c)) {
+						sys.io.File.copy(__c, __c + '.corrupt-' + Std.int(Date.now().getTime()));
+						__backedUp = true;
+						break;
+					}
+				}
+			} catch (e:Dynamic) {}
+			trace(Lang.tOr('clientprefs.saveSuspectHead', '[ClientPrefs] 存档不可信（已知字段加载 ') + __loadedKnown + '/' + __totalKnown
+				+ Lang.tOr('clientprefs.saveSuspectTail', '），本次启动跳过迁移写盘')
+				+ (__backedUp
+					? Lang.tOr('clientprefs.saveSuspectBackedUp', '；原档已复制为 .corrupt-* 留证')
+					: Lang.tOr('clientprefs.saveSuspectBackupFailed', '；⚠ 残档留证失败（未找到 sol 路径），请手动备份')));
+		}
+#end
+
 		// 判定选项旧值迁移：'新版' -> 'KE 判定'，'旧判定' -> 'PE 判定'
 		if (data.noteJudgment == '新版' || data.noteJudgment == '旧判定')
 			data.noteJudgment = (data.noteJudgment == '新版') ? 'KE 判定' : 'PE 判定';
@@ -772,7 +816,7 @@ class ClientPrefs {
 		{
 			data.comboStackMigrated = true;
 			if (data.comboStacking) data.comboStacking = false;
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 
 		// 小图标跳动旧值迁移：原「SB引擎图标跳动」已移除，两个 bool 合并为单枚举 iconBopStyle。
@@ -783,7 +827,7 @@ class ClientPrefs {
 		{
 			data.iconBopMigrated = true;
 			if (data.keIconBop) data.iconBopStyle = IconBop.KE;
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 
 		// GPU 缓存旧默认迁移：桌面旧默认 false（CPU 位图 + GPU 纹理双份，大图集 192MB×2）→
@@ -794,7 +838,7 @@ class ClientPrefs {
 			#if desktop
 			if (!data.cacheOnGPU) data.cacheOnGPU = true;
 			#end
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 
 		// 图集降采样撤回迁移：本会话曾把 textureScale 写盘为 0.5（标题黑屏/文字错乱回归），
@@ -806,7 +850,7 @@ class ClientPrefs {
 		{
 			data.texScaleMigrated = true;
 			if (data.textureScale < 1) data.textureScale = 1.0;
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 
 		// TuoboLoad 档位归一（配置被手改/跨版本时兜底；'0'=关闭是默认，绝不强制改动）
@@ -829,7 +873,7 @@ class ClientPrefs {
 		{
 			data.bgScaleMigrated = true;
 			if (data.backgroundScale < 1) data.backgroundScale = 1.0;
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 
 		// GPU 缓存强制开启迁移（一次性）：历史会话用户因崩溃关闭了 cacheOnGPU，
@@ -842,7 +886,7 @@ class ClientPrefs {
 			#if desktop
 			data.cacheOnGPU = true;
 			#end
-			saveSettings();
+			if (!__saveSuspect) saveSettings();
 		}
 		
 		if(Main.fpsVar != null) {
