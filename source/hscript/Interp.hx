@@ -23,6 +23,7 @@ package hscript;
 import haxe.PosInfos;
 import hscript.Expr;
 import haxe.Constraints.IMap;
+import hscript.CustomClassHandler;
 
 private enum Stop {
 	SBreak;
@@ -54,11 +55,70 @@ class Interp {
 	public var errorHandler : Error -> Void; // error() 触发时的回调（hscriptPos 下为包装类 Error），默认 null = 零行为变化
 	public var scriptObject : Dynamic;                                           // 壳实例反向引用（interp 所属对象）
 
+	// Meteoric: 顶层脚本类注册表（纯脚本类；引擎基类壳路径在宿主 InterpEx 层）
+	public var scriptClasses : Map<String, Expr.ClassDecl> = [];
+
+	/** 注册顶层脚本类（通常由 Parser.onClass 接线；键 = 类名）。 */
+	public function defineScriptClass( c : Expr.ClassDecl ) : String {
+		scriptClasses.set(c.name, c);
+		return c.name;
+	}
+
+	/**
+	 * Meteoric: 实例化顶层脚本类（纯脚本对象模型）。
+	 * 实例 = TemplateClass（__interp + hget/hset 动态字段）+ 专属 interp：
+	 * 继承链的父类体先求值到同一 interp（子类字段追加、方法覆盖），
+	 * 方法调用经 variables 里的闭包（fcall/get 走 hget），字段读写走 variables/hset。
+	 * static 字段为每实例副本近似（语料级语义；真共享在宿主 InterpEx 层）。
+	 */
+	function createScriptObject( decl : Expr.ClassDecl, args : Array<Dynamic> ) : Dynamic {
+		var interp = new Interp();
+		interp.errorHandler = errorHandler;
+		// 类体方法要能访问宿主变量
+		for (k => v in variables)
+			interp.variables.set(k, v);
+		var visited:Array<String> = [decl.name];
+		evalClassChain(decl, interp, visited);
+		var inst = new TemplateClass();
+		inst.__interp = interp;
+		interp.scriptObject = inst;
+		interp.variables.set("this", inst);
+		var newFn = interp.variables.get("new");
+		if (newFn != null)
+			Reflect.callMethod(null, newFn, args);
+		return inst;
+	}
+
+	/** 沿 extends 链从最顶层基类往下求值类体（防循环继承）。 */
+	function evalClassChain( decl : Expr.ClassDecl, interp : Interp, visited : Array<String> ) : Void {
+		if (decl.extend != null) {
+			var ext = new Printer().typeToString(decl.extend);
+			var parentDecl = scriptClasses.get(ext);
+			if (parentDecl == null)
+				error(ECustom("script class '" + decl.name + "' extends '" + ext + "' which is not a script class (engine base classes require the CUSTOM_CLASSES shell path)"));
+			if (visited.indexOf(parentDecl.name) < 0) {
+				visited.push(parentDecl.name);
+				evalClassChain(parentDecl, interp, visited);
+			}
+		}
+		for (f in decl.fields) {
+			switch (f.kind) {
+			case KVar(v):
+				interp.variables.set(f.name, v.expr != null ? interp.exprReturn(v.expr) : null);
+			case KFunction(fn):
+				interp.exprReturn(Tools.mk(EFunction(fn.args, fn.expr, f.name, fn.ret), fn.expr));
+			}
+		}
+	}
+
 	#if hscriptPos
 	var curExpr : Expr;
 	#end
 
 	public function new() {
+		// Meteoric: eval 目标下未初始化的 Int 字段是 null（hxcpp 默认 0），
+		// depth null 会让顶层函数定义走 locals 分支并被块 restore 回滚（官方 2.7.0 隐性 bug）
+		depth = 0;
 		locals = new Map();
 		declared = new Array();
 		resetVariables();
@@ -593,6 +653,10 @@ class Interp {
 			var a = new Array();
 			for( e in params )
 				a.push(expr(e));
+			// Meteoric: 顶层脚本类实例化（cnew 引擎/壳路径之前分流）
+			var scDecl = scriptClasses.get(cl);
+			if (scDecl != null)
+				return createScriptObject(scDecl, a);
 			return cnew(cl,a);
 		case EThrow(e):
 			throw expr(e);
@@ -839,6 +903,11 @@ class Interp {
 
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
+		// Meteoric: 脚本对象动态字段（TemplateClass 脚本类实例 / CUSTOM_CLASSES 壳实例共用接口）
+		if ( o is IHScriptCustomBehaviour ) {
+			var beh : IHScriptCustomBehaviour = cast o;
+			return beh.hget(f);
+		}
 		return {
 			#if php
 				// https://github.com/HaxeFoundation/haxe/issues/4915
@@ -855,6 +924,11 @@ class Interp {
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
+		// Meteoric: 脚本对象动态字段写入
+		if ( o is IHScriptCustomBehaviour ) {
+			var beh : IHScriptCustomBehaviour = cast o;
+			return beh.hset(f, v);
+		}
 		Reflect.setProperty(o,f,v);
 		return v;
 	}
