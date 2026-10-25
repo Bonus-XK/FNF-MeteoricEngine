@@ -179,6 +179,16 @@ typecheck + i18n + 真机（默认 opengl 必须零变化）→ vulkan 档真探
 2. 引擎 CI（`ci/setup-lime-sdl3.sh`）要同步出 develop 版组装脚本，否则 CI 与本地分叉；
 3. `haxelib dev lime` 指向切换要有回滚命令记录（`haxelib dev lime /usr/local/lib/haxe/lib/lime/8,2,2`）。
 
+## 事故记录：2026-10-25 用户存档丢失（已装防护，见引擎提交 e6d17d0）
+
+lime-meteoric 8.4 演练期间，游戏进程被 kill -9 时 sol 非原子写遭截断 → 下次启动
+SharedObject 反序列化**静默失败** → loadPrefs 的 6 处启动迁移 saveSettings() 用默认值
+覆写残档，用户设置全丢（无 TM/快照可恢复；周目进度/分数/回放/mods 在独立存储未受影响）。
+已在 ClientPrefs 装损坏防护（加载率<30% ⇒ 跳过迁移写盘 + .corrupt 留证，真机验证通过）。
+**跟进项**：① openfl SharedObject 的 sol 落盘改原子写（tmp+rename，需动 openfl/lime 层）；
+② lime-meteoric 8.4 构建下同款防护复验；③ compile-mac.sh 的 typecheck ndll 校验按
+lime 版本分流（8.4 ndll 会被当成「未知指纹」走墙钟覆盖分支报错）。
+
 ## 远期（不在本轨道内）
 
 - OpenFL 显示列表跑 Vulkan（等上游）。
