@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+	<!-- Meteoric Vulkan 沙盒（阶段 1）：验证 lime 8.4 develop 的 Vulkan 引导链
+	     在 macOS + MoltenVK 上能否走通。不带任何 Meteoric 补丁（stock develop），
+	     排除补丁干扰；跑通后 P2 才把补丁重放到这份树上。 -->
+	<app title="Meteoric VK Sandbox" file="VKSandbox" package="com.bonusxk.vksandbox" version="0.1.0" company="Bonus-XK" main="Main" />
+
+	<!-- renderer="vulkan"：lime 8.4 实验性 Vulkan 窗口；解析器自动置 lime-vulkan define。
+	     arm64 同引擎：工具链跑在 Rosetta 下不声明会编出 x86_64（见引擎 Project.xml 同款注释） -->
+	<window width="960" height="600" background="#101018" hardware="true" vsync="false" renderer="vulkan" resizable="true" />
+	<architecture name="arm64" if="arm64" />
+
+	<source path="Source" />
+	<haxelib name="lime" />
+</project>
