@@ -98,6 +98,10 @@ class SaveVariables {
 // 高清渲染开关（重启生效）：true=Retina 2x 清晰（游戏内大规模谱面约 700~1400 帧）；
 	// false=1x 高性能（画面略糊，帧率约 3 倍，游戏内可 2200+）。由 SDLWindow.cpp 在创建窗口时读取模式文件。
 	@:keep public var highDPIRender:Bool = true;
+	// 渲染后端（桌面端，重启生效）：'opengl'（默认，零行为变化）| 'vulkan'（实验性）。
+	// 语义与探测/自动回退见 backend/RendererBackend.hx —— 选 vulkan 只会初始化
+	// Vulkan 子系统（隐藏窗口驻留句柄），主画面渲染暂仍为 OpenGL。
+	@:keep public var rendererBackend:String = 'opengl';
 	// 性能模式（Seiun 移植）：音符走「无着色器 + ColorTransform 上色 + 直连 quad 合批」快速路径，
 	// 消除每 item 的 shader 绑定/缓冲重灌开销；部分音符渲染细节（如单色平涂代替三色渐变）略有差异。
 	@:keep public var perfMode:Bool = false;

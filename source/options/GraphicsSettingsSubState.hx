@@ -22,6 +22,20 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			boyfriend.visible = false;
 		}
 
+		#if desktop
+		// 渲染后端（Vulkan 实验性轨道）：默认 OpenGL = 现状零变化；
+		// Vulkan = 启动时初始化 Vulkan 子系统，失败自动回退 OpenGL（见 backend/RendererBackend.hx）。
+		// 存储值为英文（与 closeAnimStyle 同款）；档位显示名走 optionValue.rendererBackend.<i> 自动派生。
+		// ⚠ 名字/说明显式走 tOr：新增的裸 CJK 字面量会被 i18n 覆盖检查拦下
+		//   （存量选项的中文字面量是基线豁免，新代码必须走 tOr，见 RenderModeSubState 同款注释）。
+		var option:Option = new Option(Lang.tOr('option.rendererBackend', '渲染后端'),
+			Lang.tOr('optionDesc.rendererBackend', '主画面渲染后端。OpenGL（默认）：当前唯一的主画面渲染实现，最稳定。Vulkan（实验性）：启动时初始化 Vulkan 子系统（主画面渲染暂仍为 OpenGL，Vulkan 渲染能力随引擎迭代逐步接入），需要 Vulkan 运行时（macOS 为 MoltenVK），不可用时自动回退 OpenGL，游戏不受影响。切换后重启游戏生效'),
+			'rendererBackend',
+			'string',
+			['opengl', 'vulkan']);
+		addOption(option);
+		#end
+
 		//I'd suggest using "Low Quality" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('低画质', //Name
 			'开启后，禁用部分背景细节，缩短加载时间并提升性能', //Description
