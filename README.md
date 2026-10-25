@@ -130,14 +130,11 @@ mods/MyMod/
 
 ### 朋友与社区
 
-感谢 SeiunEngine 生态的伙伴们长期以来的支持、测试与交流：
-
-- **[陌鸿 (mohong2)](https://github.com/mohong2)** —— ME 的一生之敌，也为 ME 引擎提供了很好的想法
-- **[CitriSnow](https://space.bilibili.com/1951803423)** —— 提供脚本设计方案，全程支持开发（SeiunEngine）
-- **[MuXue](https://space.bilibili.com/3493084289566971)** —— 找出无数 bug，为引擎稳定性与质量做出重大贡献（SeiunEngine）
-- **[Pico](https://space.bilibili.com/3546752359598592)**（不是 FNF 角色那个 Pico）—— 自 MohongEngine 时代一路支持，宝贵 bug 反馈（SeiunEngine）
-- **[Wolf Yeying (小狼夜瑛)](https://space.bilibili.com/3493115727972533)** —— 发现并报告多个 bug，助力引擎稳定运行（SeiunEngine）
-- **[一只可爱的bf呀](https://space.bilibili.com/3546642993122123)** —— 精神支持与点子（SeiunEngine）
+- **[陌鸿](https://github.com/mohong2)** —— ME 的一生之敌，也为 ME 提供了许多优秀的想法
+- **[ZeroSeven](https://space.bilibili.com/1951803423)** —— 提供 Lua 优化方案
+- **[暮雪](https://space.bilibili.com/3493084289566971)** —— Neko Engine 开发者，贡献了许多想法并协助排查引擎 Bug
+- **[Pico皮科](https://space.bilibili.com/3546752359598592)** —— 找出无数 Bug，助力引擎稳定性与质量
+- **[小狼夜瑛](https://space.bilibili.com/3493115727972533)** —— 为 ME 提出众多想法
 
 ## License
 
