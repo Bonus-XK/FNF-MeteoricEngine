@@ -139,7 +139,7 @@ mods/MyMod/
 - **[暮雪](https://space.bilibili.com/3493084289566971)** —— Neko Engine 开发者，贡献了许多想法并协助排查引擎 Bug
 - **[Pico皮科](https://space.bilibili.com/3546752359598592)** —— 找出无数 Bug，助力引擎稳定性与质量
 - **[小狼夜瑛](https://space.bilibili.com/3493115727972533)** —— 为 ME 提出众多想法
-- **idk** 与 **GC** —— 为 ME 的性能优化提出众多想法，并应用到引擎中
+- **[idk](https://space.bilibili.com/3494379664705910)** 与 **GC** —— 为 ME 的性能优化提出众多想法，并应用到引擎中
 
 ## License
 
