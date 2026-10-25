@@ -590,3 +590,4 @@ class NativeAudioSource
 		return position;
 	}
 }
+

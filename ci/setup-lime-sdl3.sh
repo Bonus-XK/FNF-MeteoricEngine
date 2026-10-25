@@ -69,6 +69,10 @@ cp -R ci/lime-sdl3-patch/project/src/system/FileWatcher.cpp "$LIME_DIR/project/s
 cp -R ci/lime-sdl3-patch/project/src/system/System.cpp "$LIME_DIR/project/src/system/System.cpp"
 cp -R ci/lime-sdl3-patch/project/src/graphics/opengl/OpenGL.h "$LIME_DIR/project/src/graphics/opengl/OpenGL.h"
 cp -R ci/lime-sdl3-patch/tools/platforms/WindowsPlatform.hx "$LIME_DIR/tools/platforms/WindowsPlatform.hx"
+# Haxe 侧音频恢复修复（原引擎 vendor 文件 source/lime/...，2026-10-25 移入 lime 树统一维护）
+mkdir -p "$LIME_DIR/src/lime/_internal/backend/native"
+cp ci/lime-sdl3-patch/src/lime/_internal/backend/native/NativeAudioSource.hx \
+   "$LIME_DIR/src/lime/_internal/backend/native/NativeAudioSource.hx"
 cp -R ci/lime-sdl3-patch/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java "$LIME_DIR/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java"
 
 echo "==> [3/6] 对齐定制库版本（pixman/cairo/harfbuzz/openal/curl/efsw）"

@@ -1,7 +1,10 @@
 # Vulkan 轨道路线图（渲染后端二开）
 
-> 状态基线：2026-10-25。P0 已合入 master（`15f13d9`）；P1 沙盒与本文件同期；
-> P2 为待执行计划（合并面已完整测绘）。
+> 状态基线：2026-10-25 深夜。**P0/P1/P2 全部完成**：
+> P0 已合入 master（`15f13d9`）；P1 沙盒跑通；P2 合并树构建 + 引擎完整验证通过
+> （真机：默认 GL 零变化 + vulkan 档「Vulkan 子系统就绪」）。
+> lime-meteoric 工作树：`~/Documents/lime-meteoric`，分支 `meteoric-vulkan-sdl3`
+> （提交 `e39f7490` + `00ed4c8f`）。**引擎默认仍用 8.2.2**（见「切换状态」）。
 
 ## 背景与事实（查证过的，别凭印象推翻）
 
@@ -19,7 +22,10 @@
 - macOS 上 Vulkan 必须走 **MoltenVK**（Vulkan→Metal 翻译层）。SDL 的 Vulkan 加载器
   在 mac 上会依次找 `libvulkan.1.dylib` / `libMoltenVK.dylib` —— 直放 MoltenVK dylib
   + `DYLD_LIBRARY_PATH` 即可，不需要完整 Vulkan SDK。
-  （MoltenVK v1.4.2 universal2 已验证可下载：`/tmp/moltenvk/…/dynamic/dylib/macOS/libMoltenVK.dylib`）
+  （MoltenVK v1.4.2 universal2，**持久存档**：`~/Documents/meteoric-libs/MoltenVK/`
+  （含 dylib 与原始 tar）；运行需 `DYLD_LIBRARY_PATH=~/Documents/meteoric-libs/MoltenVK/MoltenVK/dynamic/dylib/macOS`。
+  `/usr/local/lib` 与 `~/lib` 都不在 SDL 的 dlopen 搜索路径内（实测）——P2 要在 fork 里
+  加「优先从引擎目录显式 `SDL_Vulkan_LoadLibrary(绝对路径)`」的加载逻辑，彻底去掉环境变量）
 
 ## P0：引擎渲染后端选项（已合入 `15f13d9`）
 
@@ -90,7 +96,62 @@ haxelib dev lime <dir>
    `pixman-region64f.c`（借自 Meteoric 补丁的解法，已验证）。
 运行：`DYLD_LIBRARY_PATH=<MoltenVK dylib 所在目录> ./VKSandbox.app/Contents/MacOS/VKSandbox`
 
-## P2：lime-meteoric（develop + Meteoric 补丁重放）—— 合并面已测绘
+## P2：lime-meteoric（develop + Meteoric 补丁重放）—— ✅ 2026-10-25 完成并真机验证
+
+**验证结果**（mac arm64 / Apple M4 / MoltenVK 1.4.2）：
+- ndll（release/debug，`-Dlime-vulkan`）构建 EXIT=0；
+- 沙盒全链路（窗口→引导→instance→物理设备枚举 Apple M4→300 帧）✓；
+- **引擎**（OpenFL 9.2.1 + flixel 5.2.2 + 全量源码）在 lime-meteoric 上：typecheck EXIT=0、
+  完整构建 EXIT=0、真机默认 GL 启动零变化（0 缺原语 / 0 探测输出）、
+  **vulkan 档真机打出「[Renderer] Vulkan 子系统就绪；主画面渲染仍为 OpenGL」**。
+
+**P2 实际执行中追加修的坑（全部已修，勿再踩）**：
+1. `SetAlwaysOnTop` 在 8.4 基类升为纯虚 → SDLWindow 必须实现（SDL3 `SDL_SetWindowAlwaysOnTop`）。
+2. SDL3 仍有 `SDL_WINDOW_VULKAN` 窗口标志且**必须设置**（SDL_video.c：带标志建窗自动
+   LoadLibrary，失败=窗口创建干净失败；`SDL_Vulkan_CreateSurface` 也检查它）。
+   「SDL3 删了该标志」是误记。
+3. Meteoric 的 SDL_build_config.h **src 副本**未开 `SDL_VIDEO_VULKAN`（include 副本开了，
+   两份不一致！）→ cocoa 驱动无 Vulkan，报「Vulkan support is either not configured in SDL」。
+4. `SDL_cocoavulkan` 链接缺 `QuartzCore`（CAMetalLayer）。
+5. SDL3 把 **loader 层扩展** `VK_KHR_portability_enumeration` 无条件列入 mac 必需扩展；
+   直连 MoltenVK（无 Vulkan loader）时驱动不提供它 → `vkCreateInstance` 返回
+   `VK_ERROR_EXTENSION_NOT_PRESENT(-7)`。修法：ExternalInterface 的
+   CreateManagedVulkanInstance 按 `vkEnumerateInstanceExtensionProperties` 可用性过滤必需表。
+6. `lime rebuild` 不从工程 XML 继承 `lime-vulkan`（见 P1 坑 3）；**引擎侧的 haxedef 还必须在
+   Project.xml 任何 `<haxelib>` 之前声明**——lime 的 include.xml 在依赖解析早期求值，
+   放在 Haxedefines 区（库声明之后）完全失效（实测，`meteoric_no_sdl_sound` 的 unless
+   逃生口因此不可达，最终在 fork 里翻转默认极性解决）。
+7. 引擎 `source/lime/.../NativeAudioSource.hx` vendor 机制：引擎 source 目录解析优先级
+   **高于** lime 库 classpath，vendor 文件一直实际生效（且空模块对 `import` 式引用不穿透）。
+   已按 CI.md 原则移除 vendor：音频修复移植进两棵 lime 树（lime-meteoric 8.4 +
+   /usr/local 8.2.2 dev 树，内容=原 vendor 版，8.2.2 零行为变化）+ CI 覆盖层补文件
+   （`ci/lime-sdl3-patch/src/...` + setup 脚本拷贝行）。
+8. **app 构建不会重建 bundle 里的规范名 `lime.ndll`**——`lime rebuild` 产物名是
+   `lime-64.ndll`/`lime-debug-64.ndll`，要手动就位 `$LIME/ndll/MacArm64/lime.ndll`
+   （app 构建只从这里取）。
+9. **compile-mac.sh 的 arm64 自动检测以 `tools/lime.ndll.wallclock-arm64` 存在为前提**
+   （第 19 行）——把墙钟文件暂存走会静默落到 x86_64！测试时用 `METEORIC_ARCH=arm64` 显式指定。
+10. ndll 还原（wallclock swap）后 bundle 签名失效 → `Taskgated Invalid Signature` 秒杀
+    （空日志假象）。`codesign --force --deep -s - <app>` 即恢复。
+
+**切换状态**：会话结束时已回滚——`haxelib dev lime` → 8.2.2、墙钟文件归位、引擎重建+真机
+验证正常。**常驻切到 lime-meteoric 的操作**（建议先真机完整游玩验证 8.4 构建：进曲/视频/音频流）：
+```bash
+haxelib dev lime /Users/raidbounce/Documents/lime-meteoric   # 切
+# 构建：METEORIC_ARCH=arm64 ... ./compile-mac.sh；⚠ 需先把 tools/lime.ndll.wallclock* 暂存
+# （否则 post-build 会用 8.2.2 老 ndll 覆盖 8.4 产物 → 23 个缺原语崩溃），且 compile-mac.sh
+# 的墙钟还原逻辑需要适配 lime-meteoric（跟进项）
+haxelib dev lime /usr/local/lib/haxe/lib/lime/8,2,2          # 回滚
+```
+
+**P2 遗留（跟进项，非阻塞）**：
+- compile-mac.sh 适配 lime-meteoric（ndll 还原逻辑按 lime 版本分流 + 检测条件与墙钟文件解耦）
+- `RendererBackend` 探测的设备名为空（cosmetic；上下文就绪已证明 C++ 侧全引导）
+- 引擎 Vulkan 档下的进曲/音频流/视频长跑验证（需人工游玩）
+- Windows/Android 目标构建、SDLMenu/SDLWindowMac/虚拟手柄移植、sdl_sound 移植或永久放弃
+- lime-meteoric push 到 GitHub（现为本地分支）
+
+### P2 执行前的合并面测绘（留档参考，执行结果见上）
 
 **基座**：`~/Documents/lime-meteoric`（develop 8.4.0 已组装，见上）。**不是** overlay
 `ci/lime-sdl3-patch`（那是 8.2.2 基座，直接覆盖会把 8.4 的 Vulkan / SDLMenu / Mac 窗口代码抹掉）。

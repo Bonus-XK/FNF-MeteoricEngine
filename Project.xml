@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project>
+	<!-- _________________________ Meteoric lime-meteoric 编译开关（必须置顶） _________________________
+	     ⚠ 这两个 haxedef 必须出现在任何 <haxelib> 之前：lime 的 include.xml（依赖解析早期求值）
+	   里的条件（unless="meteoric_no_sdl_sound"）与 hxcpp Build.xml 的 OBJEXT 门控都要在
+	   lime 被拉入的瞬间看到它们；放在下方 Haxedefines 区（库声明之后）会全部失效（实测）。 -->
+
+	<!-- Vulkan 轨道（lime-meteoric 8.4）：lime 的 Vulkan CFFI/VKRenderer 编进 ndll。
+	     主窗口仍是 OpenGL（零行为变化）；rendererBackend='vulkan' 时 RendererBackend 才会
+	     创建隐藏 Vulkan 窗口（见 backend/RendererBackend.hx 与 docs/VULKAN-ROADMAP.md）。 -->
+	<haxedef name="lime-vulkan" if="desktop" />
+	<!-- sdl_sound 是 SDL2 时代库，lime-meteoric 原生侧默认不编（其 Build.xml 同名开关）；
+	     Haxe 侧必须同步关（lime include.xml 的 haxedef 带 unless="meteoric_no_sdl_sound" 逃生口），
+	     否则音频流式路径调用不存在的 CFFI 原语（缺 prime 警告 + 流式失败）。关闭后回落 vorbis 直读。 -->
+	<haxedef name="meteoric_no_sdl_sound" if="desktop" />
+
 	<!-- _________________________ Application Settings _________________________ -->
 
 	<app title="FNF':Meteoric Engine" file="Meteoric" packageName="com.bonusxk.meteoric" package="com.bonusxk.meteoric" main="Main" version="1.2.0" company="Bonus-XK" />
@@ -173,7 +187,7 @@
 	<haxedef name="HXC_LIBVLC_LOGGING" if="VIDEOS_ALLOWED debug" />
 	
 	<!-- ______________________________ Haxedefines _____________________________ -->
-
+	<!--（lime-vulkan / meteoric_no_sdl_sound 见文件顶部——必须在库声明之前）-->
 	<!--Enable the Flixel core recording system-->
 	<!--<haxedef name="FLX_RECORD" />-->
 
