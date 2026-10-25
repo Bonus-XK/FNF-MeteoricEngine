@@ -34,7 +34,11 @@ class Interp {
 
 	public var variables : Map<String,Dynamic>;
 	public var locals : Map<String,{ r : Dynamic }>;
-	var binops : Map<String, Expr -> Expr -> Dynamic >;
+	// Meteoric(性能,移植自 seiun 1.2.0): op 表静态共享 + 无捕获签名 Interp->Expr->Expr->Dynamic
+	// —— ① 每个 new Interp() 不再分配 ~40 个闭包（脚本类/多脚本场景省内存省构造时间）
+	// ② eval/hxcpp 下无捕获函数调用比闭包快（expression 语料 exec 主热路径）
+	static var binops : Map<String, Interp -> Expr -> Expr -> Dynamic >;
+	static var binopsInitialized = false;
 
 	var depth : Int;
 	var inTry : Bool;
@@ -86,45 +90,54 @@ class Interp {
 	}
 
 	function initOps() {
-		var me = this;
-		binops = new Map();
-		binops.set("+",function(e1,e2) return me.expr(e1) + me.expr(e2));
-		binops.set("-",function(e1,e2) return me.expr(e1) - me.expr(e2));
-		binops.set("*",function(e1,e2) return me.expr(e1) * me.expr(e2));
-		binops.set("/",function(e1,e2) return me.expr(e1) / me.expr(e2));
-		binops.set("%",function(e1,e2) return me.expr(e1) % me.expr(e2));
-		binops.set("&",function(e1,e2) return me.expr(e1) & me.expr(e2));
-		binops.set("|",function(e1,e2) return me.expr(e1) | me.expr(e2));
-		binops.set("^",function(e1,e2) return me.expr(e1) ^ me.expr(e2));
-		binops.set("<<",function(e1,e2) return me.expr(e1) << me.expr(e2));
-		binops.set(">>",function(e1,e2) return me.expr(e1) >> me.expr(e2));
-		binops.set(">>>",function(e1,e2) return me.expr(e1) >>> me.expr(e2));
-		binops.set("==",function(e1,e2) return me.expr(e1) == me.expr(e2));
-		binops.set("!=",function(e1,e2) return me.expr(e1) != me.expr(e2));
-		binops.set(">=",function(e1,e2) return me.expr(e1) >= me.expr(e2));
-		binops.set("<=",function(e1,e2) return me.expr(e1) <= me.expr(e2));
-		binops.set(">",function(e1,e2) return me.expr(e1) > me.expr(e2));
-		binops.set("<",function(e1,e2) return me.expr(e1) < me.expr(e2));
-		binops.set("||",function(e1,e2) return me.expr(e1) == true || me.expr(e2) == true);
+		// Meteoric(性能): 表只构建一次静态共享；先完整建好再发布，避免并发构造看到半成品表（seiun 同款保护）
+		if (binopsInitialized)
+			return;
+		var table = new Map<String, Interp -> Expr -> Expr -> Dynamic >();
+		table.set("+",function(i,e1,e2) return i.expr(e1) + i.expr(e2));
+		table.set("-",function(i,e1,e2) return i.expr(e1) - i.expr(e2));
+		table.set("*",function(i,e1,e2) return i.expr(e1) * i.expr(e2));
+		table.set("/",function(i,e1,e2) return i.expr(e1) / i.expr(e2));
+		table.set("%",function(i,e1,e2) return i.expr(e1) % i.expr(e2));
+		table.set("&",function(i,e1,e2) return i.expr(e1) & i.expr(e2));
+		table.set("|",function(i,e1,e2) return i.expr(e1) | i.expr(e2));
+		table.set("^",function(i,e1,e2) return i.expr(e1) ^ i.expr(e2));
+		table.set("<<",function(i,e1,e2) return i.expr(e1) << i.expr(e2));
+		table.set(">>",function(i,e1,e2) return i.expr(e1) >> i.expr(e2));
+		table.set(">>>",function(i,e1,e2) return i.expr(e1) >>> i.expr(e2));
+		table.set("==",function(i,e1,e2) return i.expr(e1) == i.expr(e2));
+		table.set("!=",function(i,e1,e2) return i.expr(e1) != i.expr(e2));
+		table.set(">=",function(i,e1,e2) return i.expr(e1) >= i.expr(e2));
+		table.set("<=",function(i,e1,e2) return i.expr(e1) <= i.expr(e2));
+		table.set(">",function(i,e1,e2) return i.expr(e1) > i.expr(e2));
+		table.set("<",function(i,e1,e2) return i.expr(e1) < i.expr(e2));
+		table.set("||",function(i,e1,e2) return i.expr(e1) == true || i.expr(e2) == true);
 		// Meteoric: null 合并 a ?? b —— 左侧非 null 取左侧，否则求右侧
-		binops.set("??",function(e1,e2) { var v = me.expr(e1); return v == null ? me.expr(e2) : v; });
-		binops.set("&&",function(e1,e2) return me.expr(e1) == true && me.expr(e2) == true);
-		binops.set("=",assign);
-		binops.set("...",function(e1,e2) return new IntIterator(me.expr(e1),me.expr(e2)));
-		binops.set("is",function(e1,e2) return #if (haxe_ver >= 4.2) Std.isOfType #else Std.is #end (me.expr(e1), me.expr(e2)));
-		assignOp("+=",function(v1:Dynamic,v2:Dynamic) return v1 + v2);
-		assignOp("-=",function(v1:Float,v2:Float) return v1 - v2);
-		assignOp("*=",function(v1:Float,v2:Float) return v1 * v2);
-		assignOp("/=",function(v1:Float,v2:Float) return v1 / v2);
-		assignOp("%=",function(v1:Float,v2:Float) return v1 % v2);
-		assignOp("&=",function(v1,v2) return v1 & v2);
-		assignOp("|=",function(v1,v2) return v1 | v2);
-		assignOp("^=",function(v1,v2) return v1 ^ v2);
-		assignOp("<<=",function(v1,v2) return v1 << v2);
-		assignOp(">>=",function(v1,v2) return v1 >> v2);
-		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
+		table.set("??",function(i,e1,e2) { var v = i.expr(e1); return v == null ? i.expr(e2) : v; });
+		table.set("&&",function(i,e1,e2) return i.expr(e1) == true && i.expr(e2) == true);
+		table.set("=",function(i,e1,e2) return i.assign(e1,e2));
+		table.set("...",function(i,e1,e2) return new IntIterator(i.expr(e1),i.expr(e2)));
+		table.set("is",function(i,e1,e2) return #if (haxe_ver >= 4.2) Std.isOfType #else Std.is #end (i.expr(e1), i.expr(e2)));
+		addAssignOp(table,"+=",function(v1:Dynamic,v2:Dynamic) return v1 + v2);
+		addAssignOp(table,"-=",function(v1:Float,v2:Float) return v1 - v2);
+		addAssignOp(table,"*=",function(v1:Float,v2:Float) return v1 * v2);
+		addAssignOp(table,"/=",function(v1:Float,v2:Float) return v1 / v2);
+		addAssignOp(table,"%=",function(v1:Float,v2:Float) return v1 % v2);
+		addAssignOp(table,"&=",function(v1,v2) return v1 & v2);
+		addAssignOp(table,"|=",function(v1,v2) return v1 | v2);
+		addAssignOp(table,"^=",function(v1,v2) return v1 ^ v2);
+		addAssignOp(table,"<<=",function(v1,v2) return v1 << v2);
+		addAssignOp(table,">>=",function(v1,v2) return v1 >> v2);
+		addAssignOp(table,">>>=",function(v1,v2) return v1 >>> v2);
 		// Meteoric: null 合并赋值 a ??= b —— a 为 null 时才赋 b
-		assignOp("??=",function(v1:Dynamic,v2:Dynamic) return v1 == null ? v2 : v1);
+		addAssignOp(table,"??=",function(v1:Dynamic,v2:Dynamic) return v1 == null ? v2 : v1);
+		binops = table;
+		binopsInitialized = true;
+	}
+
+	/** Meteoric(性能): 复合赋值注册（静态表版本；运行期求值仍走实例 evalAssignOp）。 */
+	static function addAssignOp( table : Map<String, Interp -> Expr -> Expr -> Dynamic>, op : String, fop : Dynamic -> Dynamic -> Dynamic ) {
+		table.set(op, function(i,e1,e2) return i.evalAssignOp(op,fop,e1,e2));
 	}
 
 	function setVar( name : String, v : Dynamic ) {
@@ -159,10 +172,6 @@ class Interp {
 		return v;
 	}
 
-	function assignOp( op, fop : Dynamic -> Dynamic -> Dynamic ) {
-		var me = this;
-		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
-	}
 
 	function evalAssignOp(op,fop,e1,e2) : Dynamic {
 		var v;
@@ -271,10 +280,9 @@ class Interp {
 	}
 
 	public function duplicate<T>( h : Map<String,T> ) {
-		var h2 = new Map();
-		for( k in h.keys() )
-			h2.set(k,h.get(k));
-		return h2;
+		// Meteoric(性能,移植自 seiun 1.2.0): 原生 copy() 替代逐键循环——
+		// 每次脚本函数调用（EFunction 闭包捕获）都会跑 duplicate，fib 递归等调用密集场景直接受益
+		return cast h.copy();
 	}
 
 	function restore( old : Int ) {
@@ -391,7 +399,7 @@ class Interp {
 		case EBinop(op,e1,e2):
 			var fop = binops.get(op);
 			if( fop == null ) error(EInvalidOp(op));
-			return fop(e1,e2);
+			return fop(this,e1,e2);
 		case EUnop(op,prefix,e):
 			switch(op) {
 			case "!":
@@ -669,6 +677,14 @@ class Interp {
 	}
 
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
+		// Meteoric: eval 目标下 IntIterator 实例的 Dynamic/接口方法访问为 null（hasNext/next 是 inline，
+		// eval 的 field 找不到），forLoop 的 it.hasNext() 抛 "Cannot call null"；
+		// 包一层非 inline 匿名迭代器，闭包调用在 eval/hxcpp 下都可靠（seiun 同类问题）
+		if (v is IntIterator)
+		{
+			var itv:IntIterator = cast v;
+			return { hasNext: function() return itv.hasNext(), next: function() return itv.next() };
+		}
 		#if js
 		// don't use try/catch (very slow)
 		if( v is Array )
