@@ -299,7 +299,7 @@ fi
 if [ "$1" = "test" ]; then
   haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
 else
-  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG -Dlime-vulkan  # lime 工具会吞工程里 lime-* 前缀的 haxedef，Vulkan CFFI 需要此 define（见 docs/VULKAN-ROADMAP.md）
+  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
 fi
 
 # ---- 构建后处理：恢复墙钟版 lime.ndll ----

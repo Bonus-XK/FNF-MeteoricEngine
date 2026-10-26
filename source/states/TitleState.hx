@@ -113,13 +113,6 @@ class TitleState extends MusicBeatState
 
 		ClientPrefs.loadPrefs();
 
-		#if desktop
-		// 渲染后端探测（Vulkan 实验性轨道）：读 rendererBackend 偏好，
-		// 尝试初始化 Vulkan 子系统，失败自动回退 OpenGL（见 backend/RendererBackend.hx）。
-		// 必须在 loadPrefs 之后（偏好存在存档里）。
-		backend.RendererBackend.init();
-		#end
-
 		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
 		// Meteoric 脚本系统：启动编程层（必须在 loadPrefs 之后 —— 开关存在存档里）。
 		// 注意：super.create() 里已经调过一次 onStateCreate，那次存档还没加载、开关读不到，
