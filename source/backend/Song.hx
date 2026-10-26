@@ -38,6 +38,10 @@ typedef SwagSong =
 	@:optional var splashSkin:String;
 	@:optional var format:String;
 
+	// ===== Extra Keys：每谱面声明键数（1~12，缺省 4 = 完全旧行为）=====
+	// 列号协议（psych_v1 泛化）：绝对列号 col < keys = 玩家、>= keys = 对手、lane = col % keys。
+	@:optional var keys:Int;
+
 	// ===== 超大字谱面（packed 路径）专用 =====
 	// 音符级流式解析产出：packedNotes 承载**已合并**的音符簇（PackedChart），
 	// 此时 sectionNotes 为空数组。PlayState.buildChartNotes 检测到 packedNotes
@@ -259,6 +263,9 @@ class Song
 	{
 		if(songJson.events == null) onLoadJson(songJson);
 
+		// Extra Keys：旧格式谱面按声明键数泛化（旧引擎谱面只会是 4K，keys 缺省 → 行为不变）
+		var chartKeys:Int = ExtraKeys.resolveKeys(songJson.keys);
+
 		var sectionsData:Array<SwagSection> = songJson.notes;
 		if(sectionsData == null) return;
 
@@ -274,8 +281,8 @@ class Song
 
 			for (note in section.sectionNotes)
 			{
-				var gottaHitNote:Bool = (note[1] < 4) ? section.mustHitSection : !section.mustHitSection;
-				note[1] = (note[1] % 4) + (gottaHitNote ? 0 : 4);
+				var gottaHitNote:Bool = (note[1] < chartKeys) ? section.mustHitSection : !section.mustHitSection;
+				note[1] = (note[1] % chartKeys) + (gottaHitNote ? 0 : chartKeys);
 
 				// Week7 / 0.1-0.3 老谱面：noteType 是数字索引
 				if(!Std.isOfType(note[3], String))
@@ -625,10 +632,12 @@ class Song
 		return fastSkip(text, idx + 1);
 	}
 
-	static function fastScanSectionNotes(secText:String):Array<Dynamic>
+	static function fastScanSectionNotes(secText:String, chartKeys:Int):Array<Dynamic>
 	{
 		var arr:Array<Dynamic> = [];
 		var mustHit:Bool = fastReadBoolAfter(secText, 'mustHitSection', true);
+		// chartKeys <= 0 = psych_v1 绝对列号谱面：跳过列转换（col<keys 玩家 / %keys lane 已内联）
+		var convert:Bool = chartKeys > 0;
 		var idx:Int = fastValAfter(secText, 'sectionNotes', 0);
 		if (idx < 0 || idx >= secText.length || secText.charAt(idx) != '[') return arr;
 		var len:Int = secText.length;
@@ -674,14 +683,15 @@ class Song
 						else break;
 					}
 					pos = fastSkip(secText, pos);
-					if (slot == 1)
+					if (slot == 1 && convert)
 					{
-						// 列转换（与 convertToPsychV1 一致）：<4 且 mustHitSection → 玩家(0-3)；否则对手(4-7)
+						// 列转换（与 convertToPsychV1 一致）：<keys 且 mustHitSection → 玩家(0..keys-1)；否则对手(keys..2keys-1)
 						var colR:Float = note[1];
 						if (colR != colR) colR = 0;
-						var colI:Int = Std.int(colR) % 4;
-						var gottaHit:Bool = (Std.int(colR) < 4) ? mustHit : !mustHit;
-						note[1] = colI + (gottaHit ? 0 : 4);
+						var colI:Int = Std.int(colR) % chartKeys;
+						if (colI < 0) colI += chartKeys;
+						var gottaHit:Bool = (Std.int(colR) < chartKeys) ? mustHit : !mustHit;
+						note[1] = colI + (gottaHit ? 0 : chartKeys);
 					}
 				}
 				else
@@ -757,6 +767,12 @@ class Song
 		Reflect.setField(song, 'validScore', fastReadBoolAfter2(rawJson, 'validScore', false, inSong));
 		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(rawJson, 'arrowSkin', null, inSong));
 		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(rawJson, 'splashSkin', null, inSong));
+		// Extra Keys：keys 缺省 = 4；psych_v1 谱面列号已是绝对方向，内联转换必须跳过
+		// （否则 mustHit=false 段的玩家/对手列会被二次翻转——大谱面 psych_v1 的潜在缺陷，一并修正）
+		var chartKeysRead:Int = ExtraKeys.resolveKeys(fastReadNumberAfter2(rawJson, 'keys', 4, inSong));
+		var chartFmtFast:String = fastReadStringAfter2(rawJson, 'format', '', inSong);
+		var chartIsV1:Bool = chartFmtFast != null && chartFmtFast.startsWith('psych_v1');
+		Reflect.setField(song, 'keys', chartKeysRead);
 		Reflect.setField(song, 'format', 'psych_v1'); // 列已内联转换，跳过 convertToPsychV1
 
 		var notesIdx:Int = rawJson.indexOf('"notes"');
@@ -778,7 +794,7 @@ class Song
 			if (end < 0) break;
 			var secText:String = rawJson.substr(secStart, end - secStart + 1);
 			var sec:SwagSection = {
-				sectionNotes: fastScanSectionNotes(secText),
+				sectionNotes: fastScanSectionNotes(secText, chartIsV1 ? 0 : chartKeysRead),
 				sectionBeats: fastReadNumberAfter(secText, 'sectionBeats', 4),
 				typeOfSection: 0,
 				mustHitSection: fastReadBoolAfter(secText, 'mustHitSection', true),
@@ -862,6 +878,10 @@ class Song
 		Reflect.setField(song, 'validScore', fastReadBoolAfter2(head, 'validScore', false, inS));
 		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(head, 'arrowSkin', null, inS));
 		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(head, 'splashSkin', null, inS));
+		// Extra Keys：keys 缺省 = 4；psych_v1 谱面列号已是绝对方向（扫描器跳过列转换）
+		var packedKeys:Int = ExtraKeys.resolveKeys(fastReadNumberAfter2(head, 'keys', 4, inS));
+		var packedFmt:String = fastReadStringAfter2(head, 'format', '', inS);
+		Reflect.setField(song, 'keys', packedKeys);
 		Reflect.setField(song, 'format', 'psych_v1');
 
 		// 合并参数与 buildChartNotes 同源（ClientPrefs 的堆叠合并设置）
@@ -871,6 +891,8 @@ class Song
 
 		var keepLimit:Int = (ClientPrefs.data.boundedOffs) ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
 		var scanner:PackedScanner = new PackedScanner(ghostRange, ghostDensity, keepLimit);
+		scanner.keys = packedKeys;
+		scanner.absoluteCols = (packedFmt != null && packedFmt.startsWith('psych_v1'));
 		var clusters:Array<PackedChart> = scanner.scan(filePath, bpm, doMerge);
 		if (clusters == null) return null;
 		PerfProbe.mark('packed: scan done');
@@ -966,6 +988,7 @@ class Song
 					Reflect.setField(songCached, 'needsVoices', fastReadBoolAfter2(headC, 'needsVoices', true, inSC));
 					Reflect.setField(songCached, 'arrowSkin', fastReadStringAfter2(headC, 'arrowSkin', null, inSC));
 					Reflect.setField(songCached, 'splashSkin', fastReadStringAfter2(headC, 'splashSkin', null, inSC));
+					Reflect.setField(songCached, 'keys', ExtraKeys.resolveKeys(fastReadNumberAfter2(headC, 'keys', 4, inSC)));
 					Reflect.setField(songCached, 'format', 'psych_v1');
 					// 同 PackedScanner：66 Part 的 mustHit 总数可达 ~19.2 亿，逼近 Int32 上限，
 					// 用 Float 累加再夹到 Int 范围，避免夹到负数（HUD/判分都依赖它为正）。
@@ -1031,6 +1054,10 @@ class Song
 		Reflect.setField(song, 'validScore', fastReadBoolAfter2(head, 'validScore', false, inS));
 		Reflect.setField(song, 'arrowSkin', fastReadStringAfter2(head, 'arrowSkin', null, inS));
 		Reflect.setField(song, 'splashSkin', fastReadStringAfter2(head, 'splashSkin', null, inS));
+		// Extra Keys：keys 缺省 = 4；psych_v1 谱面列号已是绝对方向（扫描器跳过列转换）
+		var partsKeys:Int = ExtraKeys.resolveKeys(fastReadNumberAfter2(head, 'keys', 4, inS));
+		var partsFmt:String = fastReadStringAfter2(head, 'format', '', inS);
+		Reflect.setField(song, 'keys', partsKeys);
 		Reflect.setField(song, 'format', 'psych_v1');
 
 		var ghostRange:Float = ClientPrefs.data.ghostRange;
@@ -1040,6 +1067,8 @@ class Song
 
 		// 关键：一个 scanner 扫所有 Part —— 合并状态跨文件保持
 		var scanner:PackedScanner = new PackedScanner(ghostRange, ghostDensity, keepLimit);
+		scanner.keys = partsKeys;
+		scanner.absoluteCols = (partsFmt != null && partsFmt.startsWith('psych_v1'));
 		var t0:Float = Sys.time();
 		var used:Int = 0;
 		for (p in filePaths)

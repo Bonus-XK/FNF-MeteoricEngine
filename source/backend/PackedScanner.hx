@@ -63,6 +63,12 @@ class PackedScanner
 	var mustHit:Bool = true;
 	var gfSection:Bool = false;
 
+	// ===== Extra Keys =====
+	// keys：谱面键数（调用方从头部读入；缺省 4 = 旧行为）
+	// absoluteCols：psych_v1 绝对列号谱面 → 跳过列转换（否则 mustHit=false 段会二次翻转）
+	public var keys:Int = 4;
+	public var absoluteCols:Bool = false;
+
 	// 合并状态（跨小节、跨 Part 保持）
 	var lastLane:Array<PackedChart> = [null, null, null, null];
 	var chartSeq:Int = 0;
@@ -119,6 +125,12 @@ class PackedScanner
 
 	function scanOne(path:String):Void
 	{
+		// Extra Keys：按键数重置合并槽位（跨 Part 保持，仅在 keys 变化时重建）
+		if (lastLane.length != keys)
+		{
+			lastLane = [];
+			for (i in 0...keys) lastLane.push(null);
+		}
 		var input:FileInput = File.read(path);
 		if (input == null) return;
 		var total:Int = 0;
@@ -515,9 +527,22 @@ class PackedScanner
 		//       colI = col % 4 ; gottaHit = (col<4) ? mustHit : !mustHit
 		//   漏掉这一步的后果：该谱 mustHitSection=false + 列 0-3，
 		//   直接用 `col<4` 判方向会全部判成玩家侧。
-		var lane = col % 4;
-		if (lane < 0) lane += 4;
-		var must = (col < 4) ? mustHit : !mustHit;
+		//   Extra Keys：psych_v1 绝对列号谱面（absoluteCols=true）跳过转换；
+		//   旧格式谱面按 keys 泛化（keys 缺省 4 = 行为不变）。
+		var lane:Int;
+		var must:Bool;
+		if (absoluteCols)
+		{
+			lane = col % keys;
+			if (lane < 0) lane += keys;
+			must = (col >= 0 && col < keys);
+		}
+		else
+		{
+			lane = col % keys;
+			if (lane < 0) lane += keys;
+			must = (col < keys) ? mustHit : !mustHit;
+		}
 
 		if (doMerge)
 		{
