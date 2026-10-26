@@ -189,6 +189,7 @@ class ChartingState extends MusicBeatState
 	var check_eventsSec:EditorToggle;
 	var stepperBeats:EditorStepper;
 	var stepperSectionBPM:EditorStepper;
+	var stepperKeys:EditorStepper; // Extra Keys：谱面键数（歌曲页）
 	var check_mustHitSection:EditorToggle;
 	var check_voices:EditorToggle;
 	var notesCopied:Array<Dynamic> = [];
@@ -264,11 +265,15 @@ class ChartingState extends MusicBeatState
 				player2: 'dad',
 				gfVersion: 'gf',
 				speed: 1,
-				stage: 'stage'
+				stage: 'stage',
+				keys: 4
 			};
 			addSection();
 			PlayState.setSong(_song);
 		}
+		// Extra Keys：编辑器键数真源（缺省 4 = 旧行为；UI 可在「歌曲」页调整 1~12）
+		if (_song.keys == null) _song.keys = 4;
+		ExtraKeys.setSongKeys(_song.keys);
 
 		// Paths.clearMemory();
 
@@ -348,14 +353,7 @@ class ChartingState extends MusicBeatState
 		add(quant);
 
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
-		for (i in 0...8){
-			var note:StrumNote = new StrumNote(GRID_SIZE * (i+1), strumLine.y, i % 4, 0);
-			note.setGraphicSize(GRID_SIZE, GRID_SIZE);
-			note.updateHitbox();
-			note.playAnim('static', true);
-			strumLineNotes.add(note);
-			note.scrollFactor.set(1, 1);
-		}
+		rebuildEditorStrums();
 		add(strumLineNotes);
 
 		camPos = new FlxObject(0, 0, 1, 1);
@@ -549,6 +547,18 @@ class ChartingState extends MusicBeatState
 			_song.stage = stages[i];
 		}, panel.dropdownLayer);
 		panel.register(TAB, stageDropDown);
+
+		// Extra Keys：谱面键数（1~12；右列空位，与玩家 1 / 女友 / 玩家 2 下拉同列）
+		stepperKeys = new EditorStepper(CONTENT_X + CONTENT_RW + 24, CONTENT_Y + 206, CONTENT_RW, Lang.tOr('chart.keys', '键数 (Keys)'), _song.keys, 1, ExtraKeys.MAX_KEYS, 1, 0, function(v:Float)
+		{
+			_song.keys = Std.int(v);
+			ExtraKeys.setSongKeys(_song.keys);
+			rebuildEditorStrums();
+			reloadGridLayer();
+			updateGrid();
+			panel.showToast(Lang.tOr('chart.keysApplied', '键数已设为 ') + _song.keys);
+		});
+		panel.register(TAB, stepperKeys);
 
 		var y:Float = CONTENT_Y + 314;
 		var saveButton:EditorButton = new EditorButton(CONTENT_X, y, CONTENT_RW, 34, Lang.tOr('chart.save', '保存'), function()
@@ -1885,12 +1895,15 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		"\n\nStep: " + curStep +
 		"\n\nBeat Snap: " + quantization + "th";
 
-		var playedSound:Array<Bool> = [false, false, false, false]; //Prevents ouchy GF sex sounds
+		// Extra Keys：编辑器内部存储 = 绝对列号（col<keys 玩家），±keys 换算显示侧
+		var editorKeys:Int = ExtraKeys.songKeys;
+		var playedSound:Array<Bool> = [];
+		for (i in 0...editorKeys) playedSound.push(false); //Prevents ouchy GF sex sounds
 		curRenderedNotes.forEachAlive(function(note:Note) {
 			note.alpha = 1;
 			if(curSelectedNote != null) {
 				var noteDataToCheck:Int = note.noteData;
-				if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += 4;
+				if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += editorKeys;
 
 				if (curSelectedNote[0] == note.strumTime && ((curSelectedNote[2] == null && noteDataToCheck < 0) || (curSelectedNote[2] != null && curSelectedNote[1] == noteDataToCheck)))
 				{
@@ -1903,9 +1916,9 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 			if(note.strumTime <= Conductor.songPosition) {
 				note.alpha = 0.4;
 				if(note.strumTime > lastConductorPos && FlxG.sound.music.playing && note.noteData > -1) {
-					var data:Int = note.noteData % 4;
+					var data:Int = note.noteData % editorKeys;
 					var noteDataToCheck:Int = note.noteData;
-					if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += 4;
+					if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += editorKeys;
 						strumLineNotes.members[noteDataToCheck].playAnim('confirm', true);
 						strumLineNotes.members[noteDataToCheck].resetAnim = ((note.sustainLength / 1000) + 0.15) / playbackSpeed;
 					if(!playedSound[data]) {
@@ -1915,14 +1928,14 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 							if(_song.player1 == 'gf') //Easter egg
 								soundToPlay = 'GF_' + Std.string(data + 1);
 
-							FlxG.sound.play(Paths.sound(soundToPlay)).pan = note.noteData < 4? -0.3 : 0.3; //would be coolio
+							FlxG.sound.play(Paths.sound(soundToPlay)).pan = note.noteData < editorKeys ? -0.3 : 0.3; //would be coolio
 							playedSound[data] = true;
 						}
 
 						data = note.noteData;
 						if(note.mustPress != _song.notes[curSec].mustHitSection)
 						{
-							data += 4;
+							data += editorKeys;
 						}
 					}
 				}
@@ -2000,9 +2013,38 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 
 	var lastSecBeats:Float = 0;
 	var lastSecBeatsNext:Float = 0;
+	// Extra Keys：网格列数 = 1 事件列 + 双方各 keys 列
 	var columns:Int = 9;
+	inline function columnCount():Int return 1 + ExtraKeys.songKeys * 2;
+
+	/** （re）build 判定线宽度与顶部轨道箭头行 —— create 与「键数」变更时调用 */
+	function rebuildEditorStrums():Void
+	{
+		columns = columnCount();
+		var w:Int = Std.int(GRID_SIZE * columns);
+		if (strumLine == null) return;
+		strumLine.makeGraphic(w, 4, 0xFFFFFFFF, true);
+		strumLine.updateHitbox();
+		while (strumLineNotes.members.length > 0)
+		{
+			var old:StrumNote = strumLineNotes.members[strumLineNotes.members.length - 1];
+			strumLineNotes.remove(old);
+			old.destroy();
+		}
+		for (i in 0...(ExtraKeys.songKeys * 2)){
+			// Extra Keys：lane = i % keys（方向/颜色随 lane%4 循环复用）
+			var note:StrumNote = new StrumNote(GRID_SIZE * (i+1), strumLine.y, i % ExtraKeys.songKeys, 0);
+			note.setGraphicSize(GRID_SIZE, GRID_SIZE);
+			note.updateHitbox();
+			note.playAnim('static', true);
+			strumLineNotes.add(note);
+			note.scrollFactor.set(1, 1);
+		}
+	}
+
 	function reloadGridLayer() {
 		gridLayer.clear();
+		columns = columnCount();
 		gridBG = FlxGridOverlay.create(1, 1, columns, Std.int(getSectionBeats() * 4 * zoomList[curZoom]));
 		gridBG.antialiasing = false;
 		gridBG.scale.set(GRID_SIZE, GRID_SIZE);
@@ -2034,14 +2076,15 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		if(foundNextSec)
 		{
 			var gridBlack:FlxSprite = new FlxSprite(0, gridBG.height).makeGraphic(1, 1, FlxColor.BLACK);
-			gridBlack.setGraphicSize(Std.int(GRID_SIZE * 9), Std.int(nextGridBG.height));
+			gridBlack.setGraphicSize(Std.int(GRID_SIZE * columns), Std.int(nextGridBG.height));
 			gridBlack.updateHitbox();
 			gridBlack.antialiasing = false;
 			gridBlack.alpha = 0.4;
 			gridLayer.add(gridBlack);
 		}
 
-		var gridBlackLine:FlxSprite = new FlxSprite(gridBG.x + gridBG.width - (GRID_SIZE * 4)).makeGraphic(1, 1, FlxColor.BLACK);
+		// 玩家/对手分界线：左半 = 玩家 keys 列
+		var gridBlackLine:FlxSprite = new FlxSprite(gridBG.x + gridBG.width - (GRID_SIZE * ExtraKeys.songKeys)).makeGraphic(1, 1, FlxColor.BLACK);
 		gridBlackLine.setGraphicSize(2, leHeight);
 		gridBlackLine.updateHitbox();
 		gridBlackLine.antialiasing = false;
@@ -2547,7 +2590,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 				daText.sprTracker = note;
 			}
 			note.mustPress = _song.notes[curSec].mustHitSection;
-			if(i[1] > 3) note.mustPress = !note.mustPress;
+			if(i[1] >= ExtraKeys.songKeys) note.mustPress = !note.mustPress;
 		}
 
 		// CURRENT EVENTS
@@ -2608,8 +2651,10 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		var daNoteInfo = i[1];
 		var daStrumTime = i[0];
 		var daSus:Dynamic = i[2];
+		// Extra Keys：lane 取模（绝对列号 col<keys 玩家 / lane = col%keys）
+		var editorKeys:Int = ExtraKeys.songKeys;
 
-		var note:Note = new Note(daStrumTime, daNoteInfo % 4, null, null, true);
+		var note:Note = new Note(daStrumTime, daNoteInfo % editorKeys, null, null, true);
 		if(daSus != null) { //Common note
 			if(!Std.isOfType(i[3], String)) //Convert old note type to new note type format
 			{
@@ -2639,10 +2684,10 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		note.updateHitbox();
 		note.x = Math.floor(daNoteInfo * GRID_SIZE) + GRID_SIZE;
 		if(isNextSection && _song.notes[curSec].mustHitSection != _song.notes[curSec+1].mustHitSection) {
-			if(daNoteInfo > 3) {
-				note.x -= GRID_SIZE * 4;
+			if(daNoteInfo >= editorKeys) {
+				note.x -= GRID_SIZE * editorKeys;
 			} else if(daSus != null) {
-				note.x += GRID_SIZE * 4;
+				note.x += GRID_SIZE * editorKeys;
 			}
 		}
 
@@ -2698,7 +2743,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 
 		if(noteDataToCheck > -1)
 		{
-			if(note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += 4;
+			if(note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += ExtraKeys.songKeys;
 			for (i in _song.notes[curSec].sectionNotes)
 			{
 				if (i != curSelectedNote && i.length > 2 && i[0] == note.strumTime && i[1] == noteDataToCheck)
@@ -2729,7 +2774,7 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 	function deleteNote(note:Note):Void
 	{
 		var noteDataToCheck:Int = note.noteData;
-		if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += 4;
+		if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += ExtraKeys.songKeys;
 
 		if(note.noteData > -1) //Normal Notes
 		{
@@ -2827,7 +2872,8 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 
 		if (FlxG.keys.pressed.CONTROL && noteData > -1)
 		{
-			_song.notes[curSec].sectionNotes.push([noteStrum, (noteData + 4) % 8, noteSus, curNoteTypes[daType]]);
+			// Extra Keys：镜像放置到对侧（col + keys，再折回 2*keys 范围）
+			_song.notes[curSec].sectionNotes.push([noteStrum, (noteData + ExtraKeys.songKeys) % (ExtraKeys.songKeys * 2), noteSus, curNoteTypes[daType]]);
 		}
 
 		//trace(noteData + ', ' + noteStrum + ', ' + curSec);

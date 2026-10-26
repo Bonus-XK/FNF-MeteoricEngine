@@ -72,10 +72,14 @@ class EditorPlayState extends MusicBeatSubstate
 	public function new(playbackRate:Float)
 	{
 		super();
-		
+
 		/* setting up some important data */
 		this.playbackRate = playbackRate;
 		this.startPos = Conductor.songPosition;
+
+		// Extra Keys：试玩侧键数与游玩侧同源（SONG.keys，缺省 4）
+		ExtraKeys.setSongKeys(PlayState.SONG != null ? PlayState.SONG.keys : 4);
+		keysArray = ExtraKeys.actionNames();
 
 		Conductor.safeZoneOffset = (ClientPrefs.data.safeFrames / 60) * 1000 * playbackRate;
 		Conductor.advance(-startOffset);
@@ -326,9 +330,10 @@ class EditorPlayState extends MusicBeatSubstate
 				var daStrumTime:Float = songNotes[0];
 				if(daStrumTime < startPos) continue;
 
-				var daNoteData:Int = Std.int(songNotes[1] % 4);
-				// Psych 1.0.4 格式：列号直接决定方向（旧版谱面已由 Song.convertToPsychV1 转换）
-				var gottaHitNote:Bool = (songNotes[1] < 4);
+				// Extra Keys：绝对列号协议泛化（col<keys 玩家 / lane = col%keys；keys=4 与旧版等价）
+				var rawCol:Int = Std.int(songNotes[1]);
+				var daNoteData:Int = ExtraKeys.laneOf(rawCol);
+				var gottaHitNote:Bool = (rawCol < ExtraKeys.songKeys);
 
 				var oldNote:Note;
 				if (unspawnNotes.length > 0)
@@ -380,14 +385,7 @@ class EditorPlayState extends MusicBeatSubstate
 						}
 
 						if (sustainNote.mustPress) sustainNote.x += FlxG.width / 2; // general offset
-						else if(ClientPrefs.data.middleScroll)
-						{
-							sustainNote.x += 310;
-							if(daNoteData > 1) //Up and Right
-							{
-								sustainNote.x += FlxG.width / 2 + 25;
-							}
-						}
+						else if(ClientPrefs.data.middleScroll) sustainNote.x += ExtraKeys.sideShiftX(false, daNoteData);
 					}
 				}
 
@@ -395,25 +393,18 @@ class EditorPlayState extends MusicBeatSubstate
 				{
 					swagNote.x += FlxG.width / 2; // general offset
 				}
-				else if(ClientPrefs.data.middleScroll)
-				{
-					swagNote.x += 310;
-					if(daNoteData > 1) //Up and Right
-					{
-						swagNote.x += FlxG.width / 2 + 25;
-					}
-				}
+				else if(ClientPrefs.data.middleScroll) swagNote.x += ExtraKeys.sideShiftX(false, daNoteData);
 			}
 		}
 
 		unspawnNotes.sort(PlayState.sortByTime);
 	}
-	
+
 	private function generateStaticArrows(player:Int):Void
 	{
 		var strumLineX:Float = ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X;
 		var strumLineY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50;
-		for (i in 0...4)
+		for (i in 0...ExtraKeys.songKeys)
 		{
 			// FlxG.log.add(i);
 			var targetAlpha:Float = 1;
@@ -430,16 +421,7 @@ class EditorPlayState extends MusicBeatSubstate
 			if (player == 1)
 				playerStrums.add(babyArrow);
 			else
-			{
-				if(ClientPrefs.data.middleScroll)
-				{
-					babyArrow.x += 310;
-					if(i > 1) { //Up and Right
-						babyArrow.x += FlxG.width / 2 + 25;
-					}
-				}
 				opponentStrums.add(babyArrow);
-			}
 
 			strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
