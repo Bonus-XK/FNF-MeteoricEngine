@@ -72,6 +72,12 @@ class NotesPane extends SettingsCanvas
 	var onPixel:Bool = false;
 	var dataArray:Array<Array<FlxColor>>;
 
+	// Extra Keys：4 轨基准几何（12 轨压缩布局以它为锚点，重复 spawnNotes 不漂移）
+	var _noteGapBase:Float = 135;
+	var _noteSizeBase:Float = 102;
+	var _noteCenterBase:Float = 0;
+	var _noteSelBase:Float = 0;
+
 	var hexTypeLine:FlxSprite;
 	var hexTypeNum:Int = -1;
 	var hexTypeVisibleTimer:Float = 0;
@@ -198,6 +204,12 @@ class NotesPane extends SettingsCanvas
 		noteSelector.visible = false;
 		add(noteSelector);
 
+		// Extra Keys：捕获 4 轨基准几何（12 轨压缩布局的锚点）
+		_noteGapBase = NOTE_GAP;
+		_noteSizeBase = NOTE_SIZE;
+		_noteCenterBase = NOTE_X + (NOTE_GAP * 3 + NOTE_SIZE) / 2;
+		_noteSelBase = NOTE_SIZE + 16;
+
 		modeNotes = new FlxTypedGroup<FlxSprite>();
 		add(modeNotes);
 
@@ -216,9 +228,21 @@ class NotesPane extends SettingsCanvas
 		}
 
 		// ---- 音符编号 ----
-		for (i in 0...4)
+		// Extra Keys：编号数量跟轨道颜色表（12 轨），间距/尺寸与 spawnNotes 的压缩布局同式
+		dataArray = !onPixel ? ClientPrefs.data.arrowRGB : ClientPrefs.data.arrowRGBPixel;
+		var labGap:Float = _noteGapBase;
+		var labSize:Float = _noteSizeBase;
+		var labStartX:Float = _noteCenterBase - (_noteGapBase * 3 + _noteSizeBase) / 2;
+		if (dataArray.length > 4)
 		{
-			var lab:MenuText = new MenuText(NOTE_X + NOTE_GAP * i + NOTE_SIZE / 2 - 20, 408, Std.string(i + 1), true);
+			labGap = (_noteGapBase * 3) / (dataArray.length - 1);
+			labSize = Math.min(_noteSizeBase, labGap * 0.85);
+			if (labSize < 24) labSize = 24;
+			labStartX = _noteCenterBase - (labGap * (dataArray.length - 1) + labSize) / 2;
+		}
+		for (i in 0...dataArray.length)
+		{
+			var lab:MenuText = new MenuText(labStartX + labGap * i + labSize / 2 - 20, 408, Std.string(i + 1), true);
 			lab.fieldWidth = 40;
 			lab.alignment = 'center';
 			lab.setScale(0.35);
@@ -824,6 +848,19 @@ class NotesPane extends SettingsCanvas
 		}
 
 		Note.globalRgbShaders = [];
+		// Extra Keys：12 轨时压缩间距与箭头尺寸（整组保持与 4 轨版同中心），编号行距同步
+		var laneCount:Int = dataArray.length;
+		var selGap:Float = _noteGapBase;
+		var selSize:Float = _noteSizeBase;
+		if (laneCount > 4)
+		{
+			selGap = (_noteGapBase * 3) / (laneCount - 1);
+			selSize = Math.min(_noteSizeBase, selGap * 0.85);
+			if (selSize < 24) selSize = 24;
+		}
+		NOTE_GAP = selGap;
+		NOTE_SIZE = selSize;
+		NOTE_X = _noteCenterBase - (selGap * (laneCount - 1) + selSize) / 2;
 		for (i in 0...dataArray.length)
 		{
 			Note.initializeGlobalRGBShader(i);
@@ -834,6 +871,10 @@ class NotesPane extends SettingsCanvas
 			newNote.ID = i;
 			myNotes.add(newNote);
 		}
+		// 选中高亮框按新尺寸等比缩放（基准 = create 时的 NOTE_SIZE+16）
+		if (noteSelector != null && _noteSelBase > 0)
+			noteSelector.scale.set((NOTE_SIZE + 16) / _noteSelBase, (NOTE_SIZE + 16) / _noteSelBase);
+		noteSelector.updateHitbox();
 
 		bigNote = new Note(0, 0, false, true);
 		bigNote.setPosition(280, 430);
@@ -863,7 +904,7 @@ class NotesPane extends SettingsCanvas
 			if (note.animation.curAnim == null || note.animation.curAnim.name != newAnim) note.playAnim(newAnim, true);
 			if (instant) note.animation.curAnim.finish();
 		}
-		bigNote.animation.play('note$curSelectedNote', true);
+		bigNote.animation.play('note' + (curSelectedNote % Note.colArray.length), true);
 
 		moveSelector(modeSelector, MODE_X + MODE_GAP * curSelectedMode - 9, MODE_Y - 9, onModeColumn);
 		moveSelector(noteSelector, NOTE_X + NOTE_GAP * curSelectedNote - 8, NOTE_Y - 8, !onModeColumn);

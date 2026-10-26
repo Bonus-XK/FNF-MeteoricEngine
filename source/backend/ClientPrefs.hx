@@ -124,16 +124,35 @@ class SaveVariables {
 	@:keep public var newHealthBar:Bool = false; // 新版血量条：自绘（不依赖贴图），并融合 0.6.3 兼容模式
 	@:keep public var oldHealthBar:Bool = false; // Psych 0.6.3 旧版血量条（兼容 0.6.3 及以下的旧模组）
 	public var noteOffset:Int = 0;
+	// ===== Extra Keys：轨道颜色表扩到 12 轨（lane 0-3 = 旧四色原值；4-11 为新默认色）=====
+	// lane → 颜色在「贴图循环复用」（方向 = lane%4）基础上按 lane 独立可自定义。
+	// 旧存档只有 4 条目 → loadPrefs 里 normalizeArrowRGB() 回填。
 	public var arrowRGB:Array<Array<FlxColor>> = [
 		[0xFFC24B99, 0xFFFFFFFF, 0xFF3C1F56],
 		[0xFF00FFFF, 0xFFFFFFFF, 0xFF1542B7],
 		[0xFF12FA05, 0xFFFFFFFF, 0xFF0A4447],
-		[0xFFF9393F, 0xFFFFFFFF, 0xFF651038]];
+		[0xFFF9393F, 0xFFFFFFFF, 0xFF651038],
+		[0xFFFF9C00, 0xFFFFFFFF, 0xFF7A3E00],
+		[0xFFF5E10E, 0xFFFFFFFF, 0xFF7A7500],
+		[0xFFFF00D4, 0xFFFFFFFF, 0xFF7A0067],
+		[0xFFC0C0C0, 0xFFFFFFFF, 0xFF4A4A4A],
+		[0xFF00FFA3, 0xFFFFFFFF, 0xFF00673E],
+		[0xFF7C4DFF, 0xFFFFFFFF, 0xFF2E1670],
+		[0xFF2979FF, 0xFFFFFFFF, 0xFF0A2A6B],
+		[0xFFFF6E9C, 0xFFFFFFFF, 0xFF6E1F3C]];
 	public var arrowRGBPixel:Array<Array<FlxColor>> = [
 		[0xFFE276FF, 0xFFFFF9FF, 0xFF60008D],
 		[0xFF3DCAFF, 0xFFF4FFFF, 0xFF003060],
 		[0xFF71E300, 0xFFF6FFE6, 0xFF003100],
-		[0xFFFF884E, 0xFFFFFAF5, 0xFF6C0000]];
+		[0xFFFF884E, 0xFFFFFAF5, 0xFF6C0000],
+		[0xFFFFB514, 0xFFFFF6E0, 0xFF7A4A00],
+		[0xFFF7EC4F, 0xFFFFFCE0, 0xFF6B6200],
+		[0xFFFF5CE1, 0xFFFFE9FB, 0xFF7A0067],
+		[0xFFDCDCDC, 0xFFFFFFFF, 0xFF4A4A4A],
+		[0xFF4FFFB0, 0xFFEafff5, 0xFF00673E],
+		[0xFFA184FF, 0xFFF2ecff, 0xFF2E1670],
+		[0xFF6FA8FF, 0xFFeaf2ff, 0xFF0A2A6B],
+		[0xFFFF9DBB, 0xFFffecf2, 0xFF6E1F3C]];
 
 	@:keep public var ghostTapping:Bool = true;
 	@:keep public var smoothHealth:Bool = true;
@@ -376,7 +395,15 @@ class ClientPrefs {
 		'note_left'		=> [A, LEFT],
 		'note_down'		=> [S, DOWN],
 		'note_right'	=> [D, RIGHT],
-		
+		// Extra Keys：lane 4-11 的独立键位（lane 0-3 沿用上方旧名；旧存档没有这些键 → 保留默认）
+		'note_4'		=> [F],
+		'note_5'		=> [G],
+		'note_6'		=> [H],
+		'note_7'		=> [J],
+		'note_8'		=> [K],
+		'note_9'		=> [L],
+		'note_10'		=> [SEMICOLON],
+		'note_11'		=> [QUOTE],
 		'ui_up'			=> [W, UP],
 		'ui_left'		=> [A, LEFT],
 		'ui_down'		=> [S, DOWN],
@@ -399,7 +426,16 @@ class ClientPrefs {
 		'note_left'		=> [DPAD_LEFT, X],
 		'note_down'		=> [DPAD_DOWN, A],
 		'note_right'	=> [DPAD_RIGHT, B],
-		
+		// Extra Keys：手柄肩键/扳机给 lane 4-7，8-11 默认不绑（可在改键界面自定义）
+		'note_4'		=> [LEFT_SHOULDER],
+		'note_5'		=> [RIGHT_SHOULDER],
+		'note_6'		=> [LEFT_TRIGGER],
+		'note_7'		=> [RIGHT_TRIGGER],
+		'note_8'		=> [],
+		'note_9'		=> [],
+		'note_10'		=> [],
+		'note_11'		=> [],
+
 		'ui_up'			=> [DPAD_UP, LEFT_STICK_DIGITAL_UP],
 		'ui_left'		=> [DPAD_LEFT, LEFT_STICK_DIGITAL_LEFT],
 		'ui_down'		=> [DPAD_DOWN, LEFT_STICK_DIGITAL_DOWN],
@@ -571,6 +607,37 @@ class ClientPrefs {
 		data.hudLayout = m;
 	}
 
+	/**
+	 * Extra Keys：轨道颜色表完整性修复。
+	 * 旧存档的 arrowRGB/arrowRGBPixel 只有 4 条目（加载时按字段覆写默认 12 条目），
+	 * 这里回填到 12 轨（lane 0-3 保留用户自定义值，4-11 用默认色）；条目不足 3 色的也补齐。
+	 * JSON 往返后 FlxColor 可能变成 Int/Float —— FlxColor 是 Int 抽象，直接 cast 安全。
+	 */
+	static function normalizeArrowRGB():Void
+	{
+		for (pixel in [false, true])
+		{
+			var cur:Array<Array<FlxColor>> = pixel ? data.arrowRGBPixel : data.arrowRGB;
+			var def:Array<Array<FlxColor>> = pixel ? defaultData.arrowRGBPixel : defaultData.arrowRGB;
+			if (def == null) continue;
+			if (cur == null) cur = [];
+			var out:Array<Array<FlxColor>> = [];
+			for (i in 0...12)
+			{
+				var entry:Array<FlxColor> = (i < cur.length && cur[i] != null && cur[i].length >= 3) ? cur[i] : null;
+				if (entry == null) entry = (i < def.length && def[i] != null) ? def[i].copy() : [0xFFFFFFFF, 0xFFFFFFFF, 0xFF000000];
+				var arr:Array<FlxColor> = [];
+				for (j in 0...3)
+				{
+					var v:Dynamic = entry[j];
+					arr.push(v == null ? 0xFFFFFFFF : cast v);
+				}
+				out.push(arr);
+			}
+			if (pixel) data.arrowRGBPixel = out; else data.arrowRGB = out;
+		}
+	}
+
 	/** 视觉折叠系数：0=1.0（关）/ 1=0.75 / 2=0.5 / 3=0.25。仅视觉路径可用，判定/计分禁用。
 	 *  ⚠ 本函数必须留在 `#if (mac || windows)` **之外**：视觉折叠是跨平台功能（Android/iOS 的
 	 *  NoteChartDomain / PlayState 同样调用）。此前误放进墙钟帧循环的桌面守卫块内，
@@ -733,6 +800,7 @@ class ClientPrefs {
 		// 这里把所有这类 Map 字段统一还原为真正的 Haxe Map。
 		normalizeLoadedMaps();
 		normalizeLoadedKeys();
+		normalizeArrowRGB();
 		savedHideHud = data.hideHud;
 
 		var __saveSuspect:Bool = false;
