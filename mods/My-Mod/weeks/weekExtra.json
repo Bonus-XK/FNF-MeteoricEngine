@@ -1,0 +1,15 @@
+{
+	"songs": [
+		["extra-keys-test", "bf", [146, 113, 253]]
+	],
+	"storyName": "Extra Keys Test",
+	"weekName": "extraKeysTest",
+	"freeplayColor": [146, 113, 253],
+	"hideStoryMode": true,
+	"hideFreeplay": false,
+	"weekBackground": "stage",
+	"weekBefore": "",
+	"storymenu": [],
+	"difficulties": "",
+	"weekUnlocked": true
+}
