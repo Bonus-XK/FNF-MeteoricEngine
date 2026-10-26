@@ -21,7 +21,8 @@ class ReplayDomain
 		while (ps.replayInputPtr < ps.replayInputs.length && Conductor.songPosition >= ps.replayInputs[ps.replayInputPtr].t)
 		{
 			var ev:ReplayInput = ps.replayInputs[ps.replayInputPtr++];
-			if (ev.d < 0 || ev.d > 3) continue;
+			// Extra Keys：lane 范围随谱面键数（旧回放 0-3 不受影响）
+			if (ev.d < 0 || ev.d >= ExtraKeys.songKeys) continue;
 			if (ev.u)
 			{
 				ps.replayHeld[ev.d] = false;
@@ -39,7 +40,7 @@ class ReplayDomain
 		if (ps.generatedMusic && ps.notes.length > 0 && !ps.boyfriend.stunned)
 		{
 			var anyHold:Bool = false;
-			for (i in 0...4)
+			for (i in 0...ps.replayHeld.length)
 				if (ps.replayHeld[i]) { anyHold = true; break; }
 			if (anyHold)
 			{
@@ -69,6 +70,6 @@ class ReplayDomain
 		ps.replayInputPtr = 0;
 		while (ps.replayInputPtr < ps.replayInputs.length && ps.replayInputs[ps.replayInputPtr].t < t)
 			ps.replayInputPtr++;
-		ps.replayHeld = [false, false, false, false];
+		ps.replayHeld = ExtraKeys.falseLanes();
 	}
 }

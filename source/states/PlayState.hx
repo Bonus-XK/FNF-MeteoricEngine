@@ -628,12 +628,14 @@ class PlayState extends MusicBeatState
 		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
 		fullComboFunction = fullComboUpdate;
 
-		keysArray = [
-			'note_left',
-			'note_down',
-			'note_up',
-			'note_right'
-		];
+		// ===== Extra Keys：本曲键数真源（SONG.keys，缺省 4 = 完全旧行为）=====
+		ExtraKeys.setSongKeys(SONG != null ? SONG.keys : 4);
+		keysArray = ExtraKeys.actionNames();
+		// per-lane 运行时状态按键数定长（字段初始化器是 4K 默认值）
+		lastSplashLane = ExtraKeys.farPastLanes();
+		botBatchAnimDone = ExtraKeys.falseLanes();
+		botBatchSplashDone = ExtraKeys.falseLanes();
+		_settleAnimDone = ExtraKeys.falseLanes();
 
 		if (FlxG.sound.music != null)
 			FlxG.sound.music.stop();
@@ -669,7 +671,7 @@ class PlayState extends MusicBeatState
 				replayPressPtr = 0;
 				replayInputs = currentReplay.inputs != null ? currentReplay.inputs : [];
 				replayInputPtr = 0;
-				replayHeld = [false, false, false, false];
+				replayHeld = ExtraKeys.falseLanes();
 				replayV2 = currentReplay.isInputReplay;
 				usedAutoplay = true; // 回放成绩不计入排行
 				startOnTime = 0;     // 回放必须从头开始
@@ -1324,22 +1326,30 @@ class PlayState extends MusicBeatState
 				generateStaticArrows(1);
 			}
 			keepStrumsOnRestart = false;
+			CrashHandler.mark('countdown:arrows-done');
 			for (i in 0...playerStrums.length) {
 				setOnScripts('defaultPlayerStrumX' + i, playerStrums.members[i].x);
 				setOnScripts('defaultPlayerStrumY' + i, playerStrums.members[i].y);
-				Reflect.setProperty(this, 'defaultPlayerStrumX' + i, playerStrums.members[i].x);
-				Reflect.setProperty(this, 'defaultPlayerStrumY' + i, playerStrums.members[i].y);
+				// Extra Keys：兼容字段只有 X0..X3（Psych 0.7 遗留），lane ≥ 4 只暴露给脚本全局，
+				// 不能 Reflect.setProperty 到不存在的实例字段（hxcpp 会炸）
+				if (i < 4) {
+					Reflect.setProperty(this, 'defaultPlayerStrumX' + i, playerStrums.members[i].x);
+					Reflect.setProperty(this, 'defaultPlayerStrumY' + i, playerStrums.members[i].y);
+				}
 			}
 			for (i in 0...opponentStrums.length) {
 				setOnScripts('defaultOpponentStrumX' + i, opponentStrums.members[i].x);
 				setOnScripts('defaultOpponentStrumY' + i, opponentStrums.members[i].y);
-				Reflect.setProperty(this, 'defaultOpponentStrumX' + i, opponentStrums.members[i].x);
-				Reflect.setProperty(this, 'defaultOpponentStrumY' + i, opponentStrums.members[i].y);
+				if (i < 4) {
+					Reflect.setProperty(this, 'defaultOpponentStrumX' + i, opponentStrums.members[i].x);
+					Reflect.setProperty(this, 'defaultOpponentStrumY' + i, opponentStrums.members[i].y);
+				}
 				//if(ClientPrefs.data.middleScroll) opponentStrums.members[i].visible = false;
 			}
 
 			startedCountdown = true;
 			Conductor.setPosition(-Conductor.crochet * 5);
+			CrashHandler.mark('countdown:timer-armed');
 			setOnScripts('startedCountdown', true);
 			callOnScripts('onCountdownStarted', null);
 
@@ -1732,16 +1742,24 @@ class PlayState extends MusicBeatState
 	static function buildChartNotes(song:SwagSong, botplayPlan:Array<Array<Float>>, isPhigrosStyle:Bool,
 			createdFrom:Dynamic, playbackRate:Float, clearSections:Bool = false):PreGenResult
 	{
+		// ===== Extra Keys：本曲键数真源（布局/烘焙/预演都依赖它，必须最先写入）=====
+		ExtraKeys.setSongKeys(ExtraKeys.resolveKeys(song != null ? song.keys : 4));
+		var songKeys:Int = ExtraKeys.songKeys;
 		// 平行数组代理（Meteoric Fix 续）：本函数是 CastNote 的唯一生产者入口，
 		// 每曲构建前重置上一曲的全部槽位数据（旧对象随 unspawnNotes 丢弃）
 		CastNote.resetPacked();
 		var noteTypes:Array<String> = [];
 		var totalNotes:Int = 0;
-		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
+		var botLaneCounts:Array<Int> = botplayPlan != null ? ExtraKeys.zeroLanes() : null;
 		// botplay 计划并入本遍历（不再由 preRenderBotplay 二次全谱扫描）：与 botLaneCounts
 		// 严格同口径（含密度倍数与长条段），保证 generateChartNotes 的校验恒等。
 		// 仅在 preRenderNotes 开启（需要计划）时构建，省 11.8M 级谱面的 {{ }} 内存。
-		var botplayLanes:Array<Array<Float>> = botplayPlan != null ? [[], [], [], []] : null;
+		var botplayLanes:Array<Array<Float>> = null;
+		if (botplayPlan != null)
+		{
+			botplayLanes = [];
+			for (i in 0...songKeys) botplayLanes.push([]);
+		}
 
 		var arrows:Array<CastNote> = [];
 		var unspawnNotes:Array<CastNote> = [];
@@ -1780,7 +1798,8 @@ class PlayState extends MusicBeatState
 		var boundedKeep:Int = (ClientPrefs.data.boundedOffs) ? Std.int(ClientPrefs.data.boundedOffsKeep) : 0;
 		var doGhostMerge:Bool = ClientPrefs.data.skipGhostNotes || forceDenseMerge;
 		var ghostDensity:Bool = ClientPrefs.data.ghostDensity;
-		var lastLaneArrow:Array<CastNote> = [null, null, null, null];
+		var lastLaneArrow:Array<CastNote> = [];
+		for (i in 0...songKeys) lastLaneArrow.push(null);
 
 		// H-Slice 挤压音符字段读取：note[3]/note[4] 为数组或 *.cmpSpam 对象时返回 [剩余数, 密度]
 		function extractSpamData(note:Array<Dynamic>):Array<Float>
@@ -1804,10 +1823,12 @@ class PlayState extends MusicBeatState
 			for (songNotes in section.sectionNotes)
 			{
 				var daStrumTime:Float = songNotes[0];
-				var daNoteData:Int = Std.int(songNotes[1] % 4);
-				if (daNoteData < 0 || daNoteData > 3) continue;
-				// Psych 1.0.4 格式：列号直接决定方向（<4 玩家、>=4 对手），不再用 mustHitSection 翻转
-				var gottaHitNote:Bool = (songNotes[1] < 4);
+				// Extra Keys：绝对列号协议泛化（col < keys 玩家 / lane = col % keys；keys=4 与旧版等价）
+				var rawCol:Int = Std.int(songNotes[1]);
+				var daNoteData:Int = ExtraKeys.laneOf(rawCol);
+				if (daNoteData < 0 || daNoteData >= songKeys) continue;
+				// Psych 1.0.4 格式：列号直接决定方向（<keys 玩家、>=keys 对手），不再用 mustHitSection 翻转
+				var gottaHitNote:Bool = (rawCol < songKeys);
 
 				// ===== 堆叠合并（H-Slice 移植）：同轨 ±ghostRange 内的幽灵箭头合并为 density =====
 				if (doGhostMerge)
@@ -1965,8 +1986,13 @@ class PlayState extends MusicBeatState
 		// 缓存加载路径 offsKeep←density（PackedCache.load），≥4M 的墙谱两种口径都过阈值。
 		// Float 累加防 Int32 溢出（66 Part 实测 Σ ≈ 38.5 亿 > 2^31）。
 		var packedRawF:Float = 0;
-		var botLaneCounts:Array<Int> = botplayPlan != null ? [0, 0, 0, 0] : null;
-		var botplayLanes:Array<Array<Float>> = botplayPlan != null ? [[], [], [], []] : null;
+		var botLaneCounts:Array<Int> = botplayPlan != null ? ExtraKeys.zeroLanes() : null;
+		var botplayLanes:Array<Array<Float>> = null;
+		if (botplayPlan != null)
+		{
+			botplayLanes = [];
+			for (i in 0...ExtraKeys.songKeys) botplayLanes.push([]);
+		}
 		var unspawnNotes:Array<CastNote> = [];
 
 		for (c in clusters)
@@ -2036,7 +2062,7 @@ class PlayState extends MusicBeatState
 		// preRenderNotes 开启时是 O(原始音符数) 的潜在内存炸弹，墙簇 density 190 万起步）。
 		var _laneEntries:Int = 0;
 		if (botplayLanes != null)
-			for (l in 0...4)
+			for (l in 0...botplayLanes.length)
 				if (botplayLanes[l] != null) _laneEntries += botplayLanes[l].length;
 		PerfProbe.mark('packedbuild: done clusters=' + clusters.length
 			+ ' raw=' + Std.int(Math.min(packedRawF, 2147483000))
@@ -2179,7 +2205,8 @@ class PlayState extends MusicBeatState
 		var segCount:Int = floorSus + 1;
 		for (i in 0...segCount)
 		{
-			var seg:Note = new Note(target.strumTime + stepCrochet * i, target.noteData & 3,
+			// Extra Keys：位打包低 8 位 = lane（旧 `& 3` 会把 lane≥4 截断成 0-3）
+			var seg:Note = new Note(target.strumTime + stepCrochet * i, target.noteData & 255,
 				prev, true, false, PlayState.instance);
 			// 字段（与安卓 generateChartNotes 直建路径同款）
 			seg.chartSeq = _segmentSeqBase++;
@@ -2694,7 +2721,7 @@ class PlayState extends MusicBeatState
 		// 重开：录制从头开始（回放数据保持，按键/空按游标与按住状态复位）
 		replayPressPtr = 0;
 		replayInputPtr = 0;
-		replayHeld = [false, false, false, false];
+		replayHeld = ExtraKeys.falseLanes();
 		replayInjecting = false;
 		if (recordingReplay && !replayMode)
 			currentReplay = new Replay(SONG.song, Difficulty.getString(storyDifficulty));

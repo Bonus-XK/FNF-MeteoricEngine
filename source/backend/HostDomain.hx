@@ -2005,8 +2005,10 @@ class HostDomain
 	}
 
 	/** 原 PlayState.spawnOneWithTail（作用域分析：零遮蔽，2 处成员引用已限定）。 */
+	static var _spawnProbeMarked:Bool = false;
 	public static function spawnOneWithTail(ps:PlayState, target:CastNote):Note
 	{
+		if (!_spawnProbeMarked) { _spawnProbeMarked = true; CrashHandler.mark('spawn:first-note lane=' + (target.noteData & 255)); }
 		var hadOffs:Bool = target.offs != null; // 合并簇：尾巴已在上方 offs 分支挂到 base
 		var n:Note = ps.spawnOne(target);
 		if (!hadOffs && target.holdLength > 0 && target.chartSeq >= 0)

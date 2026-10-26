@@ -661,7 +661,8 @@ class NoteChartDomain
 		if (ps.botplayPlan != null)
 		{
 			// 校验预演与正式生成完全一致（同一遍历逻辑下必然一致；不一致时回退实时判定，防止错位）
-			for (lane in 0...4)
+			// Extra Keys：按当前谱面键数逐轨校验
+			for (lane in 0...ExtraKeys.songKeys)
 				if (ps.botLaneCounts[lane] != ps.botplayPlan[lane].length)
 				{
 					ps.botplayPlan = null;
@@ -730,7 +731,7 @@ class NoteChartDomain
 			var suffix:String = '';
 			if(note != null) suffix = note.animSuffix;
 
-			var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, direction)))] + 'miss' + suffix;
+			var animToPlay:String = ps.singAnimations[ExtraKeys.laneOf(direction) % ps.singAnimations.length] + 'miss' + suffix;
 			char.playAnim(animToPlay, true);
 
 			if(char != ps.gf && ps.combo > 5 && ps.gf != null && ps.gf.animOffsets.exists('sad'))
@@ -940,7 +941,7 @@ class NoteChartDomain
 		// 【视觉/性能】密集谱自动游玩：每轨 250ms 最多 1 次溅射。原实现 botHitBatch 只限
 		// "每帧每轨 1 个"——700fps 下每秒最多 2800 个、同屏上千个溅射精灵：既是"五颜六色"
 		// 乱象，也是密集段渲染/更新的大头。节流后每轨约 2~4 个/秒，观感恢复正常。
-		if (PlayState.densePerfMode && (ps.cpuControlled || ps.replayMode) && data >= 0 && data < 4)
+		if (PlayState.densePerfMode && (ps.cpuControlled || ps.replayMode) && data >= 0 && data < ExtraKeys.songKeys)
 		{
 			var nowSplash:Float = Conductor.songPosition;
 			if (nowSplash - ps.lastSplashLane[data] < 250) return;
@@ -1099,7 +1100,8 @@ class NoteChartDomain
 				ps.health -= 0.02 * ps.healthLoss * hitMult;
 			}
 			if(!ClientPrefs.data.hudOnly && !note.noAnimation && !(ps.botHitBatch && ps.botBatchAnimDone[note.noteData])) {
-				var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, note.noteData)))];
+				// Extra Keys：sing 动画按 lane%4 循环复用 4 方向（与箭头贴图循环一致）
+				var animToPlay:String = ps.singAnimations[ExtraKeys.laneOf(note.noteData) % ps.singAnimations.length];
 
 				var char:Character = ps.boyfriend;
 				var animCheck:String = 'hey';
@@ -1183,7 +1185,7 @@ class NoteChartDomain
 			}
 
 			var char:Character = ps.dad;
-			var animToPlay:String = ps.singAnimations[Std.int(Math.abs(Math.min(ps.singAnimations.length-1, note.noteData)))] + altAnim;
+			var animToPlay:String = ps.singAnimations[ExtraKeys.laneOf(note.noteData) % ps.singAnimations.length] + altAnim;
 			if(note.gfNote) {
 				char = ps.gf;
 			}

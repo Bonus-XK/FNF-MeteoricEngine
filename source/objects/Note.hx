@@ -623,12 +623,14 @@ class Note extends FlxSprite
 			if (ClientPrefs.data.perfMode)
 			{
 				rgbShader.enabled = false;
-				var laneColors:Array<FlxColor> = PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel[noteData] : ClientPrefs.data.arrowRGB[noteData];
+				var laneColors:Array<FlxColor> = ExtraKeys.laneColors(noteData, PlayState.isPixelStage);
 				color = (laneColors != null && laneColors.length > 0) ? laneColors[0] : 0xFFFFFFFF;
 			}
 
-			x += swagWidth * (noteData);
-			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
+			// Extra Keys：lane 间距走 laneGap（keys>4 自动压缩；keys<=4 = swagWidth 原值）
+			x += ExtraKeys.laneGap * (noteData);
+			// 贴图循环复用：lane ≥ 4 的方向 = lane % 4（紫/蓝/绿/红循环），动画照播
+			if(!isSustainNote && noteData > -1) {
 				var animToPlay:String = '';
 				animToPlay = colArray[noteData % colArray.length];
 				if (bakedKind < 0) {
@@ -712,9 +714,10 @@ class Note extends FlxSprite
 			var newRGB:RGBPalette = new RGBPalette();
 			globalRgbShaders[noteData] = newRGB;
 
-			var arr:Array<FlxColor> = (!PlayState.isPixelStage) ? ClientPrefs.data.arrowRGB[noteData] : ClientPrefs.data.arrowRGBPixel[noteData];
-			if (noteData > -1 && noteData <= arr.length)
+			// Extra Keys：laneColors 带 12 轨越界兜底（lane 4-11 用独立自定义色）
+			if (noteData > -1)
 			{
+				var arr:Array<FlxColor> = ExtraKeys.laneColors(noteData, PlayState.isPixelStage);
 				newRGB.r = arr[0];
 				newRGB.g = arr[1];
 				newRGB.b = arr[2];
@@ -750,7 +753,7 @@ class Note extends FlxSprite
 		if (bakeNotes && !inEditor && noteData > -1)
 		{
 			var useRGB:Bool = !PlayState.densePerfMode && !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
-			var arr:Array<FlxColor> = (loadPath.startsWith('pixelUI/') ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB)[noteData];
+			var arr:Array<FlxColor> = ExtraKeys.laneColors(noteData, loadPath.startsWith('pixelUI/'));
 			bakedLoadPath = loadPath;
 			bakedR = arr[0];
 			bakedG = arr[1];
@@ -775,7 +778,7 @@ class Note extends FlxSprite
 				antialiasing = PlayState.isPixelStage ? false : ClientPrefs.data.antialiasing;
 				if (PlayState.isPixelStage)
 				{
-					setGraphicSize(Std.int(width * PlayState.daPixelZoom));
+					setGraphicSize(Std.int(width * PlayState.daPixelZoom * ExtraKeys.laneScale));
 					if (isSustainNote)
 					{
 						offsetX += _lastNoteOffX;
@@ -785,7 +788,7 @@ class Note extends FlxSprite
 				}
 				else
 				{
-					setGraphicSize(Std.int(width * 0.7));
+					setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
 					if (!isSustainNote)
 					{
 						centerOffsets();
@@ -811,7 +814,7 @@ class Note extends FlxSprite
 				var graphic = Paths.image(loadPath);
 				loadGraphic(graphic, true, Math.floor(graphic.width / 4), Math.floor(graphic.height / 5));
 			}
-			setGraphicSize(Std.int(width * PlayState.daPixelZoom));
+			setGraphicSize(Std.int(width * PlayState.daPixelZoom * ExtraKeys.laneScale));
 			loadPixelNoteAnims();
 			antialiasing = false;
 
@@ -942,7 +945,7 @@ class Note extends FlxSprite
 	static function getBakedNoteGraphic(loadPath:String, col:Int, kind:Int):FlxGraphic
 	{
 		var useRGB:Bool = !PlayState.densePerfMode && !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
-		var arr:Array<FlxColor> = (loadPath.startsWith('pixelUI/') ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB)[col];
+		var arr:Array<FlxColor> = ExtraKeys.laneColors(col, loadPath.startsWith('pixelUI/'));
 		var key:String = getBakedNoteKey(loadPath, col, kind, arr[0], arr[1], arr[2], useRGB);
 		var g:FlxGraphic = bakedNoteGraphics.get(key);
 		return g;
@@ -1040,7 +1043,8 @@ class Note extends FlxSprite
 
 		var skin:String = (PlayState.SONG.arrowSkin != null && PlayState.SONG.arrowSkin.length > 0) ? PlayState.SONG.arrowSkin : defaultNoteSkin;
 		var sig:String = PlayState.SONG.song + '|' + (pixelStage ? 'p' : 'n') + '|' + skin + '|' + ClientPrefs.data.noteSkin + '|'
-			+ types.join(',') + '|' + (PlayState.SONG.disableNoteRGB == true ? 'rgb0' : 'rgb1') + '|';
+			+ types.join(',') + '|' + (PlayState.SONG.disableNoteRGB == true ? 'rgb0' : 'rgb1')
+			+ '|k' + ExtraKeys.resolveKeys(PlayState.SONG.keys) + '|';
 		var colors:Array<Array<FlxColor>> = pixelStage ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB;
 		for (c in colors)
 			for (v in c)
@@ -1096,9 +1100,10 @@ class Note extends FlxSprite
 		PlayState.stageUI = pixelStage ? 'pixel' : 'normal';
 		try
 		{
+			// Extra Keys：按当前谱面键数烘焙全部轨道外观（4K 仍是 0...4，行为不变）
 			for (type in types)
 			{
-				for (col in 0...4)
+				for (col in 0...ExtraKeys.songKeys)
 				{
 					// 用一次性探针音符解析该类型最终的皮肤与颜色（与正式生成完全同一路径）
 					var probe:Note = new Note(0, col, null, false, true);
@@ -1134,7 +1139,11 @@ class Note extends FlxSprite
 	// 运行时机器人不再逐帧试探判定窗口，音符到达预演时刻即命中，堆叠箭头再多也只需一次比较。
 	static function preRenderBotplay():Void
 	{
-		botplayLanes = [[], [], [], []];
+		// Extra Keys：预演轨道数按当前谱面键数
+		var planKeys:Int = ExtraKeys.resolveKeys(PlayState.SONG != null ? PlayState.SONG.keys : 4);
+		ExtraKeys.setSongKeys(planKeys);
+		botplayLanes = [];
+		for (i in 0...planKeys) botplayLanes.push([]);
 		if (PlayState.SONG != null && PlayState.SONG.notes != null)
 		{
 			// 与 PlayState.generateChartNotes 完全相同的遍历顺序与长条细分规则
@@ -1145,13 +1154,13 @@ class Note extends FlxSprite
 				for (songNotes in section.sectionNotes)
 				{
 					var daStrumTime:Float = songNotes[0];
-					var daNoteData:Int = Std.int(songNotes[1] % 4);
-					if (daNoteData < 0 || daNoteData > 3) continue;
-					// Psych 1.0.4 / convertToPsychV1 / fastParseSong 后列号为绝对方向（<4 玩家，>=4 对手），
+					var daNoteData:Int = ExtraKeys.laneOf(Std.int(songNotes[1]));
+					if (daNoteData < 0 || daNoteData >= planKeys) continue;
+					// Psych 1.0.4 / convertToPsychV1 / fastParseSong 后列号为绝对方向（<keys 玩家，>=keys 对手），
 					// 与 PlayState.buildChartNotes 的判定完全一致；旧的 mustHitSection 翻转规则已作废
 					// （否则 mustHit=false 段的玩家音符被漏计 → botplayPlan 校验失败 → 退回实时判定，
 					//   高密度谱自动命中路径失效）。Obsolescence-spam 类全绝对列号谱面必须走本规则。
-					var gottaHitNote:Bool = (songNotes[1] < 4);
+					var gottaHitNote:Bool = (songNotes[1] < planKeys);
 					if (!gottaHitNote) continue;
 
 					botplayLanes[daNoteData].push(daStrumTime);
@@ -1188,6 +1197,8 @@ class Note extends FlxSprite
 		var existing:FlxGraphic = bakedNoteGraphics.get(key);
 		if (existing != null) return existing;
 
+		// Extra Keys：像素图集只有 4 列（方向），lane ≥ 4 取模取帧；颜色仍按 lane 独立烘焙
+		var frameCol:Int = col % colArray.length;
 		var bitmap:BitmapData = null;
 		if (pixelStage)
 		{
@@ -1198,7 +1209,7 @@ class Note extends FlxSprite
 			var fh:Int = Math.floor(sheet.height / rows);
 			var row:Int = kind == BAKE_HOLD ? 0 : 1;
 			bitmap = new BitmapData(fw, fh, true, FlxColor.TRANSPARENT);
-			bitmap.copyPixels(sheet, new Rectangle(col * fw, row * fh, fw, fh), new Point(0, 0));
+			bitmap.copyPixels(sheet, new Rectangle(frameCol * fw, row * fh, fw, fh), new Point(0, 0));
 		}
 		else
 		{
@@ -1216,8 +1227,9 @@ class Note extends FlxSprite
 			if (atlas == null || atlas.parent == null || atlas.parent.bitmap == null || !atlas.parent.bitmap.readable)
 				atlas = getBakeAtlas(loadPath);
 			if (atlas == null) { trace('BAKE FAIL atlas: ' + loadPath); return null; }
-			var prefix:String = kind == BAKE_NOTE ? colArray[col] + '0'
-				: colArray[col] + (kind == BAKE_HOLD ? ' hold piece' : ' hold end');
+			var colName:String = colArray[frameCol];
+			var prefix:String = kind == BAKE_NOTE ? colName + '0'
+				: colName + (kind == BAKE_HOLD ? ' hold piece' : ' hold end');
 			var frame:FlxFrame = null;
 			for (f in atlas.frames)
 			{
@@ -1233,7 +1245,7 @@ class Note extends FlxSprite
 					{
 						if (f.name == null) continue;
 						if (f.name.indexOf('hold end') >= 0
-							&& (f.name.indexOf(colArray[col]) >= 0 || f.name.toLowerCase().indexOf('pruple') >= 0))
+							&& (f.name.indexOf(colName) >= 0 || f.name.toLowerCase().indexOf('pruple') >= 0))
 						{ frame = f; break; }
 					}
 				}
@@ -1251,7 +1263,7 @@ class Note extends FlxSprite
 				return null;
 			}
 			bitmap = bakeAtlasFrame(frame);
-			if (kind == BAKE_NOTE && col == 0)
+			if (kind == BAKE_NOTE && frameCol == 0)
 				bakedArrowRenderWidth.set(loadPath, Std.int(bitmap.width * 0.7));
 		}
 
@@ -1475,24 +1487,29 @@ class Note extends FlxSprite
 	}
 
 	function loadNoteAnims(cacheKey:String) {
+		// Extra Keys：lane ≥ 4 循环复用 4 色帧名（colArray[noteData % 4]）
+		var col:String = colArray[noteData % colArray.length];
 		if (isSustainNote)
 		{
 			addCachedNoteAnim(cacheKey, 'purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
-			addCachedNoteAnim(cacheKey, colArray[noteData] + 'holdend', colArray[noteData] + ' hold end', 24, true);
-			addCachedNoteAnim(cacheKey, colArray[noteData] + 'hold', colArray[noteData] + ' hold piece', 24, true);
+			addCachedNoteAnim(cacheKey, col + 'holdend', col + ' hold end', 24, true);
+			addCachedNoteAnim(cacheKey, col + 'hold', col + ' hold piece', 24, true);
 		}
-		else addCachedNoteAnim(cacheKey, colArray[noteData] + 'Scroll', colArray[noteData] + '0', 30, true);
+		else addCachedNoteAnim(cacheKey, col + 'Scroll', col + '0', 30, true);
 
-		setGraphicSize(Std.int(width * 0.7));
+		setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
 		updateHitbox();
 	}
 
 	function loadPixelNoteAnims() {
+		// Extra Keys：像素图集 4 列（方向）× N 行布局，lane ≥ 4 取模复用列帧
+		var colIdx:Int = noteData % colArray.length;
+		var col:String = colArray[colIdx];
 		if(isSustainNote)
 		{
-			animation.add(colArray[noteData] + 'holdend', [noteData + 4], 24, true);
-			animation.add(colArray[noteData] + 'hold', [noteData], 24, true);
-		} else animation.add(colArray[noteData] + 'Scroll', [noteData + 4], 24, true);
+			animation.add(col + 'holdend', [colIdx + 4], 24, true);
+			animation.add(col + 'hold', [colIdx], 24, true);
+		} else animation.add(col + 'Scroll', [colIdx + 4], 24, true);
 	}
 
 	// 【性能模式（Seiun 移植）】简单音符直连 quad 合批：跳过 FlxSprite.draw 的矩阵/绘制管线开销。
@@ -1745,7 +1762,7 @@ class Note extends FlxSprite
 		noAnimation = noMissAnimation = (target.noteData & (1 << 13)) != 0;
 		blockHit = (target.noteData & (1 << 14)) != 0;
 		ignoreNote = (target.noteData & (1 << 15)) != 0;
-		noteData = target.noteData & 3;
+		noteData = target.noteData & 255; // Extra Keys：低 8 位 = lane（0..11），旧 `& 3` 会截断 lane≥4
 
 		hitsoundDisabled = isSustainNote;
 
@@ -1916,8 +1933,8 @@ class Note extends FlxSprite
 		{
 			alpha = multAlpha = 1;
 			// 箭头复生：重置缩放（长条生命残留 scale.y≈2 → 箭头被上下拉伸）
-			if (PlayState.isPixelStage) scale.set(PlayState.daPixelZoom, PlayState.daPixelZoom);
-			else scale.set(0.7, 0.7);
+			if (PlayState.isPixelStage) scale.set(PlayState.daPixelZoom * ExtraKeys.laneScale, PlayState.daPixelZoom * ExtraKeys.laneScale);
+			else scale.set(0.7 * ExtraKeys.laneScale, 0.7 * ExtraKeys.laneScale);
 			updateHitbox();
 		}
 		clipRect = null;

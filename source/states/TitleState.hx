@@ -245,7 +245,7 @@ class TitleState extends MusicBeatState
 			Difficulty.resetList();
 			PlayState.isStoryMode = false;
 			PlayState.storyDifficulty = tDiff;
-			Sys.println('[TEST] jump to song: ' + tName + ' | json=' + tJson + ' | folder=' + tFolder + ' | diff=' + tDiff
+			trace('[TEST] jump to song: ' + tName + ' | json=' + tJson + ' | folder=' + tFolder + ' | diff=' + tDiff
 				+ ' | chart=' + Std.string(backend.Song.resolveChartPath(tJson, tFolder)));
 			LoadingState.loadSongAndSwitchState(new PlayState(), Paths.formatToSongPath(tName), tJson, tFolder, true, new states.FreeplayState());
 		}

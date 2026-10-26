@@ -32,16 +32,18 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 	static var colors:Array<String> = ['Purple', 'Blue', 'Green', 'Red'];
 
 	var holdSplashes:Array<FlxSprite> = [];
-	var durations:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0];
-	var hideCountdowns:Array<Float> = [0, 0, 0, 0, 0, 0, 0, 0];
+	var durations:Array<Int> = [];
+	var hideCountdowns:Array<Float> = [];
 
 	public function new()
 	{
 		super();
 
-		for (i in 0...8)
+		// Extra Keys：精灵数 = 玩家 keys + 对手 keys，颜色按 lane%4 循环
+		var total:Int = ExtraKeys.songKeys * 2;
+		for (i in 0...total)
 		{
-			var color:String = colors[i % 4];
+			var color:String = colors[i % colors.length];
 			var spr:FlxSprite = new FlxSprite();
 			var atlas:FlxAtlasFrames = Paths.getSparrowAtlas('noteHolding/holdCover' + color);
 			if (atlas != null)
@@ -61,13 +63,15 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 			spr.antialiasing = true;
 			add(spr);
 			holdSplashes.push(spr);
+			durations.push(0);
+			hideCountdowns.push(0);
 		}
 	}
 
 	// 命中长条：显示 + 循环 'holding' + 清零空按计数（模组 sustainHolding）
 	public function onHit(index:Int):Void
 	{
-		if (index < 0 || index > 7) return;
+		if (index < 0 || index >= holdSplashes.length) return;
 		var spr:FlxSprite = holdSplashes[index];
 		if (spr == null) return;
 		durations[index] = 0;
@@ -80,7 +84,9 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 	// 每帧跟随判定线位置（模组 onUpdate -> updateHoldSplashPos）
 	public function syncPositions(playerStrums:FlxTypedGroup<StrumNote>, opponentStrums:FlxTypedGroup<StrumNote>):Void
 	{
-		for (i in 0...4)
+		// Extra Keys：前 keys 个 = 玩家各轨，后 keys 个 = 对手各轨
+		var n:Int = Std.int(holdSplashes.length / 2);
+		for (i in 0...n)
 		{
 			var strum:StrumNote = playerStrums.members[i];
 			var spr:FlxSprite = holdSplashes[i];
@@ -88,9 +94,9 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 			spr.x = strum.x + POS_OFFSET;
 			spr.y = strum.y + POS_OFFSET;
 		}
-		for (i in 4...8)
+		for (i in n...holdSplashes.length)
 		{
-			var strum:StrumNote = opponentStrums.members[i - 4];
+			var strum:StrumNote = opponentStrums.members[i - n];
 			var spr:FlxSprite = holdSplashes[i];
 			if (strum == null || spr == null) continue;
 			spr.x = strum.x + POS_OFFSET;
@@ -102,7 +108,7 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 	{
 		super.update(elapsed);
 
-		for (i in 0...8)
+		for (i in 0...holdSplashes.length)
 		{
 			durations[i]++;
 			// 模组语义：== endDelay 只触发一次（计数继续累加直到下次 onHit 清零）

@@ -92,14 +92,27 @@ class CameraHudDomain
 		var noteOff:Array<Float> = ps.hudGetOffset('note');
 		var strumLineX:Float = ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X;
 		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
+		var nKeys:Int = ExtraKeys.songKeys;
 		for (i in 0...ps.strumLineNotes.members.length)
 		{
 			var strum:StrumNote = ps.strumLineNotes.members[i];
-			var px:Float = strumLineX + (i * Note.swagWidth) + noteOff[0];
-			if (i < 4 && ClientPrefs.data.middleScroll)
+			var px:Float;
+			if (nKeys == 4)
 			{
-				px += 310;
-				if (i > 1) px += FlxG.width / 2 + 25;
+				// 4K：保留旧公式（含其历史行为，零变化）
+				px = strumLineX + (i * Note.swagWidth) + noteOff[0];
+				if (i < 4 && ClientPrefs.data.middleScroll)
+				{
+					px += 310;
+					if (i > 1) px += FlxG.width / 2 + 25;
+				}
+			}
+			else
+			{
+				// Extra Keys：成员序 = 对手 0..keys-1 + 玩家 keys..2keys-1，按 laneX 正确定位
+				var isPlayer:Bool = i >= nKeys;
+				var lane:Int = i % nKeys;
+				px = ExtraKeys.laneX(strumLineX, isPlayer, lane) + noteOff[0];
 			}
 			strum.x = px;
 			strum.y = strumLineY + noteOff[1];
@@ -165,7 +178,9 @@ class CameraHudDomain
 		// 判定计数侧边栏：位置由 GameHUD.updateJudgementTxt 每帧管理（openfl TextField）
 	}
 
-	/** 原 PlayState.generateStaticArrows（作用域分析：零遮蔽，9 处成员引用已限定）。 */
+	/** 原 PlayState.generateStaticArrows（作用域分析：零遮蔽，9 处成员引用已限定）。
+	 *  Extra Keys：轨道数 = ExtraKeys.songKeys；位置统一走 ExtraKeys.laneX
+	 *  （keys==4 逐项复现旧常量路径，含中滚对手手调值）。 */
 	public static function generateStaticArrows(ps:PlayState, player:Int):Void
 	{
 		var hudNoteOff:Array<Float> = ps.hudGetOffset('note');
@@ -173,7 +188,7 @@ class CameraHudDomain
 		var strumLineY:Float = (ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50);
 		strumLineX += hudNoteOff[0];
 		strumLineY += hudNoteOff[1];
-		for (i in 0...4)
+		for (i in 0...ExtraKeys.songKeys)
 		{
 			// FlxG.log.add(i);
 			var targetAlpha:Float = 1;
@@ -197,16 +212,7 @@ class CameraHudDomain
 			if (player == 1)
 				ps.playerStrums.add(babyArrow);
 			else
-			{
-				if(ClientPrefs.data.middleScroll)
-				{
-					babyArrow.x += 310;
-					if(i > 1) { //Up and Right
-						babyArrow.x += FlxG.width / 2 + 25;
-					}
-				}
 				ps.opponentStrums.add(babyArrow);
-			}
 
 			ps.strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();

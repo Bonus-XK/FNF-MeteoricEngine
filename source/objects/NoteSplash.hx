@@ -89,6 +89,7 @@ class NoteSplash extends FlxSprite
 					if(note.noteSplashData.b != -1) note.rgbShader.b = note.noteSplashData.b;
 					tempShader = note.rgbShader.parent;
 				}
+				// Extra Keys：lane ≥ 4 取 lane 自己的调色板（initializeGlobalRGBShader 按 lane 建表）
 				else tempShader = Note.globalRgbShaders[direction];
 			}
 			else tempShader = Note.globalRgbShaders[direction];
@@ -108,13 +109,17 @@ class NoteSplash extends FlxSprite
 		offset.set(10, 10);
 
 		var animNum:Int = FlxG.random.int(1, maxAnims);
-		animation.play('note' + direction + '-' + animNum, true);
-		
+		// Extra Keys：溅射皮肤只有 4 色（purple/blue/green/red），lane ≥ 4 循环复用方向帧；
+		// 着色调色板仍取 lane 自己的（globalRgbShaders[direction]）
+		var dirCol:Int = direction % Note.colArray.length;
+		if (dirCol < 0) dirCol += Note.colArray.length;
+		animation.play('note' + dirCol + '-' + animNum, true);
+
 		var minFps:Int = 22;
 		var maxFps:Int = 26;
 		if(config != null)
 		{
-			var animID:Int = direction + ((animNum - 1) * Note.colArray.length);
+			var animID:Int = dirCol + ((animNum - 1) * Note.colArray.length);
 			//trace('anim: ${animation.curAnim.name}, $animID');
 			var offs:Array<Float> = config.offsets[FlxMath.wrap(animID, 0, config.offsets.length-1)];
 			offset.x += offs[0];

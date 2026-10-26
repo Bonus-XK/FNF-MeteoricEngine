@@ -37,10 +37,8 @@ class StrumNote extends FlxSprite
 		useRGBShader = false; // 安卓 GPU：RGB 着色器输出全黑，强制用贴图原色
 		#end
 		
-		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[leData];
-		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[leData];
-		
-		if(leData <= arr.length)
+		// Extra Keys：laneColors 12 轨越界兜底（lane 4-11 用独立自定义色）
+		var arr:Array<FlxColor> = ExtraKeys.laneColors(leData, PlayState.isPixelStage);
 		{
 			@:bypassAccessor
 			{
@@ -223,7 +221,7 @@ class StrumNote extends FlxSprite
 			animation.addByPrefix('red', 'arrowRIGHT');
 
 			antialiasing = ClientPrefs.data.antialiasing;
-			setGraphicSize(Std.int(width * 0.7));
+			setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
 
 			switch (Math.abs(noteData) % 4)
 			{
@@ -256,9 +254,9 @@ class StrumNote extends FlxSprite
 
 	public function postAddedToGroup() {
 		playAnim('static');
-		x += Note.swagWidth * noteData;
-		x += 50;
-		x += ((FlxG.width / 2) * player);
+		// Extra Keys：布局统一走 ExtraKeys.laneX（keys==4 逐项复现旧常量路径，
+		// 含中滚对手 310 / lane>1 加宽屏的旧手调值；keys>4 用泛化居中布局）
+		x = ExtraKeys.laneX(x, player == 1, noteData);
 		ID = noteData;
 	}
 
