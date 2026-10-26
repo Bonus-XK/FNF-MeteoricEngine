@@ -36,7 +36,15 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 		#end
 
-		//I'd suggest using "Low Quality" as an example for making your own option since it is the simplest here
+		#if desktop
+		// Vulkan 画面镜像：只在渲染后端=Vulkan 且子系统就绪时生效（重启后）。
+		// 与渲染后端行同页相邻展示，语义联动但字段独立（一个语义一个字段）。
+		var option:Option = new Option(Lang.tOr('option.rendererVulkanMirror', 'Vulkan 画面镜像'),
+			Lang.tOr('optionDesc.rendererVulkanMirror', '需要「渲染后端」为 Vulkan 且子系统就绪（macOS 需 MoltenVK，并经 DYLD_LIBRARY_PATH 启动）。开启后弹出第二个窗口，引擎画面每帧由 Vulkan/MoltenVK 在交换链上呈现（30fps 节流；含帧回读与上传播放，有轻微帧率开销）。主画面渲染仍为 OpenGL。修改后重启游戏生效'),
+			'rendererVulkanMirror',
+			'bool');
+		addOption(option);
+		#end
 		var option:Option = new Option('低画质', //Name
 			'开启后，禁用部分背景细节，缩短加载时间并提升性能', //Description
 			'lowQuality', //Save data variable name

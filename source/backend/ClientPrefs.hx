@@ -102,6 +102,10 @@ class SaveVariables {
 	// 语义与探测/自动回退见 backend/RendererBackend.hx —— 选 vulkan 只会初始化
 	// Vulkan 子系统（隐藏窗口驻留句柄），主画面渲染暂仍为 OpenGL。
 	@:keep public var rendererBackend:String = 'opengl';
+	// Vulkan 画面镜像（桌面端，重启生效，默认关）：rendererBackend='vulkan' 且子系统就绪时，
+	// 弹出第二个窗口，引擎画面每帧（30fps 节流）经 MoltenVK 在 Vulkan 交换链上呈现。
+	// 见 backend/RendererBackend.hx 的镜像段。
+	@:keep public var rendererVulkanMirror:Bool = false;
 	// 性能模式（Seiun 移植）：音符走「无着色器 + ColorTransform 上色 + 直连 quad 合批」快速路径，
 	// 消除每 item 的 shader 绑定/缓冲重灌开销；部分音符渲染细节（如单色平涂代替三色渐变）略有差异。
 	@:keep public var perfMode:Bool = false;
