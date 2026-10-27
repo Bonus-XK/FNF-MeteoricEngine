@@ -873,6 +873,11 @@ source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类�
 source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- 会触发 __newindex 存到 __constructor，不会覆盖包装器。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- 包装器不存进类表，用户写 function Enemy:new(...) 时\\n	1	生成进用户 Lua 类的注释文本
+source/psychlua/ObjectBridge.hx	[ObjectBridge] Lua 胶水加载失败($status): 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] newObj: 构造 $className 失败: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] newObj: 类不存在: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] objCall: ${objTypeOf(obj)}.$keyStr 不是方法	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/ScriptGroup.hx	$func 出错 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	$func 抛出异常 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	(未知)	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）

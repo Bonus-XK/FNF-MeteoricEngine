@@ -3343,6 +3343,7 @@ class PlayState extends MusicBeatState
 		}
 		luaArray = [];
 		FunkinLua.customFunctions.clear();
+		psychlua.ObjectBridge.clearRegistry(); // Lua 对象桥句柄注册表随脚本一起释放
 		#end
 
 		#if HSCRIPT_ALLOWED

@@ -105,7 +105,6 @@ class FunkinLua {
 		// 全局变量初始化（阶段 A 拆分：psychlua/functions/ScriptGlobals.hx）
 		ScriptGlobals.implement(this);
 
-
 		// 由 HScript.hx 等注入的自定义回调统一注册
 		for (name => func in customFunctions)
 		{
@@ -133,6 +132,7 @@ class FunkinLua {
 		DialogueCommands.implement(this);    // 对话 / 视频
 		SoundCommands.implement(this);       // 声音
 		MiscCommands.implement(this);        // 颜色工具 / 输入探测 / 定时器 / 调试 / 本脚本控制
+		ObjectBridge.implement(this);        // Lua 对象桥：getObj/newObj/objCall —— Haxe 对象一等引用
 
 		// ==== 与拆分前同序的既有模块 ====
 		ReflectionFunctions.implement(this);

@@ -2,6 +2,35 @@
 
 > 版本：1.2.0
 
+## 未发布
+
+- **【新功能】Lua 对象桥（Object Bridge）**：Lua 脚本获得 Haxe 对象的一等引用，
+  能力接近改源码。**纯增量**，不改任何既有 Lua 函数，旧 mod 零影响。
+  - 背景：`Convert.toLua` 无法把 Haxe 类实例传进 Lua（一律变 nil），传统 Lua 只能靠
+    字符串路径间接操作（`setProperty('boyfriend.x', 100)`），无引用、无链式调用。
+  - 新增 13 个 Lua 全局函数：`getObj`（按路径取句柄，支持 `game.notes` / 完整类路径）、
+    `newObj`（`Type.createInstance` 构造任意类）、`objGet` / `objSet` / `objCall`、
+    `objEq` / `isObj` / `objType` / `objKeys` / `objLen` / `releaseObj` / `objCount`、
+    `runHaxeCodeObj`（HScript 顶层表达式求值，返回对象包成句柄而非压成 nil）。
+  - 用法：`local bf = getObj('boyfriend')` 后 `bf.x = bf.x + 10`、`bf:playAnim('hey')`；
+    `getObj('flixel.FlxG')` 直接读写任意类静态成员；数组 0 基索引保持引用
+    （`getObj('game.notes').members[0]:kill()`）。
+  - 实现：`source/psychlua/ObjectBridge.hx`（句柄注册表 + `LuaL.dostring` 注入的
+    metatable 胶水；元方法全部走既有 `Lua_helper` 回调通道，**不碰裸指针 API**，
+    栈平衡纪律与 `Convert.hx` 同源）；注册点 `FunkinLua.hx`，清理点
+    `PlayState.destroy()`（`clearRegistry()`）。10 个 `__hx_*` 内部回调名已冻结进
+    契约基线（lua_unique 227 → 238）。文档：`docs/LUA-OBJECT-BRIDGE.md`。
+  - 限制：数组 0 基且不支持 `pairs()`/`#`（用 `objLen`/`objKeys`）；Lua 函数不能传给
+    期望 Haxe 函数的参数；句柄在切状态后失效（`PlayState.destroy` 清空注册表）；
+    方法调用会执行任意 Haxe 代码，勿在 onUpdate 里调用会触发脚本回调的方法
+    （与既有 `callMethodFromClass` 同一风险面）。
+  - **真机验证**：debug 构建 + `METEORIC_TEST_SONG` 全自动冒烟 21 步全过（句柄读写、
+    方法调用、类静态、构造、句柄传参、链式、HScript 互操作、音符组 0 基索引），整曲无崩溃。
+- **【修复】`ScriptGlobals` 在 `FlxG.sound.music` 为 null 时 SEGV**：
+  `METEORIC_TEST_SONG` 测试路径从标题直接跳曲，标题音乐未启动，任何带 `script.lua`
+  的曲目在测试路径必崩（`songLength` 全局初始化解引用空音乐）。null 时给 0；
+  正常游玩路径音乐恒非空，零行为变化。该 bug 与对象桥无关（二分定位时发现）。
+
 ## 1.2.0 主要更新（自 1.1.3 以来）
 
 - **【重写】小图标跳动：两个 bool 合并为单枚举 + 5 种样式 + 「关闭」档**
