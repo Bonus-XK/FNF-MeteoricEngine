@@ -184,7 +184,8 @@ class Song
 			disableNoteRGB: song.disableNoteRGB,
 			arrowSkin: song.arrowSkin,
 			splashSkin: song.splashSkin,
-			format: song.format
+			format: song.format,
+			keys: song.keys // Extra Keys：深拷贝必须带上键数，否则缓存/重开路径丢 keys → 退回 4K 且解码错乱
 		};
 
 		if (song.notes != null)

@@ -727,6 +727,9 @@ class Note extends FlxSprite
 				newRGB.g = arr[1];
 				newRGB.b = arr[2];
 			}
+			#if meteoric_debug
+			trace('[XK] rgbPalette lane=' + noteData + ' r=' + Std.string(newRGB.r) + ' g=' + Std.string(newRGB.g) + ' b=' + Std.string(newRGB.b));
+			#end
 		}
 		return globalRgbShaders[noteData];
 	}
