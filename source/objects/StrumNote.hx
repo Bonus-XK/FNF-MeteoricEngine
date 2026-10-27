@@ -100,15 +100,18 @@ class StrumNote extends FlxSprite
 						var fhPx:Int = Std.int(height);
 						var tintedPx:BitmapData = pb.clone();
 						var arrPx:Array<Array<FlxColor>> = ClientPrefs.data.arrowRGBPixel;
+						// Extra Keys：lane ≥ 4 统一用本 lane 调色板（帧列仍是循环复用的 0-3 列）
+						var lanePalPx:Array<FlxColor> = ExtraKeys.laneColors(noteData, true);
 						for (fi in 4...20) // 跳过第 0 行(static 帧 0-3)
 						{
 							var col:Int = fi % 4;
 							var row:Int = Std.int(fi / 4);
 							if (arrPx == null || arrPx.length <= col) continue;
+							var pal:Array<FlxColor> = (noteData >= 4) ? lanePalPx : arrPx[col];
 							var rect:Rectangle = new Rectangle(col * fwPx, row * fhPx, fwPx, fhPx);
 							var fb:BitmapData = new BitmapData(fwPx, fhPx, true, 0x00000000);
 							fb.copyPixels(pb, rect, new Point(0, 0));
-							objects.Note.applyRGBToBitmap(fb, arrPx[col][0], arrPx[col][1], arrPx[col][2]);
+							objects.Note.applyRGBToBitmap(fb, pal[0], pal[1], pal[2]);
 							tintedPx.copyPixels(fb, fb.rect, new Point(col * fwPx, row * fhPx));
 						}
 						var gPx:FlxGraphic = FlxGraphic.fromBitmapData(tintedPx, false, null, false);
@@ -180,29 +183,33 @@ class StrumNote extends FlxSprite
 							src = objects.Note.getBakeBitmapData('images/' + texture);
 						if (src != null && src.readable)
 						{
-							var tinted:BitmapData = src.clone();
-							var arr:Array<Array<FlxColor>> = (PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB);
-							for (fr in frames.frames)
-							{
-								var nm:String = fr.name;
-								if (nm == null) continue;
-								var ln:String = nm.toLowerCase();
-								if (ln.startsWith('green') || ln.startsWith('blue') || ln.startsWith('purple') || ln.startsWith('red')) continue; // 彩色动画帧不动
-								if (ln.startsWith('arrow')) continue; // 未按下(静态)恢复素材原色渲染;染色仅作用于 press/confirm 帧
-								var col:Int = -1;
-								if (ln.indexOf('left') >= 0) col = 0;
-								else if (ln.indexOf('down') >= 0) col = 1;
-								else if (ln.indexOf('up') >= 0) col = 2;
-								else if (ln.indexOf('right') >= 0) col = 3;
-								if (col < 0 || arr == null || arr.length <= col) continue;
-								// FlxFrame.frame 是 UV 矩形（x/y + right/bottom 编码于 width/height）
-								var frc:flixel.math.FlxRect = fr.frame;
-								var rect:Rectangle = new Rectangle(frc.x, frc.y, frc.width, frc.height);
-								var frBmp:BitmapData = new BitmapData(Std.int(rect.width), Std.int(rect.height), true, 0x00000000);
-								frBmp.copyPixels(src, rect, new Point(0, 0));
-								objects.Note.applyRGBToBitmap(frBmp, arr[col][0], arr[col][1], arr[col][2]);
-								tinted.copyPixels(frBmp, frBmp.rect, new Point(rect.x, rect.y));
-							}
+						var tinted:BitmapData = src.clone();
+						var arr:Array<Array<FlxColor>> = (PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB);
+						// Extra Keys：lane ≥ 4 的帧全是循环复用的 0-3 方向帧，按帧名取列色会串到
+						// lane 0-3 的调色板 —— 统一改用本 lane 自己的调色板
+						var lanePal:Array<FlxColor> = ExtraKeys.laneColors(noteData, PlayState.isPixelStage);
+						for (fr in frames.frames)
+						{
+							var nm:String = fr.name;
+							if (nm == null) continue;
+							var ln:String = nm.toLowerCase();
+							if (ln.startsWith('green') || ln.startsWith('blue') || ln.startsWith('purple') || ln.startsWith('red')) continue; // 彩色动画帧不动
+							if (ln.startsWith('arrow')) continue; // 未按下(静态)恢复素材原色渲染;染色仅作用于 press/confirm 帧
+							var col:Int = -1;
+							if (ln.indexOf('left') >= 0) col = 0;
+							else if (ln.indexOf('down') >= 0) col = 1;
+							else if (ln.indexOf('up') >= 0) col = 2;
+							else if (ln.indexOf('right') >= 0) col = 3;
+							if (col < 0 || arr == null || arr.length <= col) continue;
+							// FlxFrame.frame 是 UV 矩形（x/y + right/bottom 编码于 width/height）
+							var frc:flixel.math.FlxRect = fr.frame;
+							var rect:Rectangle = new Rectangle(frc.x, frc.y, frc.width, frc.height);
+							var frBmp:BitmapData = new BitmapData(Std.int(rect.width), Std.int(rect.height), true, 0x00000000);
+							frBmp.copyPixels(src, rect, new Point(0, 0));
+							var pal:Array<FlxColor> = (noteData >= 4) ? lanePal : arr[col];
+							objects.Note.applyRGBToBitmap(frBmp, pal[0], pal[1], pal[2]);
+							tinted.copyPixels(frBmp, frBmp.rect, new Point(rect.x, rect.y));
+						}
 							var g:FlxGraphic = FlxGraphic.fromBitmapData(tinted, false, null, false);
 							g.persist = true;
 							var xmlData:String = backend.Paths.getTextFromFile('images/' + texture + '.xml');

@@ -4,7 +4,11 @@ import flixel.FlxSprite;
 import flixel.group.FlxSpriteGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.graphics.frames.FlxAtlasFrames;
+import flixel.graphics.frames.FlxFramesCollection;
 import backend.Paths;
+import openfl.display.BitmapData;
+import openfl.geom.Rectangle;
+import openfl.geom.Point;
 
 /**
  * NoteHoldCover 原生移植（QT Rewired 模组 scripts/NoteHoldCover.lua 的引擎内实现）。
@@ -31,6 +35,36 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 
 	static var colors:Array<String> = ['Purple', 'Blue', 'Green', 'Red'];
 
+	/** Extra Keys：把整张图集按 lane 调色板 CPU 染色（覆盖层无着色器，与 StrumNote 移动端同管线） */
+	static function tintAtlas(atlas:FlxAtlasFrames, loadPath:String, lane:Int):FlxAtlasFrames
+	{
+		try
+		{
+			if (atlas == null || atlas.parent == null || atlas.parent.bitmap == null || !atlas.parent.bitmap.readable)
+				return atlas;
+			var src:BitmapData = atlas.parent.bitmap;
+			var tinted:BitmapData = src.clone();
+			var pal:Array<FlxColor> = ExtraKeys.laneColors(lane, false);
+			for (fr in atlas.frames)
+			{
+				if (fr == null || fr.frame == null) continue;
+				var frc = fr.frame;
+				var rect:Rectangle = new Rectangle(frc.x, frc.y, frc.width, frc.height);
+				var frBmp:BitmapData = new BitmapData(Std.int(rect.width), Std.int(rect.height), true, 0x00000000);
+				frBmp.copyPixels(src, rect, new Point(0, 0));
+				objects.Note.applyRGBToBitmap(frBmp, pal[0], pal[1], pal[2]);
+				tinted.copyPixels(frBmp, frBmp.rect, new Point(rect.x, rect.y));
+			}
+			var g = flixel.graphics.FlxGraphic.fromBitmapData(tinted, false, null, false);
+			g.persist = true;
+			var xmlData:String = Paths.getTextFromFile('images/' + loadPath + '.xml');
+			if (xmlData != null && xmlData.length > 0)
+				return FlxAtlasFrames.fromSparrow(g, xmlData);
+		}
+		catch (e:Dynamic) {}
+		return atlas;
+	}
+
 	var holdSplashes:Array<FlxSprite> = [];
 	var durations:Array<Int> = [];
 	var hideCountdowns:Array<Float> = [];
@@ -43,11 +77,16 @@ class NoteHoldCoverHandler extends FlxSpriteGroup
 		var total:Int = ExtraKeys.songKeys * 2;
 		for (i in 0...total)
 		{
-			var color:String = colors[i % colors.length];
+			var lane:Int = i % ExtraKeys.songKeys;
+			var color:String = colors[lane % colors.length];
 			var spr:FlxSprite = new FlxSprite();
 			var atlas:FlxAtlasFrames = Paths.getSparrowAtlas('noteHolding/holdCover' + color);
 			if (atlas != null)
 			{
+				// Extra Keys：lane ≥ 4 循环复用 4 色覆盖层贴图 —— 覆盖层没有 RGB 着色器，
+				// 必须 CPU 染成本 lane 调色板，否则长条覆盖与箭头体/溅射不同色
+				if (lane >= colors.length)
+					atlas = tintAtlas(atlas, 'noteHolding/holdCover' + color, lane);
 				spr.frames = atlas;
 				spr.animation.addByPrefix('holdStart', 'holdCoverStart' + color, 24, false);
 				spr.animation.addByPrefix('holding', 'holdCover' + color, 24, true);

@@ -623,8 +623,13 @@ class Note extends FlxSprite
 			if (ClientPrefs.data.perfMode)
 			{
 				rgbShader.enabled = false;
-				var laneColors:Array<FlxColor> = ExtraKeys.laneColors(noteData, PlayState.isPixelStage);
-				color = (laneColors != null && laneColors.length > 0) ? laneColors[0] : 0xFFFFFFFF;
+				// Extra Keys：lane ≥ 4 且已烘焙（烘焙色已含 lane 调色板）时不再叠加平涂色，
+				// 否则烘焙色 × 平涂色双重着色（与密集档 063 的既有处理同因）
+				if (bakedKind < 0)
+				{
+					var laneColors:Array<FlxColor> = ExtraKeys.laneColors(noteData, PlayState.isPixelStage);
+					color = (laneColors != null && laneColors.length > 0) ? laneColors[0] : 0xFFFFFFFF;
+				}
 			}
 
 			// Extra Keys：lane 间距走 laneGap（keys>4 自动压缩；keys<=4 = swagWidth 原值）
@@ -750,7 +755,16 @@ class Note extends FlxSprite
 		#if mobile
 		if (!ClientPrefs.data.psych063Mode) bakeNotes = true;
 		#end
-		if (bakeNotes && !inEditor && noteData > -1)
+		// Extra Keys：lane ≥ 4 没有原生第 5 色帧（贴图循环复用紫/蓝/绿/红）。
+		// RGB 着色器不生效的路径（063 兼容/关着色器/密集自动档/perfMode/disableNoteRGB）
+		// 下箭头体会退回紫/蓝原色，而溅射始终按 lane 调色板染色 —— 两边不同源。
+		// 此时强制走烘焙 CPU 上色（与移动端同管线），箭头体与溅射用同一调色板。
+		var shaderlessExtraLane:Bool = noteData >= colArray.length
+			&& (ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders || PlayState.densePerfMode
+				|| ClientPrefs.data.perfMode
+				|| (PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true));
+		var lazyBakeOnMiss:Bool = #if mobile true #else shaderlessExtraLane #end;
+		if ((bakeNotes || shaderlessExtraLane) && !inEditor && noteData > -1)
 		{
 			var useRGB:Bool = !PlayState.densePerfMode && !(PlayState.SONG != null && PlayState.SONG.disableNoteRGB == true);
 			var arr:Array<FlxColor> = ExtraKeys.laneColors(noteData, loadPath.startsWith('pixelUI/'));
@@ -760,17 +774,15 @@ class Note extends FlxSprite
 			bakedB = arr[2];
 			bakedKey = getBakedNoteKey(loadPath, noteData, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE, bakedR, bakedG, bakedB, useRGB);
 			var baked:FlxGraphic = bakedNoteGraphics.get(bakedKey);
-			#if mobile
-			if (baked == null)
+			if (baked == null && lazyBakeOnMiss)
 			{
-				// 移动端懒烘焙：首次遇到该外观时现算（每种外观只算一次，此后全部复用）
+				// 懒烘焙：首次遇到该外观时现算（每种外观只算一次，此后全部复用）
 				var pixelStage:Bool = PlayState.isPixelStage;
 				bakeNoteAppearance(loadPath, pixelStage, noteData, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE, bakedR, bakedG, bakedB, useRGB);
 				bakeNoteAppearance(loadPath, pixelStage, noteData, isSustainNote ? BAKE_NOTE : BAKE_HOLDEND, bakedR, bakedG, bakedB, useRGB);
 				bakeNoteAppearance(loadPath, pixelStage, noteData, BAKE_HOLD, bakedR, bakedG, bakedB, useRGB);
 				baked = bakedNoteGraphics.get(bakedKey);
 			}
-			#end
 			if (baked != null)
 			{
 				useBakedGraphic(baked, isSustainNote ? BAKE_HOLDEND : BAKE_NOTE);
