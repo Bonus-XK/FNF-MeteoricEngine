@@ -130,6 +130,8 @@
   "optionDesc.runtimePack": "把 ≤160px 的小贴图打包进运行时共享图集（减少纹理数量与绘制批次；实验性，若出现贴图错乱请关闭）",
   "option.backgroundScale": "背景图分辨率",
   "optionDesc.backgroundScale": "独立大背景图（舞台/菜单背景等）的缩放比例，0.5 = 50%（大幅省内存，背景略降清晰度）",
+  "option.wideScreen": "宽屏适配",
+  "optionDesc.wideScreen": "开启后画面铺满宽屏并显示更多内容：高度锁定 720，宽度按屏幕比例自适应（16:9 ~ 20:9），更宽/更窄的屏幕自动回退等比黑边。对新打开的界面生效",
   "option.framerateMode": "帧率上限",
   "clientprefs.saveSuspectHead": "[ClientPrefs] 存档不可信（已知字段加载 ",
   "clientprefs.saveSuspectTail": "），本次启动跳过迁移写盘",

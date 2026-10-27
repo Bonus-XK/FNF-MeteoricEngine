@@ -40,6 +40,9 @@ class SaveVariables {
 	@:keep public var antialiasing:Bool = true;
 	@:keep public var holdCover:Bool = true; // 长条按压覆盖（QT 模组 NoteHoldCover.lua 原生移植）
 	@:keep public var runtimePack:Bool = false; // 运行时贴图密排列（≤160px 小贴图打包进共享图集，减少纹理/绘制批次；实验性，默认关闭）
+	// 宽屏适配（backend/MeteoricScaleMode）：高度锁 720、宽度按窗口比例自适应 [1280,1600]。
+	// 默认关闭 = 保持 flixel 默认 RatioScaleMode（等比 + 黑边），零行为变化。
+	@:keep public var wideScreen:Bool = false;
 
 	// ===== Meteoric 脚本系统（编程层）=====
 	// 总开关 + 分项开关。总开关默认关闭 —— 关闭时引擎行为与本层落地前完全一致。

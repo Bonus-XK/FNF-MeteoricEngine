@@ -1,6 +1,6 @@
 package states;
 import backend.Lang;
-
+import flixel.system.scaleModes.MeteoricScaleMode;
 import backend.WeekData;
 import backend.Highscore;
 
@@ -54,6 +54,9 @@ class TitleState extends MusicBeatState
 	public static var volumeUpKeys:Array<FlxKey> = [FlxKey.NUMPADPLUS, FlxKey.PLUS];
 
 	public static var initialized:Bool = false;
+
+	// 【宽屏适配】本次运行是否已因缩放模式应用导致逻辑宽度变化而重建过标题界面（防循环）
+	public static var relaunchedForWidescreen:Bool = false;
 
 	var blackScreen:FlxSprite;
 	var credGroup:FlxGroup;
@@ -112,6 +115,16 @@ class TitleState extends MusicBeatState
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 
 		ClientPrefs.loadPrefs();
+
+		// 【宽屏适配】存档加载后应用缩放模式（backend/MeteoricScaleMode）。
+		// 若逻辑宽度因此变化（如 20:9 手机 1280→1600），已按旧宽度排版的标题界面
+		// 整体重建一次（静态标记防循环：重建后 apply() 宽度不再变化，走正常流程）。
+		if (MeteoricScaleMode.apply() && !relaunchedForWidescreen)
+		{
+			relaunchedForWidescreen = true;
+			FlxG.resetState();
+			return;
+		}
 
 		#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
 		// Meteoric 脚本系统：启动编程层（必须在 loadPrefs 之后 —— 开关存在存档里）。

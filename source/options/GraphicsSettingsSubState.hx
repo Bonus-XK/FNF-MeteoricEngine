@@ -1,5 +1,6 @@
 package options;
 import backend.Lang;
+import flixel.system.scaleModes.MeteoricScaleMode;
 
 import objects.Character;
 
@@ -76,6 +77,15 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.displayFormat = '%v%';
 		option.scrollSpeed = 0.05;
 		option.onChange = null;
+
+		// 【宽屏适配】高度锁 720、宽度按窗口比例自适应（backend/MeteoricScaleMode）。
+		// 切换后立即重测量；已打开界面的布局在重新进入该界面时按新宽度生成。
+		var option:Option = new Option('宽屏适配', //Name
+			'开启后画面铺满宽屏并显示更多内容：高度锁定 720，宽度按屏幕比例自适应（16:9 ~ 20:9），更宽/更窄的屏幕自动回退等比黑边。对新打开的界面生效', //Description
+			'wideScreen',
+			'bool');
+		addOption(option);
+		option.onChange = function() MeteoricScaleMode.apply();
 
 		// JS 优化移植续：帧率上限设置项（原 30~1000 的「帧率」项已被移除，现以档位形式回归）
 		//

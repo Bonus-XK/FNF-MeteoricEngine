@@ -635,7 +635,9 @@ source/options/GraphicsSettingsSubState.hx	压扁	1	Option 兜底原文：Option
 source/options/GraphicsSettingsSubState.hx	命中长条时在判定线上显示按压覆盖动画（QT 模组 NoteHoldCover 原生移植，可关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	图像设置	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	坠落	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	宽屏适配	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	帧率上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	开启后画面铺满宽屏并显示更多内容：高度锁定 720，宽度按屏幕比例自适应（16:9 ~ 20:9），更宽/更窄的屏幕自动回退等比黑边。对新打开的界面生效	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，使用 GPU 缓存纹理，可减少内存占用（显卡性能较差时建议关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，在加载曲目时预先渲染所有音符贴图，大幅优化高密度音符堆叠场景（会牺牲加载速度）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，禁用部分背景细节，缩短加载时间并提升性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -833,7 +835,9 @@ source/options/ProgrammingSettingsSubState.hx	开启 Meteoric 脚本系统：允
 source/options/ProgrammingSettingsSubState.hx	开启后，Lua 脚本的停止哨兵按 Psych Engine 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	开启后：F5 = 重建当前界面的状态脚本，Shift+F5 = 重建全局脚本。\\n脚本自己创建的对象要在 destroy() 里清理，否则会残留。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	扫描已启用模组的 source/ 目录，把其中的 class 注册给 HScript：脚本可以 import 后 new，或调用实例 / 静态成员。\\n只支持普通 class；import 必须写在脚本顶部。\\n默认关闭；关闭时脚本行为与旧版完全一致。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	按资源名加载同名脚本：scripting/stages/<舞台名>.hx、scripting/characters/<角色名>.hx、scripting/notes/<音符类型>.hx、scripting/events/<事件名>.hx。\\n每个资源名随对局只加载一次；脚本可获得 stage / character / noteType / eventName 变量。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/ProgrammingSettingsSubState.hx	模组类库（source/）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	状态脚本（覆盖界面）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	状态重定向	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/ProgrammingSettingsSubState.hx	编程	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -861,11 +865,9 @@ source/psychlua/HScript.hx	 调用失败 @ 	1	诊断日志（trace / Sys.println
 source/psychlua/HScript.hx	[HScript] importScript 找不到脚本库：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/HScript.hx	[HScript] importScript 挂组失败：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/HScript.hx	[HScript] 脚本库加载失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/psychlua/HScript.hx	[HScript] 脚本库执行失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/psychlua/HScript.hx	[HScript] 脚本库解析失败 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/HScript.hx	（来源：	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/HScript.hx	）	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
-source/psychlua/HScript.hx	：	4	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/psychlua/HScript.hx	：	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/psychlua/LuaClass.hx	    -- Enemy.isInstanceOf(instance) 与 instance:isInstanceOf(Enemy) 均可用\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- Parent.new(self, ...) 即可初始化父类部分），否则创建新实例。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例时视为调用构造函数（子类里写\\n	1	生成进用户 Lua 类的注释文本
@@ -876,10 +878,7 @@ source/scripting/ScriptGroup.hx	$func 抛出异常 @ 	2	Meteoric 脚本层的诊
 source/scripting/ScriptGroup.hx	(未知)	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	(未知错误)	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	加载失败 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
-source/scripting/ScriptGroup.hx	执行失败 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
-source/scripting/ScriptGroup.hx	脚本内容为空 @ 	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
-source/scripting/ScriptGroup.hx	解析失败 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
-source/scripting/ScriptGroup.hx	：	9	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
+source/scripting/ScriptGroup.hx	：	5	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/ScriptGroup.hx	：\\n	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptRepl.hx	  ·  	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/scripting/ScriptRepl.hx	…	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
@@ -974,5 +973,3 @@ source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻�
 source/substates/ResultsSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	· 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/options/ProgrammingSettingsSubState.hx	扫描已启用模组的 source/ 目录，把其中的 class 注册给 HScript：脚本可以 import 后 new，或调用实例 / 静态成员。\\n只支持普通 class；import 必须写在脚本顶部。\\n默认关闭；关闭时脚本行为与旧版完全一致。\\n需要先打开「脚本系统（总开关）」。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/ProgrammingSettingsSubState.hx	模组类库（source/）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue

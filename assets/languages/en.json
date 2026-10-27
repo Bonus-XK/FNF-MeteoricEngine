@@ -130,6 +130,8 @@
   "optionDesc.runtimePack": "Packs textures of 160px or smaller into a shared runtime atlas (fewer textures and draw batches; experimental, turn off if textures look wrong).",
   "option.backgroundScale": "Background Resolution",
   "optionDesc.backgroundScale": "Scale factor for large standalone backgrounds (stage/menu backgrounds). 0.5 = 50% (saves a lot of memory, slightly softer background).",
+  "option.wideScreen": "Widescreen Fit",
+  "optionDesc.wideScreen": "Fills widescreen displays and shows more content: height locked at 720, width adapts to the screen aspect (16:9 to 20:9); wider or narrower screens fall back to uniform scaling with black bars. Applies to newly opened screens",
   "option.framerateMode": "Framerate Cap",
   "clientprefs.saveSuspectHead": "[ClientPrefs] Save data untrusted (loaded ",
   "clientprefs.saveSuspectTail": " known fields), skipping migration writes this boot",

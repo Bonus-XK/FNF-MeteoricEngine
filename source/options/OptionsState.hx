@@ -1,5 +1,6 @@
 package options;
 import backend.Lang;
+import flixel.system.scaleModes.MeteoricScaleMode;
 import backend.WheelScroll;
 
 import objects.BackButton;
@@ -802,6 +803,8 @@ class OptionsState extends MusicBeatState
 		}
 		BaseOptionsMenu.promptHost = null;
 		ClientPrefs.loadPrefs();
+		// 恢复默认值后重应用缩放模式（宽屏适配开关可能被重置；变化在新打开的界面生效）
+		MeteoricScaleMode.apply();
 		super.destroy();
 	}
 }
