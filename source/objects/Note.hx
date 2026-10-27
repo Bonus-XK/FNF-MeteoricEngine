@@ -507,12 +507,16 @@ class Note extends FlxSprite
 		// 实测左 strum 颜色随池化音符的轨道乱跳（调色板串色）。
 		// 禁用态本就不参与 RGB 渲染（063 预染色贴图 / 烘焙 / 关着色器 / disableNoteRGB），
 		// 这里的写入纯属污染 → 直接跳过。
+		//
+		// Extra Keys：旧条件 `noteData <= arr.length` 是错的——arr.length 是**每轨颜色数(3)**，
+		// lane 0-3 碰巧通过（3<=3），lane≥4 恒假 → 复生音符的调色板停在模板 lane 0（紫色），
+		// 即"多出轨道箭头显示 lane 0 颜色"的根因。改为检查颜色表完整性。
 		if (rgbShader == null || !rgbShader.enabled) return;
 
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
 
-		if (noteData > -1 && noteData <= arr.length)
+		if (noteData > -1 && arr != null && arr.length >= 3)
 		{
 			rgbShader.r = arr[0];
 			rgbShader.g = arr[1];
