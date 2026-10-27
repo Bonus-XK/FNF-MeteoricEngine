@@ -631,6 +631,12 @@ class PlayState extends MusicBeatState
 		// ===== Extra Keys：本曲键数真源（SONG.keys，缺省 4 = 完全旧行为）=====
 		ExtraKeys.setSongKeys(SONG != null ? SONG.keys : 4);
 		keysArray = ExtraKeys.actionNames();
+		#if meteoric_debug
+		trace('[XK2] create song=' + (SONG != null ? SONG.song : 'null')
+			+ ' rawKeys=' + (SONG != null ? Std.string(Reflect.field(SONG, 'keys')) : 'null')
+			+ ' songKeys=' + ExtraKeys.songKeys + ' gap=' + ExtraKeys.laneGap
+			+ ' width=' + FlxG.width + ' actions=' + keysArray.length);
+		#end
 		// per-lane 运行时状态按键数定长（字段初始化器是 4K 默认值）
 		lastSplashLane = ExtraKeys.farPastLanes();
 		botBatchAnimDone = ExtraKeys.falseLanes();

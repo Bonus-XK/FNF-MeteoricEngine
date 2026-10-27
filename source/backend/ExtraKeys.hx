@@ -47,13 +47,21 @@ class ExtraKeys
 				n = (parsed != null) ? parsed : DEFAULT_KEYS;
 			}
 		}
-		if (n < 1) n = 1;
+		// ⚠ 非法值（0 / 负数）回退默认 4 —— 不能钳到 1：
+		//   SwagSong.keys 是 @:optional，旧谱面（无 keys 字段）读到的是 null，
+		//   null 传给 Int 形参在 hxcpp 下会变成 0（Null<Int> 的装箱陷阱），
+		//   钳到 1 会让所有内置 4K 谱面变成「1 键」（实测事故）。
+		if (n < 1) n = DEFAULT_KEYS;
 		if (n > MAX_KEYS) n = MAX_KEYS;
 		return n;
 	}
 
-	/** 进曲 / 进编辑器时调用：写入 songKeys 并重算布局。 */
-	public static function setSongKeys(k:Int):Void
+	/**
+	 * 进曲 / 进编辑器时调用：写入 songKeys 并重算布局。
+	 * @param k 必须是 Dynamic/可空：谱面没有 keys 字段时传进来的是 null，
+	 *          用 Int 形参会被静默装箱成 0 → 全部内置曲变 1 键。
+	 */
+	public static function setSongKeys(k:Dynamic):Void
 	{
 		songKeys = resolveKeys(k);
 		computeLayout();
