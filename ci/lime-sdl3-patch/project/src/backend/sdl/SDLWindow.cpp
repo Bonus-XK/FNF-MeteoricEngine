@@ -679,13 +679,23 @@ namespace lime {
 
 	double SDLWindow::GetScale () {
 
-		// 【Meteoric 修复】Windows 高清：SDL3 在 Windows 上 window 尺寸即物理像素，
-		// 旧实现 SDL_GetWindowSizeInPixels/SDL_GetWindowSize 恒为 1.0 → OpenFL 永远按
-		// 逻辑尺寸渲染（高分屏模糊/偏小）。SDL_GetWindowDisplayScale 是 SDL3 官方「内容缩放」：
-		//   Windows = 显示器 DPI/96（100%→1.0，125%→1.25，150%→1.5，200%→2.0）；
-		//   macOS Retina = 2.0（开 HIGH_PIXEL_DENSITY）/ 1.0（关）—— 与旧行为完全一致。
+		// 【Meteoric 修复·Android 显示错乱（2026-10-27）】
+		// SDL3 的 Android 视频驱动中 window 尺寸即物理像素（Android_CreateWindow 直接
+		// window->w/h = Android_SurfaceWidth/Height，Android 无逻辑/物理坐标之分），
+		// 而 SDL_GetWindowDisplayScale 在 Android 返回的是设备显示密度
+		// （SDLSurface.surfaceChanged: densityDpi/160，约 2.0~3.5；Android 驱动未实现
+		// GetWindowContentScale 钩子 → display_scale = pixel_density(=1) × content_scale(=密度)）。
+		// OpenFL 全链按「物理尺寸 = window.width × window.scale」推导渲染尺寸/像素比/
+		// 触摸坐标（Stage.hx: window.width*scale、__pixelRatio=window.scale、
+		// touch.x*width*scale），width(=像素)×scale(=密度) → 双重放大：
+		// 画面被放大数倍只露左上角、触摸/点击全部错位 —— CI Android 产物显示错乱根因。
+		// （本地 Android 构建走原版 SDL2 lime，scale 恒 1.0，故本地无此问题。）
+		// Android 恒返回 1.0 = 恢复原版 lime SDL2 行为；桌面端（Windows/macOS）不受影响。
+		#ifdef ANDROID
+		return 1.0;
+		#else
 		return SDLWindow::MeteoricScale (sdlWindow);
-
+		#endif
 	}
 
 
