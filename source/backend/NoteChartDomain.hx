@@ -758,6 +758,12 @@ class NoteChartDomain
 		for (note in ps.botHitQueue)
 		{
 			if (note == null || !note.alive || note.blockHit) continue;
+			#if meteoric_debug
+			if (!note.isSustainNote && Math.abs(note.strumTime - Conductor.songPosition) > 150)
+				trace('[XK] farHit seq=' + note.chartSeq + ' lane=' + (note.noteData & 255)
+					+ ' must=' + note.mustPress + ' strum=' + Std.int(note.strumTime)
+					+ ' pos=' + Std.int(Conductor.songPosition) + ' off=' + Std.int(note.strumTime - Conductor.songPosition));
+			#end
 			if (note.chartSeq >= 0)
 			{
 				if (ps.botBatchSeenSeq.exists(note.chartSeq)) continue;

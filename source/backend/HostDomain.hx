@@ -1343,6 +1343,7 @@ class HostDomain
 	// 刻意不用 compact()：压缩或移动堆内对象，与 lime 原生侧持有的指针交互存在不确定性。
 	static var _gcBreathLast:Float = 0;
 
+	static var _xkLastPos:Float = -1;
 	public static function update(ps:PlayState, elapsed:Float)
 	{
 		#if METEORIC_PROFILE
@@ -1667,6 +1668,16 @@ class HostDomain
 		backend.MeteoricProfile.phaseEnd('death');
 
 		backend.MeteoricProfile.phaseBegin('spawn');
+		#if meteoric_debug
+		if (ps.startedCountdown && !ps.rewinding && !ps.endingSong && Conductor.songPosition > 0)
+		{
+			var xkD:Float = Conductor.songPosition - _xkLastPos;
+			if (_xkLastPos >= 0 && (xkD > 300 || xkD < -300))
+				trace('[XK] timeJump ' + Std.int(xkD) + 'ms -> pos=' + Std.int(Conductor.songPosition)
+					+ ' notes=' + ps.notes.members.length + ' spawnId=' + ps.currentSpawnId + '/' + (ps.unspawnNotes != null ? ps.unspawnNotes.length : -1));
+			_xkLastPos = Conductor.songPosition;
+		}
+		#end
 		ps.noteSpawn();
 		backend.MeteoricProfile.phaseEnd('spawn');
 

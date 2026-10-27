@@ -242,6 +242,9 @@ class TitleState extends MusicBeatState
 			var tFolder:String = (parts.length > 2 && parts[2].length > 0) ? parts[2] : parts[0];
 			var tDiff:Null<Int> = (parts.length > 3) ? Std.parseInt(parts[3]) : 2;
 			if (tDiff == null) tDiff = 2;
+			// METEORIC_TEST_SONG 追加段 "bot"：强制开启 botplay（复现自动游玩问题用）
+			if (parts.length > 4 && parts[4] == 'bot')
+				ClientPrefs.data.gameplaySettings.set('botplay', true);
 			Difficulty.resetList();
 			PlayState.isStoryMode = false;
 			PlayState.storyDifficulty = tDiff;
