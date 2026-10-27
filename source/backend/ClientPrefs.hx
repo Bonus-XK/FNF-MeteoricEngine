@@ -40,7 +40,8 @@ class SaveVariables {
 	@:keep public var antialiasing:Bool = true;
 	@:keep public var holdCover:Bool = true; // 长条按压覆盖（QT 模组 NoteHoldCover.lua 原生移植）
 	@:keep public var runtimePack:Bool = false; // 运行时贴图密排列（≤160px 小贴图打包进共享图集，减少纹理/绘制批次；实验性，默认关闭）
-	// 宽屏适配（backend/MeteoricScaleMode）：高度锁 720、宽度按窗口比例自适应 [1280,1600]。
+	// 宽屏适配（flixel/system/scaleModes/MeteoricScaleMode）：窗口比例自适应逻辑分辨率
+	// （宽窗高度锁 720 宽度扩展；窄窗宽度锁 1280 高度延伸；超上限回退等比黑边）。
 	// 默认关闭 = 保持 flixel 默认 RatioScaleMode（等比 + 黑边），零行为变化。
 	@:keep public var wideScreen:Bool = false;
 

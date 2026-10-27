@@ -4,15 +4,19 @@ import backend.ClientPrefs;
 import flixel.FlxG;
 
 /**
- * 【Meteoric 宽屏适配】高度锁定 720、宽度随窗口比例自适应的缩放模式。
+ * 【Meteoric 宽屏适配】按窗口比例自适应逻辑分辨率的缩放模式（宽窄两个方向都铺满）。
  *
- * 参考 Kathy Engine（Psych Mobile 分支）的 PlayStateScaleMode / MobileScaleMode 思路：
- *   - 高度恒为 720（游戏设计基准高度），不随窗口增减；
- *   - 宽度 = 720 × 窗口宽高比，夹取在 [MIN_WIDTH, MAX_WIDTH]（即 16:9 ~ 20:9）；
- *   - 窗口比例在区间内 → 精确铺满、无黑边、不变形，水平方向多显示游戏内容
- *     （HUD/轨道以 FlxG.width 为锚的布局自动展开，模组脚本读 FlxG.width 亦自动盖满）；
- *   - 窗口比 16:9 更窄（4:3 / 竖屏）→ 保持 1280 宽等比缩放，上下留黑边；
- *   - 窗口比 20:9 更宽（21:9 / 32:9 超宽屏）→ 保持 1600 宽等比缩放，左右留黑边。
+ * 参考 Kathy Engine（Psych Mobile 分支）的 PlayStateScaleMode / MobileScaleMode 思路，
+ * 并按 Meteoric 需求扩展到窄窗口：
+ *   - 窗口比 16:9 更宽（宽屏手机 / 超宽屏）：高度锁 720，宽度 = 720 × 窗口比例，
+ *     夹取 [1280, 1600]（即 16:9 ~ 20:9）→ 水平方向多显示内容；
+ *   - 窗口比 16:9 更窄（MacBook 内屏 / 竖屏）：宽度锁 1280，高度 = 1280 ÷ 窗口比例，
+ *     夹取 [720, 1440]（最高 2×720）→ 垂直方向多显示内容；
+ *   - 比例在上述区间内 → 精确铺满、无黑边、不变形；
+ *   - 超出夹取上限（比 20:9 更宽 / 比 1280:1440 更方的窗口）→ 回退等比缩放 + 居中黑边。
+ *
+ * 以 FlxG.width/height 为锚的 HUD/轨道/菜单布局自动展开；模组脚本读 FlxG.width/
+ * FlxG.height 的事件/遮罩自动盖满全屏。
  *
  * 由 ClientPrefs.data.wideScreen 控制（设置 → 图像 →「宽屏适配」，默认关闭）：
  * 默认关闭时引擎保持 flixel 默认 RatioScaleMode（等比 + 黑边）——零行为变化。
@@ -24,28 +28,47 @@ import flixel.FlxG;
  */
 class MeteoricScaleMode extends BaseScaleMode
 {
-	/** 逻辑宽度下限 = 16:9（游戏设计基准宽度；更窄的窗口不缩窄游戏内容） */
+	/** 逻辑宽度下限 = 16:9 基准宽（窄窗方向锁这个宽向下延伸高度） */
 	public static inline var MIN_WIDTH:Int = 1280;
 	/** 逻辑宽度上限 = 20:9（覆盖主流全面屏手机；更宽的显示器回退等比黑边） */
 	public static inline var MAX_WIDTH:Int = 1600;
-	/** 锁定的逻辑高度（游戏设计基准） */
-	public static inline var LOCKED_HEIGHT:Int = 720;
+	/** 逻辑高度基准 = 16:9 基准高（宽窗方向锁这个高向两侧扩展宽度） */
+	public static inline var BASE_HEIGHT:Int = 720;
+	/** 逻辑高度上限 = 2 × 720（窄窗方向；更方/竖屏的窗口回退等比黑边） */
+	public static inline var MAX_HEIGHT:Int = 1440;
 
 	override public function onMeasure(Width:Int, Height:Int):Void
 	{
 		if (Width <= 0) Width = MIN_WIDTH;
-		if (Height <= 0) Height = LOCKED_HEIGHT;
+		if (Height <= 0) Height = BASE_HEIGHT;
 
-		// 逻辑尺寸：高度锁死，宽度按窗口比例推算后夹取
-		var gameW:Float = LOCKED_HEIGHT * (Width / Height);
-		if (gameW < MIN_WIDTH) gameW = MIN_WIDTH;
-		else if (gameW > MAX_WIDTH) gameW = MAX_WIDTH;
+		var aspect:Float = Width / Height;
+		var baseRatio:Float = MIN_WIDTH / BASE_HEIGHT; // 16:9 分界
+
+		var gameW:Float;
+		var gameH:Float;
+		if (aspect >= baseRatio)
+		{
+			// 宽窗：高度锁 720，宽度按窗口比例扩展，上限 20:9
+			gameH = BASE_HEIGHT;
+			gameW = BASE_HEIGHT * aspect;
+			if (gameW < MIN_WIDTH) gameW = MIN_WIDTH;
+			else if (gameW > MAX_WIDTH) gameW = MAX_WIDTH;
+		}
+		else
+		{
+			// 窄窗：宽度锁 1280，高度按窗口比例向下延伸，上限 2×720
+			gameW = MIN_WIDTH;
+			gameH = MIN_WIDTH / aspect;
+			if (gameH < BASE_HEIGHT) gameH = BASE_HEIGHT;
+			else if (gameH > MAX_HEIGHT) gameH = MAX_HEIGHT;
+		}
 
 		// ⚠ 不要调 super.onMeasure()：flixel 的 BaseScaleMode.onMeasure 会先把
-		// FlxG.width/height 重置回 initialWidth/initialHeight（恒定值），动态宽度即刻失效。
-		// 这里按 Kathy PlayStateScaleMode 同款自行完成四步测量。
+		// FlxG.width/height 重置回 initialWidth/initialHeight（恒定值），动态尺寸即刻失效。
+		// 这里按 Kathy PlayStateScaleMode 同款思路自行完成四步测量。
 		FlxG.width = Math.round(gameW);
-		FlxG.height = LOCKED_HEIGHT;
+		FlxG.height = Math.round(gameH);
 
 		updateGameSize(Width, Height);
 		updateDeviceSize(Width, Height);
@@ -55,7 +78,7 @@ class MeteoricScaleMode extends BaseScaleMode
 
 	/** 按【动态后的】游戏比例等比适配窗口（Kathy PlayStateScaleMode 同款）：
 	 *  比例在夹取区间内时 gameRatio == windowRatio → gameSize == 窗口尺寸（精确铺满）；
-	 *  超出区间（宽度被夹取）→ 居中留黑边，画面始终不变形。 */
+	 *  超出区间（宽或高被夹取）→ 居中留黑边，画面始终不变形。 */
 	override function updateGameSize(Width:Int, Height:Int):Void
 	{
 		var gameRatio:Float = FlxG.width / FlxG.height;

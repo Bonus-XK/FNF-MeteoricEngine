@@ -78,10 +78,10 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.scrollSpeed = 0.05;
 		option.onChange = null;
 
-		// 【宽屏适配】高度锁 720、宽度按窗口比例自适应（backend/MeteoricScaleMode）。
-		// 切换后立即重测量；已打开界面的布局在重新进入该界面时按新宽度生成。
+		// 【宽屏适配】窗口比例自适应逻辑分辨率（flixel/system/scaleModes/MeteoricScaleMode）。
+		// 切换后立即重测量；已打开界面的布局在重新进入该界面时按新尺寸生成。
 		var option:Option = new Option('宽屏适配', //Name
-			'开启后画面铺满宽屏并显示更多内容：高度锁定 720，宽度按屏幕比例自适应（16:9 ~ 20:9），更宽/更窄的屏幕自动回退等比黑边。对新打开的界面生效', //Description
+			'开启后画面铺满窗口并多显示内容：比 16:9 宽的窗口高度锁 720、宽度自适应（上限 20:9）；比 16:9 窄的窗口宽度锁 1280、高度自适应（上限 2×720）；超限时回退等比黑边。对新打开的界面生效', //Description
 			'wideScreen',
 			'bool');
 		addOption(option);

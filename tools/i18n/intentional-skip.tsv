@@ -637,7 +637,7 @@ source/options/GraphicsSettingsSubState.hx	图像设置	1	Option 兜底原文：
 source/options/GraphicsSettingsSubState.hx	坠落	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	宽屏适配	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	帧率上限	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
-source/options/GraphicsSettingsSubState.hx	开启后画面铺满宽屏并显示更多内容：高度锁定 720，宽度按屏幕比例自适应（16:9 ~ 20:9），更宽/更窄的屏幕自动回退等比黑边。对新打开的界面生效	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/GraphicsSettingsSubState.hx	开启后画面铺满窗口并多显示内容：比 16:9 宽的窗口高度锁 720、宽度自适应（上限 20:9）；比 16:9 窄的窗口宽度锁 1280、高度自适应（上限 2×720）；超限时回退等比黑边。对新打开的界面生效	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，使用 GPU 缓存纹理，可减少内存占用（显卡性能较差时建议关闭）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，在加载曲目时预先渲染所有音符贴图，大幅优化高密度音符堆叠场景（会牺牲加载速度）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/GraphicsSettingsSubState.hx	开启后，禁用部分背景细节，缩短加载时间并提升性能	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
