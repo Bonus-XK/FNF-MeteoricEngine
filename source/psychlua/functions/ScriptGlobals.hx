@@ -36,7 +36,9 @@ class ScriptGlobals
 		funk.set('scrollSpeed', PlayState.SONG.speed);
 		funk.set('crochet', Conductor.crochet);
 		funk.set('stepCrochet', Conductor.stepCrochet);
-		funk.set('songLength', FlxG.sound.music.length);
+		// 【Meteoric 修复】METEORIC_TEST_SONG 测试路径从标题直接跳曲，标题音乐未启动
+		// → FlxG.sound.music 为 null，此处解引用直接 SEGV（hxcpp 空指针）。null 时给 0。
+		funk.set('songLength', FlxG.sound.music != null ? FlxG.sound.music.length : 0);
 		funk.set('songName', PlayState.SONG.song);
 		funk.set('songPath', Paths.formatToSongPath(PlayState.SONG.song));
 		funk.set('startedCountdown', false);
