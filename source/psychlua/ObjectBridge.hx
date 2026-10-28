@@ -35,8 +35,16 @@ import Type.ValueType;
  * - 返回给 Lua 的 Haxe 对象一律重新包装为句柄；原始类型 / Array / String 直接传值
  *   （Array 是快照：嵌套对象不会保持引用，见 docs/LUA-OBJECT-BRIDGE.md）。
  *
- * 生命周期：注册表是全局的（句柄可跨脚本共享），`PlayState.destroy()` 时
- * 调 `clearRegistry()` 整体释放；脚本也可用 `releaseObj(h)` 单独释放。
+ * 生命周期：注册表是全局的（句柄可跨脚本共享）。清理点有三处：
+ * `PlayState.destroy()` 调 `clearRegistry()`；界面脚本接入时 PlayState 侧不清理，
+ * 由最后一个 MenuScript 销毁（`releaseMenu()`）且不在 PlayState 时清空——
+ * 覆盖「纯菜单会话」与「暂停子状态挂 PlayState」两种情形。
+ *
+ * 双模式：resolverId = 0 为 PlayState 语义（LuaUtils 路径解析），>0 为注册表里
+ * 对应 MenuScript 的句柄 id（findObject / state 字段）。GLUE 按状态烘焙 resolverId；
+ * 所有 __hx_* 回调都是状态无关闭包（Lua_helper.callbacks 是跨状态全局表、按名分发，
+ * 捕获单个脚本上下文会被后注册的脚本覆盖）。菜单模式下（PlayState.instance == null）
+ * 属性/方法/写路径自动走不依赖 PlayState 的通道（walkVar / Reflect）。
  *
  * 重入警告：`objCall` / 方法调用会执行任意 Haxe 方法；若该方法内部触发
  * callOnScripts（如 startSong），与既有 `callMethod`/`callMethodFromClass` 有相同的
@@ -52,6 +60,8 @@ class ObjectBridge
 	static var nextId:Int = 0;
 	/** 对象 → id 的反向索引（同一对象重复包装时复用句柄；key 失败则退化为每次新 id）。 */
 	static var reverse:haxe.ds.ObjectMap<Dynamic, Int> = new haxe.ds.ObjectMap<Dynamic, Int>();
+	/** 已接入对象桥的界面脚本数（用于最后一个销毁时清空注册表）。 */
+	static var liveMenus:Int = 0;
 
 	/** 整体释放注册表（PlayState.destroy 调用）。 */
 	public static function clearRegistry():Void
@@ -62,6 +72,40 @@ class ObjectBridge
 	}
 
 	// ===== 核心工具 =====
+
+	/**
+	 * 桥内诊断输出：PlayState 里走 luaTrace（游戏内调试框），菜单里走 trace（终端）。
+	 * luaTrace 内部解引用 PlayState.instance，菜单（instance == null）下会 NPE。
+	 */
+	static function bridgeTrace(msg:String):Void
+	{
+		if (PlayState.instance != null)
+			FunkinLua.luaTrace(msg, false, false, FlxColor.RED);
+		else
+			trace(msg);
+	}
+
+	/**
+	 * 取子字段。菜单模式（PlayState.instance == null）下不碰 LuaUtils——
+	 * 其内部会解引用 PlayState.instance（variables 表检查），菜单里必 NPE。
+	 */
+	static function walkVar(obj:Dynamic, seg:String, allowMaps:Bool):Dynamic
+	{
+		if (PlayState.instance == null)
+		{
+			if (isMapObject(obj)) return Reflect.callMethod(obj, Reflect.field(obj, 'get'), [seg]);
+			if (Std.isOfType(obj, Array))
+			{
+				var i:Null<Int> = Std.parseInt(seg);
+				if (i == null) return null;
+				var arr:Array<Dynamic> = cast obj;
+				if (i < 0 || i >= arr.length) return null;
+				return arr[i];
+			}
+			return Reflect.getProperty(obj, seg);
+		}
+		return LuaUtils.getVarInArray(obj, seg, allowMaps);
+	}
 
 	/** 把 Haxe 对象包成句柄标记（匿名对象，经 Convert 复制进 Lua 后由胶水补挂 metatable）。 */
 	static function wrapNew(obj:Dynamic):Dynamic
@@ -159,7 +203,7 @@ class ObjectBridge
 
 		var keyStr:String = Std.string(key);
 		var val:Dynamic = null;
-		try val = LuaUtils.getVarInArray(obj, keyStr, true) catch (e:Dynamic) return null;
+		try val = walkVar(obj, keyStr, true) catch (e:Dynamic) return null;
 
 		if (val == null) return null;
 		if (Reflect.isFunction(val))
@@ -177,7 +221,8 @@ class ObjectBridge
 		var v:Dynamic = unwrapArg(value);
 		try
 		{
-			if (keyStr.indexOf('[') >= 0)
+			// 括号路径走 LuaUtils（内部解引用 PlayState.instance），仅游玩模式可用
+			if (PlayState.instance != null && keyStr.indexOf('[') >= 0)
 				LuaUtils.setVarInArray(obj, keyStr, v);
 			else if (Std.isOfType(obj, Array))
 			{
@@ -192,7 +237,7 @@ class ObjectBridge
 		}
 		catch (e:Dynamic)
 		{
-			FunkinLua.luaTrace('[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: ' + Std.string(e), false, false, FlxColor.RED);
+			bridgeTrace('[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: ' + Std.string(e));
 		}
 	}
 
@@ -204,10 +249,10 @@ class ObjectBridge
 
 		var keyStr:String = Std.string(name);
 		var func:Dynamic = null;
-		try func = LuaUtils.getVarInArray(obj, keyStr, true) catch (e:Dynamic) {}
+		try func = walkVar(obj, keyStr, true) catch (e:Dynamic) {}
 		if (func == null || !Reflect.isFunction(func))
 		{
-			FunkinLua.luaTrace('[ObjectBridge] objCall: ${objTypeOf(obj)}.$keyStr 不是方法', false, false, FlxColor.RED);
+			bridgeTrace('[ObjectBridge] objCall: ${objTypeOf(obj)}.$keyStr 不是方法');
 			return null;
 		}
 
@@ -230,28 +275,45 @@ class ObjectBridge
 		return encodeValue(result);
 	}
 
-	/** 按路径解析对象：PlayState 脚本对象 / 实例字段 → 失败则按完整类路径 resolveClass。 */
-	static function getObj(path:String, allowMaps:Bool):Dynamic
+	/**
+	 * 按路径解析对象。resolverId = 0：PlayState 语义（脚本对象 / 实例字段 / 完整类路径）；
+	 * resolverId > 0：注册表里对应的 MenuScript（scriptObjects / state 字段 / 完整类路径）。
+	 * 两者的根段解析之后都走同一套 walkVar 逐段下钻，失败再退回 resolveClass。
+	 */
+	static function getObj(path:String, allowMaps:Bool, resolverId:Int):Dynamic
 	{
 		if (path == null || path.length == 0) return null;
 		var obj:Dynamic = null;
 		var split:Array<String> = path.split('.');
-		if (split.length == 1)
+
+		var root:Dynamic = null;
+		if (resolverId > 0)
 		{
-			try obj = LuaUtils.getObjectDirectly(path, true, allowMaps) catch (e:Dynamic) {}
+			var script:MenuScript = registry.get(resolverId);
+			if (script != null)
+			{
+				try
+				{
+					if (split[0] == 'state' || split[0] == 'this' || split[0] == 'instance')
+						root = script.state;
+					else
+						root = script.findObject(split[0]);
+				}
+				catch (e:Dynamic) {}
+			}
 		}
 		else
 		{
-			var root:Dynamic = null;
 			try root = LuaUtils.getObjectDirectly(split[0], true, allowMaps) catch (e:Dynamic) {}
-			if (root != null)
+		}
+
+		if (root != null)
+		{
+			obj = root;
+			for (i in 1...split.length)
 			{
-				obj = root;
-				for (i in 1...split.length)
-				{
-					try obj = LuaUtils.getVarInArray(obj, split[i], allowMaps) catch (e:Dynamic) { obj = null; break; }
-					if (obj == null) break;
-				}
+				try obj = walkVar(obj, split[i], allowMaps) catch (e:Dynamic) { obj = null; break; }
+				if (obj == null) break;
 			}
 		}
 		if (obj == null)
@@ -269,7 +331,7 @@ class ObjectBridge
 		try cls = Type.resolveClass(className) catch (e:Dynamic) {}
 		if (cls == null)
 		{
-			FunkinLua.luaTrace('[ObjectBridge] newObj: 类不存在: ' + className, false, false, FlxColor.RED);
+			bridgeTrace('[ObjectBridge] newObj: 类不存在: ' + className);
 			return null;
 		}
 		var args:Array<Dynamic> = [];
@@ -390,45 +452,17 @@ class ObjectBridge
 
 	// ===== 注册入口 =====
 
+	/**
+	 * 游玩脚本（PlayState / FunkinLua）接入：完整模式。
+	 * 所有 __hx_* 回调都是状态无关闭包（不捕获 funk/script）——Lua_helper.callbacks
+	 * 是跨状态全局表、按名分发，捕获单个脚本上下文会导致后注册者覆盖先注册者；
+	 * getObj 的脚本上下文经 GLUE 烘焙的 resolverId（0 = PlayState 语义）显式传入。
+	 */
 	public static function implement(funk:FunkinLua):Void
 	{
 		var lua:State = funk.lua;
 		if (lua == null) return;
-
-		// 内部回调（字符串字面量名 → 自动进契约基线 tools/contract/script-surface.tsv）
-		Lua_helper.add_callback(lua, '__hx_getObj', function(path:String, allowMaps:Dynamic) {
-			return getObj(path, allowMaps != null && allowMaps != false);
-		});
-		Lua_helper.add_callback(lua, '__hx_newObj', function(className:String, argsTable:Dynamic) {
-			return newObj(className, argsTable);
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_index', function(id:Dynamic, key:Dynamic) {
-			return objIndex(Std.int(id), key);
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_newindex', function(id:Dynamic, key:Dynamic, value:Dynamic) {
-			objNewIndex(Std.int(id), key, value);
-			return null;
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_call', function(id:Dynamic, name:Dynamic, packed:Dynamic) {
-			return objCall(Std.int(id), name, packed);
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_type', function(id:Dynamic) {
-			return objType(Std.int(id));
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_keys', function(id:Dynamic) {
-			return objKeys(Std.int(id));
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_len', function(id:Dynamic) {
-			return objLen(Std.int(id));
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_release', function(id:Dynamic) {
-			return releaseObj(Std.int(id));
-		});
-		Lua_helper.add_callback(lua, '__hx_obj_count', function() {
-			var n:Int = 0;
-			for (_ in registry.keys()) n++;
-			return n;
-		});
+		registerCore(lua, 0);
 
 		// 与 HScript 层互操作：返回值不像 runHaxeCode 那样把对象压成 nil，而是包装成句柄。
 		// 代码以「顶层表达式」语义求值：interp.execute 的返回值 = 最后一个表达式的值
@@ -469,9 +503,82 @@ class ObjectBridge
 		});
 		#end
 
-		// Lua 胶水：metatable + 公开函数名（getObj / newObj / objGet / objSet / objCall /
-		// objEq / isObj / objType / objKeys / objLen / releaseObj / objCount / runHaxeCodeObj）
-		var status:Int = LuaL.dostring(lua, GLUE);
+		doGlue(lua, 0);
+	}
+
+	/**
+	 * 界面脚本（menus/<界面名>.lua / MenuScript）接入：菜单模式。
+	 * 根对象解析走 script.findObject / script.state / 完整类路径；菜单里没有
+	 * HScript 模块，runHaxeCodeObj 返回 nil（胶水里有 nil 保护）。
+	 * @return 注册是否成功（false = lua 状态不可用，调用方不应调 releaseMenu）
+	 */
+	public static function implementMenu(script:MenuScript):Bool
+	{
+		var lua:State = script.lua;
+		if (lua == null) return false;
+
+		// MenuScript 实例本身注册进注册表：GLUE 里的 resolverId 就是它的句柄 id
+		var rid:Dynamic = wrapNew(script);
+		var resolverId:Int = rid != null ? Reflect.field(rid, '__hxid') : 0;
+		registerCore(lua, resolverId);
+		liveMenus++;
+		doGlue(lua, resolverId);
+		return true;
+	}
+
+	/**
+	 * 界面脚本销毁时调用。最后一个菜单脚本销毁且不在 PlayState 时清空注册表
+	 * （PlayState 场景由 PlayState.destroy 的 clearRegistry 负责）。
+	 */
+	public static function releaseMenu():Void
+	{
+		liveMenus--;
+		if (liveMenus <= 0 && PlayState.instance == null) clearRegistry();
+	}
+
+	/** 共用注册：10 个状态无关的 __hx_* 内部回调（字符串字面量名 → 自动进契约基线）。 */
+	static function registerCore(lua:State, resolverId:Int):Void
+	{
+		Lua_helper.add_callback(lua, '__hx_getObj', function(rid:Dynamic, path:String, allowMaps:Dynamic) {
+			var useRid:Int = rid != null ? Std.int(rid) : resolverId;
+			return getObj(path, allowMaps != null && allowMaps != false, useRid);
+		});
+		Lua_helper.add_callback(lua, '__hx_newObj', function(className:String, argsTable:Dynamic) {
+			return newObj(className, argsTable);
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_index', function(id:Dynamic, key:Dynamic) {
+			return objIndex(Std.int(id), key);
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_newindex', function(id:Dynamic, key:Dynamic, value:Dynamic) {
+			objNewIndex(Std.int(id), key, value);
+			return null;
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_call', function(id:Dynamic, name:Dynamic, packed:Dynamic) {
+			return objCall(Std.int(id), name, packed);
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_type', function(id:Dynamic) {
+			return objType(Std.int(id));
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_keys', function(id:Dynamic) {
+			return objKeys(Std.int(id));
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_len', function(id:Dynamic) {
+			return objLen(Std.int(id));
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_release', function(id:Dynamic) {
+			return releaseObj(Std.int(id));
+		});
+		Lua_helper.add_callback(lua, '__hx_obj_count', function() {
+			var n:Int = 0;
+			for (_ in registry.keys()) n++;
+			return n;
+		});
+	}
+
+	/** 注入当前状态的 GLUE（resolverId 烘焙进 getObj 调用）。 */
+	static function doGlue(lua:State, resolverId:Int):Void
+	{
+		var status:Int = LuaL.dostring(lua, StringTools.replace(GLUE, '__HX_RESOLVER__', Std.string(resolverId)));
 		if (status != 0)
 		{
 			var err:String = null;
@@ -481,10 +588,12 @@ class ObjectBridge
 		}
 	}
 
-	// LuaJIT 5.1 胶水。注意：
+	// LuaJIT 5.1 胶水模板。注意：
+	// - __HX_RESOLVER__ 由 doGlue 按状态替换：0 = PlayState 语义，>0 = 注册表里 MenuScript 的句柄 id；
 	// - __hxobj_mt 的 __index 对方法标记返回绑定闭包（方法调用 obj:method(...) 的入口）；
 	// - __HX_WRAP 给从 Haxe 回来的句柄标记补挂 metatable；
-	// - 打包实参用 {n=个数, [1]=..}，nil 中间参数会缺号，Haxe 侧按 null 处理。
+	// - 打包实参用 {n=个数, [1]=..}，nil 中间参数会缺号，Haxe 侧按 null 处理；
+	// - runHaxeCodeObj 仅游玩脚本注册（菜单里 __hx_runHaxeCodeObj 为 nil，直接返回 nil）。
 	static final GLUE:String = "
 __HXOBJ_MT = {
 	__index = function(t, k)
@@ -517,7 +626,7 @@ function __HX_WRAP(v)
 	return v
 end
 
-function getObj(path) return __HX_WRAP(__hx_getObj(path)) end
+function getObj(path) return __HX_WRAP(__hx_getObj(__HX_RESOLVER__, path)) end
 
 function newObj(className, args) return __HX_WRAP(__hx_newObj(className, args)) end
 
@@ -571,6 +680,7 @@ end
 function objCount() return __hx_obj_count() end
 
 function runHaxeCodeObj(code, vars, func, args)
+	if __hx_runHaxeCodeObj == nil then return nil end
 	return __HX_WRAP(__hx_runHaxeCodeObj(code, vars, func, args))
 end
 ";

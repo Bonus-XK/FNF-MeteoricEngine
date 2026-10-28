@@ -46,6 +46,8 @@ class MenuScript
 	public var scriptTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
 	public var scriptTimers:Map<String, FlxTimer> = new Map<String, FlxTimer>();
 	public var scriptSounds:Map<String, FlxSound> = new Map<String, FlxSound>();
+	/** 对象桥是否已接入（决定 destroy 时是否 releaseMenu）。 */
+	var bridgeOk:Bool = false;
 
 	public function new(state:Dynamic, scriptName:String)
 	{
@@ -70,6 +72,9 @@ class MenuScript
 
 		// ---- 文字与对象定制 API ----		// ==== 阶段 D：界面脚本回调改为注册表模式（psychlua/functions/MenuCommands.hx）====
 		MenuCommands.implement(this);
+
+		// Lua 对象桥（菜单模式）：getObj 解析 state 字段 / scriptObjects / 完整类路径
+		bridgeOk = ObjectBridge.implementMenu(this);
 
 		// 加载并执行脚本文件
 		var content:String = getScriptContent(scriptName);
@@ -150,6 +155,11 @@ class MenuScript
 	{
 		call('onDestroy', []);
 		closed = true;
+		if(bridgeOk)
+		{
+			ObjectBridge.releaseMenu(); // 最后一个菜单脚本销毁且不在 PlayState 时清空句柄注册表
+			bridgeOk = false;
+		}
 		if(lua != null)
 		{
 			Lua.close(lua);

@@ -26,6 +26,20 @@
     （与既有 `callMethodFromClass` 同一风险面）。
   - **真机验证**：debug 构建 + `METEORIC_TEST_SONG` 全自动冒烟 21 步全过（句柄读写、
     方法调用、类静态、构造、句柄传参、链式、HScript 互操作、音符组 0 基索引），整曲无崩溃。
+- **【对象桥扩展】界面脚本（`menus/<界面名>.lua`）接入同一套 API**：`main_menu` /
+  `freeplay` / `story_menu` / `options` / `pause` / `results` / `gameover` 全部可用。
+  - `getObj` 根解析适配菜单语境：`scriptObjects` / 界面实例字段 / `state`（当前界面）；
+    完整类路径与 `newObj` 与游玩脚本完全一致。
+  - **无开关自动适配**：`PlayState.instance == null` 即菜单模式，属性/方法/写路径自动走
+    不依赖 PlayState 的通道（菜单里 `LuaUtils` 会解引用空 PlayState，必须绕开）。
+  - `__hx_getObj` 改为状态无关闭包 + GLUE 按状态烘焙 resolverId：`Lua_helper.callbacks`
+    是跨状态全局表、按名分发，捕获单个脚本上下文会被后注册脚本覆盖（游玩/菜单/暂停
+    子状态共存的场景必须显式传上下文）。
+  - `runHaxeCodeObj` 在菜单返回 nil（菜单无 HScript 模块，胶水有 nil 保护）。
+  - 句柄注册表清理：最后一个界面脚本销毁且不在 PlayState 时清空（`releaseMenu`）。
+  - **真机验证**：结算界面（bot 打完整曲自动进入）冒烟 17 步全过——state 句柄、界面字段、
+    FlxTypedGroup/Array 句柄与 0 基索引、精灵属性读写回环、方法调用、原始值字段、
+    句柄传参 add、`runHaxeCodeObj` nil 保护；游玩模式回归复验 9 组全过；全程零崩溃。
 - **【修复】`ScriptGlobals` 在 `FlxG.sound.music` 为 null 时 SEGV**：
   `METEORIC_TEST_SONG` 测试路径从标题直接跳曲，标题音乐未启动，任何带 `script.lua`
   的曲目在测试路径必崩（`songLength` 全局初始化解引用空音乐）。null 时给 0；

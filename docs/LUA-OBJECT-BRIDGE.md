@@ -69,6 +69,38 @@ end
 内部另有 10 个 `__hx_*` 回调名（已冻结进 `tools/contract/script-surface.tsv`）与
 胶水名 `__HXOBJ_MT` / `__HX_WRAP`，请勿在脚本里占用。
 
+## 界面脚本（menus/*.lua）也支持
+
+对象桥同时接入了界面脚本系统（`MenuScript`）：`menus/<界面名>.lua`（main_menu、
+freeplay、story_menu、options、pause、results、gameover）里可用**全部同名 API**。
+
+菜单模式的差异（自动适配，无需开关）：
+
+| 项 | 游玩脚本 | 界面脚本 |
+|---|---|---|
+| `getObj('xxx')` 根解析 | PlayState 脚本对象 / 实例字段 | `scriptObjects` / 当前界面的字段 / `state` |
+| `getObj('state.xxx')` | `state` = PlayState | `state` = 当前界面实例 |
+| 完整类路径 + `newObj` | ✓ | ✓（相同） |
+| 括号路径 `'members[0]'` | ✓ | ✗（用数字索引 `h.members[0]`） |
+| `runHaxeCodeObj` | ✓ | 返回 nil（菜单无 HScript 模块） |
+| 句柄注册表清理 | `PlayState.destroy` | 最后一个界面脚本销毁时（不在 PlayState 时） |
+
+界面脚本示例（结算界面）：
+
+```lua
+function onCreate()
+    local grp = getObj('grpMenuShit')       -- 界面字段 → FlxTypedGroup 句柄
+    local item = grp.members[0]             -- 0 基索引 → MenuText 句柄
+    item.alpha = 0.8
+    local btn = getObj('menuButtons')[0]    -- 数组字段 → 元素句柄
+    btn.x = btn.x + 20
+    objCall(getObj('state'), 'add', newObj('flixel.FlxSprite', {0, 0}))
+end
+```
+
+注意：界面脚本加载时机很早（`onCreate` 时部分控件尚未创建），引用界面对象建议
+放在 `onUpdate` 延迟若干帧之后。
+
 ## 语义与限制（重要）
 
 1. **数组是 0 基**（Haxe 风格）：`notes.members[0]` 是第一个音符。
@@ -85,6 +117,8 @@ end
 7. **枚举值**：可作句柄传递，但字段读写未必有意义（hxcpp 枚举内部表示）。
 8. `runHaxeCodeObj` 里用 HScript 返回对象时，Lua 侧拿到的句柄与 `getObj` 句柄
    等价互通。
+9. 菜单模式下 `LuaUtils` 依赖 PlayState 的特殊通道（括号路径等）不可用，已自动
+   回退到 Reflect 通道；`PlayState.instance == null` 是模式检测依据。
 
 ## 实现位置
 
