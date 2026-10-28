@@ -19,6 +19,7 @@ import backend.CameraHudDomain;
 import backend.EventDomain;
 import backend.IconBop;
 import backend.NoteChartDomain;
+import backend.PopupAnim;
 import backend.Song;
 import backend.Section;
 import backend.PackedChart;
@@ -3082,6 +3083,12 @@ class PlayState extends MusicBeatState
 
 		if (!showRatingPop && !showComboPop) return;
 
+		// 弹窗弹出方式（见 backend.PopupAnim）：classic = 上游原抛物线，
+		// 其余三种由 PopupAnim 接管运动与销毁（本函数后续据此分流）。
+		var popupStyle:String = ClientPrefs.data.popupStyle;
+		var popupCustom:Bool = PopupAnim.isCustom(popupStyle);
+		var popupDur:Float = ClientPrefs.data.popupDuration;
+
 		var uiPrefix:String = "";
 		var uiSuffix:String = '';
 		var antialias:Bool = ClientPrefs.data.antialiasing;
@@ -3226,26 +3233,42 @@ class PlayState extends MusicBeatState
 			if(showComboNumPop)
 				insert(members.indexOf(strumLineNotes), numScore);
 
-			FlxTween.tween(numScore, {alpha: 0}, 0.2 / playbackRate, {
-				onComplete: function(tween:FlxTween)
-				{
-					numScore.destroy();
-				},
-				startDelay: Conductor.crochet * 0.002 / playbackRate
-			});
+			if (popupCustom)
+			{
+				PopupAnim.play(numScore, popupStyle, playbackRate, popupDur);
+			}
+			else
+			{
+				FlxTween.tween(numScore, {alpha: 0}, 0.2 * popupDur / playbackRate, {
+					onComplete: function(tween:FlxTween)
+					{
+						numScore.destroy();
+					},
+					startDelay: Conductor.crochet * 0.002 / playbackRate
+				});
+			}
 
 			daLoop++;
 			if(numScore.x > xThing) xThing = numScore.x;
 		}
 		// 修复：Combo 词的水平位置不再被“数字最大 x”覆盖回默认——保留方向键 Rank 偏移
 		if (comboSpr != null) comboSpr.x = xThing + 50 + ClientPrefs.data.comboOffset[0];
-		if (rating != null)
-			FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
-				startDelay: Conductor.crochet * 0.001 / playbackRate
-			});
 
-		if (comboSpr != null)
-			FlxTween.tween(comboSpr, {alpha: 0}, 0.2 / playbackRate, {
+		// 淡出与销毁：classic 走上游原链（rating 由 comboSpr 的 onComplete 一并销毁）；
+		// 其余风格交给 backend.PopupAnim —— 它接管运动 + 淡出 + 销毁，这里不要再叠 alpha 补间。
+		if (popupCustom)
+		{
+			PopupAnim.play(rating, popupStyle, playbackRate, popupDur);
+			PopupAnim.play(comboSpr, popupStyle, playbackRate, popupDur);
+		}
+		else if (comboSpr != null)
+		{
+			if (rating != null)
+				FlxTween.tween(rating, {alpha: 0}, 0.2 * popupDur / playbackRate, {
+					startDelay: Conductor.crochet * 0.001 / playbackRate
+				});
+
+			FlxTween.tween(comboSpr, {alpha: 0}, 0.2 * popupDur / playbackRate, {
 				onComplete: function(tween:FlxTween)
 				{
 					comboSpr.destroy();
@@ -3253,14 +3276,17 @@ class PlayState extends MusicBeatState
 				},
 				startDelay: Conductor.crochet * 0.002 / playbackRate
 			});
+		}
 		else if (rating != null)
-			FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
+		{
+			FlxTween.tween(rating, {alpha: 0}, 0.2 * popupDur / playbackRate, {
 				onComplete: function(tween:FlxTween)
 				{
 					rating.destroy();
 				},
 				startDelay: Conductor.crochet * 0.001 / playbackRate
 			});
+		}
 	}
 
 	public var strumsBlocked:Array<Bool> = [];

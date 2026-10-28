@@ -1721,5 +1721,13 @@
   "controls.key.note_11": "Note 12",
   "controls.keyBind.note_11": "Note 12",
   "chart.keys": "Keys",
-  "chart.keysApplied": "Keys set to "
+  "chart.keysApplied": "Keys set to ",
+  "option.popupStyle": "Popup Animation",
+  "optionDesc.popupStyle": "How the rating (Sick/Good…) and combo number/word appear on a hit.\nClassic: tossed upward then falls under gravity (engine default);\nPop: springs from 0.78x up to 1.06x, settles, then floats up and fades;\nSlide: glides in from 20px below, then floats up and fades;\nFade: stays in place, only opacity changes (least obstructing on fast charts)",
+  "optionValue.popupStyle.0": "Classic",
+  "optionValue.popupStyle.1": "Pop",
+  "optionValue.popupStyle.2": "Slide",
+  "optionValue.popupStyle.3": "Fade",
+  "option.popupDuration": "Popup Duration",
+  "optionDesc.popupDuration": "Scales the whole popup: appear / hold / fade.\n1.0 is the designed baseline (~0.35s); lower is snappier, higher is more relaxed"
 }

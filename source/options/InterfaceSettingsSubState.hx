@@ -96,6 +96,28 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option(
+			backend.Lang.tOr('option.popupStyle', '弹窗弹出方式'),
+			backend.Lang.tOr('optionDesc.popupStyle',
+				'命中时评级（Sick/Good…）与连击数字、Combo 词以什么方式出现。\n经典抛物：向上抛出后受重力下坠（引擎原有行为）；\n弹性弹出：从 0.78 倍弹到 1.06 倍再收住，悬停后上浮淡出；\n上滑：从下方 20px 滑入到位，再上浮淡出；\n淡入淡出：位置完全不动，只有透明度变化（高速谱最不挡视线）'),
+			'popupStyle',
+			'string',
+			backend.PopupAnim.CHOICES);
+		addOption(option);
+
+		var option:Option = new Option(
+			backend.Lang.tOr('option.popupDuration', '弹窗时长'),
+			backend.Lang.tOr('optionDesc.popupDuration',
+				'整体缩放弹窗的出现 / 停留 / 消失时长。1.0 为设计基准（约 0.35 秒）；\n调小更利落，调大更从容'),
+			'popupDuration',
+			'float');
+		option.scrollSpeed = 1.2;
+		option.decimals = 2;
+		option.changeValue = 0.05;
+		option.minValue = 0.50;
+		option.maxValue = 2.00;
+		addOption(option);
+
 		#if !mobile
 		var option:Option = new Option('FPS计数器',
 			'关闭后，帧数计数器（FPS）将不会显示',

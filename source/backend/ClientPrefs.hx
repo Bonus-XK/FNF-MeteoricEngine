@@ -268,6 +268,18 @@ class SaveVariables {
 	@:keep public var playerLightStrum:Bool = true;     // 手动命中/按下时玩家 strum 高亮
 	@:keep public var ratingPopups:Bool = true;         // 评级弹窗（Sick/Good…）
 	@:keep public var comboPopups:Bool = true;          // 连击数字 + Combo 词弹窗
+	/**
+	 * 弹窗弹出方式（单枚举，= `backend.PopupAnim.CHOICES` 的元素）。
+	 * classic 经典抛物（上游原行为）/ pop 弹性弹出 / slide 上滑 / fade 淡入淡出。
+	 */
+	@:keep public var popupStyle:String = PopupAnim.DEFAULT_STYLE;
+	/**
+	 * 弹窗时长倍率：整体缩放进入 / 悬停 / 退出三段时长。
+	 * 1.0 = 设计基准（约 0.35s）；调小更利落（高速谱不挡视线），调大更从容。
+	 */
+	@:keep public var popupDuration:Float = 1.0;
+	/** 一次性迁移标记：老存档没有 `popupStyle` / `popupDuration` 字段，首次启动时补默认值（见 `loadPrefs`） */
+	@:keep public var popupMigrated:Bool = false;
 	@:keep public var lessBotLag:Bool = false;          // 自动游玩只计分不弹窗（JS 引擎 lessBotLag）
 	// 【GC 呼吸阀】大块内存守护：进曲时设 GC 最低空余水位 + 每 20s 强制一次全量回收。
 	// 用途：墙谱游玩期 hxcpp 大块池只增不还（僵尸缓冲等不到 major），物理内存耗尽冻结。
@@ -895,6 +907,19 @@ class ClientPrefs {
 		{
 			data.iconBopMigrated = true;
 			if (data.keIconBop) data.iconBopStyle = IconBop.KE;
+			if (!__saveSuspect) saveSettings();
+		}
+
+		// 弹窗弹出方式旧值迁移：老存档没有这两个字段（读出来是 null），
+		// null 会命中 classic 分支而看不到新效果，所以首次启动时补上默认值。
+		// 只迁移一次，之后尊重用户手动选择。
+		if (!data.popupMigrated)
+		{
+			data.popupMigrated = true;
+			if (data.popupStyle == null) data.popupStyle = PopupAnim.DEFAULT_STYLE;
+			// ⚠ 不要写 `data.popupDuration == null`：hxcpp 等静态平台上 Float 不能与 null 比较
+			// （编译期报错），缺失字段在那里会被初始化成 0，用 > 0 判断即可一并覆盖。
+			if (!(data.popupDuration > 0)) data.popupDuration = 1.0;
 			if (!__saveSuspect) saveSettings();
 		}
 

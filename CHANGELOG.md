@@ -4,6 +4,29 @@
 
 ## 未发布
 
+- **【新功能】评分 / 连击弹窗的弹出方式可选（4 种）**：原先 `PlayState.popUpScore` 只有一种写法——
+  给精灵一个向上初速度（`velocity.y -= random(140,175)`）加向下重力（`acceleration.y = 550`），
+  再叠一条 alpha 淡出。这个「抛物线抛出」有两个毛病：精灵从命中那一刻起就在加速下坠，
+  尾巴长、位置会飘；且进入没有缓冲，alpha 直接满值，观感是「贴上来」而不是「弹出来」。
+  - 新增 **`backend/PopupAnim.hx`** 作为**单一实现点**，提供 4 种方式
+    （选项 → 界面 → **弹窗弹出方式** / **弹窗时长**）：
+    - **`classic` 经典抛物**：引擎原有行为，逐字保留（不经过本类）。
+    - **`pop` 弹性弹出（新默认）**：从 **0.78 倍**弹到 **1.06 倍**再收住，悬停后上浮 14px 淡出。
+      ⚠ 过冲**刻意只留 6%** —— 同日修 `IconBop`「太 Q 弹」时量到的结论是过冲 >10% 就读成果冻感；
+      这里只保留「弹一下」的暗示，且回落用 `quadOut` 一次收干净，不用 `elastic`（会反复摆）。
+    - **`slide` 上滑**：从下方 20px 滑入到位，再上浮淡出，无缩放。
+    - **`fade` 淡入淡出**：位置完全不动，只有透明度变化（高速谱最不挡视线）。
+  - 三种新风格下 `play()` **接管**精灵的全部运动与销毁：先清掉 classic 的 `velocity/acceleration`，
+    再以当时的 scale / x / y 为基准播补间，结束时 `destroy()`。
+    ⚠ 因此必须在 `setGraphicSize()` + `updateHitbox()` **之后**调用，否则基准值取错。
+  - 缩放用 `FlxTween.num` 的第 5 个参数（`TweenFunction`）逐帧插值写回 `scale`，
+    而不是直接 tween `spr.scale` —— 后者依赖 FlxPoint 的字段写入语义，
+    不同 flixel 版本对 scale setter 的处理不一致，自己插值最稳。
+  - 所有时长都除以 `playbackRate`，变速下节奏不变（与 `IconBop` 同口径）。
+  - **老存档兼容**：新增一次性迁移 `popupMigrated`，老存档没有
+    `popupStyle` / `popupDuration` 字段，首次启动时补默认值（否则 null 会命中 classic 而看不到新效果）。
+    ⚠ `popupDuration` 判定写成 `!(data.popupDuration > 0)` 而非 `== null`：
+    hxcpp 等静态平台上 Float 不能与 null 比较，编译期就会报错。
 - **【改动】小图标跳动支点改为「中上方」**：原先 `origin` 钉在 **(0,0) 左上角**，图标只往右下长。
   再叠加 Psych 那两个**符号相反**的 x 补偿式（P1 `+(150*scale.x-150)/2`、P2 `-(150*scale.x)/2`），
   实际效果是 **P2 恰好居中、P1 却整体往右窜 ~17px**，两个图标弹起来不对称、一顿一顿往外挣 ——
