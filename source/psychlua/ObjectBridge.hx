@@ -4,6 +4,8 @@ import llua.Lua;
 import llua.LuaL;
 import llua.State;
 import Type.ValueType;
+import backend.BaseStage;
+import objects.Alphabet;
 
 /**
  * Lua 对象桥（Object Bridge）—— 让 Lua 脚本持有 Haxe 对象的一等引用。
@@ -68,6 +70,7 @@ class ObjectBridge
 	{
 		registry = new Map<Int, Dynamic>();
 		reverse = new haxe.ds.ObjectMap<Dynamic, Int>();
+		enumTypeIds = new Map<Int, Bool>();
 		nextId = 0;
 	}
 
@@ -111,11 +114,25 @@ class ObjectBridge
 	static function wrapNew(obj:Dynamic):Dynamic
 	{
 		if (obj == null) return null;
-		if (reverse.exists(obj))
+		// hxcpp 的 ObjectMap 对枚举值做哈希实测 SEGV（2026-10-28）——枚举值跳过反向索引
+		var canHash:Bool = true;
+		try
+		{
+			switch (Type.typeof(obj))
+			{
+				case ValueType.TEnum(_): canHash = false;
+				default:
+			}
+		}
+		catch (e:Dynamic) {}
+		if (canHash && reverse.exists(obj))
 			return {__hxid: reverse.get(obj)};
 		nextId++;
 		registry.set(nextId, obj);
-		try reverse.set(obj, nextId) catch (e:Dynamic) {}
+		if (canHash)
+		{
+			try reverse.set(obj, nextId) catch (e:Dynamic) {}
+		}
 		return {__hxid: nextId};
 	}
 
@@ -138,6 +155,15 @@ class ObjectBridge
 			var obj:Dynamic = registry.get(Reflect.field(v, '__hxid'));
 			return obj != null ? obj : v;
 		}
+		// ⚠【架构性限制】Lua 函数不能桥接成 Haxe 回调：桥接后的回调会在任意 Haxe 时机
+		// 被调用（tween/timer 完成点），绕开 FunkinLua.luaCallDepth 的嵌套 pcall 防护，
+		// 实测触发 LuaJIT 栈堆损坏 → SEGV（2026-10-28 真机复现）。传函数参数的地方
+		// 一律置 null（行为 = 无回调）并给出诊断，带回调的逻辑请用 runHaxeCodeObj。
+		if (Std.isOfType(v, LuaCallback))
+		{
+			bridgeTrace('[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数（LuaJIT 嵌套 pcall 风险），已置为空回调');
+			return null;
+		}
 		if (Std.isOfType(v, Array))
 		{
 			var arr:Array<Dynamic> = cast v;
@@ -149,11 +175,60 @@ class ObjectBridge
 					var obj:Dynamic = registry.get(Reflect.field(e, '__hxid'));
 					out.push(obj != null ? obj : e);
 				}
+				else if (Std.isOfType(e, LuaCallback))
+				{
+					bridgeTrace('[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数，已置为空回调');
+					out.push(null);
+				}
 				else out.push(e);
 			}
 			return out;
 		}
+		// 匿名对象（如 tween 的 options 表）：函数字段置 null，其余保留
+		if (Type.typeof(v) == ValueType.TObject && !isHandleAnon(v))
+		{
+			var fields:Array<String> = null;
+			try fields = Reflect.fields(v) catch (e:Dynamic) {}
+			if (fields != null)
+			{
+				for (f in fields)
+				{
+					var fv:Dynamic = null;
+					try fv = Reflect.field(v, f) catch (e:Dynamic) {}
+					if (fv != null && Std.isOfType(fv, LuaCallback))
+					{
+						bridgeTrace('[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数（字段 $f），已置为空回调');
+						try Reflect.setField(v, f, null) catch (e:Dynamic) {}
+					}
+				}
+			}
+			return v;
+		}
 		return v;
+	}
+
+	/** 从 {n=..,[1]=..} 打包表（或 Lua 数组）取实参，句柄/函数标记一并还原。 */
+	static function argsFromPacked(argsTable:Dynamic):Array<Dynamic>
+	{
+		var args:Array<Dynamic> = [];
+		if (argsTable == null) return args;
+		if (Std.isOfType(argsTable, Array))
+		{
+			for (a in cast(argsTable, Array<Dynamic>)) args.push(unwrapArg(a));
+		}
+		else
+		{
+			var n:Dynamic = null;
+			try n = Reflect.field(argsTable, 'n') catch (e:Dynamic) {}
+			var cnt:Int = n != null ? Std.int(n) : 0;
+			for (i in 0...cnt)
+			{
+				var a:Dynamic = null;
+				try a = Reflect.field(argsTable, Std.string(i + 1)) catch (e:Dynamic) {}
+				args.push(unwrapArg(a));
+			}
+		}
+		return args;
 	}
 
 	/** 把 Haxe 值编码成可传回 Lua 的形式：原始类型/Array/String 直接传，对象包句柄。 */
@@ -202,6 +277,11 @@ class ObjectBridge
 		}
 
 		var keyStr:String = Std.string(key);
+		// 枚举对象：绝不反射枚举本体，成员经 Type.createEnum 取值
+		if (enumTypeIds.exists(id))
+		{
+			try return encodeValue(Type.createEnum(cast obj, keyStr, [])) catch (e:Dynamic) return null;
+		}
 		var val:Dynamic = null;
 		try val = walkVar(obj, keyStr, true) catch (e:Dynamic) return null;
 
@@ -237,7 +317,7 @@ class ObjectBridge
 		}
 		catch (e:Dynamic)
 		{
-			bridgeTrace('[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: ' + Std.string(e));
+			bridgeTrace('[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: $e');
 		}
 	}
 
@@ -256,23 +336,105 @@ class ObjectBridge
 			return null;
 		}
 
-		var args:Array<Dynamic> = [];
-		var cnt:Int = 0;
-		if (packed != null)
-		{
-			var n:Dynamic = null;
-			try n = Reflect.field(packed, 'n') catch (e:Dynamic) {}
-			if (n != null) cnt = Std.int(n);
-			for (i in 0...cnt)
-			{
-				var a:Dynamic = null;
-				try a = Reflect.field(packed, Std.string(i + 1)) catch (e:Dynamic) {}
-				args.push(unwrapArg(a));
-			}
-		}
-
+		var args:Array<Dynamic> = argsFromPacked(packed);
 		var result:Dynamic = Reflect.callMethod(obj, func, args);
 		return encodeValue(result);
+	}
+
+	/**
+	 * 构造类实例（类句柄的 `Foo(...)` `__call` 语义入口）。
+	 * 仅当注册表对象是类时有效；实例被调用视为脚本错误。
+	 */
+	static function constructObj(id:Int, packed:Dynamic):Dynamic
+	{
+		var obj:Dynamic = registry.get(id);
+		if (obj == null) return null;
+		var clsName:String = null;
+		try clsName = Type.getClassName(obj) catch (e:Dynamic) {}
+		if (clsName == null)
+		{
+			bridgeTrace('[ObjectBridge] 只有类句柄可以调用构造（${objTypeOf(obj)} 不是类），实例化请用 newObj');
+			return null;
+		}
+		var inst:Dynamic = null;
+		try inst = Type.createInstance(obj, argsFromPacked(packed))
+		catch (e:Dynamic)
+		{
+			bridgeTrace('[ObjectBridge] 构造 $clsName 失败: $e');
+			return null;
+		}
+		return encodeValue(inst);
+	}
+
+	/**
+	 * import 别名 + 类句柄：`importClass('backend.WeekData', 'WeekData')`。
+	 * alias 在 Lua 侧由胶水写进 _G（避免跨状态全局表错位）；不传 alias 只返回句柄。
+	 */
+	static function importClassInternal(path:String):Dynamic
+	{
+		var cls:Dynamic = null;
+		try cls = Type.resolveClass(path) catch (e:Dynamic) {}
+		if (cls == null)
+		{
+			bridgeTrace('[ObjectBridge] importClass: 类不存在: $path');
+			return null;
+		}
+		if (Reflect.isFunction(cls)) return null;
+		return encodeValue(cls);
+	}
+
+	// hxcpp 的 Type.resolveEnum 依赖 RTTI 注册，部分引擎枚举拿不到（HScript 同限，其靠
+	// preset 注入常量值绕过）。这里显式引用保活常用引擎枚举；String 背书的 abstract enum
+	// （如 FlxTextAlign）值就是字符串，脚本直接传字符串即可，无需枚举对象。
+	// 惰性构建：静态初始化阶段引用其他模块的枚举值可能拿到 null（hxcpp boot 顺序）
+	static var enumKeep:Map<String, Dynamic> = null;
+
+	static function resolveEnumLoose(path:String):Dynamic
+	{
+		var e:Dynamic = null;
+		try e = Type.resolveEnum(path) catch (err:Dynamic) {}
+		if (e != null) return e;
+		if (enumKeep == null)
+			enumKeep = [
+				// 键 = hxcpp 运行时类型路径（模块子类型的源码速记在注册表里不存在）；
+				// 值 = 枚举本体（import backend.BaseStage 已把同文件声明的 Countdown 导入）
+				'backend.Countdown' => Countdown,
+				'objects.Alignment' => Alignment,
+			];
+		return enumKeep.get(path);
+	}
+
+	/** 取枚举对象为句柄（成员走属性读取；abstract enum 走 enumKeep 或直接传原始值）。 */
+	static function getEnumH(path:String):Dynamic
+	{
+		var e:Dynamic = resolveEnumLoose(path);
+		if (e == null)
+		{
+			bridgeTrace('[ObjectBridge] getEnum: 枚举不存在: $path');
+			return null;
+		}
+		var h:Dynamic = encodeValue(e);
+		if (h != null) enumTypeIds[Reflect.field(h, '__hxid')] = true;
+		return h;
+	}
+
+	/** 构造枚举值：makeEnum('enum.Full.Path', 'ConstructorName', {arg1, arg2})。 */
+	static function makeEnumH(path:String, name:String, argsTable:Dynamic):Dynamic
+	{
+		var e:Dynamic = resolveEnumLoose(path);
+		if (e == null)
+		{
+			bridgeTrace('[ObjectBridge] makeEnum: 枚举不存在: $path');
+			return null;
+		}
+		var val:Dynamic = null;
+		try val = Type.createEnum(e, name, argsFromPacked(argsTable))
+		catch (err:Dynamic)
+		{
+			bridgeTrace('[ObjectBridge] makeEnum: $path.$name 构造失败: $err');
+			return null;
+		}
+		return encodeValue(val);
 	}
 
 	/**
@@ -331,34 +493,15 @@ class ObjectBridge
 		try cls = Type.resolveClass(className) catch (e:Dynamic) {}
 		if (cls == null)
 		{
-			bridgeTrace('[ObjectBridge] newObj: 类不存在: ' + className);
+			bridgeTrace('[ObjectBridge] newObj: 类不存在: $className');
 			return null;
 		}
-		var args:Array<Dynamic> = [];
-		if (argsTable != null)
-		{
-			if (Std.isOfType(argsTable, Array))
-			{
-				for (a in cast(argsTable, Array<Dynamic>)) args.push(unwrapArg(a));
-			}
-			else
-			{
-				var n:Dynamic = null;
-				try n = Reflect.field(argsTable, 'n') catch (e:Dynamic) {}
-				var cnt:Int = n != null ? Std.int(n) : 0;
-				for (i in 0...cnt)
-				{
-					var a:Dynamic = null;
-					try a = Reflect.field(argsTable, Std.string(i + 1)) catch (e:Dynamic) {}
-					args.push(unwrapArg(a));
-				}
-			}
-		}
+		var args:Array<Dynamic> = argsFromPacked(argsTable);
 		var inst:Dynamic = null;
 		try inst = Type.createInstance(cls, args)
 		catch (e:Dynamic)
 		{
-			FunkinLua.luaTrace('[ObjectBridge] newObj: 构造 $className 失败: ' + Std.string(e), false, false, FlxColor.RED);
+			bridgeTrace('[ObjectBridge] newObj: 构造 $className 失败: ' + Std.string(e));
 			return null;
 		}
 		return encodeValue(inst);
@@ -368,12 +511,25 @@ class ObjectBridge
 	{
 		var obj:Dynamic = registry.get(id);
 		if (obj == null) return null;
+		if (enumTypeIds.exists(id)) return 'enum';
 		return objTypeOf(obj);
 	}
 
 	static function objTypeOf(obj:Dynamic):String
 	{
 		if (obj == null) return 'null';
+		// 枚举值：先于 getClass 处理（hxcpp 上对 enum 值走 getClass 不可靠）
+		try
+		{
+			switch (Type.typeof(obj))
+			{
+				case ValueType.TEnum(_):
+					var en:Dynamic = Type.getEnum(obj);
+					if (en != null) return Type.getEnumName(en) + '(enum value)';
+				default:
+			}
+		}
+		catch (e:Dynamic) {}
 		// 实例
 		var cls:Class<Dynamic> = null;
 		try cls = Type.getClass(obj) catch (e:Dynamic) {}
@@ -404,6 +560,27 @@ class ObjectBridge
 		var obj:Dynamic = registry.get(id);
 		if (obj == null) return null;
 		if (Std.isOfType(obj, Array)) return obj;
+		// Map：Reflect.fields 不可靠，走 keys() 迭代器（配合 objGet 即可遍历 Map）
+		try
+		{
+			if (isMapObject(obj))
+			{
+				var out:Array<Dynamic> = [];
+				var it:Dynamic = Reflect.callMethod(obj, Reflect.field(obj, 'keys'), []);
+				// hxcpp 不允许 for-in Dynamic，手动推进迭代器
+				while (true)
+				{
+					var hasNext:Bool = false;
+					try hasNext = it.hasNext() catch (e:Dynamic) break;
+					if (!hasNext) break;
+					var k:Dynamic = null;
+					try k = it.next() catch (e:Dynamic) break;
+					out.push(k);
+				}
+				return out;
+			}
+		}
+		catch (e:Dynamic) {}
 		try
 		{
 			return Reflect.fields(obj);
@@ -439,6 +616,10 @@ class ObjectBridge
 		catch (e:Dynamic) {}
 		return true;
 	}
+
+	// 枚举对象句柄的 id 标记（hxcpp 上对 enum 对象做 getClass/Reflect 实测 SEGV，
+	// 见 2026-10-28 崩溃；所有枚举操作必须走 Type.createEnum，绝不直接反射枚举对象）
+	static var enumTypeIds:Map<Int, Bool> = new Map<Int, Bool>();
 
 	static function isMapObject(obj:Dynamic):Bool
 	{
@@ -573,6 +754,39 @@ class ObjectBridge
 			for (_ in registry.keys()) n++;
 			return n;
 		});
+		// 类句柄的 Foo(...) 构造入口（GLUE __call 元方法）
+		Lua_helper.add_callback(lua, '__hx_obj_construct', function(id:Dynamic, packed:Dynamic) {
+			return constructObj(Std.int(id), packed);
+		});
+		// import 别名 + 类句柄（alias 由胶水写 _G，避免跨状态全局表错位）
+		Lua_helper.add_callback(lua, '__hx_importClass', function(path:String) {
+			return importClassInternal(path);
+		});
+		// 枚举：getEnum 拿句柄读成员，makeEnum 构造枚举值（abstract enum 亦可）
+		Lua_helper.add_callback(lua, '__hx_getEnum', function(path:String) {
+			return getEnumH(path);
+		});
+		Lua_helper.add_callback(lua, '__hx_makeEnum', function(path:String, name:Dynamic, argsTable:Dynamic) {
+			return makeEnumH(path, name != null ? Std.string(name) : null, argsTable);
+		});
+		// import 路由（状态无关）：类/枚举 → 句柄标记；'pkg.*' → 包标记 {__hxpkg=path}；
+		// 解析失败返回 nil，GLUE 层会回落到旧的 Lua 库文件导入（per-script 状态在旧闭包里）
+		Lua_helper.add_callback(lua, '__hx_import_route', function(path:String) {
+			if (path == null || path.length == 0) return null;
+			if (StringTools.endsWith(path, '.*'))
+			{
+				var pkg:String = path.substr(0, path.length - 2);
+				if (pkg.length == 0) return null;
+				return {__hxpkg: pkg};
+			}
+			var cls:Dynamic = null;
+			try cls = Type.resolveClass(path) catch (e:Dynamic) {}
+			if (cls != null && !Reflect.isFunction(cls)) return encodeValue(cls);
+			var en:Dynamic = null;
+			try en = Type.resolveEnum(path) catch (e:Dynamic) {}
+			if (en != null) return encodeValue(en);
+			return null;
+		});
 	}
 
 	/** 注入当前状态的 GLUE（resolverId 烘焙进 getObj 调用）。 */
@@ -594,7 +808,44 @@ class ObjectBridge
 	// - __HX_WRAP 给从 Haxe 回来的句柄标记补挂 metatable；
 	// - 打包实参用 {n=个数, [1]=..}，nil 中间参数会缺号，Haxe 侧按 null 处理；
 	// - runHaxeCodeObj 仅游玩脚本注册（菜单里 __hx_runHaxeCodeObj 为 nil，直接返回 nil）。
+	// GLUE 内的 import：先捕获宿主已注册的旧 import 闭包（库文件导入，
+	// per-script 状态在其闭包里），再定义 HScript 同款语义的 import。
 	static final GLUE:String = "
+local __HX_IMPORT_LIB = import
+
+-- HScript-style import (semantics mirror hscript):
+--   import('pkg.Class')      -> _G.Class = class handle (auto short name)
+--   import('pkg.Class','A')  -> _G.A = class handle
+--   import('pkg.*')          -> lazy package table (bind on access)
+--   import('mylib.lua')      -> legacy Lua library import
+function import(path, alias)
+	local r = __hx_import_route(path)
+	if type(r) == 'table' then
+		if r.__hxid ~= nil then
+			r = __HX_WRAP(r)
+			local short = alias
+			if short == nil or short == '' then
+				local p = string.reverse(path)
+				local cut = string.find(p, '.', 1, true)
+				short = cut ~= nil and string.reverse(string.sub(p, 1, cut - 1)) or path
+			end
+			if short ~= nil and short ~= '' and short ~= 'Class' then _G[short] = r end
+			return r
+		end
+		if r.__hxpkg ~= nil then
+			local pkgPath = r.__hxpkg
+			local pkg = setmetatable({}, {__index = function(t, k)
+				local h = import(pkgPath .. '.' .. k)
+				rawset(t, k, h)
+				return h
+			end})
+			if alias ~= nil and alias ~= '' then _G[alias] = pkg end
+			return pkg
+		end
+	end
+	return __HX_IMPORT_LIB(path)
+end
+
 __HXOBJ_MT = {
 	__index = function(t, k)
 		local r = __hx_obj_index(t.__hxid, k)
@@ -616,6 +867,12 @@ __HXOBJ_MT = {
 	end,
 	__newindex = function(t, k, v)
 		__hx_obj_newindex(t.__hxid, k, v)
+	end,
+	__call = function(h, ...)
+		local n = select('#', ...)
+		local packed = {n = n}
+		for i = 1, n do packed[i] = select(i, ...) end
+		return __HX_WRAP(__hx_obj_construct(h.__hxid, packed))
 	end
 }
 
@@ -627,6 +884,19 @@ function __HX_WRAP(v)
 end
 
 function getObj(path) return __HX_WRAP(__hx_getObj(__HX_RESOLVER__, path)) end
+
+-- import alias: importClass('backend.WeekData', 'WeekData') binds _G.WeekData = class handle
+function importClass(path, alias)
+	local h = __HX_WRAP(__hx_importClass(path))
+	if h ~= nil and alias ~= nil and type(alias) == 'string' and alias ~= '' then
+		_G[alias] = h
+	end
+	return h
+end
+
+function getEnum(path) return __HX_WRAP(__hx_getEnum(path)) end
+
+function makeEnum(path, name, args) return __HX_WRAP(__hx_makeEnum(path, name, args)) end
 
 function newObj(className, args) return __HX_WRAP(__hx_newObj(className, args)) end
 

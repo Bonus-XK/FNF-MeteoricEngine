@@ -37,6 +37,23 @@
     子状态共存的场景必须显式传上下文）。
   - `runHaxeCodeObj` 在菜单返回 nil（菜单无 HScript 模块，胶水有 nil 保护）。
   - 句柄注册表清理：最后一个界面脚本销毁且不在 PlayState 时清空（`releaseMenu`）。
+- **【对象桥扩展】HScript 同款 `import` + `class` 继承 Haxe 类**：
+  - `import('flixel.FlxSprite')` 把类绑定进全局（自动末段短名）、支持别名与
+    `import('flixel.util.*')` 包懒解析；旧 Lua 库文件导入语义不变。
+  - 类句柄支持 `Foo(...)` 直接构造（`__call` 元方法）。
+  - `Class.new('MySprite', FlxSprite)` 继承 Haxe 类：实例持有真对象（`__hxobj`），
+    读属性 Lua 类链优先、Haxe 兜底，写属性自动写穿到 Haxe 侧存在的字段；
+    **引擎主动回调的虚方法不会进 Lua**（架构限制，文档已写明）。
+  - `getEnum` / `makeEnum`：真实引擎枚举经保活映射支持（路径用 hxcpp 运行时类型名，
+    如 `backend.Countdown`）；String 背书的 abstract enum（FlxTextAlign 等）直接传字符串。
+  - `objKeys` 支持 Map（`keys()` 迭代器）。
+  - **【架构性放弃】Lua 函数不能传给 Haxe 回调参数**：桥接回调在任意 Haxe 时机被调用
+    会绕开 `luaCallDepth` 嵌套防护，实测触发 LuaJIT 栈堆损坏 SEGV（真机复现）。
+    传函数参数处安全置空 + 诊断；带回调的逻辑用 `runHaxeCodeObj`。
+  - 途中修复的 hxcpp 深坑（均注释在案）：对枚举对象 Reflect/getClass SEGV、
+    ObjectMap 哈希枚举值 SEGV、枚举运行时路径不含模块速记段。
+  - 真机验证：import/别名/构造/包懒解析/class 继承（构造参数/Lua 字段/Haxe 读写穿透/
+    方法互调）/枚举成员与构造/Map 遍历/回调置空安全 全过，零崩溃。
   - **真机验证**：结算界面（bot 打完整曲自动进入）冒烟 17 步全过——state 句柄、界面字段、
     FlxTypedGroup/Array 句柄与 0 基索引、精灵属性读写回环、方法调用、原始值字段、
     句柄传参 add、`runHaxeCodeObj` nil 保护；游玩模式回归复验 9 组全过；全程零崩溃。

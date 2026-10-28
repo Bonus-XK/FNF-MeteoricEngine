@@ -2,7 +2,7 @@
 # generator: tools/contract/gen_script_surface.py
 # schema: 1
 # columns: kind<TAB>name<TAB>source_location
-# counts: lua_unique=238 hscript_unique=194 lua_ui_unique=73 pairs_unique=505 bare_name_unique=452 registrations=514 dynamic_sites=4
+# counts: lua_unique=243 hscript_unique=194 lua_ui_unique=73 pairs_unique=510 bare_name_unique=457 registrations=519 dynamic_sites=4
 # 口径: pairs_unique = 唯一 (kind,name) 对数（= 契约条目数）；bare_name_unique = 跨命名空间去重后的裸名数（同一裸名可同时属于多个 kind，属独立契约）
 # dynamic_sites: source/psychlua/FunkinLua.hx:112, source/psychlua/FunkinLua.hx:398, source/psychlua/HScript.hx:870, source/psychlua/MenuScript.hx:213
 # 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。
@@ -213,17 +213,22 @@ hscript	tr	source/psychlua/HScript.hx:567
 hscript	trOr	source/psychlua/HScript.hx:570
 hscript	version	source/psychlua/HScript.hx:716
 lua	FlxColor	source/psychlua/functions/MiscCommands.hx:64
-lua	__hx_getObj	source/psychlua/ObjectBridge.hx:542
-lua	__hx_newObj	source/psychlua/ObjectBridge.hx:546
-lua	__hx_obj_call	source/psychlua/ObjectBridge.hx:556
-lua	__hx_obj_count	source/psychlua/ObjectBridge.hx:571
-lua	__hx_obj_index	source/psychlua/ObjectBridge.hx:549
-lua	__hx_obj_keys	source/psychlua/ObjectBridge.hx:562
-lua	__hx_obj_len	source/psychlua/ObjectBridge.hx:565
-lua	__hx_obj_newindex	source/psychlua/ObjectBridge.hx:552
-lua	__hx_obj_release	source/psychlua/ObjectBridge.hx:568
-lua	__hx_obj_type	source/psychlua/ObjectBridge.hx:559
-lua	__hx_runHaxeCodeObj	source/psychlua/ObjectBridge.hx:471
+lua	__hx_getEnum	source/psychlua/ObjectBridge.hx:766
+lua	__hx_getObj	source/psychlua/ObjectBridge.hx:723
+lua	__hx_importClass	source/psychlua/ObjectBridge.hx:762
+lua	__hx_import_route	source/psychlua/ObjectBridge.hx:774
+lua	__hx_makeEnum	source/psychlua/ObjectBridge.hx:769
+lua	__hx_newObj	source/psychlua/ObjectBridge.hx:727
+lua	__hx_obj_call	source/psychlua/ObjectBridge.hx:737
+lua	__hx_obj_construct	source/psychlua/ObjectBridge.hx:758
+lua	__hx_obj_count	source/psychlua/ObjectBridge.hx:752
+lua	__hx_obj_index	source/psychlua/ObjectBridge.hx:730
+lua	__hx_obj_keys	source/psychlua/ObjectBridge.hx:743
+lua	__hx_obj_len	source/psychlua/ObjectBridge.hx:746
+lua	__hx_obj_newindex	source/psychlua/ObjectBridge.hx:733
+lua	__hx_obj_release	source/psychlua/ObjectBridge.hx:749
+lua	__hx_obj_type	source/psychlua/ObjectBridge.hx:740
+lua	__hx_runHaxeCodeObj	source/psychlua/ObjectBridge.hx:652
 lua	addAnimation	source/psychlua/functions/ObjectCommands.hx:157
 lua	addAnimationByIndices	source/psychlua/functions/ObjectCommands.hx:170
 lua	addAnimationByIndicesLoop	source/psychlua/DeprecatedFunctions.hx:14

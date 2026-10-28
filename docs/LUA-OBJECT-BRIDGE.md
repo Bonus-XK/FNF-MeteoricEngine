@@ -69,6 +69,43 @@ end
 内部另有 10 个 `__hx_*` 回调名（已冻结进 `tools/contract/script-surface.tsv`）与
 胶水名 `__HXOBJ_MT` / `__HX_WRAP`，请勿在脚本里占用。
 
+## import 与 class（HScript 同款语义）
+
+**import**——绑定 Haxe 类/枚举到脚本全局：
+
+```lua
+import('flixel.FlxSprite')              -- _G.FlxSprite = 类句柄（自动取末段短名）
+import('backend.WeekData', 'WD')        -- _G.WD = 类句柄
+import('flixel.util.*')                 -- 包懒解析表（访问成员时按需绑定并缓存）
+import('mylib.lua') / import('lib')     -- 旧语义：Lua 库文件导入（不变）
+```
+
+类句柄支持静态访问与 **`Foo(...)` 直接构造**（`__call` 元方法）。
+
+**class 继承 Haxe 类**——`Class.new` 的 parent 传类句柄即可：
+
+```lua
+Class.new('MySprite', FlxSprite)
+function MySprite:new(x, y) self.hp = 99 end   -- 构造参数同时给 Haxe 构造与 new()
+local m = MySprite(30, 40)
+m:makeGraphic(20, 20, 0xFFFFFF00)              -- Haxe 方法（继承）
+m.x = m.x + 5                                  -- 写穿透：Haxe 侧有的字段写 Haxe，没有的写 Lua 表
+self.__hxobj.x = 1                             -- 显式直写 Haxe 属性
+```
+
+限制（诚实版）：**引擎主动回调的虚方法（update/draw 等）不会进 Lua**——真对象上没有
+override，引擎 C++ 调用绕过脚本层；Lua 侧能覆盖的是「脚本自己调用」的方法。
+
+**枚举**：`getEnum(path)` 拿枚举句柄（成员 `cd.ONE` 经 `Type.createEnum` 读取）、
+`makeEnum(path, 'CTOR', args)` 构造枚举值。注意：
+- 路径用 **hxcpp 运行时类型路径**：模块内声明的子枚举 `Countdown` 是
+  `backend.Countdown`（不是 `backend.BaseStage.Countdown`，源码速记在注册表里不存在）；
+- String 背书的 abstract enum（如 `FlxTextAlign`）**值就是字符串**，直接传 `'center'`；
+- 常用引擎枚举已显式保活（`backend.Countdown` / `objects.Alignment`），hxcpp 的
+  `resolveEnum` 对部分枚举拿不到（HScript 同限，其靠 preset 注入常量绕过）。
+
+**迭代**：数组用数字索引；Map 用 `objKeys(map)`（已支持 `keys()` 迭代器）+ `objGet`。
+
 ## 界面脚本（menus/*.lua）也支持
 
 对象桥同时接入了界面脚本系统（`MenuScript`）：`menus/<界面名>.lua`（main_menu、
@@ -119,6 +156,13 @@ end
    等价互通。
 9. 菜单模式下 `LuaUtils` 依赖 PlayState 的特殊通道（括号路径等）不可用，已自动
    回退到 Reflect 通道；`PlayState.instance == null` 是模式检测依据。
+10. **【架构性】Lua 函数不能传给 Haxe 回调参数**（tween onComplete / FlxTimer 回调等）：
+    桥接后的回调会在任意 Haxe 时机被调用，绕开 `luaCallDepth` 嵌套防护，实测触发
+    LuaJIT 栈堆损坏 SEGV（2026-10-28 真机复现）。传函数参数处安全置空并给诊断；
+    带回调的逻辑请用 `runHaxeCodeObj`。
+11. 对枚举对象做 `Reflect`/`getClass`、ObjectMap 哈希枚举值，在 hxcpp 上均实测 SEGV——
+    引擎内部已全部绕开（标记式路由 + `Type.createEnum`），但脚本不要对枚举句柄用
+    `pairs`/`rawget` 之类。
 
 ## 实现位置
 
