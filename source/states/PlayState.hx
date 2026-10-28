@@ -3817,8 +3817,11 @@ class GameHUD
 			iconFlyTarget = 0;
 			st.healthDisplayPct = st.health / 2 * 100;
 		}
-		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset + iconFlyOff;
-		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2 + iconFlyOff;
+		// 跳动中心改为「中上」后，横向居中由 `origin` 自己完成，x 不再需要按 scale 补偿。
+		// 旧公式里的 `+ (150*scale.x - 150)/2`（P1）与 `- (150*scale.x)/2`（P2）是按
+		// 「支点 = 左上角」写的，且两式符号相反 —— P2 恰好居中、P1 却整体往右窜 ~17px。
+		iconP1.x = healthBar.barCenter - iconOffset + iconFlyOff;
+		iconP2.x = healthBar.barCenter - 75 - iconOffset * 2 + iconFlyOff;
 		// 胜利小图标（OSEngine/FNF PR#138 语义）：3 帧 = [0 正常 / 1 劣势 / 2 胜利]，2 帧兼容旧图标
 		iconP1.animation.curAnim.curFrame = iconFrame(iconP1, healthBar.percent, true);
 		iconP2.animation.curAnim.curFrame = iconFrame(iconP2, healthBar.percent, false);

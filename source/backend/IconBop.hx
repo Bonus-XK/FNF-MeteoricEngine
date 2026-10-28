@@ -16,10 +16,10 @@ import objects.HealthIcon;
  *   none 关闭 / pulse 脉冲 / alternate 错拍 / nod 点头 / hop 跳跃 / squash 挤压 / ke KE 引擎
  *
  * 约定（改本类必读）：
- *  - 缩放一律走 `setScale` / `setScaleXY`（`updateHitbox()` + `origin(0,0)`），
- *    与历史 KE 实现口径一致。图标 x 由 `GameHUD.update` 每帧按 `150*scale.x` 重算
- *    （强绑血条中心，见 `PlayState.hx` 的 `iconP1.x = ...`），所以**缩放/旋转都不会
- *    让图标漂移**，本类不要碰 x。
+ *  - 缩放一律走 `setScale` / `setScaleXY`（`updateHitbox()` + `setPivot()`）。
+ *    跳动中心是**中上方**（`origin = (frameWidth*0.5, 0)`）：横向从中心向两侧等宽扩张，
+ *    纵向从顶边往下长。因此**缩放本身不会让图标漂移**，x 不需要按 scale 补偿
+ *    （旧公式那两个符号相反的补偿项已随本次改动移除，见 `PlayState.GameHUD.update`）。
  *  - `beatHit` 由 `NoteChartDomain.beatHit` 调用；该函数内部已用
  *    `lastBeatHit >= curBeat` 早退，一帧最多触发一次 → 这里是「每拍一次」而非「累积」。
  *  - 所有时间常数都乘 `playbackRate`，0.5x / 1.5x 变速下跳动快慢不变。
@@ -491,7 +491,7 @@ class IconBop
 		// flixel 6.2 改成重载后这个坑就出现了。本引擎图标缩放一律用双参。
 		icon.scale.set(s, s);
 		icon.updateHitbox();
-		icon.origin.set(0, 0);
+		setPivot(icon);
 	}
 
 	/** 非等比缩放（挤压档）。同样必须双参，理由见 `setScale`。 */
@@ -499,7 +499,23 @@ class IconBop
 	{
 		icon.scale.set(sx, sy);
 		icon.updateHitbox();
-		icon.origin.set(0, 0);
+		setPivot(icon);
+	}
+
+	/**
+	 * 跳动中心 —— **中上方**（顶边中点）：横向从中心向两侧等宽扩张，纵向仍从顶部往下长。
+	 *
+	 * `origin` 就是 flixel 的缩放/旋转支点，单位是**未缩放的帧坐标**，
+	 * 所以水平中心 = `frameWidth * 0.5`；`y = 0` 表示顶边不动（不会往上顶）。
+	 *
+	 * ⚠ 必须在 `updateHitbox()` **之后**设：它内部会调 `centerOrigin()`
+	 * （`FlxSprite.centerOrigin()` → `origin.set(frameWidth*0.5, frameHeight*0.5)`）
+	 * 把支点放回正中，晚于它才会生效。
+	 * ⚠ 同理必须传**两个**参数（见 `setScale` 里的 flixel 6.2 单参 `set` 重载说明）。
+	 */
+	static inline function setPivot(icon:HealthIcon):Void
+	{
+		icon.origin.set(icon.frameWidth * 0.5, 0);
 	}
 
 	/** KE 用：按像素数放大（历史实现按 frameWidth 折算成 scale） */
