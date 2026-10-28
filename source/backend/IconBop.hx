@@ -50,8 +50,13 @@ class IconBop
 
 	// ==================== 参数（像素 / 度 / 秒） ====================
 
-	/** 脉冲：每拍双方同步放到的峰值缩放 */
-	static inline final PULSE_SCALE:Float = 1.16;
+	/**
+	 * 脉冲：每拍双方同步放到的峰值缩放。
+	 *
+	 * ⚠ 2026-10-28 手感收敛：1.16 → 1.12。原值在 150px 图标上是放大 24px，
+	 * 配上 ζ=0.45 的弹簧回弹过冲（反缩 4.0px）被用户评为「太 Q 弹」。
+	 */
+	static inline final PULSE_SCALE:Float = 1.12;
 	/** 错拍：涨的一侧 / 缩的一侧，逐拍互换 */
 	static inline final ALT_UP:Float = 1.14;
 	static inline final ALT_DOWN:Float = 0.94;
@@ -64,8 +69,14 @@ class IconBop
 	 * 历史值 3.5° + 线性回正看不出效果，两个原因：
 	 *  ① 幅度太小 —— 3.5° 绕左上角旋转，150px 图标远角只抬 ~9px，被同帧的缩放盖过；
 	 *  ② 线性回正 0.14s 就归零，**没有过冲** —— 「点头」的灵魂是越过中线再回来。
-	 * 现在角度也走弹簧（见 `angX/angV`），峰值 8°（远角抬 ~21px）且约 17% 过冲，
+	 * 角度改走弹簧（见 `angX/angV`）后：峰值 8°（远角抬 ~21px），过冲约 17%，
 	 * 「偏头→越过中线→回正」三段都能看出来。
+	 *
+	 * ⚠ 2026-10-28「统一收」的**已知代价**：本次把共用弹簧（含倾角弹簧）一并
+	 *   从 ω=24 / ζ=0.45 收到 ω=32 / ζ=0.72，倾角过冲随之从 +1.33° 降到 +0.20°
+	 *   （约 2.5%），「越过中线」这一段基本看不出来了。峰值 8° 未动，远角位移
+	 *   仍是 ~21px，所以点头**依然看得见**，只是回正变得干净、不再反向晃。
+	 *   若要单独保住过冲：给 `angleStep` 传回旧的 K/C 即可，无需改其它逻辑。
 	 */
 	static inline final NOD_ANGLE:Float = 8.0;
 
@@ -101,17 +112,43 @@ class IconBop
 	// 阻尼弹簧同时解决两点：过冲提供生命力，且只有**位移与速度同时**趋零才归零，
 	// 归零那一刻视觉上没有任何跳变。
 	//
-	// 参数（离线扫参得出，60/120/144/240fps 均验证过不抖动、不过冲发散）：
-	// ω = 24 rad/s（周期 ≈ 0.26s），ζ = 0.45 → 过冲约 16.6%、停稳约 0.38s。
-	// 逐帧轨迹（相对 1.0）：1.134 → 0.973（过冲）→ 1.000，全程连续无跳变。
-	// ⚠ 改这两个值前先跑一遍扫参：过冲 >25% 会晃，<10% 会显得"软塌"。
-	static inline final SPRING_K:Float = 576.0; // ω²
-	static inline final SPRING_C:Float = 21.6; // 2ζω
+	// 参数（离线扫参得出）：ω = 32 rad/s（周期 ≈ 0.20s），ζ = 0.72 → 连续解过冲约 3.8%，
+	// 60fps 半隐式欧拉实测过冲 0.03px（离散附加阻尼把它吃掉了），停稳约 0.23s。
+	// 逐帧轨迹（相对 1.0，60fps）：1.103 → 1.074 → 1.047 → 1.025 → 1.011 → 1.002
+	//   → 0.998 → 0.997 → 1.000，全程连续无跳变。
+	//
+	// ⚠ 2026-10-28 手感收敛（用户实机反馈「太 Q 弹」）：
+	//   原 ω=24 / ζ=0.45 → 过冲 16.6%，150px 图标冲过中线后**反缩 4.0px** 再晃回来，
+	//   停稳 0.383s；在 150BPM（0.4s/拍）下几乎整拍都在抖，读起来就是橡皮/果冻感。
+	//   现在过冲压到全帧率不可见（≤0.5px，60/120/144/240fps 一致），
+	//   但收尾仍是弹簧（非线性、位移与速度同时趋零才归零），不会退回上一版的「生硬 / 卡顿」。
+	// ⚠ 改这两个值前先跑一遍扫参：过冲 >25% 会晃；且弹簧越硬，整帧积分的帧率相关性越强
+	//   （见 `SPRING_H_SUB`）。
+	static inline final SPRING_K:Float = 1024.0; // ω²
+	static inline final SPRING_C:Float = 46.08; // 2ζω
 	/** 归零阈值：位移与速度**同时**小于此值才停（位移 0.15% ≈ 0.2px，已不可见） */
 	static inline final SPRING_EPS_X:Float = 0.0015;
 	static inline final SPRING_EPS_V:Float = 0.02;
-	/** 单帧积分上限：ω·h < 2 才稳定，长帧（切窗/卡顿）时钳住防发散 */
+	/** 单帧模拟总时长上限：ω·h < 2 才稳定，长帧（切窗/卡顿）时钳住防发散 */
 	static inline final SPRING_H_MAX:Float = 0.0334;
+	/**
+	 * 固定子步长（秒 = 1/240）—— **让弹簧行为与帧率无关**。
+	 *
+	 * 原先一个物理帧只积分一步（`h` = 整帧时长）。半隐式欧拉对**阻尼**项是显式的，
+	 * `C·h` 越大失真越严重：
+	 *   ω=24 / ζ=0.45（旧参数）：C·h = 0.36 @60fps、0.09 @240fps
+	 *   ω=32 / ζ=0.72（新参数）：C·h = 0.768 @60fps ← 一步就吃掉 77% 的冲量，
+	 *     跳跃档落地压扁 7.94px → 1.86px @60fps，而 @240fps 是 5.60px
+	 *     —— 同一份设置在 60Hz 与 240Hz 屏上差 3 倍。
+	 * 现在把一帧切成 ≤ H_SUB 的子步累加，各帧率轨迹一致。
+	 *
+	 * ⚠ 循环终止性证明（AGENTS.md §6）：
+	 *   每轮 `remaining -= h`，其中 `h = min(H_SUB, remaining)`；
+	 *   当 `remaining > 0` 时 `h > 0`，故 remaining 严格递减；
+	 *   且当 `remaining <= H_SUB` 时 `h = remaining`，该轮后 remaining 恰好为 0 → 退出。
+	 *   迭代次数上界 = ceil(H_MAX / H_SUB) = ceil(0.0334 / 0.0041667) = 9。
+	 */
+	static inline final SPRING_H_SUB:Float = 0.0041667;
 
 	// ==================== 每帧状态 ====================
 
@@ -313,12 +350,19 @@ class IconBop
 		var v:Float = V[i];
 		if (x == 0 && v == 0) return 0; // 已静止：零开销
 
-		var h:Float = dt * rate;
-		// 长帧（切窗/瞬时卡顿）时钳住步长，否则 ω·h ≥ 2 会让显式积分发散成抖动
-		if (h > SPRING_H_MAX) h = SPRING_H_MAX;
+		// 本帧要模拟的总时长（长帧时钳住，见 SPRING_H_MAX）
+		var remaining:Float = dt * rate;
+		if (remaining > SPRING_H_MAX) remaining = SPRING_H_MAX;
 
-		v += (-SPRING_K * x - SPRING_C * v) * h;
-		x += v * h;
+		// 切成固定子步累加：阻尼项是显式积分，误差只取决于 C·h，
+		// 固定 h 之后手感就与帧率无关了。终止性证明见 `SPRING_H_SUB`。
+		while (remaining > 0)
+		{
+			var h:Float = (remaining > SPRING_H_SUB) ? SPRING_H_SUB : remaining;
+			v += (-SPRING_K * x - SPRING_C * v) * h;
+			x += v * h;
+			remaining -= h;
+		}
 
 		if (Math.abs(x) < SPRING_EPS_X && Math.abs(v) < SPRING_EPS_V)
 		{
