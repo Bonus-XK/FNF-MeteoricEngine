@@ -874,10 +874,19 @@ source/psychlua/LuaClass.hx	    -- new 包装：第一个参数是本类实例�
 source/psychlua/LuaClass.hx	    -- 会触发 __newindex 存到 __constructor，不会覆盖包装器。\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/LuaClass.hx	    -- 包装器不存进类表，用户写 function Enemy:new(...) 时\\n	1	生成进用户 Lua 类的注释文本
 source/psychlua/ObjectBridge.hx	[ObjectBridge] Lua 胶水加载失败($status): 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] getEnum: 枚举不存在: $path	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] importClass: 类不存在: $path	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] makeEnum: $path.$name 构造失败: $err	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] makeEnum: 枚举不存在: $path	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/ObjectBridge.hx	[ObjectBridge] newObj: 构造 $className 失败: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/psychlua/ObjectBridge.hx	[ObjectBridge] newObj: 类不存在: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] newObj: 类不存在: $className	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/psychlua/ObjectBridge.hx	[ObjectBridge] objCall: ${objTypeOf(obj)}.$keyStr 不是方法	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
-source/psychlua/ObjectBridge.hx	[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: 	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] objSet(${objTypeOf(obj)}.$keyStr) 失败: $e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数（LuaJIT 嵌套 pcall 风险），已置为空回调	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数（字段 $f），已置为空回调	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] 不支持把 Lua 函数传给 Haxe 回调参数，已置为空回调	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] 只有类句柄可以调用构造（${objTypeOf(obj)} 不是类），实例化请用 newObj	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/psychlua/ObjectBridge.hx	[ObjectBridge] 构造 $clsName 失败: $e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
 source/scripting/ScriptGroup.hx	$func 出错 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	$func 抛出异常 @ 	2	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
 source/scripting/ScriptGroup.hx	(未知)	1	Meteoric 脚本层的诊断日志（log()/logError()，终端可见，非界面文案）
