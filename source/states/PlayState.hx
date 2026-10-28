@@ -3088,6 +3088,10 @@ class PlayState extends MusicBeatState
 		var popupStyle:String = ClientPrefs.data.popupStyle;
 		var popupCustom:Bool = PopupAnim.isCustom(popupStyle);
 		var popupDur:Float = ClientPrefs.data.popupDuration;
+		// 立体层：弹窗挂到游戏世界摄像机（camGame）而不是 HUD 层，于是会跟随舞台镜头
+		// 一起移动与缩放，且绘制在 HUD 元素之下（"下一层"）。
+		var popup3D:Bool = ClientPrefs.data.popup3D;
+		var popupCam:FlxCamera = popup3D ? camGame : camHUD;
 
 		var uiPrefix:String = "";
 		var uiSuffix:String = '';
@@ -3114,7 +3118,7 @@ class PlayState extends MusicBeatState
 				rating.loadGraphic(Paths.image(ratingPath));
 			else
 				rating.loadGraphic(Paths.image(uiPrefix + ratingImg + uiSuffix));
-			rating.cameras = [camHUD];
+			rating.cameras = [popupCam];
 			rating.screenCenter();
 			rating.x = placement - 40;
 			rating.y -= 60;
@@ -3137,7 +3141,7 @@ class PlayState extends MusicBeatState
 				comboSpr.loadGraphic(Paths.image(comboPath));
 			else
 				comboSpr.loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));
-			comboSpr.cameras = [camHUD];
+			comboSpr.cameras = [popupCam];
 			comboSpr.screenCenter();
 			comboSpr.x = placement;
 			comboSpr.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
@@ -3211,7 +3215,7 @@ class PlayState extends MusicBeatState
 		for (i in seperatedScore)
 		{
 			var numScore:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'num' + Std.int(i) + uiSuffix));
-			numScore.cameras = [camHUD];
+			numScore.cameras = [popupCam];
 			numScore.screenCenter();
 			numScore.x = placement + (43 * daLoop) - 90 + ClientPrefs.data.comboOffset[2];
 			numScore.y += 80 - ClientPrefs.data.comboOffset[3];
@@ -3235,10 +3239,13 @@ class PlayState extends MusicBeatState
 
 			if (popupCustom)
 			{
-				PopupAnim.play(numScore, popupStyle, playbackRate, popupDur);
+				PopupAnim.play(numScore, popupStyle, playbackRate, popupDur, popupCam, popup3D);
 			}
 			else
 			{
+				// 立体层：屏幕像素 → camGame 世界坐标（见 PopupAnim.toStageLayer 注释）
+				if (popup3D) PopupAnim.toStageLayer(numScore, popupCam);
+
 				FlxTween.tween(numScore, {alpha: 0}, 0.2 * popupDur / playbackRate, {
 					onComplete: function(tween:FlxTween)
 					{
@@ -3258,34 +3265,45 @@ class PlayState extends MusicBeatState
 		// 其余风格交给 backend.PopupAnim —— 它接管运动 + 淡出 + 销毁，这里不要再叠 alpha 补间。
 		if (popupCustom)
 		{
-			PopupAnim.play(rating, popupStyle, playbackRate, popupDur);
-			PopupAnim.play(comboSpr, popupStyle, playbackRate, popupDur);
+			// backend.PopupAnim 接管运动 + 淡出 + 销毁
+			PopupAnim.play(rating, popupStyle, playbackRate, popupDur, popupCam, popup3D);
+			PopupAnim.play(comboSpr, popupStyle, playbackRate, popupDur, popupCam, popup3D);
 		}
-		else if (comboSpr != null)
+		else
 		{
-			if (rating != null)
+			// 立体层：屏幕像素 → camGame 世界坐标（换算见 PopupAnim.toStageLayer 注释）
+			if (popup3D)
+			{
+				PopupAnim.toStageLayer(rating, popupCam);
+				PopupAnim.toStageLayer(comboSpr, popupCam);
+			}
+
+			if (comboSpr != null)
+			{
+				if (rating != null)
+					FlxTween.tween(rating, {alpha: 0}, 0.2 * popupDur / playbackRate, {
+						startDelay: Conductor.crochet * 0.001 / playbackRate
+					});
+
+				FlxTween.tween(comboSpr, {alpha: 0}, 0.2 * popupDur / playbackRate, {
+					onComplete: function(tween:FlxTween)
+					{
+						comboSpr.destroy();
+						if (rating != null) rating.destroy();
+					},
+					startDelay: Conductor.crochet * 0.002 / playbackRate
+				});
+			}
+			else if (rating != null)
+			{
 				FlxTween.tween(rating, {alpha: 0}, 0.2 * popupDur / playbackRate, {
+					onComplete: function(tween:FlxTween)
+					{
+						rating.destroy();
+					},
 					startDelay: Conductor.crochet * 0.001 / playbackRate
 				});
-
-			FlxTween.tween(comboSpr, {alpha: 0}, 0.2 * popupDur / playbackRate, {
-				onComplete: function(tween:FlxTween)
-				{
-					comboSpr.destroy();
-					if (rating != null) rating.destroy();
-				},
-				startDelay: Conductor.crochet * 0.002 / playbackRate
-			});
-		}
-		else if (rating != null)
-		{
-			FlxTween.tween(rating, {alpha: 0}, 0.2 * popupDur / playbackRate, {
-				onComplete: function(tween:FlxTween)
-				{
-					rating.destroy();
-				},
-				startDelay: Conductor.crochet * 0.001 / playbackRate
-			});
+			}
 		}
 	}
 

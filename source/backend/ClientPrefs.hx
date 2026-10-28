@@ -278,6 +278,12 @@ class SaveVariables {
 	 * 1.0 = 设计基准（约 0.35s）；调小更利落（高速谱不挡视线），调大更从容。
 	 */
 	@:keep public var popupDuration:Float = 1.0;
+	/**
+	 * 弹窗立体层：开启后评分 / 连击弹窗从 HUD 层移到**游戏世界层（camGame）**，
+	 * 于是会跟随舞台镜头一起移动、缩放（绘制顺序：舞台/角色 < 弹窗 < HUD）。
+	 * 关闭 = 固定在 HUD 层（引擎原有行为）。
+	 */
+	@:keep public var popup3D:Bool = false;
 	/** 一次性迁移标记：老存档没有 `popupStyle` / `popupDuration` 字段，首次启动时补默认值（见 `loadPrefs`） */
 	@:keep public var popupMigrated:Bool = false;
 	@:keep public var lessBotLag:Bool = false;          // 自动游玩只计分不弹窗（JS 引擎 lessBotLag）

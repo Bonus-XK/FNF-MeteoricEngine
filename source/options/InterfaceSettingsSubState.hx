@@ -118,6 +118,14 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		option.maxValue = 2.00;
 		addOption(option);
 
+		var option:Option = new Option(
+			backend.Lang.tOr('option.popup3D', '弹窗立体层'),
+			backend.Lang.tOr('optionDesc.popup3D',
+				'开启后，评分与连击弹窗从 HUD 层移到游戏世界层（舞台/角色所在层）：\n它们会跟随舞台镜头一起移动、缩放，且绘制在 HUD 元素下方。\n关闭 = 固定在 HUD 层（引擎原有行为）'),
+			'popup3D',
+			'bool');
+		addOption(option);
+
 		#if !mobile
 		var option:Option = new Option('FPS计数器',
 			'关闭后，帧数计数器（FPS）将不会显示',
