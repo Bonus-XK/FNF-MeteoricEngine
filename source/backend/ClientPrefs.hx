@@ -849,6 +849,9 @@ class ClientPrefs {
 			// 但 appStorageDir 是否已含 localPath 段在不同 lime 版本有差异——两个候选都试，
 			// 拷没拷到都要在日志里说真话，不许静默）。
 			var __backedUp:Bool = false;
+			// 隔离测试模式（METEORIC_SAVE_DIR）下**不留证**：隔离目录首次是空的，
+			// 此时下面那套"找不到就回退复制真实存档"会去拷用户的真档，纯属误导。
+			if (CoolUtil.testSavePath() == null)
 			try {
 				var __base:String = lime.system.System.applicationStorageDirectory;
 				if (__base == null || __base.length == 0) __base = './';

@@ -121,6 +121,10 @@ class CoolUtil
 	**/
 	inline public static function getSavePath(folder:String = 'ShadowMario'):String {
 		#if (sys && !android)
+		// 测试隔离：METEORIC_SAVE_DIR 优先级最高 —— 自动化/bot 冒烟跑在独立目录，
+		// 存档全部写到那里，**绝不触碰玩家真实存档**。详见 testSavePath()。
+		var isolated:String = testSavePath();
+		if (isolated != null) return isolated;
 		// 携带模式：设置改写到引擎目录（详见 portableRelativeTo）
 		// ⚠ 必须放在 @:privateAccess **之前**：那个标记只作用于紧随其后的 return 表达式，
 		//   插在中间会让 FlxSave.validate 的私有访问授权落到本段代码上（编译报
@@ -245,6 +249,58 @@ class CoolUtil
 		var dst:String = target;
 		while (dst.length > 0 && (dst.charAt(0) == '/' || dst.charAt(0) == '\\')) dst = dst.substr(1);
 		return up.toString() + dst;
+	}
+
+	/**
+	 * 测试隔离存档目录（环境变量 `METEORIC_SAVE_DIR`），未设置时返回 null。
+	 *
+	 * 用途：bot 冒烟 / 自动化回归跑在独立目录，`funkin.sol` / `controls_v3.sol` 全部写到那里，
+	 * **绝不触碰玩家真实存档**。
+	 *
+	 * ⚠ 2026-10-29 的血债，别重犯：
+	 *   以前的流程是「跑测试前备份 → 跑完用备份 cp 回去」。备份是**前一天**做的，
+	 *   于是每跑一轮就把用户在这之后改的设置**全部回滚一次**，半天跑七轮 = 冲掉七次，
+	 *   直接把人家存档设置搞没了。
+	 *   有了这个开关，测试**根本不需要**「备份 / 恢复」这套危险动作：
+	 *   `METEORIC_SAVE_DIR=/tmp/meteoric-test ./Meteoric` 即可，真实存档一个字节都不会被写。
+	 *
+	 * ⚠ **必须传绝对路径**（`FlxSave.bind` → `FlxSharedObject.getLocal(name, path)`，
+	 *   相对路径在那里会失败、把整个启动挂住；绝对路径实测可用）。
+	 * ⚠ 但实际落盘位置是 `storageDirectory + 你给的绝对路径`，即
+	 *   `METEORIC_SAVE_DIR=/tmp/meteoric-test` 会写到
+	 *   `~/Library/Application Support/tmp/meteoric-test/`。
+	 *   反正**不会落进 `Bonus-XK/Meteoric/`**，隔离目的达到；只是路径不直观，心里有数即可。
+	 */
+	public static function testSavePath():String
+	{
+		#if (sys && !android)
+		var env:String = null;
+		try
+		{
+			env = Sys.getEnv('METEORIC_SAVE_DIR');
+		}
+		catch (e:Dynamic) {}
+		if (env == null || env.length == 0) return null;
+		// 相对路径补成绝对路径 —— **绝不能返回 null**：那会回退到真实存档，
+		// 等于隔离失效（宁可路径丑一点，也不能碰用户的档）。
+		if (env.charAt(0) != '/')
+		{
+			try
+			{
+				env = sys.FileSystem.fullPath(env);
+			}
+			catch (e:Dynamic) {}
+			if (env == null || env.charAt(0) != '/') return null;
+		}
+		try
+		{
+			sys.FileSystem.createDirectory(env);
+		}
+		catch (e:Dynamic) {}
+		return env;
+		#else
+		return null;
+		#end
 	}
 
 	/** 携带模式下的存档目录（相对写法，可直接给 FlxSave.bind）；非携带模式返回 null。 */
