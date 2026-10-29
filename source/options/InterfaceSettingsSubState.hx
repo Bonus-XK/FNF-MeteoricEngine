@@ -121,7 +121,7 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option(
 			backend.Lang.tOr('option.popup3D', '弹窗立体层'),
 			backend.Lang.tOr('optionDesc.popup3D',
-				'开启后，评分与连击弹窗从 HUD 层移到游戏世界层（舞台/角色所在层）：\n它们会跟随舞台镜头一起移动、缩放，且绘制在 HUD 元素下方。\n关闭 = 固定在 HUD 层（引擎原有行为）'),
+				'开启后，评分与连击弹窗挂到舞台层（HUD 的下一层）：\n它们被钉在舞台里的固定位置 —— 镜头推近就跟着变大、镜头平移就跟着移出视野，\n并且绘制在 HUD 元素下方。关闭 = 挂在 HUD 层（引擎原有行为）'),
 			'popup3D',
 			'bool');
 		addOption(option);

@@ -1731,5 +1731,5 @@
   "option.popupDuration": "Popup Duration",
   "optionDesc.popupDuration": "Scales the whole popup: appear / hold / fade.\n1.0 is the designed baseline (~0.35s); lower is snappier, higher is more relaxed",
   "option.popup3D": "Popup 3D Layer",
-  "optionDesc.popup3D": "When on, rating and combo popups move from the HUD layer to the game world layer (where the stage/characters live):\nthey follow the stage camera as it moves and zooms, and draw underneath the HUD.\nOff = fixed on the HUD layer (engine default)"
+  "optionDesc.popup3D": "When on, rating and combo popups attach to the stage layer (one level below the HUD):\nthey are pinned to a fixed point in the world, so they grow as the camera zooms in and slide out of view as it pans,\nand they draw underneath the HUD. Off = attached to the HUD layer (engine default)"
 }

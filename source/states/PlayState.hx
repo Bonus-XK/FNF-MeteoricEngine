@@ -3088,10 +3088,10 @@ class PlayState extends MusicBeatState
 		var popupStyle:String = ClientPrefs.data.popupStyle;
 		var popupCustom:Bool = PopupAnim.isCustom(popupStyle);
 		var popupDur:Float = ClientPrefs.data.popupDuration;
-		// 立体层：弹窗挂到游戏世界摄像机（camGame）而不是 HUD 层，于是会跟随舞台镜头
-		// 一起移动与缩放，且绘制在 HUD 元素之下（"下一层"）。
-		var popup3D:Bool = ClientPrefs.data.popup3D;
-		var popupCam:FlxCamera = popup3D ? camGame : camHUD;
+		// 立体层（对齐 Codename Engine）：只把弹窗挂到舞台摄像机 camGame、**不动坐标**。
+		// 弹窗因此被钉在世界里的固定点上 —— 镜头推近它跟着变大、镜头平移它跟着移出视野，
+		// 但相对世界始终不动；绘制顺序也落到 HUD 元素之下（"下一层"）。
+		var popupCam:FlxCamera = ClientPrefs.data.popup3D ? camGame : camHUD;
 
 		var uiPrefix:String = "";
 		var uiSuffix:String = '';
@@ -3239,13 +3239,10 @@ class PlayState extends MusicBeatState
 
 			if (popupCustom)
 			{
-				PopupAnim.play(numScore, popupStyle, playbackRate, popupDur, popupCam, popup3D);
+				PopupAnim.play(numScore, popupStyle, playbackRate, popupDur, popupCam);
 			}
 			else
 			{
-				// 立体层：屏幕像素 → camGame 世界坐标（见 PopupAnim.toStageLayer 注释）
-				if (popup3D) PopupAnim.toStageLayer(numScore, popupCam);
-
 				FlxTween.tween(numScore, {alpha: 0}, 0.2 * popupDur / playbackRate, {
 					onComplete: function(tween:FlxTween)
 					{
@@ -3266,18 +3263,11 @@ class PlayState extends MusicBeatState
 		if (popupCustom)
 		{
 			// backend.PopupAnim 接管运动 + 淡出 + 销毁
-			PopupAnim.play(rating, popupStyle, playbackRate, popupDur, popupCam, popup3D);
-			PopupAnim.play(comboSpr, popupStyle, playbackRate, popupDur, popupCam, popup3D);
+			PopupAnim.play(rating, popupStyle, playbackRate, popupDur, popupCam);
+			PopupAnim.play(comboSpr, popupStyle, playbackRate, popupDur, popupCam);
 		}
 		else
 		{
-			// 立体层：屏幕像素 → camGame 世界坐标（换算见 PopupAnim.toStageLayer 注释）
-			if (popup3D)
-			{
-				PopupAnim.toStageLayer(rating, popupCam);
-				PopupAnim.toStageLayer(comboSpr, popupCam);
-			}
-
 			if (comboSpr != null)
 			{
 				if (rating != null)

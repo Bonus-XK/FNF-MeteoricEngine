@@ -26,6 +26,16 @@ import flixel.util.FlxTimer;
  *    `centerOrigin()`，所以缩放支点是精灵中心 —— 原地弹出、不漂移。
  *  - 所有时长都除以 `playbackRate`，变速下节奏不变（与 `IconBop` 同口径）。
  *  - classic 分支**不经过本类**，上游原行为逐字保留。
+ *
+ * 立体层的口径（`ClientPrefs.data.popup3D`，对齐 Codename Engine 的做法）：
+ *  Codename 的 `comboGroup` 是 `new RotatingSpriteGroup(FlxG.width * 0.55, FlxG.height * 0.5 - 60)`
+ *  —— **直接用屏幕尺寸算出的值当世界坐标**，随后 `add(comboGroup)` 落到默认相机 `camGame`，
+ *  **既不设 `cameras` 也不设 `scrollFactor`（默认 1,1），更不做任何坐标反解**。
+ *  于是弹窗被钉在世界里的一个固定点上：镜头推近它跟着变大，镜头平移它跟着移出视野，
+ *  但它相对**世界**始终不动 —— 这正是"场景里的物体"该有的行为。
+ *
+ *  ⚠ 所以本类在立体层下**只换摄像机、不动坐标**。曾经写过一版"按当前 viewLeft/zoom
+ *  反解回屏幕位置"的换算，那会让每次弹出都追着镜头跑、失去世界感，已废弃。
  */
 class PopupAnim
 {
@@ -89,10 +99,9 @@ class PopupAnim
 	 * @param rate     `playbackRate`
 	 * @param durScale 时长倍率（`ClientPrefs.data.popupDuration`）
 	 * @param cam      目标摄像机（HUD 层传 `camHUD`，立体层传 `camGame`）
-	 * @param onStage  true = 立体层：把屏幕坐标换算成游戏世界坐标以跟随舞台镜头
 	 */
 	public static function play(spr:FlxSprite, style:String, rate:Float, durScale:Float,
-			?cam:FlxCamera, onStage:Bool = false):Void
+			?cam:FlxCamera):Void
 	{
 		if (spr == null) return;
 
@@ -100,17 +109,8 @@ class PopupAnim
 		spr.velocity.set(0, 0);
 		spr.acceleration.set(0, 0);
 
-		if (cam != null)
-		{
-			spr.cameras = [cam];
-			// 立体层：精灵坐标原本是按 HUD 层写的**屏幕像素**，而 camGame 的视图原点
-			// 是世界坐标 viewLeft/viewTop、且带 zoom 缩放，所以要反解一次世界坐标，
-			// 这样镜头不动时屏幕位置与 classic 完全一致，镜头一动就跟着动。
-			if (onStage)
-			{
-				toStageLayer(spr, cam);
-			}
-		}
+		// 立体层只换摄像机，**不动坐标** —— 见类注释「立体层的口径」。
+		if (cam != null) spr.cameras = [cam];
 
 		var bsx:Float = spr.scale.x; // 基准缩放（setGraphicSize 之后的值，常见是 0.7）
 		var bsy:Float = spr.scale.y;
@@ -151,27 +151,6 @@ class PopupAnim
 			else
 				FlxTween.tween(spr, {y: by - LIFT, alpha: 0}, tOut, {ease: FlxEase.quadIn, onComplete: function(_) finish()});
 		});
-	}
-
-	/**
-	 * 把精灵从「HUD 屏幕坐标」搬到游戏世界层（camGame），使其跟随舞台镜头。
-	 *
-	 * flixel 的相机视图（源码 `FlxCamera.hx:2383-2405`）在世界坐标里是一个矩形：
-	 *   `viewLeft = scroll.x + viewMarginX`，`viewWidth = width - viewMarginX * 2`
-	 * 其中 `viewMarginX = (width / 2) * (1 - 1 / totalScaleX)`（zoom 围绕中心切边）。
-	 * 于是世界 → 屏幕是 `screen = (world - viewLeft) * totalScale`，反解即下面两行。
-	 *
-	 * ⚠ 只补偿位置，**不补偿尺寸**：弹窗会跟着镜头 zoom 一起缩放 —— 这正是
-	 * 「立体层」想要的效果（弹窗像场景里的物体，而不是贴在屏幕上的 UI）。
-	 */
-	public static function toStageLayer(spr:FlxSprite, cam:FlxCamera):Void
-	{
-		var sx:Float = cam.totalScaleX;
-		var sy:Float = cam.totalScaleY;
-		if (!(sx > 0.01)) sx = 1.0; // 静态平台 Float 不能与 null 比；顺便防 0 除
-		if (!(sy > 0.01)) sy = 1.0;
-		spr.x = cam.viewLeft + spr.x / sx;
-		spr.y = cam.viewTop + spr.y / sy;
 	}
 
 	/**

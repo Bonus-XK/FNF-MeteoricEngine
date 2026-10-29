@@ -279,9 +279,10 @@ class SaveVariables {
 	 */
 	@:keep public var popupDuration:Float = 1.0;
 	/**
-	 * 弹窗立体层：开启后评分 / 连击弹窗从 HUD 层移到**游戏世界层（camGame）**，
-	 * 于是会跟随舞台镜头一起移动、缩放（绘制顺序：舞台/角色 < 弹窗 < HUD）。
-	 * 关闭 = 固定在 HUD 层（引擎原有行为）。
+	 * 弹窗立体层：开启后评分 / 连击弹窗挂到**舞台摄像机 camGame**（HUD 的下一层），
+	 * 坐标**不做任何换算** —— 弹窗就钉在世界里的固定点上，镜头怎么动它都在那儿
+	 * （绘制顺序：舞台/角色 < 弹窗 < HUD）。口径对齐 Codename Engine 的 `comboGroup`。
+	 * 关闭 = 挂在 HUD 层（引擎原有行为）。
 	 */
 	@:keep public var popup3D:Bool = false;
 	/** 一次性迁移标记：老存档没有 `popupStyle` / `popupDuration` 字段，首次启动时补默认值（见 `loadPrefs`） */
