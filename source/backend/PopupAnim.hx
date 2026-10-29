@@ -154,6 +154,40 @@ class PopupAnim
 	}
 
 	/**
+	 * 立体层兜底：把弹窗的**屏幕位置**夹进摄像机可视区，越界才动。
+	 *
+	 * 为什么需要：立体层把弹窗钉在世界坐标上，而不同舞台 / 段落的 `camGame.scroll`
+	 * 差别很大（Week 1 实测 `scroll.x ∈ [-154, 237]`、`scroll.y ∈ [-9, 175]`），
+	 * 镜头一上移，原本贴屏幕顶部的弹窗就会直接跑出可视区、玩家完全看不见。
+	 * 正常情况**不改变任何坐标**（只有越界时才夹），所以"世界里的固定点"这个手感保留；
+	 * 越界时夹到边缘，保证至少看得见。
+	 */
+	public static function fitToView(spr:FlxSprite, cam:FlxCamera):Void
+	{
+		if (spr == null || cam == null) return;
+		var sx:Float = cam.totalScaleX;
+		var sy:Float = cam.totalScaleY;
+		if (!(sx > 0.01)) sx = 1.0;
+		if (!(sy > 0.01)) sy = 1.0;
+
+		final PAD:Float = 12; // 留一点边距，别让字紧贴屏幕边缘
+		var screenX:Float = (spr.x - cam.viewLeft) * sx;
+		var screenY:Float = (spr.y - cam.viewTop) * sy;
+		var w:Float = spr.width * sx;
+		var h:Float = spr.height * sy;
+
+		var nx:Float = screenX;
+		var ny:Float = screenY;
+		if (nx < PAD) nx = PAD;
+		else if (nx + w > cam.width - PAD) nx = cam.width - PAD - w;
+		if (ny < PAD) ny = PAD;
+		else if (ny + h > cam.height - PAD) ny = cam.height - PAD - h;
+
+		if (nx != screenX) spr.x = cam.viewLeft + nx / sx;
+		if (ny != screenY) spr.y = cam.viewTop + ny / sy;
+	}
+
+	/**
 	 * 按倍率缩放精灵（以基准缩放 `bsx/bsy` 为单位 1）。
 	 *
 	 * 用 `FlxTween.num` 而不是直接 tween `spr.scale`：后者依赖 FlxPoint 的字段写入

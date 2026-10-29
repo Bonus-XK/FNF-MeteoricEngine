@@ -25,6 +25,11 @@ class NoteOffsetState extends MusicBeatState
 	var coolText:FlxText;
 	var rating:FlxSprite;
 	var comboNums:FlxSpriteGroup;
+	/**
+	 * 弹窗预览挂哪个相机 —— 必须跟 `PlayState.popUpScore` 的选择保持同源，
+	 * 否则本页调到「看起来对」的位置，进游戏却是另一处（立体层开启时尤其明显）。
+	 */
+	var popupCam:FlxCamera;
 	var dumbTexts:FlxTypedGroup<FlxText>;
 
 	var barPercent:Float = 0;
@@ -59,6 +64,10 @@ class NoteOffsetState extends MusicBeatState
 		CustomFadeTransition.nextCamera = camOther;
 		FlxG.camera.scroll.set(120, 130);
 
+		// 预览层与游戏同源：立体层开启时弹窗挂 camGame（会跟着这里的舞台背景偏移），
+		// 关闭时挂 camHUD（像素级等价的经典表现）。
+		popupCam = ClientPrefs.data.popup3D ? camGame : camHUD;
+
 		persistentUpdate = true;
 		FlxG.sound.pause();
 
@@ -83,7 +92,7 @@ class NoteOffsetState extends MusicBeatState
 		coolText.x = FlxG.width * 0.35;
 
 		rating = new FlxSprite().loadGraphic(Paths.image('sick'));
-		rating.cameras = [camHUD];
+		rating.cameras = [popupCam];
 		rating.antialiasing = ClientPrefs.data.antialiasing;
 		rating.setGraphicSize(Std.int(rating.width * 0.7));
 		rating.updateHitbox();
@@ -91,7 +100,7 @@ class NoteOffsetState extends MusicBeatState
 		add(rating);
 
 		comboNums = new FlxSpriteGroup();
-		comboNums.cameras = [camHUD];
+		comboNums.cameras = [popupCam];
 		add(comboNums);
 
 		var seperatedScore:Array<Int> = [];
@@ -104,7 +113,7 @@ class NoteOffsetState extends MusicBeatState
 		for (i in seperatedScore)
 		{
 			var numScore:FlxSprite = new FlxSprite(43 * daLoop).loadGraphic(Paths.image('num' + i));
-			numScore.cameras = [camHUD];
+			numScore.cameras = [popupCam];
 			numScore.antialiasing = ClientPrefs.data.antialiasing;
 			numScore.setGraphicSize(Std.int(numScore.width * 0.5));
 			numScore.updateHitbox();
@@ -355,16 +364,16 @@ class NoteOffsetState extends MusicBeatState
 				else
 					controllerPointer.getScreenPosition(startMousePos, camHUD);
 
-				if (startMousePos.x - comboNums.x >= 0 && startMousePos.x - comboNums.x <= comboNums.width &&
-					startMousePos.y - comboNums.y >= 0 && startMousePos.y - comboNums.y <= comboNums.height)
+				// 命中判定必须按**屏幕矩形**算：立体层下精灵坐标是世界坐标，
+				// 直接拿 x/y 跟鼠标屏幕坐标相减会永远判不中（拖不动）。
+				if (hitTestPopup(startMousePos, comboNums, popupCam))
 				{
 					holdingObjectType = true;
 					startComboOffset.x = ClientPrefs.data.comboOffset[2];
 					startComboOffset.y = ClientPrefs.data.comboOffset[3];
 					//trace('yo bro');
 				}
-				else if (startMousePos.x - rating.x >= 0 && startMousePos.x - rating.x <= rating.width &&
-						 startMousePos.y - rating.y >= 0 && startMousePos.y - rating.y <= rating.height)
+				else if (hitTestPopup(startMousePos, rating, popupCam))
 				{
 					holdingObjectType = false;
 					startComboOffset.x = ClientPrefs.data.comboOffset[0];
@@ -517,15 +526,41 @@ class NoteOffsetState extends MusicBeatState
 		lastBeatHit = curBeat;
 	}
 
+	/**
+	 * 弹窗预览的屏幕命中检测。
+	 *
+	 * ⚠ 不能用 `mouse.x - spr.x`：立体层下精灵挂 camGame、坐标是世界坐标，
+	 * 而鼠标拿到的是屏幕像素，两者差着一个 `scroll` 和 `zoom`。这里统一换算成
+	 * 屏幕矩形再比（flixel 的 `getScreenBounds()` 不含 zoom，所以自己算）。
+	 */
+	function hitTestPopup(point:FlxPoint, spr:FlxSprite, cam:FlxCamera):Bool
+	{
+		if (spr == null || cam == null) return false;
+		var sx:Float = cam.totalScaleX;
+		var sy:Float = cam.totalScaleY;
+		if (!(sx > 0.01)) sx = 1.0;
+		if (!(sy > 0.01)) sy = 1.0;
+		var rx:Float = (spr.x - cam.viewLeft) * sx;
+		var ry:Float = (spr.y - cam.viewTop) * sy;
+		return point.x >= rx && point.x <= rx + spr.width * sx
+			&& point.y >= ry && point.y <= ry + spr.height * sy;
+	}
+
 	function repositionCombo()
 	{
+		// 立体层的垂直基准与 PlayState.popUpScore 完全一致（视图上半部的固定值），
+		// 这样本页看到的上下排布就是游戏里的排布。
+		var stageY:Float = ClientPrefs.data.popup3D ? (FlxG.height * 0.5) : 0;
+
 		rating.screenCenter();
 		rating.x = coolText.x - 40 + ClientPrefs.data.comboOffset[0];
-		rating.y -= 60 + ClientPrefs.data.comboOffset[1];
+		rating.y = ClientPrefs.data.popup3D ? (stageY - 150) : (rating.y - 60);
+		rating.y -= ClientPrefs.data.comboOffset[1];
 
 		comboNums.screenCenter();
 		comboNums.x = coolText.x - 90 + ClientPrefs.data.comboOffset[2];
-		comboNums.y += 80 - ClientPrefs.data.comboOffset[3];
+		comboNums.y = ClientPrefs.data.popup3D ? (stageY + 80) : (comboNums.y + 80);
+		comboNums.y -= ClientPrefs.data.comboOffset[3];
 		reloadTexts();
 	}
 

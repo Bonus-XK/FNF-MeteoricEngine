@@ -3088,10 +3088,16 @@ class PlayState extends MusicBeatState
 		var popupStyle:String = ClientPrefs.data.popupStyle;
 		var popupCustom:Bool = PopupAnim.isCustom(popupStyle);
 		var popupDur:Float = ClientPrefs.data.popupDuration;
-		// 立体层（对齐 Codename Engine）：只把弹窗挂到舞台摄像机 camGame、**不动坐标**。
+		// 立体层（对齐 Codename Engine）：把弹窗挂到舞台摄像机 camGame、坐标取**固定世界值**。
 		// 弹窗因此被钉在世界里的固定点上 —— 镜头推近它跟着变大、镜头平移它跟着移出视野，
 		// 但相对世界始终不动；绘制顺序也落到 HUD 元素之下（"下一层"）。
-		var popupCam:FlxCamera = ClientPrefs.data.popup3D ? camGame : camHUD;
+		var popup3D:Bool = ClientPrefs.data.popup3D;
+		var popupCam:FlxCamera = popup3D ? camGame : camHUD;
+		// 立体层的垂直基准：HUD 那套「贴着屏幕顶部」的布局（rating 的 y ≈ 125）挂到世界坐标后，
+		// 镜头一上移就整块跑出可视区 —— Week 1 实测 scroll.y 会到 175，屏幕 Y 只剩 8px，几乎看不见。
+		// 改用视图上半部的**固定**基准（不查 scroll，保证世界坐标固定），数值参考 Codename 的
+		// comboGroup.y = FlxG.height*0.5 - 60 再按本引擎的上下排布拉开。
+		var stageY:Float = FlxG.height * 0.5;
 
 		var uiPrefix:String = "";
 		var uiSuffix:String = '';
@@ -3121,7 +3127,8 @@ class PlayState extends MusicBeatState
 			rating.cameras = [popupCam];
 			rating.screenCenter();
 			rating.x = placement - 40;
-			rating.y -= 60;
+			// 立体层走视图上半部的固定基准，HUD 层保持上游原样（screenCenter 后 -60）
+			rating.y = popup3D ? (stageY - 150) : (rating.y - 60);
 			rating.acceleration.y = 550 * playbackRate * playbackRate;
 			rating.velocity.y -= FlxG.random.int(140, 175) * playbackRate;
 			rating.velocity.x -= FlxG.random.int(0, 10) * playbackRate;
@@ -3144,13 +3151,14 @@ class PlayState extends MusicBeatState
 			comboSpr.cameras = [popupCam];
 			comboSpr.screenCenter();
 			comboSpr.x = placement;
+			// 立体层走视图上半部的固定基准，HUD 层保持上游原样（screenCenter 后 +60）
+			comboSpr.y = popup3D ? (stageY + 60) : (comboSpr.y + 60);
 			comboSpr.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
 			comboSpr.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
 			comboSpr.visible = (!ClientPrefs.data.hideHud && showComboPop);
 			comboSpr.x += ClientPrefs.data.comboOffset[0];
 			comboSpr.y -= ClientPrefs.data.comboOffset[1];
 			comboSpr.antialiasing = antialias;
-			comboSpr.y += 60;
 			comboSpr.velocity.x += FlxG.random.int(1, 10) * playbackRate;
 		}
 
@@ -3176,6 +3184,14 @@ class PlayState extends MusicBeatState
 
 		if (comboSpr != null) comboSpr.updateHitbox();
 		if (rating != null) rating.updateHitbox();
+
+		// 立体层兜底：尺寸已定，把越界的弹窗夹回可视区（正常情况不动坐标）。
+		// 必须放在 updateHitbox() 之后 —— 夹取要用最终的 width/height。
+		if (popup3D)
+		{
+			PopupAnim.fitToView(rating, popupCam);
+			PopupAnim.fitToView(comboSpr, popupCam);
+		}
 
 		var seperatedScore:Array<Int> = [];
 
@@ -3218,7 +3234,9 @@ class PlayState extends MusicBeatState
 			numScore.cameras = [popupCam];
 			numScore.screenCenter();
 			numScore.x = placement + (43 * daLoop) - 90 + ClientPrefs.data.comboOffset[2];
-			numScore.y += 80 - ClientPrefs.data.comboOffset[3];
+			// 立体层走视图上半部的固定基准，HUD 层保持上游原样（screenCenter 后 +80）
+			numScore.y = popup3D ? (stageY + 80) : (numScore.y + 80);
+			numScore.y -= ClientPrefs.data.comboOffset[3];
 			
 			if (!ClientPrefs.data.comboStacking)
 				lastScore.push(numScore);
@@ -3226,6 +3244,8 @@ class PlayState extends MusicBeatState
 			if (!PlayState.isPixelStage) numScore.setGraphicSize(Std.int(numScore.width * 0.5));
 			else numScore.setGraphicSize(Std.int(numScore.width * daPixelZoom));
 			numScore.updateHitbox();
+			// 立体层兜底：数字尺寸已定，越界才夹回可视区
+			if (popup3D) PopupAnim.fitToView(numScore, popupCam);
 
 			numScore.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
 			numScore.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
