@@ -112,31 +112,47 @@ class ExtraKeys
 		return songKeys > 4;
 	}
 
-	/** lane 的箭头 static 帧方向名（小写，如 left/square/rup）。仅 Leather 风格下有意义。 */
+	/** lane 的箭头 static 帧方向名（小写，如 left/square/rup）。仅 Leather 风格下有意义。
+	 *  ⚠ lane 参数可以是绝对列号 col（含 side 偏移），内部统一取模归一。 */
 	public static function arrowDirFrame(lane:Int):String
 	{
 		loadManiaData();
+		var l:Int = normLane(lane);
 		var row:Array<String> = rowAt(noteCountDirections, songKeys);
-		if (row == null || lane < 0 || lane >= row.length) return colNameOf(lane);
-		return row[lane].toLowerCase();
+		if (row == null || l >= row.length) return colNameOf(l);
+		return row[l].toLowerCase();
 	}
 
-	/** lane 的音符帧前缀（如 purple/plus/rup）。Leather 帧 = 前缀+"0"/" hold0"/" hold end0"。 */
+	/** lane 的音符帧前缀。**与判定线同源（maniaDirections 基础方向帧）**：
+	 *  Leather 原版的 maniaAnimationDirections 在第二组键用 left2/right2 专用造型
+	 *  （画面方向与判定线不一致，玩家只能凭位置识别），不符合直觉——
+	 *  这里统一改用基础方向帧（left0/up0/right0...），判定线与音符方向严格一致。
+	 *  ⚠ lane 参数可以是绝对列号 col（含 side 偏移），内部统一取模归一。 */
 	public static function noteAnimPrefix(lane:Int):String
 	{
 		loadManiaData();
-		var row:Array<String> = rowAt(otherNoteAnim, songKeys);
-		if (row == null || lane < 0 || lane >= row.length) return colNameOf(lane);
-		return row[lane].toLowerCase();
+		var l:Int = normLane(lane);
+		var row:Array<String> = rowAt(noteCountDirections, songKeys);
+		if (row == null || l >= row.length) return colNameOf(l);
+		return row[l].toLowerCase();
 	}
 
 	/** lane 的角色 sing 动画名（singLEFT 等）。 */
 	public static function charSingAnim(lane:Int):String
 	{
 		loadManiaData();
+		var l:Int = normLane(lane);
 		var row:Array<String> = rowAt(charAnimTable, songKeys);
-		if (row == null || lane < 0 || lane >= row.length) return singNameOf(lane);
-		return row[lane];
+		if (row == null || l >= row.length) return singNameOf(l);
+		return row[l];
+	}
+
+	/** 任意整数（含 col/负数）归一到 [0, keys) 的 lane。 */
+	public static inline function normLane(lane:Int):Int
+	{
+		var l:Int = lane % songKeys;
+		if (l < 0) l += songKeys;
+		return l;
 	}
 
 	static function colNameOf(lane:Int):String
