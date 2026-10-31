@@ -42,6 +42,15 @@ typedef SwagSong =
 	// 列号协议（psych_v1 泛化）：绝对列号 col < keys = 玩家、>= keys = 对手、lane = col % keys。
 	@:optional var keys:Int;
 
+	// ===== Leather Engine 格式兼容（2026-10-31 移植）=====
+	// Leather 谱面顶层是**双方独立键数**：keyCount = 对手、playerKeyCount = 玩家；
+	// lane 编码是「Psych 传统泛化」——每个 section 内 lane < 主唱方键数 = 主唱方、
+	// lane ≥ 主唱键数 = 另一方（lane % 对方键数），主唱方由 mustHitSection 决定。
+	// convertToPsychV1 检测到这两个字段即按 Leather 语义烘焙成 psych_v1 列号，
+	// 并把 max(kc, pkc) 归一写入 keys（双方键数不同时另一侧多出的轨道自然空置）。
+	@:optional var keyCount:Int;
+	@:optional var playerKeyCount:Int;
+
 	// ===== 超大字谱面（packed 路径）专用 =====
 	// 音符级流式解析产出：packedNotes 承载**已合并**的音符簇（PackedChart），
 	// 此时 sectionNotes 为空数组。PlayState.buildChartNotes 检测到 packedNotes
@@ -266,6 +275,50 @@ class Song
 
 		// Extra Keys：旧格式谱面按声明键数泛化（旧引擎谱面只会是 4K，keys 缺省 → 行为不变）
 		var chartKeys:Int = ExtraKeys.resolveKeys(songJson.keys);
+
+		// ===== Leather Engine 格式兼容（2026-10-31 移植）=====
+		// 检测：谱面顶层有 keyCount / playerKeyCount 任一字段即按 Leather 语义转换。
+		// Leather lane 编码（Psych 传统泛化）：每个 section 内
+		//   lane < 主唱方键数 → 主唱方（lane % 主唱键数）；
+		//   lane ≥ 主唱键数 → 另一方（lane % 对方键数）；
+		// 主唱方由 mustHitSection 决定（true=玩家）。双方键数独立，可不同。
+		// 烘焙成 psych_v1 绝对列号：玩家 [0, keys)、对手 [keys, 2*keys)，keys = max(kc, pkc)
+		// —— 键数小的一侧多出的轨道自然空置，无需运行时感知 Leather。
+		var leatherKC:Null<Int> = cast Reflect.hasField(songJson, 'keyCount') ? songJson.keyCount : null;
+		var leatherPKC:Null<Int> = cast Reflect.hasField(songJson, 'playerKeyCount') ? songJson.playerKeyCount : null;
+		var hasKC:Bool = (leatherKC != null && leatherKC > 0);
+		var hasPKC:Bool = (leatherPKC != null && leatherPKC > 0);
+		if (hasKC || hasPKC)
+		{
+			var eKeys:Int = hasKC ? leatherKC : chartKeys;
+			var pKeys:Int = hasPKC ? leatherPKC : chartKeys;
+			var runKeys:Int = (eKeys > pKeys) ? eKeys : pKeys; // max：轨道数取大者
+			if (eKeys != pKeys)
+				trace('[Leather] 双方键数不同（对手 ' + eKeys + ' / 玩家 ' + pKeys
+					+ '）→ 按 ' + runKeys + ' 键运行，键数小的一侧多出的轨道将空置');
+			songJson.keys = runKeys;
+
+			var sectionsDataL:Array<SwagSection> = songJson.notes;
+			if (sectionsDataL != null)
+			{
+				for (section in sectionsDataL)
+				{
+					for (note in section.sectionNotes)
+					{
+						var must:Bool = section.mustHitSection;
+						var mainKeys:Int = must ? pKeys : eKeys; // 主唱方键数
+						var otherKeys:Int = must ? eKeys : pKeys; // 另一方键数
+						var lane:Int = Std.int(note[1]);
+						var isMain:Bool = lane < mainKeys;
+						var gottaHitNote:Bool = isMain ? must : !must;
+						var sideLane:Int = isMain ? (lane % mainKeys) : (lane % otherKeys);
+						note[1] = sideLane + (gottaHitNote ? 0 : runKeys);
+					}
+				}
+			}
+			// 已按 Leather 语义烘焙完成，跳过下方通用 psych 泛化
+			return;
+		}
 
 		var sectionsData:Array<SwagSection> = songJson.notes;
 		if(sectionsData == null) return;
@@ -1186,7 +1239,7 @@ class Song
 		// 候选根目录必须与 resolveChartPath 的解析链对齐，否则「别的玩家的分段谱」一律
 		// 报「找不到 xxx-parts 谱面」。原实现只查了前两级：
 		//   ① Mods.currentModDirectory   —— 只有当前正在加载的那个模组
-		//   ② Mods.getGlobalMods()       —— 只有 pack.json 里 runsGlobally 的模组
+		//   ② Mods.getGlobalMods()       —— 只有 mod.json 里 runsGlobally 的模组
 		// 普通歌曲模组**两者都不满足**：它不 runsGlobally，且选曲前还没成为 currentModDirectory。
 		// 补上：
 		//   ③ Mods.getModDirectories()   —— 扫全部模组
@@ -1211,12 +1264,13 @@ class Song
 		// 候选目录：先各根下的 data/<歌名>/（标准布局），再 data/ 根下（扁平布局，
 		// 少数分段谱把 song-1.json 直接摊在 data/ 里）。扁平布局放在最后，避免抢在标准布局前面。
 		var dirs:Array<String> = [];
+		var modRel:String = Paths.modRelPath(rel); // 模组侧重分类目录（内置侧仍用 rel）
 		for (root in roots)
 		{
-			var d:String = Paths.mods(root + '/' + rel);
+			var d:String = Paths.mods(root + '/' + modRel);
 			if (FileSystem.exists(d)) dirs.push(d);
 		}
-		var modsFlat:String = Paths.mods('data/');
+		var modsFlat:String = Paths.mods(Paths.modRelPath('data/'));
 		if (FileSystem.exists(modsFlat)) dirs.push(modsFlat);
 		#if (sys && !android)
 		var assetDir:String = Paths.json(rel.substr(0, rel.length - 1));
