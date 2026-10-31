@@ -32,7 +32,7 @@
 	<!--Minimum without FLX_NO_GAMEPAD: 11.8, without FLX_NO_NATIVE_CURSOR: 11.2-->
 	<set name="SWF_VERSION" value="11.8" />
 	
-	<!-- ______________________ PSYCH ENGINE CUSTOMIZATION ______________________ -->
+	<!-- _____________________ METEORIC ENGINE CUSTOMIZATION _____________________ -->
 
 	<!-- 1150 万音符级谱面（Obsolescence-spam）GC 硬上限修复：
 	     hxcpp 4.3.2 Immix GC 未定义 HXCPP_GC_BIG_BLOCKS 时块数上限为 16 位（65534 块 × 32KB ≈ 2GB），
@@ -46,7 +46,6 @@
 	<define name="ACHIEVEMENTS_ALLOWED" />
 	<!-- 安卓禁用视频：hxCodec 预编译的 VLC 库为 4KB 对齐，不符合 Android 15+ 的 16KB 页对齐要求 -->
 	<define name="VIDEOS_ALLOWED" if="windows || linux" unless="32bits || win32build"/>
-	<define name="PSYCH_WATERMARKS"/> <!-- DELETE THIS TO REMOVE WATERMARKS/DEV NAMES ON TITLE SCREEN -->
 	<define name="TITLE_SCREEN_EASTER_EGG" if="officialBuild"/> <!-- DELETE THE if="officialBuild" for enabling this on an unofficial build -->
 
 	<!-- ____________________________ Window Settings ___________________________ -->
@@ -163,9 +162,9 @@
 	<haxelib name="flixel" />
 	<haxelib name="flixel-ui" />
 	<haxelib name="flixel-addons" />
-	<haxelib name="flxanimate" /> <!-- 全平台启用：PsychFlxAnimate/loadAnimateAtlas 无条件编译，Android 同样需要 -->
+	<haxelib name="flxanimate" /> <!-- 全平台启用：MeteoricFlxAnimate/loadAnimateAtlas 无条件编译，Android 同样需要 -->
 
-	<!--Psych stuff needed-->
+	<!-- 脚本 / 模组 / 视频运行时依赖 -->
 	<haxelib name="linc_luajit" if="LUA_ALLOWED"/>
 	<haxelib name="SScript"/>
 	<haxelib name="hscript-meteoric"/>

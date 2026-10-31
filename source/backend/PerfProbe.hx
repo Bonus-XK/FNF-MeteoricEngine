@@ -13,6 +13,9 @@ import StringTools;
  * 本类**不再**提供环境变量自动进歌入口：自动跳转会绕开/改变真实进歌路径，
  * 实测结果不可信，且历史版本在该路径上不稳定，已整体移除。
  */
+#if mac
+@:headerCode('#include <mach/mach.h>')
+#end
 class PerfProbe
 {
 	static var _armed:Bool = false;
@@ -85,29 +88,16 @@ class PerfProbe
 				i = j + 2;
 			}
 			return (best >= 0) ? (best / 1024.0) : -1; // KB → MB
-			#elseif mac
-			// ps -axo rss=,comm 逐行 "123456 /path/to/Meteoric"。
-			// ⚠ macOS 的 ps 不支持 Linux 的 %c 关键字（实测报 "ps: %c: keyword not found"，
-			//    stdout 为空 → 旧实现永远返回 -1，profile 里一直是 ram=n/a）。
-			// comm 是完整路径，取最后一段与当前可执行文件名比较；多开时取最大 RSS。
-			var pr = new sys.io.Process('ps', ['-axo', 'rss=,comm']);
-			var out:String = pr.stdout.readAll().toString();
-			pr.close();
-			var base:String = haxe.io.Path.withoutDirectory(Sys.programPath()).toLowerCase();
-			var best:Float = -1;
-			for (line in out.split('\n'))
-			{
-				var s:String = StringTools.trim(line);
-				if (s.length == 0) continue;
-				var sp:Int = s.indexOf(' ');
-				if (sp <= 0) continue;
-				var nm:String = StringTools.trim(s.substr(sp + 1));
-				if (nm.length <= 0 || haxe.io.Path.withoutDirectory(nm).toLowerCase() != base) continue;
-				var rss:Float = Std.parseFloat(s.substr(0, sp));
-				if (Math.isFinite(rss) && rss > best) best = rss;
-			}
-			return (best >= 0) ? (best / 1024.0) : -1;
-			#else
+		#elseif mac
+		// [2026-10-31 关键修复] 采样 RSS **绝不能再走子进程**。
+		// 崩溃栈证实：sys.io.Process('ps') → hxcpp _hx_std_process_run → fork；
+		// fork 出的子进程在 hxcpp 标准库某些路径会调 exit()，而 macOS 的电源日志
+		// （CSPowerLog / PLClientLogger）注册了 atexit 钩子 —— 在 fork 后的子进程
+		// 上下文里初始化 os_log 直接 SIGSEGV（采样线程每 2s 一次，长期必中）。
+		// 改用 Mach task_info 直读本进程 RSS：零 fork、零 atexit、微秒级。
+		// （__cpp__ 的第一个参数必须是单个字符串字面量，不能拼接。）
+		return untyped __cpp__('({ mach_task_basic_info_data_t __i; mach_msg_type_number_t __c = MACH_TASK_BASIC_INFO_COUNT; double __r = -1.0; if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&__i, &__c) == KERN_SUCCESS) __r = (double)__i.resident_size / 1048576.0; __r; })');
+		#else
 			var txt:String = sys.io.File.getContent('/proc/self/status');
 			for (line in txt.split('\n'))
 			{

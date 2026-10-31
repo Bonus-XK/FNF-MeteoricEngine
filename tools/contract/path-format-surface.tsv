@@ -72,9 +72,9 @@ contract	path	mods	/mods/	source/backend/Paths.hx:1066	mod 根目录名（Androi
 contract	path	mods	mods/	source/backend/Paths.hx:1066	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
 contract	path	mods	/mods/	source/backend/Paths.hx:1069	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
 contract	path	mods	mods/	source/backend/Paths.hx:1069	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
-contract	path	mods	mods/	source/psychlua/HScript.hx:227	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
-contract	path	mods	mods/	source/psychlua/HScript.hx:228	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
-contract	path	mods	mods/	source/psychlua/HScript.hx:270	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/scripting/lua/HScript.hx:227	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/scripting/lua/HScript.hx:228	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
+contract	path	mods	mods/	source/scripting/lua/HScript.hx:270	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
 contract	path	mods	mods	source/states/MainMenuState.hx:66	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
 contract	path	mods	mods	source/states/MainMenuState.hx:858	mod 根目录名（AndroidStorage.hx:123 / ModInstaller.hx:445,652 / ContainerStore.hx:96）
 contract	save	modsList.txt	/modsList.txt	source/backend/Mods.hx:171	mod 清单：Android 落 AndroidStorage.root()+'/modsList.txt'，桌面落 'modsList.txt'（Mods.hx:184-186）
@@ -108,8 +108,8 @@ exclude	excluded	.json	.json	source/backend/WeekData.hx:131	文件名拼接片�
 exclude	excluded	.json	.json	source/backend/WeekData.hx:141	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/cutscenes/DialogueCharacter.hx:59	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/cutscenes/DialogueCharacter.hx:69	文件名拼接片段（非完整契约 token）
-exclude	excluded	.json	.json	source/flxanimate/PsychFlxAnimate.hx:26	文件名拼接片段（非完整契约 token）
-exclude	excluded	.json	.json	source/flxanimate/PsychFlxAnimate.hx:37	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/flxanimate/MeteoricFlxAnimate.hx:26	文件名拼接片段（非完整契约 token）
+exclude	excluded	.json	.json	source/flxanimate/MeteoricFlxAnimate.hx:37	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/objects/Character.hx:106	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/objects/Character.hx:122	文件名拼接片段（非完整契约 token）
 exclude	excluded	.json	.json	source/objects/Character.hx:128	文件名拼接片段（非完整契约 token）

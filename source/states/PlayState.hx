@@ -51,7 +51,7 @@ import openfl.Lib;
 import tjson.TJSON as Json;
 
 import cutscenes.CutsceneHandler;
-import cutscenes.DialogueBoxPsych;
+import cutscenes.MeteoricDialogueBox;
 
 import states.StoryMenuState;
 import states.FreeplayState;
@@ -93,12 +93,12 @@ import scripting.Scripting;
 #end
 
 #if LUA_ALLOWED
-import psychlua.*;
+import scripting.lua.*;
 #else
-import psychlua.FunkinLua;
-import psychlua.LuaUtils;
+import scripting.lua.FunkinLua;
+import scripting.lua.LuaUtils;
 #if HSCRIPT_ALLOWED
-import psychlua.HScript;
+import scripting.lua.HScript;
 #end
 #end
 
@@ -236,7 +236,7 @@ class PlayState extends MusicBeatState
 	// 【性能】脚本调用默认参数复用：每帧 callOnScripts/setOnScripts 会走到这里，
 	// 原来每次都 new [] / [Function_Continue]（空脚本时纯浪费）；两数组只读共享安全
 	static var _noExclusions:Array<String> = [];
-	static var _noExcludeValues:Array<Dynamic> = [psychlua.FunkinLua.Function_Continue];
+	static var _noExcludeValues:Array<Dynamic> = [scripting.lua.FunkinLua.Function_Continue];
 	public static var isPixelStage(get, never):Bool;
 
 	@:noCompletion
@@ -1267,8 +1267,8 @@ class PlayState extends MusicBeatState
 	}
 
 	var dialogueCount:Int = 0;
-	public var psychDialogue:DialogueBoxPsych;
-	//You don't have to add a song, just saying. You can just do "startDialogue(DialogueBoxPsych.parseDialogue(Paths.json(songName + '/dialogue')))" and it should load dialogue.json
+	public var psychDialogue:MeteoricDialogueBox;
+	//You don't have to add a song, just saying. You can just do "startDialogue(MeteoricDialogueBox.parseDialogue(Paths.json(songName + '/dialogue')))" and it should load dialogue.json
 	public function startDialogue(dialogueFile:DialogueFile, ?song:String = null):Void
 	{
 		// TO DO: Make this more flexible, maybe?
@@ -1278,7 +1278,7 @@ class PlayState extends MusicBeatState
 			inCutscene = true;
 			precacheList.set('dialogue', 'sound');
 			precacheList.set('dialogueClose', 'sound');
-			psychDialogue = new DialogueBoxPsych(dialogueFile, song);
+			psychDialogue = new MeteoricDialogueBox(dialogueFile, song);
 			psychDialogue.scrollFactor.set();
 			if(endingSong) {
 				psychDialogue.finishThing = function() {
@@ -3397,7 +3397,7 @@ class PlayState extends MusicBeatState
 		}
 		luaArray = [];
 		FunkinLua.customFunctions.clear();
-		psychlua.ObjectBridge.clearRegistry(); // Lua 对象桥句柄注册表随脚本一起释放
+		scripting.lua.ObjectBridge.clearRegistry(); // Lua 对象桥句柄注册表随脚本一起释放
 		#end
 
 		#if HSCRIPT_ALLOWED

@@ -6,7 +6,7 @@ import backend.Paths;
 import flixel.FlxG;
 import flixel.input.FlxInput.FlxInputState;
 import flixel.input.keyboard.FlxKey;
-import psychlua.HScript;
+import scripting.lua.HScript;
 import scripting.ScriptOrder.ScriptOrderEntry;
 import sys.FileSystem;
 import sys.io.File;
@@ -54,7 +54,7 @@ typedef ScriptingScriptFile =
  *
  * ## 脚本能拿到什么
  *
- * - `psychlua.HScript` 的 187 个预设全局（引擎类：`PlayState` `Paths` `FlxSprite` `Character` …、
+ * - `scripting.lua.HScript` 的 187 个预设全局（引擎类：`PlayState` `Paths` `FlxSprite` `Character` …、
  *   Flixel 类、`sys` 文件系统、`Reflect` / `Type` 反射）—— 与既有 mods 脚本同一套 API。
  * - 额外注入：`state`（当前 State）、`game`（PlayState 实例）、`scripting`（本层入口）。
  *

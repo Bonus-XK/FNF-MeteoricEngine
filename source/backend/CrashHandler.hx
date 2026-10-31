@@ -39,6 +39,8 @@ typedef LogEntry =
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
 #include <stdint.h>
 #include <dlfcn.h>
 #include <sys/ucontext.h>
@@ -145,6 +147,10 @@ static void meteoric_native_sig_handler(int sig, siginfo_t* si, void* uctx) {
 	bl += snprintf(body + bl, sizeof(body) - bl, "信号       : %d (%s)\\n", sig, sigName);
 	bl += snprintf(body + bl, sizeof(body) - bl, "PC/SP/FP   : 0x%llx / 0x%llx / 0x%llx\\n",
 		(unsigned long long)pc, (unsigned long long)sp, (unsigned long long)fp);
+	// 进程加载基址（主可执行文件的 Mach-O 头）：配合 atos 可以把报告里的
+	// 运行时地址换算成「文件偏移」，从而解析出函数名（ASLR 每次启动不同，必须记录）。
+	bl += snprintf(body + bl, sizeof(body) - bl, "加载基址   : 0x%llx\\n",
+		(unsigned long long)(uintptr_t)_dyld_get_image_header(0));
 	if (stage && stage[0])
 		bl += snprintf(body + bl, sizeof(body) - bl, "最后阶段   : %.300s\\n", stage);
 	else
@@ -968,9 +974,30 @@ class CrashHandler
 	// 最近一个跨过的阶段实时落盘 last_stage.txt（覆盖写）并写入进程环境变量
 	// METEORIC_LAST_STAGE（原生处理器读取）——原生崩溃后最后一行 = 死因阶段。
 	// 调用点少量（进曲/生成/首次命中/结算约 10 次/曲），无性能影响。
-	public static function mark(stage:String):Void
+	/**
+	 * 记录「当前正在执行的 Lua 回调 + 脚本」，写进原生崩溃报告的「最后阶段」。
+	 *
+	 * 为什么必须做：SEGV 发生在 `lua_pcall` 里时，`last_stage.txt` 只记到最后一次 mark
+	 * （例如 `PlayState.noteSpawn:start`），而同帧后续的 onBeatHit/onStepHit 崩了也显示同一行，
+	 * 完全无法定位是哪个脚本的哪个回调（2026-10-30 Rock Solid 崩溃即此）。
+	 *
+	 * 开销控制：只有 (stage,func,script) 组合变化时才 putEnv，同一回调连续调用不重复写。
+	 */
+	static var _lastLuaCtx:String = '';
+	public static function setLuaContext(func:String, script:String):Void
 	{
-		lastStage = stage;
+		#if (cpp && !windows)
+		if (func == null || func.length == 0) return;
+		var ctx:String = lastStage + ' | lua:' + func + '@' + (script == null ? '?' : script);
+		if (ctx == _lastLuaCtx) return;
+		_lastLuaCtx = ctx;
+		try Sys.putEnv('METEORIC_LAST_STAGE', ctx) catch(e:Dynamic) {}
+		#end
+	}
+
+	public static function mark(stage:String):Void
+	{		lastStage = stage;
+		_lastLuaCtx = ''; // 阶段变了：允许下一次 Lua 调用重新写入上下文
 		logEvent('stage:' + stage);
 		#if (cpp && !windows)
 		try

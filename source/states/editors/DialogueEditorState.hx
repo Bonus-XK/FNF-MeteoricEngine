@@ -18,7 +18,7 @@ import sys.io.File;
 
 import objects.TypedAlphabet;
 
-import cutscenes.DialogueBoxPsych;
+import cutscenes.MeteoricDialogueBox;
 import cutscenes.DialogueCharacter;
 
 class DialogueEditorState extends MusicBeatState
@@ -90,7 +90,7 @@ class DialogueEditorState extends MusicBeatState
 		animText.scrollFactor.set();
 		add(animText);
 		
-		daText = new TypedAlphabet(DialogueBoxPsych.DEFAULT_TEXT_X, DialogueBoxPsych.DEFAULT_TEXT_Y, DEFAULT_TEXT);
+		daText = new TypedAlphabet(MeteoricDialogueBox.DEFAULT_TEXT_X, MeteoricDialogueBox.DEFAULT_TEXT_Y, DEFAULT_TEXT);
 		daText.setScale(0.7);
 		add(daText);
 		changeText();
@@ -210,7 +210,7 @@ class DialogueEditorState extends MusicBeatState
 				}
 		}
 		box.animation.play(anim, true);
-		DialogueBoxPsych.updateBoxOffsets(box);
+		MeteoricDialogueBox.updateBoxOffsets(box);
 	}
 
 	function reloadCharacter() {
@@ -219,12 +219,12 @@ class DialogueEditorState extends MusicBeatState
 		character.reloadAnimations();
 		character.setGraphicSize(Std.int(character.width * DialogueCharacter.DEFAULT_SCALE * character.jsonFile.scale));
 		character.updateHitbox();
-		character.x = DialogueBoxPsych.LEFT_CHAR_X;
-		character.y = DialogueBoxPsych.DEFAULT_CHAR_Y;
+		character.x = MeteoricDialogueBox.LEFT_CHAR_X;
+		character.y = MeteoricDialogueBox.DEFAULT_CHAR_Y;
 
 		switch(character.jsonFile.dialogue_pos) {
 			case 'right':
-				character.x = FlxG.width - character.width + DialogueBoxPsych.RIGHT_CHAR_X;
+				character.x = FlxG.width - character.width + MeteoricDialogueBox.RIGHT_CHAR_X;
 			
 			case 'center':
 				character.x = FlxG.width / 2;
@@ -261,8 +261,8 @@ class DialogueEditorState extends MusicBeatState
 			characterAnimSpeed();
 		}
 
-		daText.y = DialogueBoxPsych.DEFAULT_TEXT_Y;
-		if(daText.rows > 2) daText.y -= DialogueBoxPsych.LONG_TEXT_ADD;
+		daText.y = MeteoricDialogueBox.DEFAULT_TEXT_Y;
+		if(daText.rows > 2) daText.y -= MeteoricDialogueBox.LONG_TEXT_ADD;
 
 	}
 

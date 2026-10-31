@@ -4,7 +4,7 @@ import backend.Lang;
 import hscript.Expr;
 import hscript.Tools;
 import hscript.Expr.ErrorDef;
-import psychlua.HScript;
+import scripting.lua.HScript;
 
 /** REPL 一次执行的结果。 */
 typedef ScriptReplResult =
@@ -37,7 +37,7 @@ typedef ScriptReplResult =
  * ## 上下文
  *
  * 每次执行前重新绑定 `state` / `game` / `scripting`（界面可能已经换过），
- * 其余 preset（FlxG / PlayState / Paths / FlxSprite / Reflect / Type …）由 `psychlua.HScript.preset()` 注入。
+ * 其余 preset（FlxG / PlayState / Paths / FlxSprite / Reflect / Type …）由 `scripting.lua.HScript.preset()` 注入。
  */
 class ScriptReplSession
 {

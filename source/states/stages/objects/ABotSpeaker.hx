@@ -1,6 +1,6 @@
 package states.stages.objects;
 
-import flxanimate.PsychFlxAnimate;
+import flxanimate.MeteoricFlxAnimate;
 #if funkin.vis
 import funkin.vis.dsp.SpectralAnalyzer;
 #end
@@ -14,8 +14,8 @@ class ABotSpeaker extends FlxSpriteGroup
 	public var bg:FlxSprite;
 	public var vizSprites:Array<FlxSprite> = [];
 	public var eyeBg:FlxSprite;
-	public var eyes:PsychFlxAnimate;
-	public var speaker:PsychFlxAnimate;
+	public var eyes:MeteoricFlxAnimate;
+	public var speaker:MeteoricFlxAnimate;
 
 	#if funkin.vis
 	var analyzer:SpectralAnalyzer;
@@ -67,7 +67,7 @@ class ABotSpeaker extends FlxSpriteGroup
 		eyeBg.updateHitbox();
 		add(eyeBg);
 
-		eyes = new PsychFlxAnimate(-10, 230);
+		eyes = new MeteoricFlxAnimate(-10, 230);
 		Paths.loadAnimateAtlas(eyes, 'abot/systemEyes');
 		eyes.anim.addBySymbolIndices('lookleft', 'a bot eyes lookin', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], 24, false);
 		eyes.anim.addBySymbolIndices('lookright', 'a bot eyes lookin', [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35], 24, false);
@@ -75,7 +75,7 @@ class ABotSpeaker extends FlxSpriteGroup
 		eyes.anim.curFrame = eyes.anim.length - 1;
 		add(eyes);
 
-		speaker = new PsychFlxAnimate(-65, -10);
+		speaker = new MeteoricFlxAnimate(-65, -10);
 		Paths.loadAnimateAtlas(speaker, 'abot/abotSystem');
 		speaker.anim.addBySymbol('anim', 'Abot System', 24, false);
 		speaker.anim.play('anim', true);

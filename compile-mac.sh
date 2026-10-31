@@ -48,6 +48,49 @@ if [ ! -d "$NEKOPATH" ] || [ ! -f "$NEKOPATH/std.ndll" ]; then
   done
 fi
 
+# ---- ccache：加速重复的 C++ 编译 ----
+# 为什么需要：hxcpp 的增量是「文件级」，改一个中心类（Paths.hx / ClientPrefs.hx / Mods.hx）
+# 会让上百个 .cpp 重新走 clang++；本项目共 1463 个 cpp / 1630 个 .o，一轮就是 5~8 分钟。
+# ccache 按「预处理后源码 + 编译参数」哈希缓存 .o，内容没变就直接复用。
+# 为什么用 PATH 前置而不是改 hxcpp 的 CXX 变量：hxcpp/lime 的编译器变量散落在各版本
+# Build.xml 里（本项目 hxcpp 4.3.2 的 tools/ 下甚至没有 toolchain 目录），升级即失效；
+# PATH 前置是 brew 官方推荐做法，与 hxcpp 版本无关。
+# 关闭：METEORIC_NO_CCACHE=1 ./compile-mac.sh
+if [ "${METEORIC_NO_CCACHE:-0}" != "1" ]; then
+  CCACHE_LIBEXEC=""
+  for _p in /opt/homebrew/opt/ccache/libexec /usr/local/opt/ccache/libexec; do
+    if [ -d "$_p" ]; then CCACHE_LIBEXEC="$_p"; break; fi
+  done
+  if [ -n "$CCACHE_LIBEXEC" ]; then
+    export PATH="$CCACHE_LIBEXEC:$PATH"
+    # 归一化绝对路径 + 忽略工作目录差异，提高跨次构建的命中率
+    export CCACHE_BASEDIR="$(pwd)"
+    export CCACHE_NOHASHDIR=true
+
+    CCACHE_BIN="/opt/homebrew/bin/ccache"
+    [ -x "$CCACHE_BIN" ] || CCACHE_BIN="/usr/local/bin/ccache"
+    export CCACHE_BIN
+
+    # ⚠ 关键：PATH 前置对 hxcpp **无效**。它的 mac 工具链把编译器写成绝对路径
+    #   <exe name="/opt/homebrew/opt/llvm@18/bin/clang++ -isysroot ...">
+    # 所以必须给 toolchain 打补丁，让每条编译命令以 ccache 开头。
+    # 只改 compiler 段的这一处；linker / getversion 不动（链接无缓存意义，
+    # 且改 linker 会干扰增量链接）。原文件备份为 *.meteoric-orig，可随时还原。
+    for _tc in /usr/local/lib/haxe/lib/hxcpp/*/toolchain/mac-toolchain.xml; do
+      [ -f "$_tc" ] || continue
+      if grep -q "$CCACHE_BIN" "$_tc" 2>/dev/null; then continue; fi
+      cp -p "$_tc" "$_tc.meteoric-orig" 2>/dev/null || true
+      perl -pi -e 's{<exe name="(/opt/homebrew/opt/llvm[^"]*?/bin/clang\+\+)}{<exe name="$ENV{CCACHE_BIN} $1}' "$_tc"
+      echo "[compile] 已为 hxcpp 工具链接入 ccache: $_tc"
+    done
+
+    _cc_info=$(/opt/homebrew/bin/ccache -s 2>/dev/null | grep -iE "cache size|hit rate" | tr -s ' ' | tr '\n' ' ')
+    echo "[compile] ccache 已启用 ${_cc_info}"
+  else
+    echo "[compile] ccache 未安装，跳过（brew install ccache 可显著加速重复构建）"
+  fi
+fi
+
 # ---- 自动关闭旧的游戏进程 ----
 # 构建会替换 app 文件，旧进程持有旧文件句柄会干扰；测试时重复启动也会冲突。
 # 顺带清掉 lime livereload 残留进程（进程名同样是 Meteoric）。
@@ -159,6 +202,18 @@ if [ -n "$DEBUG_FLAGS" ]; then
   echo "[compile] 调试构建：启用 meteoric_debug 诊断输出"
 fi
 
+# ---- 保留 C++ 符号（诊断用）：METEORIC_KEEP_SYMBOLS=1 ./compile-mac.sh ----
+# 为什么需要：hxcpp 在 release 下构建完成后默认跑 `strip`，所有函数名被剥掉，
+# 崩溃报告/lldb 里的栈全是裸地址（`no symbol`），间歇性 SEGV 无法定位。
+# -D HXCPP_DEBUG_LINK 会把工具链的 `nostrip` 打开（gcc-toolchain.xml:40），
+# 跳过 strip 阶段 —— .o 与链接产物不变，只是不再剥符号，产物体积变大。
+# ⚠ 仅供本地诊断，勿分发带符号的产物。
+STRIP_FLAGS=""
+if [ "${METEORIC_KEEP_SYMBOLS:-0}" = "1" ]; then
+  STRIP_FLAGS="-D HXCPP_DEBUG_LINK"
+  echo "[compile] 保留 C++ 符号（HXCPP_DEBUG_LINK）—— 仅供诊断，勿分发"
+fi
+
 # ---- 构建期 git 信息 → GitInfoData.hx（FPS 显示用）----
 # 值烘焙进二进制，运行时零开销。
 # ⚠ 不用 Haxe 宏：Codename Engine 的 GitCommitMacro 走 #if macro + sys.io.Process，
@@ -252,7 +307,11 @@ if [ "$1" = "typecheck" ]; then
 
     if [ "$TC_OK" = "1" ]; then
       # 同 post-build：不带 --deep 的 codesign 才不会替换 ndll（见下方 post-build 注释）
-      codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+      # bundle 级签名会遍历 Resources 里的 78GB mod 数据（每文件算哈希写 CodeResources），
+      # 默认跳过；分发前用 METEORIC_SIGN_BUNDLE=1 补签。
+      if [ "${METEORIC_SIGN_BUNDLE:-0}" = "1" ]; then
+        codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+      fi
       sleep 2
       # 签名后再确认一次 —— 旧写法用 --deep 会把 ndll 换回 lime 自带版，
       # 而日志却打印「已还原」，是假成功（实测 2026-10-06）
@@ -297,9 +356,9 @@ if [ "${METEORIC_CUSTOM_CLASSES:-0}" = "1" ]; then
 fi
 
 if [ "$1" = "test" ]; then
-  haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
+  haxelib run lime test macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG $STRIP_FLAGS
 else
-  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG
+  haxelib run lime build macos -release $ARCH_FLAG $PROFILE_DEFINE $DEBUG_FLAGS $CUSTOM_CLASSES_FLAG $STRIP_FLAGS
 fi
 
 # ---- 构建后处理：恢复墙钟版 lime.ndll ----
@@ -358,7 +417,14 @@ if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
   else
   codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/lime.ndll" 2>/dev/null || true
   codesign --force -s - "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" 2>/dev/null || true
-  codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+  # ⚠ bundle 级签名是构建时间的最大杀手：codesign 会把 Resources 下**每个文件**的哈希
+  # 写进 _CodeSignature/CodeResources，而本 bundle 的 mods/ 有 78GB（stupid-griefer 数据），
+  # 实测单这一步就要 15 分钟以上（2026-10-30 实测构建 21 分钟里有 15 分钟耗在这）。
+  # 本地迭代不需要它：主程序与 ndll 已各自签好，终端 `./Meteoric` 可直接启动（已验证）。
+  # 只在分发（公证 / 拷到别的机器）时才补签：METEORIC_SIGN_BUNDLE=1 ./compile-mac.sh
+  if [ "${METEORIC_SIGN_BUNDLE:-0}" = "1" ]; then
+    codesign --force -s - "export/release/macos/bin/Meteoric.app" 2>/dev/null || true
+  fi
   fi
   sleep 2
   # 判据：三层签名各自有效 + ndll 架构与主程序一致 + 补丁符号在位。
@@ -368,10 +434,11 @@ if [ -f "$STABLE_NDLL" ] && [ -f "$APP_NDLL" ]; then
   REF_ARCH=$(lipo -archs "$STABLE_NDLL" 2>/dev/null)
   APP_ARCH=$(lipo -archs "$APP_NDLL" 2>/dev/null)
   MAIN_ARCH=$(lipo -archs "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" 2>/dev/null)
-  if codesign -v "export/release/macos/bin/Meteoric.app" >/dev/null 2>&1 \
+  # 校验口径同步：bundle 级签名默认跳过（见上），改为验「主程序 + ndll」两层。
+  if codesign -v "export/release/macos/bin/Meteoric.app/Contents/MacOS/Meteoric" >/dev/null 2>&1 \
      && codesign -v "$APP_NDLL" >/dev/null 2>&1 \
      && [ "$REF_ARCH" = "$APP_ARCH" ] && [ "$APP_ARCH" = "$MAIN_ARCH" ]; then
-      echo "[post-build] ✓ 签名有效（bundle/主程序/ndll 三层）+ $NDLL_SRC 已就位 (arch: $APP_ARCH)"
+      echo "[post-build] ✓ 签名有效（主程序/ndll）+ $NDLL_SRC 已就位 (arch: $APP_ARCH)"
   else
       echo "[post-build] ⚠ 签名或 ndll 还原未完全成功（ndll arch=$APP_ARCH / 主程序 arch=$MAIN_ARCH / 参考=$REF_ARCH）"
       echo "[post-build]    非致命：引擎会按 SDL3_DYNAMIC_API 标记自动回退 1000 帧档运行。"

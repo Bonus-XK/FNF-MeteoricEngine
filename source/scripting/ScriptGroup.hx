@@ -1,6 +1,6 @@
 package scripting;
 
-import psychlua.HScript;
+import scripting.lua.HScript;
 import sys.FileSystem;
 import sys.io.File;
 

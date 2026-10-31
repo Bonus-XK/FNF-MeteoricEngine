@@ -20,8 +20,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "source")
-LUA_ROOT = SRC  # 全 source/：Lua 回调不止在 psychlua（如 backend/Discord.hx）
-HSX_FILE = os.path.join(SRC, "psychlua", "HScript.hx")
+LUA_ROOT = SRC  # 全 source/：Lua 回调不止在 scripting/lua（如 backend/Discord.hx）
+HSX_FILE = os.path.join(SRC, "scripting", "lua", "HScript.hx")
 OUT_TSV = os.path.join(ROOT, "tools", "contract", "script-surface.tsv")
 OUT_MD = os.path.join(ROOT, "tools", "contract", "BASELINE.md")
 
@@ -53,7 +53,7 @@ def scan_lua():
 
 
 def scan_hscript():
-    """HScript 可见名：psychlua/HScript.hx 的 preset + 编程层（source/scripting）注入的宿主变量。
+    """HScript 可见名：scripting/lua/HScript.hx 的 preset + 编程层（source/scripting）注入的宿主变量。
 
     编程层（source/scripting/*.hx）也会用 set('name', ...) 往脚本注入变量
     （state / game / scripting），这些同样是脚本可见名，必须一起冻结在基线里。
@@ -123,8 +123,8 @@ def render(rows, stats):
         "# 动态点口径: 名字非字面量（运行期由脚本经 FunkinLua.customFunctions / MenuScript.addLocalCallback 注册），基线只冻结内建字面量面。",
         "# multi_site: %s" % (", ".join("%s.%s" % (k, n) for k, n in stats["multi_site"]) or "(none)"),
         "# kind=lua    : source/** 下 Lua_helper.add_callback 的字符串字面量",
-        "# kind=hscript: source/psychlua/HScript.hx 的 set('…') 预设变量",
-# kind=lua-ui : source/psychlua/** 下 addLocalCallback 的字符串字面量名（含界面/脚本桥，非仅 MenuScript）
+        "# kind=hscript: source/scripting/lua/HScript.hx 的 set('…') 预设变量",
+# kind=lua-ui : source/scripting/lua/** 下 addLocalCallback 的字符串字面量名（含界面/脚本桥，非仅 MenuScript）
         "# 不变量：本文件中的名字只增不减；删除或改名 = 破坏 mod 兼容，必须人工评审。",
     ]
     for kind, name, loc in rows:

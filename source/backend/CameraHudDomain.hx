@@ -11,7 +11,7 @@ import states.PlayState;
 import states.PlayState.GameHUD;
 import objects.Note;
 import objects.StrumNote;
-import psychlua.FunkinLua;
+import scripting.lua.FunkinLua;
 import backend.CoolUtil;
 import flixel.text.FlxText.FlxTextBorderStyle;
 import backend.Rating;

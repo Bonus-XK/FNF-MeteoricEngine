@@ -24,7 +24,7 @@ import backend.Section.SwagSection;
 import objects.Character;
 import backend.Rating;
 import objects.NoteSplash;
-import psychlua.FunkinLua;
+import scripting.lua.FunkinLua;
 
 /** 音符与谱面域（C2 首批迁出）。
  *  迁出策略：函数体迁到本类；PlayState 保留**同签名转发入口**，故全仓 `PlayState.*` 调用点零改动。

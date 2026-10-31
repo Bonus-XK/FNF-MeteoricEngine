@@ -378,7 +378,7 @@ class Main extends Sprite
 		}
 		#end
 	
-		#if LUA_ALLOWED Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(psychlua.CallbackHandler.call)); #end
+		#if LUA_ALLOWED Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(scripting.lua.CallbackHandler.call)); #end
 		Controls.instance = new Controls();
 		ClientPrefs.loadDefaultKeys();
 		var flxGame = new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen);
@@ -603,11 +603,11 @@ class Main extends Sprite
 		{
 			#if HSCRIPT_ALLOWED
 			var hxRet:Dynamic = states.PlayState.instance.callOnHScript(func, args);
-			if (hxRet != null && hxRet != psychlua.FunkinLua.Function_Continue) ret = hxRet;
+			if (hxRet != null && hxRet != scripting.lua.FunkinLua.Function_Continue) ret = hxRet;
 			#end
 			#if LUA_ALLOWED
 			var luaRet:Dynamic = states.PlayState.instance.callOnLuas(func, args);
-			if (luaRet != null && luaRet != psychlua.FunkinLua.Function_Continue) ret = luaRet;
+			if (luaRet != null && luaRet != scripting.lua.FunkinLua.Function_Continue) ret = luaRet;
 			#end
 		}
 		#if LUA_ALLOWED

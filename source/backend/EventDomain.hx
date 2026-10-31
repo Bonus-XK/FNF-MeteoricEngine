@@ -10,9 +10,9 @@ import backend.Paths;
 import backend.Controls;
 import flixel.input.keyboard.FlxKey;
 import backend.ClientPrefs;
-import psychlua.FunkinLua;
+import scripting.lua.FunkinLua;
 import objects.Character;
-import psychlua.LuaUtils;
+import scripting.lua.LuaUtils;
 
 #if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
 import scripting.ScriptChartEvent;

@@ -2,7 +2,7 @@ package objects;
 
 import animateatlas.AtlasFrameMaker;
 #if flxanimate
-import flxanimate.PsychFlxAnimate;
+import flxanimate.MeteoricFlxAnimate;
 #end
 
 import flixel.util.FlxSort;
@@ -75,7 +75,7 @@ class Character extends FlxSprite
 	// Atlas（Adobe Animate 2020 spritemap1）支持：与 Psych 0.7 一致，FlxAnimate 运行时渲染
 	#if flxanimate
 	public var isAnimateAtlas:Bool = false;
-	public var atlas:PsychFlxAnimate;
+	public var atlas:MeteoricFlxAnimate;
 	public var lastPlayedAnimName:String = '';
 	#end
 
@@ -164,7 +164,7 @@ class Character extends FlxSprite
 				#if flxanimate
 				else if (isAnimateAtlas)
 				{
-					atlas = new PsychFlxAnimate();
+					atlas = new MeteoricFlxAnimate();
 					atlas.showPivot = false;
 					try
 					{

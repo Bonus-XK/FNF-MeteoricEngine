@@ -6,7 +6,7 @@ import backend.ClientPrefs;
 import backend.Conductor;
 import backend.CrashHandler;
 import flixel.addons.transition.FlxTransitionableState;
-import psychlua.FunkinLua;
+import scripting.lua.FunkinLua;
 import backend.Highscore;
 import backend.MusicBeatState;
 import objects.Note;
@@ -27,7 +27,7 @@ import backend.Achievements;
 import backend.Difficulty;
 import objects.MobileControls;
 import substates.PauseSubState;
-import psychlua.HScript;
+import scripting.lua.HScript;
 import backend.TurboDensity;
 import backend.TurboDensity.TurboZone;
 
@@ -37,7 +37,7 @@ import scripting.Scripting;
 #end
 import flixel.addons.display.FlxRuntimeShader;
 import backend.BaseStage;
-import psychlua.DebugLuaText;
+import scripting.lua.DebugLuaText;
 import flixel.util.FlxStringUtil;
 import backend.MeteoricProfile;
 import backend.Replay.ReplayEvent;
@@ -253,11 +253,28 @@ class HostDomain
 		}
 
 		var foldersToCheck:Array<String> = [Paths.mods('shaders/')];
+		var seenFolders:Array<String> = [];
+		var addFolder = function(f:String):Void {
+			if(f != null && f.length > 0 && !seenFolders.contains(f))
+			{
+				seenFolders.push(f);
+				foldersToCheck.insert(0, f);
+			}
+		};
+
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
-			foldersToCheck.insert(0, Paths.mods(Mods.currentModDirectory + '/shaders/'));
+			addFolder(Paths.mods(Mods.currentModDirectory + '/shaders/'));
 
 		for(mod in Mods.getGlobalMods())
-			foldersToCheck.insert(0, Paths.mods(mod + '/shaders/'));
+			addFolder(Paths.mods(mod + '/shaders/'));
+
+		// ⚠ 必须再兜一层「所有已启用模组」：切歌后 currentModDirectory 会被
+		// WeekData / Freeplay 改写，全局模组表也可能尚未刷新 —— 只靠前两者会让已启用
+		// 模组的 shader 找不到 → createRuntimeShader 返回无源码的空壳
+		// → 脚本里 `shader.setFloat("iTime", …)` 解引用 null → SIGSEGV
+		//（2026-10-30 实测：Ultimatum 的 data/ultimatum/wavyshader.lua 即此）。
+		for(mod in Mods.parseList().enabled)
+			addFolder(Paths.mods(mod + '/shaders/'));
 
 		for (folder in foldersToCheck)
 		{
@@ -268,7 +285,7 @@ class HostDomain
 				var found:Bool = false;
 				if(FileSystem.exists(frag))
 				{
-					frag = File.getContent(frag);
+					frag = foldGlslConstants(File.getContent(frag));
 					found = true;
 				}
 				else frag = null;
@@ -295,42 +312,105 @@ class HostDomain
 		return false;
 	}
 
+	/**
+	 * GLSL 兼容性归一化 —— 让引擎去兼容模组，而不是要求模组改写 shader。
+	 *
+	 * 模组里的常见写法：
+	 *     float SAMPLEDIST = 5.0;
+	 *     for (int i = 1; i <= int(SAMPLEDIST); i++) { ... }
+	 * 但 GLSL 120（macOS 的 OpenGL 2.1）要求 for 循环边界是**编译期常量表达式**。
+	 * Apple 的 GLSL 编译器遇到运行时边界时不是报错，而是让进程直接 abort（SIGSEGV）——
+	 * 这是驱动层崩溃，Haxe 的 try/catch 完全兜不住，ErrorHandledRuntimeShader 也无效。
+	 *（2026-10-31 实测：Sonic 模组 Ultimatum 的 rimlight.frag 正是这样崩的，
+	 *  崩溃栈里没有 lua_pcall，全是裸地址。）
+	 *
+	 * 只处理「字面量初始化的全局标量」，两步且语义完全不变：
+	 *   ① `int(NAME)` → 整数字面量（把 for 边界变成常量）
+	 *   ② `float NAME = 5.0;` → `const float NAME = 5.0;`（让直接引用也常量折叠）
+	 */
+	public static function foldGlslConstants(src:String):String
+	{
+		if (src == null || src.length == 0) return src;
+
+		var out:String = src;
+		var decl:EReg = ~/(^|[;}\n])[ \t]*(float|int)[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*=[ \t]*(-?[0-9]+(?:\.[0-9]+)?)[ \t]*;/gm;
+		var pairs:Array<Array<String>> = [];
+		// ⚠ EReg.match() 每次都从头匹配，必须手动推进游标，否则死循环
+		var scan:Int = 0;
+		while (scan < out.length)
+		{
+			if (!decl.match(out.substr(scan))) break;
+			var mp = decl.matchedPos();
+			pairs.push([decl.matched(3), decl.matched(4)]);
+			var step:Int = mp.pos + mp.len;
+			if (step <= 0) step = 1;
+			scan += step;
+		}
+
+		for (p in pairs)
+		{
+			var varName:String = p[0];
+			var numVal:Float = Std.parseFloat(p[1]);
+			if (Math.isNaN(numVal)) continue;
+			var intLit:String = Std.string(Std.int(numVal));
+
+			// ① int(NAME) → 整数字面量
+			var use:EReg = new EReg('int[ \t]*\\([ \t]*' + varName + '[ \t]*\\)', 'g');
+			if (use.match(out))
+			{
+				out = use.replace(out, intLit);
+				trace('[foldGlsl] int($varName) -> $intLit');
+			}
+
+			// ② 声明补 const —— 仅 macOS。
+			// 理由：GLSL 120 的 for 循环边界在 macOS 驱动上必须严格是常量表达式，
+			// 补 const 能让 `i <= NAME` 这类直接引用也变成常量；但若某个 shader 后续给该
+			// 变量赋值，补 const 会让它编译失败 —— Windows 上很多 shader 能正常跑，
+			// 不该为了 macOS 的限制去改动它们，故只在 macOS 启用。
+			#if mac
+			var declRe:EReg = new EReg('([;}\\n][ \\t]*)(float|int)([ \\t]+' + varName + '[ \\t]*=[ \\t]*-?[0-9]+(?:\\.[0-9]+)?[ \\t]*;)', 'g');
+			if (declRe.match(out)) out = declRe.replace(out, '$1const $2$3');
+			#end
+		}
+		if (out != src) trace('[foldGlsl] 已归一化 shader 源码（' + src.length + ' -> ' + out.length + ' 字符）');
+		return out;
+	}
+
 	/** 原 PlayState.startCharacterScripts（作用域分析：零遮蔽，2 处成员引用已限定）。 */
 	public static function startCharacterScripts(ps:PlayState, name:String)
 	{
 		// Lua
+		// 独立化默认不加载角色 .lua；打开「Psych 1.0.4 模组兼容」后恢复 mods 覆盖 + preload 兜底。
 		#if LUA_ALLOWED
-		var doPush:Bool = false;
-		var luaFile:String = 'characters/' + name + '.lua';
-		#if MODS_ALLOWED
-		var replacePath:String = Paths.modFolders(luaFile);
-		if(FileSystem.exists(replacePath))
+		if(Mods.hasLegacyEnabled())
 		{
-			luaFile = replacePath;
-			doPush = true;
-		}
-		else
-		{
-			luaFile = Paths.getPreloadPath(luaFile);
-			if(FileSystem.exists(luaFile))
-				doPush = true;
-		}
-		#else
-		luaFile = Paths.getPreloadPath(luaFile);
-		if(Assets.exists(luaFile)) doPush = true;
-		#end
-
-		if(doPush)
-		{
-			for (script in ps.luaArray)
+			var doPush:Bool = false;
+			var luaFile:String = 'characters/' + name + '.lua';
+			var replacePath:String = Paths.modFolders(luaFile);
+			if(FileSystem.exists(replacePath))
 			{
-				if(script.scriptName == luaFile)
-				{
-					doPush = false;
-					break;
-				}
+				luaFile = replacePath;
+				doPush = true;
 			}
-			if(doPush) new FunkinLua(luaFile);
+			else
+			{
+				luaFile = Paths.getPreloadPath(luaFile);
+				if(FileSystem.exists(luaFile))
+					doPush = true;
+			}
+
+			if(doPush)
+			{
+				for (script in ps.luaArray)
+				{
+					if(script.scriptName == luaFile)
+					{
+						doPush = false;
+						break;
+					}
+				}
+				if(doPush) new FunkinLua(luaFile);
+			}
 		}
 		#end
 
@@ -338,18 +418,17 @@ class HostDomain
 		#if HSCRIPT_ALLOWED
 		var doPush:Bool = false;
 		var scriptFile:String = 'characters/' + name + '.hx';
-		var replacePath:String = Paths.modFolders(scriptFile);
-		if(FileSystem.exists(replacePath))
+		if(Mods.hasLegacyEnabled())
 		{
-			scriptFile = replacePath;
-			doPush = true;
+			var replacePath:String = Paths.modFolders(scriptFile);
+			scriptFile = FileSystem.exists(replacePath) ? replacePath : Paths.getPreloadPath(scriptFile);
 		}
 		else
 		{
 			scriptFile = Paths.getPreloadPath(scriptFile);
-			if(FileSystem.exists(scriptFile))
-				doPush = true;
 		}
+		if(FileSystem.exists(scriptFile))
+			doPush = true;
 
 		if(doPush)
 		{
@@ -883,6 +962,10 @@ class HostDomain
 	/** 原 PlayState.startLuasNamed（作用域分析：零遮蔽，1 处成员引用已限定）。 */
 	public static function startLuasNamed(ps:PlayState, luaFile:String):Bool
 	{
+		// 独立化默认行为：不加载 mods 里的命名 Lua 脚本（舞台 / 音符类型 / 自定义事件）。
+		// 打开「Psych 1.0.4 模组兼容」后恢复原实现（先查 mods 覆盖，再兜底 preload）。
+		if(!Mods.hasLegacyEnabled()) return false;
+
 		#if MODS_ALLOWED
 		var luaToLoad:String = Paths.modFolders(luaFile);
 		if(!FileSystem.exists(luaToLoad))
@@ -912,12 +995,22 @@ class HostDomain
 		if(!ps.runtimeShaders.exists(name) && !ps.initLuaShader(name))
 		{
 			FlxG.log.warn('Shader $name is missing!');
+			// FlxG.log.warn 不进运行日志，这里补一条 trace：
+			// 缺 shader 会返回无源码空壳，脚本再 setFloat 就是 SIGSEGV，必须留可见证据
+			trace('[createRuntimeShader] 着色器缺失，返回空壳（脚本 setFloat 可能崩溃）: ' + name
+				+ ' | curMod=' + Mods.currentModDirectory + ' globals=' + Mods.getGlobalMods().join(','));
 			return new FlxRuntimeShader();
 		}
 
 		backend.CrashHandler.logEvent('createRuntimeShader: ' + name);
 		var arr:Array<String> = ps.runtimeShaders.get(name);
-		return new FlxRuntimeShader(arr[0], arr[1]);
+		// 临时回退为裸 FlxRuntimeShader（同 setSpriteShader 的诊断改动）
+		var sh = new FlxRuntimeShader(arr[0], arr[1]);
+		// 诊断：脚本拿到 shader 后直接 setFloat(uniform)，若这里是「无源码空壳」就会原生 SEGV
+		trace('[createRuntimeShader] name=' + name
+			+ ' frag=' + (arr[0] == null ? 'NULL' : 'len' + arr[0].length)
+			+ ' vert=' + (arr[1] == null ? 'NULL(走宏默认)' : 'len' + arr[1].length));
+		return sh;
 		#else
 		FlxG.log.warn("Platform unsupported for Runtime Shaders!");
 		return null;
@@ -967,9 +1060,14 @@ class HostDomain
 	/** 原 PlayState.startHScriptsNamed（作用域分析：零遮蔽，1 处成员引用已限定）。 */
 	public static function startHScriptsNamed(ps:PlayState, scriptFile:String):Bool
 	{
-		var scriptToLoad:String = Paths.modFolders(scriptFile);
-		if(!FileSystem.exists(scriptToLoad))
-			scriptToLoad = Paths.getPreloadPath(scriptFile);
+		var scriptToLoad:String = Paths.getPreloadPath(scriptFile);
+		// Psych 1.0.4 兼容：允许 mods 覆盖命名 HScript（舞台 / 音符类型 / 自定义事件 / 角色）。
+		// 关闭时只读内置 preload（独立化行为，零变化）。
+		if(Mods.hasLegacyEnabled())
+		{
+			var modPath:String = Paths.modFolders(scriptFile);
+			if(FileSystem.exists(modPath)) scriptToLoad = modPath;
+		}
 
 		if(FileSystem.exists(scriptToLoad))
 		{
@@ -1042,12 +1140,12 @@ class HostDomain
 	/** 原 PlayState.callOnHScript（作用域分析：零遮蔽，5 处成员引用已限定）。 */
 	public static function callOnHScript(ps:PlayState, funcToCall:String, args:Array<Dynamic> = null, ?ignoreStops:Bool = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic
 	{
-		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
+		var returnVal:Dynamic = scripting.lua.FunkinLua.Function_Continue;
 
 		#if HSCRIPT_ALLOWED
 		if(exclusions == null) exclusions = PlayState._noExclusions;
 		if(excludeValues == null) excludeValues = PlayState._noExcludeValues;
-		else if (excludeValues != PlayState._noExcludeValues) excludeValues.push(psychlua.FunkinLua.Function_Continue);
+		else if (excludeValues != PlayState._noExcludeValues) excludeValues.push(scripting.lua.FunkinLua.Function_Continue);
 
 		var len:Int = ps.hscriptArray.length;
 		if (len < 1)
@@ -1237,7 +1335,7 @@ class HostDomain
 	/** 原 PlayState.callOnScripts（作用域分析：零遮蔽，4 处成员引用已限定）。 */
 	public static function callOnScripts(ps:PlayState, funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic
 	{
-		var returnVal:Dynamic = psychlua.FunkinLua.Function_Continue;
+		var returnVal:Dynamic = scripting.lua.FunkinLua.Function_Continue;
 		if(args == null) args = [];
 		if(exclusions == null) exclusions = PlayState._noExclusions;
 		if(excludeValues == null) excludeValues = PlayState._noExcludeValues;
@@ -1289,8 +1387,25 @@ class HostDomain
 		if(text && ps.modchartTexts.exists(tag)) return ps.modchartTexts.get(tag);
 		if(ps.variables.exists(tag)) return ps.variables.get(tag);
 		#end
+		// 诊断：HScript 里 `game.getLuaObject(tag).xxx` 拿到 null 后继续调方法会原生 SEGV
+		//（SScript 对 null 成员访问不抛异常 → 无法被 pcall 捕获）。MISS 只报一次，避免每帧刷屏。
+		if (tag != null && !missedLuaTags.contains(tag))
+		{
+			missedLuaTags.push(tag);
+			var keys:Array<String> = [];
+			#if LUA_ALLOWED
+			for (k in ps.modchartSprites.keys()) keys.push(k);
+			#end
+			trace('[getLuaObject] MISS tag=' + tag
+				+ ' | curMod=' + Mods.currentModDirectory
+				+ ' | sprites(' + keys.length + ')=' + keys.slice(0, 12).join(',')
+				+ ' | instanceId=' + ps.ID);
+		}
 		return null;
 	}
+
+	/** getLuaObject MISS 诊断的去重表（进程级，够诊断用了）。 */
+	static var missedLuaTags:Array<String> = [];
 
 	/** 原 PlayState.startAndEnd（作用域分析：零遮蔽，3 处成员引用已限定）。 */
 	public static function startAndEnd(ps:PlayState)

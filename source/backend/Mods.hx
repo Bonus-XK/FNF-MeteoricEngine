@@ -57,27 +57,11 @@ class Mods
 
 	inline public static function getModDirectories():Array<String>
 	{
-		var list:Array<String> = [];
-		#if MODS_ALLOWED
-		var modsFolder:String = Paths.mods();
-		// mods 目录不存在时自动创建，否则 Mod 无法加载/安装
-		if(!FileSystem.exists(modsFolder)) {
-			try {
-				FileSystem.createDirectory(modsFolder);
-			} catch(e:Dynamic) {
-				trace('Could not create mods folder: $e');
-			}
-		}
-		if(FileSystem.exists(modsFolder)) {
-			for (folder in FileSystem.readDirectory(modsFolder))
-			{
-				var path = haxe.io.Path.join([modsFolder, folder]);
-				if (sys.FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
-					list.push(folder);
-			}
-		}
-		#end
-		return list;
+		// [PSYCH-COMPAT-OFF] Psych 模组兼容已停用（2026-10-29）：不扫描 mods 目录，
+		// 也不再自动创建 mods/ 文件夹（避免"以为还在加载"的错觉）。
+		// 恢复：git revert 去除本闸门的提交。
+		var none:Array<String> = [];
+		return none;
 	}
 	
 	inline public static function mergeAllTextsNamed(path:String, defaultDirectory:String = null, allowDuplicates:Bool = false)
@@ -115,50 +99,17 @@ class Mods
 		#end
 			foldersToCheck.push(path + fileToFind);
 
-		#if MODS_ALLOWED
-		if(mods)
-		{
-			// Global mods first
-			for(mod in Mods.getGlobalMods())
-			{
-				var folder:String = Paths.mods(mod + '/' + fileToFind);
-				if(FileSystem.exists(folder)) foldersToCheck.push(folder);
-			}
-
-			// Then "PsychEngine/mods/" main folder
-			var folder:String = Paths.mods(fileToFind);
-			if(FileSystem.exists(folder)) foldersToCheck.push(Paths.mods(fileToFind));
-
-			// And lastly, the loaded mod's folder
-			if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
-			{
-				var folder:String = Paths.mods(Mods.currentModDirectory + '/' + fileToFind);
-				if(FileSystem.exists(folder)) foldersToCheck.push(folder);
-			}
-		}
-		#end
+		// [PSYCH-COMPAT-OFF] Psych 模组兼容已停用（2026-10-29）：不再追加 mods/ 下的同名目录
+		// （原先依次查 全局模组 → mods/ 根 → 当前模组 三段）。`mods` 形参保留仅为兼容调用签名。
+		// 结果：脚本/角色/事件的查找只剩内置 preload 路径，mods 里的 .lua/.hx 一律不会被扫到。
+		// 恢复：git revert 去除本闸门的提交。
 		return foldersToCheck;
 	}
 
 	public static function getPack(?folder:String = null):Dynamic
 	{
-		#if MODS_ALLOWED
-		if(folder == null) folder = Mods.currentModDirectory;
-
-		var path = Paths.mods(folder + '/pack.json');
-		if(FileSystem.exists(path)) {
-			try {
-				#if sys
-				var rawJson:String = File.getContent(path);
-				#else
-				var rawJson:String = Assets.getText(path);
-				#end
-				if(rawJson != null && rawJson.length > 0) return Json.parse(rawJson);
-			} catch(e:Dynamic) {
-				trace(e);
-			}
-		}
-		#end
+		// [PSYCH-COMPAT-OFF] Psych 模组兼容已停用（2026-10-29）：不再读取 pack.json。
+		// 恢复：git revert 去除本闸门的提交。
 		return null;
 	}
 
@@ -175,27 +126,10 @@ class Mods
 	}
 
 	inline public static function parseList():ModsList {
-		if(!updatedOnState) updateModList();
+		// [PSYCH-COMPAT-OFF] Psych 模组兼容已停用（2026-10-29）：不再读取 modsList.txt、
+		// 不再扫描 mods 目录，恒返回空表 → 模组一律不启用。
+		// 恢复：git revert 去除本闸门的提交（原实现见 updateModList()，其函数体仍完整保留）。
 		var list:ModsList = {enabled: [], disabled: [], all: []};
-
-		#if MODS_ALLOWED
-		try {
-			for (mod in CoolUtil.coolTextFile(modsListPath()))
-			{
-				//trace('Mod: $mod');
-				if(mod.trim().length < 1) continue;
-
-				var dat = mod.split("|");
-				list.all.push(dat[0]);
-				if (dat[1] == "1")
-					list.enabled.push(dat[0]);
-				else
-					list.disabled.push(dat[0]);
-			}
-		} catch(e) {
-			trace(e);
-		}
-		#end
 		return list;
 	}
 	

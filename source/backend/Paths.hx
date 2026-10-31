@@ -1202,7 +1202,7 @@ class Paths
 
 	#if flxanimate
 	/** Psych 0.7 兼容：FlxAnimate 加载（支持 mods 文件系统，走 loadAtlasEx 内容加载） */
-	public static function loadAnimateAtlas(spr:flxanimate.PsychFlxAnimate, folderOrImg:Dynamic, spriteJson:Dynamic = null, animationJson:Dynamic = null)
+	public static function loadAnimateAtlas(spr:flxanimate.MeteoricFlxAnimate, folderOrImg:Dynamic, spriteJson:Dynamic = null, animationJson:Dynamic = null)
 	{
 		var changedAnimJson = false;
 		var changedAtlasJson = false;

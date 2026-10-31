@@ -20,7 +20,7 @@ import sys.io.File;
 
 import objects.TypedAlphabet;
 
-import cutscenes.DialogueBoxPsych;
+import cutscenes.MeteoricDialogueBox;
 import cutscenes.DialogueCharacter;
 
 class DialogueCharacterEditorState extends MusicBeatState
@@ -141,7 +141,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		reloadCharacter();
 		updateTextBox();
 
-		daText = new TypedAlphabet(DialogueBoxPsych.DEFAULT_TEXT_X, DialogueBoxPsych.DEFAULT_TEXT_Y, '', 0.05, false);
+		daText = new TypedAlphabet(MeteoricDialogueBox.DEFAULT_TEXT_X, MeteoricDialogueBox.DEFAULT_TEXT_Y, '', 0.05, false);
 		daText.setScale(0.7);
 		daText.startText(DEFAULT_TEXT);
 		hudGroup.add(daText);
@@ -458,12 +458,12 @@ class DialogueCharacterEditorState extends MusicBeatState
 			char.setGraphicSize(Std.int(char.width * DialogueCharacter.DEFAULT_SCALE * character.jsonFile.scale));
 			char.updateHitbox();
 		}
-		character.x = DialogueBoxPsych.LEFT_CHAR_X;
-		character.y = DialogueBoxPsych.DEFAULT_CHAR_Y;
+		character.x = MeteoricDialogueBox.LEFT_CHAR_X;
+		character.y = MeteoricDialogueBox.DEFAULT_CHAR_Y;
 
 		switch(character.jsonFile.dialogue_pos) {
 			case 'right':
-				character.x = FlxG.width - character.width + DialogueBoxPsych.RIGHT_CHAR_X;
+				character.x = FlxG.width - character.width + MeteoricDialogueBox.RIGHT_CHAR_X;
 			
 			case 'center':
 				character.x = FlxG.width / 2;
@@ -496,7 +496,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 				anim = 'center';
 		}
 		box.animation.play(anim, true);
-		DialogueBoxPsych.updateBoxOffsets(box);
+		MeteoricDialogueBox.updateBoxOffsets(box);
 	}
 
 	override function getEvent(id:String, sender:Dynamic, data:Dynamic, ?params:Array<Dynamic>) {

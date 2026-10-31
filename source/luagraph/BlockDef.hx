@@ -10,7 +10,7 @@ import backend.DesignTokens;
  *   {p:参数名} —— 参数替换（KText/KTag 会加引号转义，其余原样）
  *   $BODY$     —— body 子序列（缩进后插入）
  *   $ELSE$     —— elseBody 子序列
- * 全部函数名/参数序均逐条核对自 source/psychlua/functions/*.hx 的 add_callback 注册原文。
+ * 全部函数名/参数序均逐条核对自 source/scripting/lua/functions/*.hx 的 add_callback 注册原文。
  */
 class BlockDef
 {

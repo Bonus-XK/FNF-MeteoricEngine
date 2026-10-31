@@ -114,12 +114,10 @@ class CoolUtil
 		#end
 	}
 
-	/** Quick Function to Fix Save Files for Flixel 5
-		if you are making a mod, you are gonna wanna change "ShadowMario" to something else
-		so Base Psych saves won't conflict with yours
-		@BeastlyGabi
-	**/
-	inline public static function getSavePath(folder:String = 'ShadowMario'):String {
+	/** 存档目录根（Flixel 5+ 由 Project.xml 的 company / file 元数据决定 → Bonus-XK/Meteoric）
+		`folder` 参数只在 flixel < 5 的旧分支生效；flixel 6.2.0 下走 else 分支，该参数不参与取值，
+		保留只为兼容既有调用签名。默认值写引擎名，避免再出现上游作者名。 **/
+	inline public static function getSavePath(folder:String = 'Meteoric'):String {
 		#if (sys && !android)
 		// 测试隔离：METEORIC_SAVE_DIR 优先级最高 —— 自动化/bot 冒烟跑在独立目录，
 		// 存档全部写到那里，**绝不触碰玩家真实存档**。详见 testSavePath()。

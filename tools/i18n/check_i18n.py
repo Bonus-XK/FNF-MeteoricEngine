@@ -372,7 +372,7 @@ SKIP_REASONS = [
     ("source/luagraph/LuaGraphTemplates.hx", "misc_print 默认文本会写进用户生成的 .lua"),
     ("source/backend/ModInstallUI.hx", "m.title == '安装完成' 状态比较"),
     ("source/backend/CustomFadeTransition.hx", "MODE_* 是 static inline var 存档值"),
-    ("source/psychlua/LuaClass.hx", "生成进用户 Lua 类的注释文本"),
+    ("source/scripting/lua/LuaClass.hx", "生成进用户 Lua 类的注释文本"),
     ("source/states/CreditsState.hx", "署名与角色描述（内容）"),
     ("source/flixel/", "引擎内部诊断日志"),
     ("source/openfl/", "存档值比较（FPS 配色档位）"),

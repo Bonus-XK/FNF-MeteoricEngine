@@ -153,7 +153,7 @@ def selftest():
         cases = [("未突变副本→PASS", r0.returncode == 0 and "RESULT: PASS" in r0.stdout,
                   next((l for l in r0.stdout.splitlines() if l.startswith("RESULT")), ""))]
         # ① 删 1 个名 → 期望 FAIL
-        hsx = os.path.join(tmp, "source", "psychlua", "HScript.hx")
+        hsx = os.path.join(tmp, "source", "scripting", "lua", "HScript.hx")
         s = open(hsx, encoding="utf-8").read()
         assert "set('" in s
         mut = s.replace("set('", "setDisabled('", 1)
@@ -163,15 +163,15 @@ def selftest():
         cases.append(("删1个名→FAIL", r.returncode == 1 and _has(r.stdout, r"脚本入口缺失 1 个(?![0-9])")
                       and _has(r.stdout, r"行级缺失 0(?![0-9])") and "RESULT: FAIL" in r.stdout,
                       next((l for l in r.stdout.splitlines() if l.startswith("RESULT")), "")))
-        shutil.copy2(os.path.join(ROOT, "source", "psychlua", "HScript.hx"), hsx)
+        shutil.copy2(os.path.join(ROOT, "source", "scripting", "lua", "HScript.hx"), hsx)
         # ② 增 1 个名 → 期望 PASS 且列出新增
-        misc = os.path.join(tmp, "source", "psychlua", "functions", "MiscCommands.hx")
+        misc = os.path.join(tmp, "source", "scripting", "lua", "functions", "MiscCommands.hx")
         with open(misc, "a", encoding="utf-8") as fh:
             fh.write('\n// selftest\nfunction _ctSelfTest(lua) { Lua_helper.add_callback(lua, "zzSelfTestApi999", null); }\n')
         r = _run(tmp)
         cases.append(("增1个名→PASS+列出新增", r.returncode == 0 and _has(r.stdout, r"新增 1(?![0-9])") and "RESULT: PASS" in r.stdout,
                       next((l for l in r.stdout.splitlines() if l.startswith("RESULT:") or l.startswith("提示")), "")))
-        shutil.copy2(os.path.join(ROOT, "source", "psychlua", "functions", "MiscCommands.hx"), misc)
+        shutil.copy2(os.path.join(ROOT, "source", "scripting", "lua", "functions", "MiscCommands.hx"), misc)
         # ③ 改 1 条路径串 → 期望 FAIL
         mods = os.path.join(tmp, "source", "backend", "Mods.hx")
         s = open(mods, encoding="utf-8").read()
@@ -194,7 +194,7 @@ def selftest():
         r = _run(tmp)
         cases.append(("真改名(删+增)→FAIL且两侧点亮", r.returncode == 1 and _has(r.stdout, r"缺失 1(?![0-9])") and _has(r.stdout, r"新增 1(?![0-9])"),
                       next((l for l in r.stdout.splitlines() if l.startswith("[1/3")), "")))
-        shutil.copy2(os.path.join(ROOT, "source", "psychlua", "HScript.hx"), hsx)
+        shutil.copy2(os.path.join(ROOT, "source", "scripting", "lua", "HScript.hx"), hsx)
         print("=== 对照用例 ===")
         allok = True
         for name, passed, last in cases:

@@ -13,7 +13,7 @@ class MusicBeatState extends FlxUIState
 {
 	#if LUA_ALLOWED
 	// 界面脚本系统：该界面上运行的自定义 Lua 脚本（menus/<界面名>.lua）
-	public var uiScripts:Array<psychlua.MenuScript> = [];
+	public var uiScripts:Array<scripting.lua.MenuScript> = [];
 	#end
 
 	#if (MODS_ALLOWED && HSCRIPT_ALLOWED && sys)
@@ -177,11 +177,10 @@ class MusicBeatState extends FlxUIState
 	// 加载界面脚本：menus/<name>.lua（可被 mod 覆盖）
 	public function loadUIscripts(name:String)
 	{
-		#if LUA_ALLOWED
-		var scriptPath:String = psychlua.MenuScript.findScriptPath(name);
-		if(scriptPath != null)
-			uiScripts.push(new psychlua.MenuScript(this, scriptPath));
-		#end
+		// [PSYCH-COMPAT-OFF] Psych 模组兼容已停用（2026-10-29）：界面 Lua 脚本不再加载。
+		// 原实现：scripting.lua.MenuScript.findScriptPath(name) 命中后 push 进 uiScripts。
+		// uiScripts 保持空数组，callUIScripts 遍历空表天然安全。
+		// 恢复：git revert 去除本闸门的提交。
 	}
 
 	// 向界面脚本广播事件（如 onChangeSelection、onConfirm）
