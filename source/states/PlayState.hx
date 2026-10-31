@@ -379,6 +379,10 @@ class PlayState extends MusicBeatState
 	public var opponentStrums:FlxTypedGroup<StrumNote>;
 	public var playerStrums:FlxTypedGroup<StrumNote>;
 
+	// 音符模表渲染器（modcharting）：仅在「编程 → 音符模表」开启且（谱面带 modchart.json
+	// 或脚本调用模表函数）时创建；不创建 = 零开销、零行为变化
+	public var playfieldRenderer:modcharting.PlayfieldRenderer = null;
+
 	// Psych 0.6.3 兼容：默认箭头位置（供 Lua 直接 getProperty/setProperty）
 	public var defaultPlayerStrumX0:Float = 0;
 	public var defaultPlayerStrumY0:Float = 0;
@@ -821,10 +825,13 @@ class PlayState extends MusicBeatState
 		#end
 
 		// "GLOBAL" SCRIPTS（回放模式不加载，见 FunkinLua.new / initHScript 的 replayMode 拦截）
+		// 独立化默认只读内置 preload 段（assets/scripts/）；打开「Psych 1.0.4 模组兼容」后
+		// 也扫 mods/<mod>/scripts/（Psych 风格全局 Lua/HScript）。
+		// Meteoric 自研脚本仍走 mods/<mod>/scripting/ 独立通道，不受此处影响。
 		#if LUA_ALLOWED
 		if (!replayMode)
 		{
-			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/');
+			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/', Mods.hasLegacyEnabled());
 			for (folder in foldersToCheck)
 				for (file in FileSystem.readDirectory(folder))
 				{
@@ -1062,10 +1069,13 @@ class PlayState extends MusicBeatState
 		cachedEventNotes = eventNotes.copy();
 
 		// SONG SPECIFIC SCRIPTS（回放模式不加载，见 FunkinLua.new / initHScript 的 replayMode 拦截）
+		// 独立化默认只读内置 preload 段；打开「Psych 1.0.4 模组兼容」后也扫 mods/<mod>/data/<歌>/
+		//（Psych 风格单曲 Lua/HScript；此时 Paths.modFolders 会回退旧 data/ 目录名）。
+		// Meteoric 单曲脚本仍走 scripting/songs/<歌名>/ 独立通道（SongScripts.load，见下方），互不重复。
 		#if LUA_ALLOWED
 		if (!replayMode)
 		{
-			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/');
+			var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/', Mods.hasLegacyEnabled());
 			for (folder in foldersToCheck)
 				for (file in FileSystem.readDirectory(folder))
 				{
@@ -1334,6 +1344,9 @@ class PlayState extends MusicBeatState
 			}
 			keepStrumsOnRestart = false;
 			CrashHandler.mark('countdown:arrows-done');
+			// 模表渲染器在判定线生成后捕获/刷新基准位（首帧 draw 前必须就绪；多 K 键数在此才实测）
+			if (playfieldRenderer != null)
+				playfieldRenderer.refreshStrumPos();
 			for (i in 0...playerStrums.length) {
 				setOnScripts('defaultPlayerStrumX' + i, playerStrums.members[i].x);
 				setOnScripts('defaultPlayerStrumY' + i, playerStrums.members[i].y);
@@ -1620,6 +1633,9 @@ class PlayState extends MusicBeatState
 		notes = new NoteGroup();
 		add(notes);
 		generateChartNotes(true);
+		// 模表：显式开启且谱面自带 modchart.json 才创建渲染器（默认关=零行为变化）
+		if (ClientPrefs.data.modchartsEnabled && modcharting.ModchartFile.existsForSong(SONG.song))
+			initModchartRenderer();
 		trace('[PLAY create] chartNotes ' + Std.int(haxe.Timer.stamp()*1000) + 'ms');
 	}
 
@@ -2116,6 +2132,25 @@ class PlayState extends MusicBeatState
 	public function repositionHUD() CameraHudDomain.repositionHUD(this);
 
 	private function generateStaticArrows(player:Int):Void CameraHudDomain.generateStaticArrows(this, player);
+
+	// 创建模表渲染器（惰性入口：create 检测到 modchart.json / Lua 首次调用模表函数）。
+	// 渲染器接管音符与判定线的绘制（两组 visible=false 只关绘制，判定/更新逻辑照常）。
+	public function initModchartRenderer():Void
+	{
+		if (playfieldRenderer != null || strumLineNotes == null || notes == null)
+			return;
+		playfieldRenderer = new modcharting.PlayfieldRenderer(strumLineNotes, notes, this);
+		playfieldRenderer.cameras = [camHUD];
+		var idx = members.indexOf(notes);
+		if (idx >= 0)
+			insert(idx, playfieldRenderer); // 与音符同层（notes 组自身已被隐藏，由渲染器代绘）
+		else
+			add(playfieldRenderer);
+		if (strumLineNotes.length > 0)
+			playfieldRenderer.refreshStrumPos(); // 判定线已生成时立即捕获基准位并按实测键数重建命中表
+		if (ClientPrefs.data.perfMode || densePerfMode)
+			trace('[Modchart] 提示：性能模式与模表渲染器同时开启，密集谱面可能掉帧');
+	}
 
 	override function openSubState(SubState:FlxSubState)
 	{

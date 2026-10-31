@@ -308,6 +308,12 @@ class Note extends FlxSprite
 	public var lateHitMult:Float = 1;
 	public var lowPriority:Bool = false;
 
+	// ==== Modchart（音符模表）专用字段：仅 modcharting.PlayfieldRenderer 接管绘制时使用 ====
+	// 长条世界空间网格（SustainStrip），池化复生时必须销毁重建（贴图/着色随谱面音符而变）
+	public var mesh:modcharting.SustainStrip = null;
+	// 模表 3D 深度分量（FlxSprite 无 z，模表渲染器独占写）
+	public var z:Float = 0;
+
 	// 脚本可修改 Angle（对齐 PE 0.6.3 行为；0.7.3/1.0.4 的 followStrumNote 每帧重算会覆盖脚本写入）：
 	// 外部/脚本写入 angle 时自动关闭 copyAngle 接管旋转；引擎内部写入
 	// （recycleNote 复生复位 / followStrumNote 每帧公式）经 _engineAngleWrite 标记绕过，
@@ -321,6 +327,15 @@ class Note extends FlxSprite
 		if (!_engineAngleWrite && wasCopy)
 			copyAngle = false; // 脚本设定 → 接管旋转：followStrumNote 不再每帧覆盖
 		return ret;
+	}
+
+	// 引擎/模表渲染器专用的角度写入：标记 _engineAngleWrite，不会把 copyAngle 置 false，
+	// 模表关闭后 followStrumNote 能照常接管角度（不残留脚本态）
+	public function engineSetAngle(Value:Float):Void
+	{
+		_engineAngleWrite = true;
+		angle = Value;
+		_engineAngleWrite = false;
 	}
 
 	public static var SUSTAIN_SIZE:Int = 44;
@@ -1737,6 +1752,13 @@ class Note extends FlxSprite
 		_engineAngleWrite = true; // 引擎复位：不触发"脚本接管旋转"逻辑
 		angle = 0;
 		_engineAngleWrite = false;
+		// 模表状态复位：池化复生不得串用旧网格/旧深度（网格持有复生前音符的贴图与着色）
+		if (mesh != null)
+		{
+			mesh.destroy();
+			mesh = null;
+		}
+		z = 0;
 		scrollFactor.set(); // 音符在 camHUD 下应为 (0,0)，与旧生成路径一致
 		// invalidateNote 会置 active=false/visible=false 且 kill()（alive=false/exists=false）；
 		// 复生必须复活（否则 Note.update 不执行、forEachAlive 跳过——
