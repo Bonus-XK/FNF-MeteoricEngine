@@ -643,10 +643,10 @@ class Note extends FlxSprite
 			if (ExtraKeys.usingLeatherSkin())
 			{
 				x = ExtraKeys.laneX(0, ExtraKeys.isPlayerCol(noteData), ExtraKeys.laneOf(noteData));
-				// 【布局诊断】Leather 音符实测
+				// 【布局诊断】Leather 音符实测（含实际贴图路径，验证 arrowSkin 是否覆盖）
 				if (!isSustainNote)
 					trace('[NOTE] lane=' + ExtraKeys.laneOf(noteData) + ' col=' + noteData
-						+ ' x=' + x + ' w=' + width);
+						+ ' x=' + x + ' w=' + width + ' tex=' + texture);
 			}
 			else
 				x += ExtraKeys.laneGap * (noteData);

@@ -216,10 +216,14 @@ class CameraHudDomain
 
 			ps.strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
-			// 【布局诊断】Leather 风格实测定轨
-			trace('[ARROWS] player=' + player + ' lane=' + i + ' keys=' + ExtraKeys.songKeys
+			// 【布局诊断】trace + 落盘（crash/layout_debug.txt）：用户端真实数据可直接比对
+			var diag:String = '[ARROWS] player=' + player + ' lane=' + i + ' keys=' + ExtraKeys.songKeys
 				+ ' gap=' + ExtraKeys.laneGap + ' scale=' + ExtraKeys.laneScale
-				+ ' x=' + babyArrow.x + ' w=' + babyArrow.width);
+				+ ' x=' + babyArrow.x + ' w=' + babyArrow.width + ' tex=' + babyArrow.texture;
+			trace(diag);
+			#if sys
+			try sys.io.File.append('./crash/layout_debug.txt').writeString(diag + '\n') catch (e:Dynamic) {}
+			#end
 		}
 	}
 
