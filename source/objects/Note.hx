@@ -638,8 +638,12 @@ class Note extends FlxSprite
 				}
 			}
 
-			// Extra Keys：lane 间距走 laneGap（keys>4 自动压缩；keys<=4 = swagWidth 原值）
-			x += ExtraKeys.laneGap * (noteData);
+			// Extra Keys：4K 走旧 col×swagWidth；Leather 风格（keys>4）直接用 laneX 全公式
+			//（组起点 + lane×步进 + 玩家组右移，覆盖 601 行的 STRUM_X 基准——Leather 从 0 起算）
+			if (ExtraKeys.usingLeatherSkin())
+				x = ExtraKeys.laneX(0, ExtraKeys.isPlayerCol(noteData), ExtraKeys.laneOf(noteData));
+			else
+				x += ExtraKeys.laneGap * (noteData);
 			// 贴图循环复用：lane ≥ 4 的方向 = lane % 4（紫/蓝/绿/红循环），动画照播
 			if(!isSustainNote && noteData > -1) {
 				var animToPlay:String = '';

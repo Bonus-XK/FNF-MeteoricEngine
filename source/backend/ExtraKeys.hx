@@ -246,17 +246,25 @@ class ExtraKeys
 		}
 		loadManiaData();
 		// keys>4：Leather 组起点公式 —— 100 − (kc−4)×16，10 键起 +30；整组偏移 maniaOffset
-		var groupStart:Float = 100 - ((songKeys - 4) * 16) + (songKeys >= 10 ? 30 : 0)
-			+ floatAt(maniaOffset, songKeys);
+		var groupStart:Float = leatherGroupStart();
 		if (middle)
 		{
 			// 中滚沿用 Meteoric 泛化：整组按键数居中（Leather 无中滚概念）
 			var start:Float = (FlxG.width - songKeys * laneGap) / 2;
 			return start + lane * laneGap;
 		}
-		var x:Float = rawBase + 50 + groupStart + lane * laneGap;
+		// Leather 从 0 起算（不含 STRUM_X 基准），玩家组整体 +FlxG.width/2
+		var x:Float = groupStart + lane * laneGap;
 		if (player) return x + FlxG.width / 2;
 		return x;
+	}
+
+	/** Leather 组起点（maniaOffset 表 + 键数修正）：轨道与音符的 x 共用此基准。 */
+	public static function leatherGroupStart():Float
+	{
+		loadManiaData();
+		return 100 - ((songKeys - 4) * 16) + (songKeys >= 10 ? 30 : 0)
+			+ floatAt(maniaOffset, songKeys);
 	}
 
 	/**
