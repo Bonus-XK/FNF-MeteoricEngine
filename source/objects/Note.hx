@@ -1531,7 +1531,9 @@ class Note extends FlxSprite
 		}
 		else addCachedNoteAnim(cacheKey, col + 'Scroll', col + '0', 30, true);
 
-		setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
+		// Leather 风格用固定帧宽 157（防 texture setter 二次触发导致的缩放累积）
+		if (leatherAnim) setGraphicSize(Std.int(157 * 0.7 * ExtraKeys.laneScale));
+		else setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
 		updateHitbox();
 	}
 

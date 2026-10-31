@@ -96,7 +96,9 @@ class StrumNote extends FlxSprite
 				animation.addByPrefix('static', dirFrame + ' static');
 				animation.addByPrefix('pressed', dirAnim + ' press', 24, false);
 				animation.addByPrefix('confirm', dirAnim + ' confirm', 24, false);
-				setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
+				// ⚠ 用固定帧宽 157（Leather 图集帧尺寸），不用动态 width：
+				// reloadNote 会被 texture setter 触发多次，动态 width 会二次缩放（91→52 越缩越小）
+				setGraphicSize(Std.int(157 * 0.7 * ExtraKeys.laneScale));
 				updateHitbox();
 				if (lastAnim != null) playAnim(lastAnim, true);
 				return;

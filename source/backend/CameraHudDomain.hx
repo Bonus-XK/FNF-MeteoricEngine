@@ -216,6 +216,10 @@ class CameraHudDomain
 
 			ps.strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
+			// 【布局诊断】Leather 风格实测定轨
+			trace('[ARROWS] player=' + player + ' lane=' + i + ' keys=' + ExtraKeys.songKeys
+				+ ' gap=' + ExtraKeys.laneGap + ' scale=' + ExtraKeys.laneScale
+				+ ' x=' + babyArrow.x + ' w=' + babyArrow.width);
 		}
 	}
 
