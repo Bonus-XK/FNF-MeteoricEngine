@@ -302,11 +302,20 @@ class SaveVariables {
 	// 0=关闭 | 1=轻度(75%) | 2=中度(50%) | 3=重度(25%)
 	@:keep public var visualFold:Int = 0;
 	@:keep public var iconFlyOverflow:Bool = false;     // 血条溢出图标飞出（JS 引擎同款：>100% 时图标沿填充方向滑出条外，不封顶）
+	// Psych Engine 1.0.4 模组兼容（默认关）：允许旧目录布局（data/ images/ music/ sounds/、
+	// custom_notetypes/、scripts/ 等）与 pack.json / modsList.txt 被读取，并恢复 Psych 风格的
+	// 脚本加载（全局 scripts/、歌曲 data/<歌>/、舞台 / 角色 / 音符类型 / 自定义事件的命名脚本）。
+	// 关闭时行为与独立化后的 Meteoric 完全一致（零行为变化）。Meteoric 新目录与 mod.json 始终优先。
+	@:keep public var psychV104Compat:Bool = false;
 	@:keep public var psych063Mode:Bool = false; // Psych Engine 0.6.3 兼容模式：关闭强制烘焙，兼容旧版箭头贴图格式
 	// Lua 0.6.3 兼容：Psych 0.6.3 的脚本停止哨兵是数字（Function_Continue=0 / Function_Stop=1 /
 	// Function_StopLua=2），0.7.x 起改为字符串哨兵。开启后 dispatch 会数字<->字符串双向归一化，
 	// 使 0.6.3 老模组里 `return Function_StopLua` 之类的写法重新生效。默认关闭。
 	@:keep public var luaUse063Compat:Bool = false;
+	// 音符模表（Modchart）总开关（默认关）：modcharting 包渲染器 + Lua/HScript 模表函数的的总闸。
+	// 关闭时：不创建渲染器、模表函数全部空转（注册但不生效），行为与功能落地前完全一致（零行为变化）。
+	// 开启后仍按需生效：仅当谱面带 modchart.json 或脚本调用模表函数时才创建渲染器，无数据零开销。
+	@:keep public var modchartsEnabled:Bool = false;
 	// Phigros 式评分（默认关）：把「每判定固定加分」换成两段式 ——
 	// 分数 = 900000×ACC + 100000×(最大连击/总音符)，ACC = (Perfect + Good×0.65)/总音符。
 	// 满分固定 100 万；评级 φ / V(全连) / S≥92万 / A≥88万 / B≥82万 / C≥70万 / F。
@@ -824,6 +833,31 @@ class ClientPrefs {
 		normalizeLoadedMaps();
 		normalizeLoadedKeys();
 		normalizeArrowRGB();
+
+		// ── 新字段显式补齐（2026-10-30 实测事故）────────────────────────────────
+		// 上面那套 `for (key in Reflect.fields(data))` 批量加载对**后加的字段会失效**：
+		// 存档里明明是 `psychV104Compat = t`，data 里却始终是默认 false
+		//（日志实证：dataNull=true fromData=false fromSave=false，481 次路径查找全 compat=false）。
+		// 后果不只是"开关不生效"：启用判定和资源路径解析会读出不同答案 → 贴图返回 null → SEGV。
+		// 这里对后加字段做一次显式回填，不依赖反射字段枚举。
+		try
+		{
+			var sd:Dynamic = FlxG.save != null ? FlxG.save.data : null;
+			if (sd != null)
+			{
+				var v:Dynamic = Reflect.field(sd, 'psychV104Compat');
+				if (v != null) data.psychV104Compat = (v == true);
+				var vm:Dynamic = Reflect.field(sd, 'modchartsEnabled');
+				if (vm != null) data.modchartsEnabled = (vm == true);
+			}
+			var __names:Array<String> = sd == null ? [] : Reflect.fields(sd);
+			trace('[ClientPrefs] psychV104Compat loaded = ' + data.psychV104Compat
+				+ ' (raw=' + Std.string(sd == null ? 'noSave' : Reflect.field(sd, 'psychV104Compat'))
+				+ ' inFields=' + (__names.indexOf('psychV104Compat') >= 0)
+				+ ' saveFields=' + (sd == null ? -1 : __names.length) + ')');
+		}
+		catch(e:Dynamic) { trace('[ClientPrefs] psychV104Compat backfill failed: $e'); }
+
 		savedHideHud = data.hideHud;
 
 		var __saveSuspect:Bool = false;

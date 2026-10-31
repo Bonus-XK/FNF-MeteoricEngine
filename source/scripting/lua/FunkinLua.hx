@@ -36,6 +36,7 @@ import substates.GameOverSubstate;
 
 import scripting.lua.LuaUtils;
 import scripting.lua.LuaUtils.LuaTweenOptions;
+import modcharting.ModchartFuncs;
 import scripting.lua.functions.ScriptGlobals;
 import scripting.lua.functions.ScriptCommands;
 import scripting.lua.functions.ScriptTweens;
@@ -133,6 +134,7 @@ class FunkinLua {
 		SoundCommands.implement(this);       // 声音
 		MiscCommands.implement(this);        // 颜色工具 / 输入探测 / 定时器 / 调试 / 本脚本控制
 		ObjectBridge.implement(this);        // Lua 对象桥：getObj/newObj/objCall —— Haxe 对象一等引用
+		ModchartFuncs.implement(this);       // 音符模表（Modchart）：默认关（函数注册但空转），开启后可用
 
 		// ==== 与拆分前同序的既有模块 ====
 		ReflectionFunctions.implement(this);
@@ -185,6 +187,8 @@ class FunkinLua {
 		var callResult:Dynamic = Function_Continue;
 		lastCalledFunction = func;
 		lastCalledScript = this;
+		// 把「哪个脚本的哪个回调」写进原生崩溃报告，否则 lua_pcall 里 SEGV 只能看到阶段名
+		backend.CrashHandler.setLuaContext(func, scriptName);
 		try {
 			if(lua != null)
 			{
@@ -430,7 +434,11 @@ class FunkinLua {
 				var found:Bool = false;
 				if(FileSystem.exists(frag))
 				{
-					frag = File.getContent(frag);
+					// ⚠ 脚本侧读 frag 的主路径就是这里（Lua 的 initLuaShader / setSpriteShader 都走它）。
+					// GLSL 兼容归一化必须在此处做：模组 shader 常见的
+					// `for (int i = 1; i <= int(SAMPLEDIST); i++)`（运行时循环边界）会让
+					// macOS 的 GLSL 120 编译器直接 abort 进程（驱动层 SEGV，try/catch 兜不住）。
+					frag = backend.HostDomain.foldGlslConstants(File.getContent(frag));
 					found = true;
 				}
 				else frag = null;

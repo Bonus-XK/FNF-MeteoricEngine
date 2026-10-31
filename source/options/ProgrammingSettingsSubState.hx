@@ -29,6 +29,12 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 	{
 		title = '编程';
 
+		var option:Option = new Option('Psych 1.0.4 模组兼容',
+			'开启后，识别 Psych Engine 1.0.4 模组：读取旧目录布局（data/ images/ music/ sounds/ custom_notetypes/ scripts/）与 pack.json / modsList.txt，\n并恢复 Psych 风格脚本加载（全局 scripts/、歌曲 data/<歌>/、舞台 / 角色 / 音符类型 / 自定义事件的 .lua / .hx）。\nMeteoric 新目录与 mod.json 仍然优先。默认关闭',
+			'psychV104Compat',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('Psych 0.6.3 兼容模式',
 			'开启后，关闭强制音符烘焙，兼容 Psych Engine 0.6.3 模组的箭头贴图格式（箭头不显示时试试这个）',
 			'psych063Mode',
@@ -38,6 +44,14 @@ class ProgrammingSettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('Lua 0.6.3 兼容',
 			'开启后，Lua 脚本的停止哨兵按 Psych Engine 0.6.3 的数字约定处理（Function_Continue=0 / Function_Stop=1 / Function_StopLua=2）。\n0.6.3 老模组的 return Function_StopLua 无效（脚本停不下来）时试试这个',
 			'luaUse063Compat',
+			'bool');
+		addOption(option);
+
+		// ===== 音符模表（Modchart）=====
+		// 总开关默认关：关闭时不创建渲染器、模表函数空转，零行为变化。
+		var option:Option = new Option('音符模表（Modchart）',
+			'开启后允许谱面使用音符模表：谱面目录放 modchart.json，或在 Lua 脚本里调 startMod / setMod / set / ease 等函数，\n可以让音符位移、旋转、缩放、消失（3D 透视可用）。\n只有带模表数据的谱面才会生效，没有模表数据的谱面零开销、零变化。',
+			'modchartsEnabled',
 			'bool');
 		addOption(option);
 

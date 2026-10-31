@@ -634,6 +634,10 @@ class HScript
 		});
 		set('WeekData', backend.WeekData);
 		set('Highscore', backend.Highscore);
+		// 音符模表（Modchart）：HScript 可直接调静态函数；总开关关闭时函数空转（见 ModchartFuncs.enabled）
+		set('ModchartFuncs', modcharting.ModchartFuncs);
+		set('ModchartUtil', modcharting.ModchartUtil);
+		set('NoteMovement', modcharting.NoteMovement);
 		set('LoadingState', states.LoadingState);
 		set('Application', lime.app.Application);
 		set('Assets', openfl.utils.Assets);
