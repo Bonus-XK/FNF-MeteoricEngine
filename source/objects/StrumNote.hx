@@ -74,6 +74,35 @@ class StrumNote extends FlxSprite
 		var lastAnim:String = null;
 		if(animation.curAnim != null) lastAnim = animation.curAnim.name;
 
+		// ===== Leather 风格箭头（keys>4 自动启用）：ui skins 图集 + 方向名帧 =====
+		// static 帧 = maniaDirections 表方向名小写 + " static"；
+		// press/confirm 帧 = maniaAnimationDirections 表 + " press"/" confirm"。
+		// 布局缩放 = 帧宽 × 0.7 × (1 − maniaSize[kc])（laneScale 已含）。
+		if (PlayState.isPixelStage == false && ExtraKeys.usingLeatherSkin())
+		{
+			var lTex:String = 'ui skins/default/arrows/default';
+			frames = Paths.getSparrowAtlas(lTex);
+			if (frames == null || frames.frames == null || frames.frames.length < 1)
+			{
+				trace('[StrumNote] Leather atlas failed: ' + lTex + ' → fallback default skin');
+				texture = 'noteSkins/NOTE_assets';
+			}
+			else
+			{
+				texture = lTex;
+				antialiasing = ClientPrefs.data.antialiasing;
+				var dirFrame:String = ExtraKeys.arrowDirFrame(noteData); // maniaDirections（static）
+				var dirAnim:String = ExtraKeys.noteAnimPrefix(noteData); // maniaAnimationDirections（press/confirm）
+				animation.addByPrefix('static', dirFrame + ' static');
+				animation.addByPrefix('pressed', dirAnim + ' press', 24, false);
+				animation.addByPrefix('confirm', dirAnim + ' confirm', 24, false);
+				setGraphicSize(Std.int(width * 0.7 * ExtraKeys.laneScale));
+				updateHitbox();
+				if (lastAnim != null) playAnim(lastAnim, true);
+				return;
+			}
+		}
+
 		if(PlayState.isPixelStage)
 		{
 			loadGraphic(Paths.image('pixelUI/' + texture));

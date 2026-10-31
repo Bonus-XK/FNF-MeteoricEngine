@@ -602,7 +602,9 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
-			texture = '';
+			// Leather 风格（keys>4）：默认用 Leather 箭头图集（含扩展方向帧 square/plus/rup 等）；
+			// 4K 或谱面显式指定 arrowSkin 时走 Psych 皮肤。
+			texture = ExtraKeys.usingLeatherSkin() ? 'ui skins/default/arrows/default' : '';
 			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 			else if(ClientPrefs.data.psych063Mode || !ClientPrefs.data.shaders || PlayState.densePerfMode) rgbShader.enabled = false; // 0.6.3 兼容/关着色器/密集谱自动档：避免 RGB 渲染成黑或叠色
@@ -641,7 +643,7 @@ class Note extends FlxSprite
 			// 贴图循环复用：lane ≥ 4 的方向 = lane % 4（紫/蓝/绿/红循环），动画照播
 			if(!isSustainNote && noteData > -1) {
 				var animToPlay:String = '';
-				animToPlay = colArray[noteData % colArray.length];
+				animToPlay = ExtraKeys.noteColName(noteData);
 				if (bakedKind < 0) {
 					animation.play(animToPlay + 'Scroll');
 				}
@@ -669,7 +671,7 @@ class Note extends FlxSprite
 			offsetX += width / 2;
 			copyAngle = false;
 
-			if (bakedKind < 0) animation.play(colArray[noteData % colArray.length] + 'holdend');
+			if (bakedKind < 0) animation.play(ExtraKeys.noteColName(noteData) + 'holdend');
 
 			updateHitbox();
 
@@ -684,7 +686,7 @@ class Note extends FlxSprite
 				if (prevNote.bakedKind >= 0)
 					prevNote.useBakedSustainBody(); // 提前渲染：长条尾 → 长条体贴图
 				else
-					prevNote.animation.play(colArray[prevNote.noteData % colArray.length] + 'hold');
+					prevNote.animation.play(ExtraKeys.noteColName(prevNote.noteData) + 'hold');
 
 				prevNote.scale.y *= Conductor.stepCrochet / 100 * 1.05;
 				if(createdFrom != null && createdFrom.songSpeed != null) prevNote.scale.y *= createdFrom.songSpeed;
@@ -978,6 +980,11 @@ class Note extends FlxSprite
 		if (!ClientPrefs.data.psych063Mode) bakeNotes = true;
 		#end
 		if (!bakeNotes || inEditor || rgbShader == null || noteData < 0) return;
+		// Leather 风格（keys>4）图集的帧结构/命名与 Psych 不同（hold 帧名无 piece、
+		// 有扩展方向），烘焙路径未适配 —— 强制跳过，走原生渲染（2026-10-31：SIGABRT
+		// "pointer being freed was not allocated"@pixman 层正是 Leather 图集被烘焙后
+		// 生命周期混乱所致）。
+		if (ExtraKeys.usingLeatherSkin()) return;
 		var pixelStage:Bool = PlayState.isPixelStage;
 		var loadPath:String = bakedLoadPath != null ? bakedLoadPath : getNoteSkinLoadPathCached(texture, '', pixelStage, isSustainNote);
 		var kind:Int = bakedKind >= 0 ? bakedKind : (isSustainNote ? BAKE_HOLDEND : BAKE_NOTE);
@@ -1507,12 +1514,16 @@ class Note extends FlxSprite
 
 	function loadNoteAnims(cacheKey:String) {
 		// Extra Keys：lane ≥ 4 循环复用 4 色帧名（colArray[noteData % 4]）
-		var col:String = colArray[noteData % colArray.length];
+		// Leather 风格（keys>4）：帧前缀走 maniaAnimationDirections 表；长条帧名用
+		// Leather 图集约定（前缀+" hold"/前缀+" hold end"，Psych 的 " hold piece" 帧不存在）。
+		var leatherAnim:Bool = ExtraKeys.usingLeatherSkin();
+		var col:String = leatherAnim ? ExtraKeys.noteAnimPrefix(noteData) : colArray[noteData % colArray.length];
 		if (isSustainNote)
 		{
-			addCachedNoteAnim(cacheKey, 'purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
-			addCachedNoteAnim(cacheKey, col + 'holdend', col + ' hold end', 24, true);
-			addCachedNoteAnim(cacheKey, col + 'hold', col + ' hold piece', 24, true);
+			if (!leatherAnim)
+				addCachedNoteAnim(cacheKey, 'purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
+			addCachedNoteAnim(cacheKey, col + 'holdend', col + (leatherAnim ? ' hold end' : ' hold end'), 24, true);
+			addCachedNoteAnim(cacheKey, col + 'hold', col + (leatherAnim ? ' hold' : ' hold piece'), 24, true);
 		}
 		else addCachedNoteAnim(cacheKey, col + 'Scroll', col + '0', 30, true);
 
