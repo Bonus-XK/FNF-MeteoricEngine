@@ -116,6 +116,13 @@ class TitleState extends MusicBeatState
 
 		ClientPrefs.loadPrefs();
 
+		// Psych 1.0.4 兼容：存档加载后**重新**计算全局模组。
+		// 上面的 pushGlobalMods() 在 loadPrefs() 之前执行，那时 psychV104Compat 还读不到，
+		// 只带 pack.json 的旧模组（runsGlobally）会被漏掉 → 其资源全部找不到。
+		#if LUA_ALLOWED
+		if (Paths.psychCompat() || Mods.hasLegacyEnabled()) Mods.pushGlobalMods();
+		#end
+
 		// 【宽屏适配】存档加载后应用缩放模式（backend/MeteoricScaleMode）。
 		// 若逻辑宽度因此变化（如 20:9 手机 1280→1600），已按旧宽度排版的标题界面
 		// 整体重建一次（静态标记防循环：重建后 apply() 宽度不再变化，走正常流程）。
@@ -245,7 +252,10 @@ class TitleState extends MusicBeatState
 		//   METEORIC_TEST_SONG="happy|happy-hard|happy|2"   曲名|谱面名|目录名|难度索引
 		// 必须放在 create() **末尾**：跳过 Highscore.load() 等既有初始化会让 PlayState
 		// 在记分/周目状态缺失下崩溃（实测 2026-09-18 12:24 的 SEGV 就是提前 return 造成）。
-		#if (meteoric_debug && sys)
+		// 2026-10-30：从 `#if (meteoric_debug && sys)` 放宽到 `#if sys` —— 没有 UI 自动化时
+		// 这是唯一能稳定复现「某首歌崩溃」的手段（Rock Solid 等只有手动选歌才进得去）。
+		// 仅在环境变量存在时生效，正式玩家不受影响。
+		#if sys
 		var testSong:String = Sys.getEnv('METEORIC_TEST_SONG');
 		if (testSong != null && testSong.length > 0)
 		{

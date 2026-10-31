@@ -27,7 +27,27 @@ class PlayCommands
 			var poop = Highscore.formatSong(name, difficultyNum);
 			PlayState.storyDifficulty = difficultyNum;
 			game.persistentUpdate = false;
-			LoadingState.loadSongAndSwitchState(new PlayState(), Paths.formatToSongPath(name), poop, Paths.formatToSongPath(name));
+			var __folder:String = Paths.formatToSongPath(name);
+			var __chart:String = backend.Song.resolveChartPath(poop, __folder);
+			trace('[loadSong] name=' + name + ' diff=' + difficultyNum + ' json=' + poop + ' folder=' + __folder
+				+ ' curMod=' + Mods.currentModDirectory + ' globals=' + Mods.getGlobalMods().join(',')
+				+ ' difficultyList=[' + backend.Difficulty.list.join(',') + ']'
+				+ ' chart=' + Std.string(__chart));
+			var __ok:Bool = LoadingState.loadSongAndSwitchState(new PlayState(), Paths.formatToSongPath(name), poop, Paths.formatToSongPath(name));
+			trace('[loadSong] switchState ok=' + __ok);
+			#if sys
+			try
+			{
+				var __f = sys.io.File.append('/tmp/meteoric_loadsong.log', false);
+				__f.writeString('[loadSong] name=' + name + ' diff=' + difficultyNum + ' json=' + poop
+					+ ' folder=' + __folder + ' curMod=' + Mods.currentModDirectory
+					+ ' globals=' + Mods.getGlobalMods().join(',')
+					+ ' difficultyList=[' + backend.Difficulty.list.join(',') + ']'
+					+ ' chart=' + Std.string(__chart) + ' ok=' + __ok + '\n');
+				__f.close();
+			}
+			catch(e:Dynamic) {}
+			#end
 
 			FlxG.sound.music.pause();
 			FlxG.sound.music.volume = 0;

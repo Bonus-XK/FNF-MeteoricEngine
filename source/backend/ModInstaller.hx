@@ -666,20 +666,22 @@ class ModInstaller
 
 			if (!found)
 			{
-				// 新 mod 默认关闭（|0）：
-				// 1) 直接 File.append 会粘在无尾换行的最后一行上（modsList.txt 由
-				//    Mods.updateModList 写出时最后一行不带 \n），把上一行启用标志破坏成
-				//    "A|1B|B" → 上一个启用的 mod 被解析成关闭（"安装后模组自动关闭" bug 根因）
-				// 2) 若默认启用且排在前，loadTopMod 会把 currentModDirectory 切到新 mod，
-				//    让当前生效的 mod 资源全部失效
-				lines.push(modName + '|0');
+				// Meteoric 原生模组（带 mod.json）默认启用（|1），开箱即用；
+				// 仅有 pack.json / 无元数据的旧目录默认关闭（|0），避免半成品被加载崩溃，
+				// 也不会让 loadTopMod 的 currentModDirectory 突然切到新 mod 顶掉现有模组。
+				// 用 saveContent 重写整表而非 append：append 会粘在无尾换行的末行上
+				//（modsListPath 由 updateModList 写出时末行不带 \n），破坏上一行的启用标志
+				//（"安装后模组自动关闭" bug 根因）。
+				var defaultOn:Bool = Mods.hasMeta(modName);
+				var line:String = modName + '|' + (defaultOn ? '1' : '0');
+				lines.push(line);
 				File.saveContent(listPath, lines.join('\n'));
-				trace('ModInstaller: added ' + modName + '|0 to ' + listPath);
+				trace('ModInstaller: added ' + line + ' to ' + listPath);
 			}
 		}
 		catch (e:Dynamic)
 		{
-			trace('ModInstaller: could not update modsList.txt: ' + Std.string(e));
+			trace('ModInstaller: could not update ${Mods.LIST_FILE}: ' + Std.string(e));
 		}
 	}
 

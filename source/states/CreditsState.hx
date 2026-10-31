@@ -742,8 +742,8 @@ class CreditsState extends MusicBeatState
 	function pushModCreditsToList(folder:String)
 	{
 		var creditsFile:String = null;
-		if (folder != null && folder.trim().length > 0) creditsFile = Paths.mods(folder + '/data/credits.txt');
-		else creditsFile = Paths.mods('data/credits.txt');
+			if (folder != null && folder.trim().length > 0) creditsFile = Paths.mods(folder + '/' + Paths.modRelPath('data/credits.txt'));
+			else creditsFile = Paths.mods(Paths.modRelPath('data/credits.txt'));
 
 		if (FileSystem.exists(creditsFile))
 		{

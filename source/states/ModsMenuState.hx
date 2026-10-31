@@ -1080,7 +1080,7 @@ class ModsMenuState extends MusicBeatState
 		// 3) 当前生效 mod 目录指向被删 mod 时清空
 		if (Mods.currentModDirectory == folder) Mods.currentModDirectory = '';
 
-		// 4) 写回 modsList.txt
+		// 4) 写回 meteoric-mods.txt
 		saveTxt();
 
 		// 5) 刷新界面：changeSelection(0) 同步选中框(selectorBar)/滚动/背景色，
@@ -1142,12 +1142,15 @@ class ModsMenuState extends MusicBeatState
 		}
 
 		try {
-			// 与 Mods.parseList 读取同一路径（安卓为外部存储 modsList.txt），
+			// 与 Mods.parseList 读取同一路径（安卓为外部存储的 meteoric-mods.txt），
 			// 否则保存到相对路径导致禁用/启用状态不生效
 			File.saveContent(Mods.modsListPath(), fileStr);
 		} catch(e:Dynamic) {
-			trace('Could not save modsList.txt: $e');
+			trace('Could not save ${Mods.LIST_FILE}: $e');
 		}
+		// 启停状态变了 → 布局/脚本闸门缓存必须失效，否则本会话内新启用的旧模组
+		// 仍按旧判定（hasLegacyEnabled）走，表现为「勾了启用却没生效」。
+		Mods.clearLegacyLayoutCache();
 		Mods.pushGlobalMods();
 	}
 
@@ -1280,7 +1283,7 @@ class ModMetadata
 		this.color = ModsMenuState.defaultColor;
 		this.restart = false;
 
-		//Try loading json
+		//Try loading json（Meteoric 原生 mod.json）
 		var pack:Dynamic = Mods.getPack(folder);
 		if(pack != null) {
 			if(pack.name != null && pack.name.length > 0)
@@ -1288,7 +1291,7 @@ class ModMetadata
 				if(pack.name != 'Name')
 					this.name = pack.name;
 				else
-					this.name = pack.folder;
+					this.name = folder; // mod.json 未必带 folder 字段，用目录名兜底
 			}
 
 			if(pack.description != null && pack.description.length > 0)

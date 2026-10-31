@@ -1,0 +1,8 @@
+{
+	"name": "My Meteoric Mod",
+	"description": "模组简介（显示在 Mods 菜单）",
+	"version": "1.0.0",
+	"color": [146, 113, 253],
+	"restart": false,
+	"runsGlobally": false
+}

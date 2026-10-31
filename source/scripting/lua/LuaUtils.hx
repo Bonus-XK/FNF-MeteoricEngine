@@ -36,6 +36,9 @@ class LuaUtils
 
 	public static function setVarInArray(instance:Dynamic, variable:String, value:Dynamic, allowMaps:Bool = false):Any
 	{
+		// 同 getVarInArray：null 目标上的写入在 hxcpp 里是原生解引用，必须先挡。
+		if (instance == null) return value;
+
 		var splitProps:Array<String> = variable.split('[');
 		if(splitProps.length > 1)
 		{
@@ -58,6 +61,7 @@ class LuaUtils
 
 			for (i in 1...splitProps.length)
 			{
+				if (target == null) return value; // 中间值 null：放弃写入，别原生解引用
 				var j:Dynamic = splitProps[i].substr(0, splitProps[i].length - 1);
 				if(i >= splitProps.length-1) //Last array
 					target[j] = value;
@@ -88,6 +92,12 @@ class LuaUtils
 	}
 	public static function getVarInArray(instance:Dynamic, variable:String, allowMaps:Bool = false):Any
 	{
+		// hxcpp 下 Reflect.getProperty(null, x) 是**原生解引用**，try/catch 兜不住（SIGSEGV）。
+		// 模组脚本普遍写 `getProperty('dad.animation.curAnim.name')`，而动画未开始时
+		// curAnim 还没创建 → 中间值 null。2026-10-30 Sonic 的 MetalJet.lua 就是这么崩的
+		//（崩溃栈落在 lua_pcall → hx_cffi）。这里统一在入口挡住。
+		if (instance == null) return null;
+
 		var splitProps:Array<String> = variable.split('[');
 		if(splitProps.length > 1)
 		{
@@ -110,6 +120,7 @@ class LuaUtils
 
 			for (i in 1...splitProps.length)
 			{
+				if (target == null) return null; // 中间值 null：别原生解引用
 				var j:Dynamic = splitProps[i].substr(0, splitProps[i].length - 1);
 				target = target[j];
 			}
@@ -200,7 +211,12 @@ class LuaUtils
 		var end = split.length;
 		if(getProperty) end = split.length-1;
 
-		for (i in 1...end) obj = getVarInArray(obj, split[i], allowMaps);
+		for (i in 1...end)
+		{
+			// 中间值为 null 就停：继续往下反射会在 hxcpp 里原生解引用 → SIGSEGV
+			if (obj == null) return null;
+			obj = getVarInArray(obj, split[i], allowMaps);
+		}
 		return obj;
 	}
 
@@ -463,7 +479,7 @@ class LuaUtils
 		if(FlxG.save.data.modSettings == null) FlxG.save.data.modSettings = new Map<String, Dynamic>();
 
 		var settings:Map<String, Dynamic> = FlxG.save.data.modSettings.get(modName);
-		var path:String = Paths.mods('$modName/data/settings.json');
+		var path:String = Paths.mods(modName + '/' + Paths.modRelPath('data/settings.json'));
 		if(sys.FileSystem.exists(path))
 		{
 			if(settings == null || !settings.exists(saveTag))

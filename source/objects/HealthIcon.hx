@@ -51,6 +51,15 @@ class HealthIcon extends FlxSprite
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-face'; //Prevents crash from missing icon
 			
 			var graphic = Paths.image(name, allowGPU);
+			if(graphic == null) graphic = Paths.image('icons/icon-face', allowGPU);
+			if(graphic == null)
+			{
+				// 图标彻底缺失时**绝不能**解引用 null：2026-10-30 Freeplay 就是在这里 SIGSEGV
+				//（fileExists 与 modFolders 路径口径不一致，判定存在但取到 null）。
+				// 跳过绘制，保持原 char，下次 changeIcon 还会再试一次。
+				trace('[HealthIcon] icon not found, skip drawing: ' + char);
+				return;
+			}
 			iconFrames = sheetFrameCount(graphic.width);
 			loadGraphic(graphic, true, Math.floor(graphic.width / iconFrames), Math.floor(graphic.height));
 			iconOffsets[0] = (width - 150) / iconFrames;

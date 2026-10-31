@@ -23,16 +23,17 @@ class Difficulty
 	{
 		if(num == null) num = PlayState.storyDifficulty;
 
-		var fileSuffix:String = list[num];
-		if(fileSuffix != defaultDifficulty)
-		{
-			fileSuffix = '-' + fileSuffix;
-		}
-		else
-		{
-			fileSuffix = '';
-		}
-		return Paths.formatToSongPath(fileSuffix);
+		// 越界/缺失一律按「默认难度（无后缀）」处理。
+		var fileSuffix:String = (num >= 0 && num < list.length) ? list[num] : null;
+		if(fileSuffix == null) return '';
+
+		// ⚠ 必须**大小写不敏感**比较：本引擎默认难度是 'Normal'，而 Psych 模组普遍用
+		// 小写写难度表（Sonic 的 `setPropertyFromClass('backend.Difficulty','list',{'normal'})`），
+		// 严格比较会拼出 `-normal` 后缀 → 谱面名变成 `break-down-normal` → 文件不存在
+		// → loadSongAndSwitchState 静默 return false（2026-10-30 实测：菜单里点歌毫无反应）。
+		if(fileSuffix.toLowerCase() == defaultDifficulty.toLowerCase()) return '';
+
+		return Paths.formatToSongPath('-' + fileSuffix);
 	}
 
 	inline public static function loadFromWeek(week:WeekData = null)

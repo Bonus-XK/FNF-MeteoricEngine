@@ -938,7 +938,13 @@ class LoadingState extends MusicBeatState
 	// 选歌用：记录待加载谱面并切状态。谱面文件不存在时返回 false（调用方自行提示）。
 	inline static public function loadSongAndSwitchState(target:FlxState, songName:String, jsonInput:String, folder:String, stopMusic = false, ?returnState:FlxState = null):Bool
 	{
-		if (Song.resolveChartPath(jsonInput, folder) == null) return false;
+		if (Song.resolveChartPath(jsonInput, folder) == null)
+		{
+			// 静默失败会让「点了选歌没反应」完全无从排查（2026-10-30 Sonic 菜单即此现象）
+			trace('[loadSongAndSwitchState] 谱面未找到，取消切歌：json=' + jsonInput + ' folder=' + folder
+				+ ' curMod=' + Mods.currentModDirectory);
+			return false;
+		}
 
 		pendingSongName = songName;
 		pendingChartJson = jsonInput;

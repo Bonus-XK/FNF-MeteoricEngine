@@ -928,7 +928,10 @@ class ChartingState extends MusicBeatState
 		}
 
 		#if sys
-		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'custom_notetypes/');
+		// 独立化默认只列内置 preload 段；打开「Psych 1.0.4 模组兼容」后一并列出 mods 里的
+		// custom_notetypes/（编辑器列得出=运行时加载得到）。
+		// Meteoric 自研音符类型脚本走 mods/<mod>/scripting/notes/（见 PROGRAMMING.md §13）。
+		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'custom_notetypes/', Mods.hasLegacyEnabled());
 		for (folder in foldersToCheck)
 			for (file in FileSystem.readDirectory(folder))
 			{

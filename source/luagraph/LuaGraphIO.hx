@@ -22,12 +22,16 @@ class LuaGraphIO
 {
 	public static inline var GRAPH_EXT:String = '.luagraph.json';
 
-	/** 当前模组的 scripts/ 目录；未选择模组时返回 null。 */
+	/**
+	 * 当前模组的图形化脚本落盘目录：`mods/<mod>/scripting/luagraph/`；未选择模组时返回 null。
+	 * 2026-10-30 从 Psych 风格的 `scripts/` 迁出 —— 那个目录已停用，
+	 * 且 `scripting/luagraph/` 不会被脚本发现层扫到（发现层只认 global/ states/ songs/）。
+	 */
 	public static function modScriptsDir():String
 	{
 		var mod:String = Mods.currentModDirectory;
 		if (mod == null || mod.length == 0) return null;
-		return Paths.mods(mod + '/scripts/');
+		return Paths.mods(mod + '/scripting/luagraph/');
 	}
 
 	public static function hasTargetMod():Bool

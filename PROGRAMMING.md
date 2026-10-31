@@ -2,14 +2,104 @@
 
 > 让 mod 作者**不碰引擎源码**也能改玩法 / 界面：用 HScript 写脚本，改一行按 F5 即生效。
 >
-> 实现说明：脚本引擎复用 Meteoric 自身的 `psychlua.HScript`（SScript 4.0.1 + 187 项 preset API），
+> 实现说明：脚本引擎复用 Meteoric 自身的 `scripting.lua.HScript`（SScript 4.0.1 + 187 项 preset API），
 > **不复制任何第三方引擎的 hscript 实现**；宿主、目录约定、事件层、生命周期全是 Meteoric 自研。
 > 入口：设置 → **编程**（主设置与暂停内设置两个入口都���）。
+
+## 0. 模组元数据与启用（2026-10-29 独立化）
+
+Meteoric 有自己的模组格式，与 Psych Engine 的 `pack.json` / `modsList.txt` 彻底分开：
+
+- **元数据**：`mods/<mod>/mod.json`（引擎只读这个，不再读 `pack.json`）。
+- **启用列表**：桌面 `meteoric-mods.txt`、安卓外部存储同名文件（引擎只读/写这个，不再碰 `modsList.txt`）。
+- **默认启用**：带 `mod.json` 的 Meteoric 原生模组在首次扫描时**自动启用**（开箱即用）；
+  只有旧 `pack.json` 或没有元数据的目录**默认关闭**，可到 Mods 菜单手动启用 —— 这样半成品 / Psych 格式模组不会被突然加载导致崩溃，磁盘现状也保持零行为变化。
+- **脚本目录**：Meteoric 自研脚本走 `mods/<mod>/scripting/`（下文各节）；Psych 风格的
+  `scripts/`、`data/<歌曲名>/`、`characters/*.lua` 等**执行点已停用**（独立化后不再加载），
+  但 Lua / HScript 运行时 API（`addLuaScript` / `addHScript`）仍保留。
+- **内容目录重分类（2026-10-30）**：模组侧启用 Meteoric 语义化目录名，
+  映射集中在 `Paths.modRelPath`（引擎内置资源目录**不变**，覆盖仍靠 key 一致）：
+
+  | 旧（Psych/FNF 通用） | 新（Meteoric） | 说明 |
+  |---|---|---|
+  | `data/` | `charts/` | 谱面 JSON、events.json、credits.txt、introText.txt |
+  | `images/` | `gfx/` | 贴图；**内部子路径不变**（`characters/`、`noteSkins/`、`icons/` …，须与内置侧对齐） |
+  | `music/` + `sounds/` | `audio/` | BGM 与音效合并 |
+  | `custom_notetypes/` | `noteTypes/` | 仅保留 `.txt` 属性文件；`.lua`/`.hx` 脚本已停用（改用 `scripting/notes/`） |
+  | `songs/` | `songs/`（不变） | 音频 Inst/Voices；该名字同时是「Vorbis 流式 vs 全量解码」的判定开关，不能改 |
+  | `characters/` `stages/` `weeks/` `shaders/` `videos/` `fonts/` | 不变 | 与内置侧同名 |
+  | `achievements/` `scripts/` `custom_events/` `menus/` | 删除 | 模组侧已无消费者 |
+
+  完整布局：
+
+  ```
+  mods/<mod>/
+  ├── mod.json            ★ 元数据（有它 → 自动启用）
+  ├── scripting/          ★ 自研 HScript（global/ states/ songs/ stages/ characters/ notes/ events/ libs/ redirects.txt）
+  ├── source/             ★ Haxe 类库（需开「模组类库」开关）
+  ├── charts/             ← 谱面 + events.json + credits.txt + introText.txt
+  ├── songs/              ← 音频（Inst/Voices）
+  ├── audio/              ← BGM + 音效
+  ├── gfx/                ← 贴图（内部子路径与内置侧对齐）
+  ├── characters/ stages/ weeks/
+  ├── noteTypes/          ← 音符类型属性 .txt
+  └── shaders/ videos/ fonts/
+  ```
+
+`mod.json` 字段（全部可选，缺失用兜底值）：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `name` | String | 显示名；缺省用目录名 |
+| `description` | String | 简介 |
+| `version` | String | 版本（仅展示） |
+| `color` | [R,G,B] | 菜单主题色，缺省 `[170,0,255]` |
+| `restart` | Bool | 切换启用后是否提示重启 |
+| `runsGlobally` | Bool | 是否作为「全局模组」在所有场景提供资源覆盖（见 `Mods.pushGlobalMods`） |
+
+模板见 `example_mods/mod.json`。**从 Psych 迁移**：把 `pack.json` 改名为 `mod.json`、删掉 `discordRPC` 字段即可，
+目录结构（`data/`、`songs/`、`weeks/`、`images/` …）原样保留。
+
+> 脚本能力默认常开（2026-10-29 产品决策）：`Scripting.isEnabled()` 目前恒为开，
+> 装着 `scripting/` 的模组放进来即生效；分项开关仍控制各能力（见第 1 节）。
+> 注意这会让设置页的「脚本系统（总开关）」暂时不联动（历史遗留）；以后若恢复存档开关判断，
+> 需同步迁移已存过 `scriptingEnabled=false` 的老存档，否则老玩家会被静默关掉脚本系统。
+
+## 0.1 Psych Engine 1.0.4 模组兼容（`psychV104Compat`，默认关）
+
+设置 → 编程 → **Psych 1.0.4 模组兼容**。打开后，引擎会额外认出 Psych 1.0.4 形态的模组
+（`pack.json` + 旧目录布局 + Psych 风格 `.lua` 脚本）。**Meteoric 新格式始终优先**，开关关闭时
+行为与独立化后的 Meteoric 完全一致（零行为变化）。
+
+| 兼容项 | 开关关闭 | 开关打开 |
+|---|---|---|
+| 元数据 | 只读 `mod.json` | 无 `mod.json` 时回退 `pack.json`（`runsGlobally` 等字段生效） |
+| 启用列表 | `meteoric-mods.txt` | 额外**只读**合并 `modsList.txt`（写入仍走 `meteoric-mods.txt`） |
+| 内容目录 | `charts/ gfx/ audio/ noteTypes/` | 找不到时回退 `data/ images/ music+ sounds/ custom_notetypes/` |
+| 默认启用 | 带 `mod.json` 才自动启用 | 带 `pack.json` 也算，自动启用 |
+| 全局 `scripts/` | 不加载 | 加载 `mods/<mod>/scripts/*.lua|.hx` |
+| 单曲 `data/<歌>/` | 不加载 | 加载 `mods/<mod>/data/<歌>/*.lua|.hx` |
+| 舞台 / 音符类型 / 自定义事件命名脚本 | 不加载 | `stages/<名>.lua`、`custom_notetypes/<名>.lua`、`custom_events/<名>.lua` 恢复 |
+| 角色脚本 | 只读内置 | `characters/<名>.lua|.hx` 允许 mods 覆盖 |
+| `instanceArg()` | 未注册 | 已支持（配合 `setProperty(..., true, true)` / `callMethodFromClass`） |
+
+**已知差异（不阻塞运行）**：
+
+- `createInstance` 的变量表仍挂在 `PlayState` 上，随对局销毁；Psych 1.0.4 是跨 State 存活。
+  「用谱面做菜单」的模组切歌时可能丢对象。
+- Meteoric 的 `FunkinLua.call()` 有重入防护（防 SIGSEGV），脚本里嵌套触发的 Lua 回调会被丢弃。
+- 1.0.4 新增的 5 个回调（`goodNoteHitPre` / `opponentNoteHitPre` / `onKeyPressPre` /
+  `onKeyReleasePre` / `preUpdateScore`）**尚未**接入；Sonic The Funk 未使用。
+- 成就 / 翻译类 1.0.4 新 API（`unlockAchievement` 等）语义与 Meteoric 不同，未接入。
+
+参考实现来源：`FNF-PsychEngine-1.0.4`（pack.json 解析、脚本加载点、`instanceArg`）
+与 `mods/SonicTheFunkChinese`（真实 1.0.4 模组，60 个 `.lua`）。
 
 ## 1. 开关
 
 全部在 设置 → 编程 里。**总开关默认关**；关闭时引擎行为与本系统落地前完全一致（不加载脚本、
 不注册事件钩子、不轮询热重载按键）。
+（注：见第 0 节 —— 脚本能力当前默认常开，上方的总开关暂不联动；此处描述的是存档字段的原始设计语义。）
 
 | 选项 | 存档字段 | 默认 | 作用 |
 |---|---|---|---|

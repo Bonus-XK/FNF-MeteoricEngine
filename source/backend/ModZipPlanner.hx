@@ -10,13 +10,18 @@ using StringTools;
  */
 class ModZipPlanner
 {
+	// 旧名保留：老 zip 包靠它们命中「这就是一个模组」，否则会被拆成多个假模组分别安装。
+	// 新名是 Meteoric 重分类后的内容目录（2026-10-30），装在里面的内容才会被引擎读取。
 	static var MOD_MARKERS:Array<String> = [
 		'data', 'songs', 'music', 'sounds', 'images', 'shaders', 'videos',
 		'stages', 'weeks', 'characters', 'custom_events', 'custom_notetypes',
-		'hscripts', 'scripts', 'lang', 'achievements', 'fonts', 'options'
+		'hscripts', 'scripts', 'lang', 'achievements', 'fonts', 'options',
+		'charts', 'gfx', 'audio', 'noteTypes'
 	];
 
-	static var MOD_MARKER_FILES:Array<String> = ['pack.json', 'icon.png', 'icon.xml'];
+	// Meteoric 原生元数据为 mod.json；pack.json 仍保留作为「这是一个模组包」的识别标记
+	//（老 zip 也能正确解包），但引擎运行时只读取 mod.json，pack.json 不再被加载。
+	static var MOD_MARKER_FILES:Array<String> = ['mod.json', 'pack.json', 'icon.png', 'icon.xml'];
 
 	public static function isModMarker(name:String):Bool
 	{
@@ -63,7 +68,7 @@ class ModZipPlanner
 				topDirs.push(top);
 		}
 
-		// Loose mod content at the zip root (data/, songs/, ... + pack.json).
+		// Loose mod content at the zip root (data/, songs/, ... + mod.json).
 		var looseMod:Bool = false;
 		for (t in topDirs)
 			if (isModMarker(t)) { looseMod = true; break; }

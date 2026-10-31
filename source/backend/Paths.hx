@@ -570,6 +570,7 @@ class Paths
 	// bitmap 非空但帧集合/GPU 资源已死，CPU 参数无法挽救缓存命中）。返回全新的 CPU 位图对象。
 	static public function imageFresh(key:String, ?library:String = null):FlxGraphic
 	{
+		if (key != null && key.startsWith('images/')) key = key.substr(7); // 同 image()：防 images/images/ 双前缀
 		var file:String = null;
 		#if MODS_ALLOWED
 		file = modsImages(key);
@@ -595,6 +596,10 @@ class Paths
 
 	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true, ?allowScale:Bool = true, ?scaleTo:Float = -1, ?allowPack:Bool = true):FlxGraphic
 	{
+		// 归一化：Psych 风格脚本/配置常写成 `images/xxx`，而本函数内部还会再拼一次 `images/`，
+		// 结果变成 `assets/images/images/xxx.png` 找不到（2026-10-30 Sonic 的 NOTE_assets-sonic 即此）。
+		if (key != null && key.startsWith('images/')) key = key.substr(7);
+
 		var bitmap:BitmapData = null;
 		var file:String = null;
 
@@ -796,12 +801,10 @@ class Paths
 		#if MODS_ALLOWED
 		if(!ignoreMods)
 		{
-			for(mod in Mods.getGlobalMods())
-				if (FileSystem.exists(mods('$mod/$key')))
-					return true;
-
-			if (FileSystem.exists(mods(Mods.currentModDirectory + '/' + key)) || FileSystem.exists(mods(key)))
-				return true;
+			// 必须与 modFolders 用同一套候选（modCandidates），否则会出现
+			// 「这里说存在、真正取资源时返回 null」的不一致 → 解引用崩溃。
+			for(p in modCandidates(key))
+				if(FileSystem.exists(p)) return true;
 		}
 		#end
 
@@ -1056,6 +1059,48 @@ class Paths
 		return currentTrackedSounds.get(gottenPath);
 	}
 
+	/**
+	 * Psych Engine 1.0.4 模组兼容开关（关闭时零行为变化）。
+	 * 放在 MODS_ALLOWED 之外：HostDomain 等文件在非 MODS 平台也会编译并调用它。
+	 * 故意**不用 inline**：inline 展开会把 ClientPrefs 依赖带到每个调用点，
+	 * 而 substates / editors 里未必 import 了 ClientPrefs。
+	 */
+	public static var _psychCompatTraced:Bool = false;
+
+	public static function psychCompat():Bool
+	{
+		#if MODS_ALLOWED
+		var fromData:Bool = ClientPrefs.data != null && ClientPrefs.data.psychV104Compat;
+		if(fromData) return true;
+
+		// 兜底：loadPrefs 用 Reflect.fields 批量复制，实测新加的字段会被漏掉
+		//（存档里确实是 true，但 data 里仍是默认 false）→ 直接问存档对象本身。
+		var fromSave:Bool = false;
+		try
+		{
+			var sd:Dynamic = flixel.FlxG.save != null ? flixel.FlxG.save.data : null;
+			if (sd != null)
+			{
+				// hxcpp 动态属性访问最可靠（Reflect.hasField 对反序列化的 Dynamic 有失效情况）
+				var raw:Dynamic = sd.psychV104Compat;
+				fromSave = (raw == true) || (Reflect.field(sd, 'psychV104Compat') == true);
+			}
+		}
+		catch(e:Dynamic) {}
+
+		if(!_psychCompatTraced)
+		{
+			_psychCompatTraced = true;
+			trace('[psychCompat] dataNull=' + (ClientPrefs.data == null)
+				+ ' fromData=' + fromData + ' fromSave=' + fromSave
+				+ (ClientPrefs.data == null ? '' : ' fieldCount=' + Reflect.fields(ClientPrefs.data).length));
+		}
+		return fromSave;
+		#else
+		return false;
+		#end
+	}
+
 	#if MODS_ALLOWED
 	/** `mods/...` 路径入口（全引擎唯一入口）。 */
 	static public function mods(key:String = '') {
@@ -1123,9 +1168,10 @@ class Paths
 	static public function resolveAssetPath(rel:String):String {
 		var p:String = modFolders(rel);
 		if (FileSystem.exists(p)) return p;
+		var modRel:String = modRelPath(rel); // 模组侧重分类目录（内置侧仍用原 rel）
 		for (mod in Mods.getModDirectories())
 		{
-			p = mods(mod + '/' + rel);
+			p = mods(mod + '/' + modRel);
 			if (FileSystem.exists(p)) return p;
 		}
 		p = getPreloadPath(rel);
@@ -1183,19 +1229,91 @@ class Paths
 		return modFolders('achievements/' + key + '.json');
 	}*/
 
-	static public function modFolders(key:String) {
-		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0) {
-			var fileToCheck:String = mods(Mods.currentModDirectory + '/' + key);
-			if(FileSystem.exists(fileToCheck)) {
-				return fileToCheck;
-			}
-		}
+	/**
+	 * 模组侧重分类映射（2026-10-30 独立化）：内置侧相对路径 → 模组侧相对路径。
+	 *
+	 * 引擎内置资源沿用原布局（assets/preload/data/、assets/shared/images/ …），
+	 * 模组侧改用 Meteoric 语义化目录名。资源覆盖只依赖 key（相对路径）一致，
+	 * **不依赖目录名一致**，所以在这里集中对齐即可：模组侧换目录名不会影响覆盖，
+	 * 内置侧也不用跟着搬动。
+	 *
+	 * 未登记的目录名原样返回 —— scripting/、characters/、stages/、weeks/、songs/、
+	 * shaders/、videos/、fonts/ 与内置侧同名，保持不变。
+	 */
+	public static function modRelPath(rel:String):String
+	{
+		if(rel == null || rel.length == 0) return rel;
+		if(rel.startsWith('data/')) return 'charts/' + rel.substr(5);
+		if(rel.startsWith('images/')) return 'gfx/' + rel.substr(7);
+		if(rel.startsWith('sounds/')) return 'audio/' + rel.substr(7);
+		if(rel.startsWith('music/')) return 'audio/' + rel.substr(6);
+		if(rel.startsWith('custom_notetypes/')) return 'noteTypes/' + rel.substr(17);
+		return rel;
+	}
 
-		for(mod in Mods.getGlobalMods()){
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
-				return fileToCheck;
-		}
+	/**
+	 * 某个模组在查找 `key` 时要尝试的目录名变体（新目录名优先，旧目录名按需回退）。
+	 *
+	 * 回退条件 = 兼容开关打开 **或** 该模组本身是旧目录布局（见 Mods.isLegacyLayout）。
+	 * 后者是关键：开关读的是存档，而 Paths 在 loadPrefs 之前就会被调用，
+	 * 只靠开关会让旧模组资源「本该找得到却找不到」。
+	 */
+	public static function modKeysFor(folder:String, key:String):Array<String>
+	{
+		var rel:String = modRelPath(key);
+		var out:Array<String> = [rel];
+		if(rel != key && (psychCompat() || Mods.isLegacyLayout(folder))) out.push(key);
+		return out;
+	}
+
+	/**
+	 * 模组侧某个 key 的**全部候选绝对路径**（按优先级排序）。
+	 *
+	 * 这是全引擎唯一的「模组资源查找口径」——`modFolders`（真正取文件）与
+	 * `fileExists`（判定存在性）**必须**共用它，否则会出现
+	 * 「fileExists 说存在 → image 返回 null → 解引用 SEGV」这类致命不一致
+	 *（2026-10-30 Freeplay 崩在 icon-sonic.png 就是这么来的：
+	 *  fileExists 用原始 key 命中 images/，modFolders 却只看 gfx/）。
+	 */
+	public static function modCandidates(key:String):Array<String>
+	{
+		var out:Array<String> = [];
+		#if MODS_ALLOWED
+		if(key == null || key.length == 0) return out;
+
+		var rel:String = modRelPath(key);
+		var globalCompat:Bool = psychCompat();
+
+		var folders:Array<String> = [];
+		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+			folders.push(Mods.currentModDirectory);
+		for(m in Mods.getGlobalMods()) if(!folders.contains(m)) folders.push(m);
+
+		// 兼容模式下把所有已启用模组纳入候选：runsGlobally 在 loadPrefs 之前读不到、
+		// currentModDirectory 又会被 WeekData / Freeplay / Credits 改写，
+		// 只靠前两者会让旧模组资源「本该找得到却找不到」。
+		if(globalCompat)
+			for(m in Mods.parseList().enabled) if(!folders.contains(m)) folders.push(m);
+
+		for(f in folders)
+			for(k in modKeysFor(f, key))
+				out.push(mods(f + '/' + k));
+
+		// mods/ 根下的散装资源
+		out.push(mods(rel));
+		if(rel != key && globalCompat) out.push(mods(key));
+		#end
+		return out;
+	}
+
+	static public function modFolders(key:String) {
+		#if MODS_ALLOWED
+		if(key == null || key.length == 0) return mods(key);
+
+		var candidates:Array<String> = modCandidates(key);
+		for(p in candidates)
+			if(FileSystem.exists(p)) return p;
+		#end
 		return mods(key);
 	}
 	#end

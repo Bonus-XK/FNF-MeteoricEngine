@@ -155,7 +155,10 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 	{
 		scriptList = [];
 		#if sys
-		var folders:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/');
+		// 列表与引擎实际加载同源：独立化默认只列内置 preload 段；
+		// 打开「Psych 1.0.4 模组兼容」后一并列出 mods 里的 Psych 脚本（列得出=跑得动）。
+		// Meteoric 自研脚本由下面的 Scripting.listInstalledScripts() 单独加入。
+		var folders:Array<String> = Mods.directoriesWithFile(Paths.getPreloadPath(), 'scripts/', Mods.hasLegacyEnabled());
 		addScriptsFromFolders(folders, 0);
 
 		// 新脚本系统：全局常驻脚本 + 状态脚本
@@ -191,7 +194,7 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 		if (songName != null)
 		{
-			folders = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/');
+			folders = Mods.directoriesWithFile(Paths.getPreloadPath(), 'data/' + songName + '/', Mods.hasLegacyEnabled());
 			addScriptsFromFolders(folders, 0);
 		}
 		#end

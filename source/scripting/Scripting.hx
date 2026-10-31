@@ -116,7 +116,10 @@ class Scripting
 	@:keep
 	public static function isEnabled():Bool
 	{
-		// 按用户要求保持脚本系统开启（临时测试配置；正式发布前应恢复存档开关判断）。
+		// Meteoric 模组体系产品决策（2026-10-29）：脚本系统默认开启、开箱即用 ——
+		// 带 mod.json + scripting/ 的模组放进去即自动启用，玩家无需先开一堆开关。
+		// 存档开关的判断逻辑保留在下方仅供参考；若要恢复「可在设置页关闭」，需同时
+		// 迁移已存过 scriptingEnabled=false 的老存档，否则老玩家会被静默关掉脚本系统。
 		return true;
 		// return ClientPrefs.data != null && ClientPrefs.data.scriptingEnabled;
 	}
