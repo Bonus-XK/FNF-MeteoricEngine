@@ -292,6 +292,17 @@ class FreeplayState extends MusicBeatState
 
 		// 0.6.3 模组兼容：Lua onCreate 设置 songColors 后应用到歌曲列表
 		applySongColors();
+
+		// 调试启动参数：直选曲目与难度（仅 --meteoric-song 传入时生效），下一帧自动「回车」
+		if (backend.DebugLaunch.autoSong != null)
+		{
+			var target:String = Paths.formatToSongPath(backend.DebugLaunch.autoSong);
+			for (i in 0...songs.length)
+				if (Paths.formatToSongPath(songs[i].songName) == target) { curSelected = i; break; }
+			if (backend.DebugLaunch.autoDiff >= 0 && backend.DebugLaunch.autoDiff < Difficulty.list.length)
+				curDifficulty = backend.DebugLaunch.autoDiff;
+			changeSelection(0, false, true); // 无声刷新选中态/分数/颜色
+		}
 	}
 
 	override function openSubState(SubState:flixel.FlxSubState) {
@@ -702,6 +713,13 @@ class FreeplayState extends MusicBeatState
 		{
 			previewRestartPending = false;
 			if (previewActive) startPreview();
+		}
+
+		// 调试启动参数：一次性自动「回车」进入 --meteoric-song 指定的曲目
+		if (backend.DebugLaunch.pendingAccept)
+		{
+			backend.DebugLaunch.pendingAccept = false;
+			accepted = true;
 		}
 
 		if (accepted)

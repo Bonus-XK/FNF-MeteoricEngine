@@ -515,7 +515,8 @@ class TitleState extends MusicBeatState
 			Conductor.syncToMusic();
 		// FlxG.watch.addQuick('amp', FlxG.sound.music.amplitude);
 
-		var pressedEnter:Bool = FlxG.keys.justPressed.ENTER || controls.ACCEPT || FlxG.mouse.justPressed;
+		var pressedEnter:Bool = FlxG.keys.justPressed.ENTER || controls.ACCEPT || FlxG.mouse.justPressed
+			|| (backend.DebugLaunch.autoSong != null); // 调试参数：自动跳过标题确认（transitioning 锁只进一次）
 
 		#if mobile
 		for (touch in FlxG.touches.list)

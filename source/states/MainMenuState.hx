@@ -378,7 +378,14 @@ class MainMenuState extends MusicBeatState
 				MusicBeatState.switchState(new TitleState());
 			}
 
-			if (controls.ACCEPT)
+			if (backend.DebugLaunch.autoSong != null)
+			{
+				// 调试启动参数：自动选中 freeplay 并确认（selectedSomethin 锁只进一次）
+				var fp:Int = optionShit.indexOf('freeplay');
+				if (fp >= 0 && curSelected != fp) changeItem(fp - curSelected);
+				selectItem();
+			}
+			else if (controls.ACCEPT)
 			{
 				selectItem();
 			}

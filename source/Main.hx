@@ -177,6 +177,8 @@ class Main extends Sprite
 	{
 		super();
 
+		backend.DebugLaunch.init(); // 调试启动参数（--meteoric-*），先于任何状态创建解析
+
 		if (stage != null)
 		{
 			init();
