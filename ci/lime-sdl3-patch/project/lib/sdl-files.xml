@@ -335,7 +335,7 @@
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/timer/windows/SDL_systimer.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/SDL_tray_utils.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/cocoa/SDL_tray.m" if="mac" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/dummy/SDL_tray.c" if="android || ios" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/dummy/SDL_tray.c" if="android || ios || linux" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/windows/SDL_tray.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/SDL_RLEaccel.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/SDL_blit.c" />
