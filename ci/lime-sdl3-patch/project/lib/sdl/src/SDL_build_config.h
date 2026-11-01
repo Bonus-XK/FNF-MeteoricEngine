@@ -724,6 +724,15 @@ typedef unsigned int uintptr_t;
 #undef SDL_JOYSTICK_ANDROID
 #define SDL_JOYSTICK_LINUX 1
 #define SDL_INPUT_LINUXEV 1
+/* SDL CMake 探测注入的宏（手写配置必须自己给）：
+ * - HAVE_LINUX_INPUT_H：core/linux 的 evdev capabilities .h/.c 整体包在这个门控里
+ *   （含 test_bit 宏）——不定义 = haptic 报 test_bit 隐式声明、手柄链接悬空（CI 实锤）
+ * - HAVE_INOTIFY(+INIT1)：手柄热插拔的 inotify 路径（glibc 标准头，开）。
+ * - 不定义 HAVE_DBUS_DBUS_H：SDL_dbus.h 需要真实 <dbus/dbus.h>（要多装 libdbus-1-dev），
+ *   不装则 dbus 层空编译、电源走 /sys，够用。 */
+#define HAVE_LINUX_INPUT_H 1
+#define HAVE_INOTIFY 1
+#define HAVE_INOTIFY_INIT1 1
 /* 手柄震动：Linux evdev force-feedback */
 #undef SDL_HAPTIC_ANDROID
 #define SDL_HAPTIC_LINUX 1
