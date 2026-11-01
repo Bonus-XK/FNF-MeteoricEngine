@@ -27,7 +27,10 @@ jobs:
     # 不允许 continue-on-error，所以放在被调用 workflow 的 job 内部实现非阻塞）
     continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 首次全量 SDL3+全套 vendored 库编译在 ubuntu 4 核上 ~90-120 分钟（120 超时
+    # 实测被硬杀且 cache post 步骤不执行、进度全丢——必须留足余量）；
+    # hxcpp 缓存建立后回落到增量量级
+    timeout-minutes: 240
     steps:
       - name: 检出代码
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
