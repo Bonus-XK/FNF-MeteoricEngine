@@ -71,6 +71,18 @@ jobs:
           echo "剩余 xcrun SDK 别名引用: $(grep -c 'xcrun --sdk macosx' "$HXCPP_DIR/toolchain/mac-toolchain.xml" || true)"
           echo "默认 SDK 引用: $(grep -c 'MacOSX.sdk' "$HXCPP_DIR/toolchain/mac-toolchain.xml" || true)"
 
+      # hxcpp 内嵌 zlib-1.2.11 的 zutil.h 在 TARGET_OS_MAC 被预定义时启用
+      # `#define fdopen(fd,mode) NULL`（2011 年老 Mac 兼容），与 Xcode 26.6/clang 21
+      # 新 SDK 的 fdopen 声明相撞（"expected ')'"，2026-11-01 实锤；macos-14 的
+      # clang 20 不预定义所以此前没事）。与 lime 侧同一问题同一修法：盖本仓库
+      # 修好的 zutil.h（本机 2026-10-18 对本地 hxcpp 也是这么修的）。
+      - name: 修补 hxcpp 内嵌 zlib 的 zutil.h（TARGET_OS_MAC/(fdopen) 冲突）
+        run: |
+          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
+          cp ci/lime-sdl3-patch/project/lib/zlib/zutil.h \
+             "$HXCPP_DIR/project/thirdparty/zlib-1.2.11/zutil.h"
+          grep -c "define fdopen" "$HXCPP_DIR/project/thirdparty/zlib-1.2.11/zutil.h" || echo "fdopen 宏已全部禁用"
+
       - name: 恢复 SDL3 lime 源码树缓存
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
