@@ -82,11 +82,28 @@ jobs:
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
-          neko run.n rebuild lime linux
+          set -o pipefail
+          neko run.n rebuild lime linux 2>&1 | tee /tmp/ndll-build.log
           ls -la ndll/Linux64/
           # lime 构建期按 lime.ndll 找引擎 ndll（发行包预拷的是官方 SDL2 时代的）；
           # 重建产物若叫 lime-64.ndll 则按 lime 的命名约定补拷
           [ -f ndll/Linux64/lime.ndll ] || cp ndll/Linux64/lime-64.ndll ndll/Linux64/lime.ndll
+
+      # 失败时把编译错误写进 Step Summary（check-run output 经公开 API 可读，
+      # 日志接口要管理员权限拿不到——这是远程排障的唯一通道）
+      - name: 失败时提取编译错误到 Step Summary
+        if: failure()
+        run: |
+          {
+            echo "### Linux ndll 重建错误（grep error）"
+            echo '```'
+            grep -i -B3 -A6 "error" /tmp/ndll-build.log | tail -120 || echo "(log 里没有 error 字样，附尾部)"
+            echo '```'
+            echo "### 构建日志尾部"
+            echo '```'
+            tail -60 /tmp/ndll-build.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY" || true
 
       # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
       - name: 恢复 hxcpp 编译缓存
