@@ -423,8 +423,12 @@
             <!-- 音频：PulseAudio + ALSA（SDL3 的 ALSA 文件保留 SDL2 时代的旧名 SDL_alsa_audio.c） -->
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/audio/pulseaudio/SDL_pulseaudio.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/audio/alsa/SDL_alsa_audio.c" />
-            <!-- core/linux：dbus（电源 UPower 依赖）+ evdev capabilities（手柄依赖）+ 线程优先级 -->
+            <!-- core/linux：dbus（电源 UPower 依赖）+ evdev capabilities（手柄依赖）
+                 + evdev 主模块（joystick 引用 SDL_EVDEV_GetEventTimestamp；
+                 无 SDL_INPUT_LINUXKD 时 evdev_kbd 自带空桩）+ 线程优先级 -->
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_dbus.c" />
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_evdev.c" />
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_evdev_kbd.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_evdev_capabilities.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_threadprio.c" />
             <!-- core/unix：poll 封装 + appid（SDL_x11window 引用 SDL_GetExeName/SDL_GetAppID） -->
