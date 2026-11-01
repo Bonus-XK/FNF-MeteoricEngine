@@ -77,6 +77,18 @@ jobs:
             GH_PROXY="" bash ci/setup-lime-sdl3.sh
           fi
 
+      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代。
+      # ⚠ 必须排在重建步骤之前：重建也走 HXCPP_COMPILE_CACHE，缓存命中能省掉
+      #   绝大部分 ndll 编译；且失败时 post 步骤会把已编译进度存下来断点续编
+      #   （排在重建之后 = 失败时 post 被 skip，90 分钟进度全丢，实测踩坑）。
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-linux-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-linux-v1-
+
       - name: 重建 lime Linux ndll（SDL3 静态编入）
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
@@ -106,15 +118,6 @@ jobs:
                 [ -n "$line" ] && echo "::error::[tail] ${line}"
               done
           exit 0
-
-      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
-      - name: 恢复 hxcpp 编译缓存
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: .hxcpp-cache
-          key: hxcpp-linux-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
-          restore-keys: |
-            hxcpp-linux-v1-
 
       # 同 compile-mac.sh 的构建期指纹块（抽到 ci/refresh-gitinfo.sh 供 Linux/iOS 复用）
       - name: 刷新 GitInfoData（FPS 显示用构建指纹）
