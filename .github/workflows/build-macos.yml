@@ -47,6 +47,21 @@ jobs:
           export NEKOPATH="$HOME/neko"
           bash ci/install-deps.sh
 
+      # 官方 hxcpp 4.3.2 的 mac 编译器走 `xcrun --sdk macosx${MACOSX_VER}` 别名解析；
+      # macos-26 镜像上别名拼法对不上（"SDK macosx26 cannot be located"，2026-11-01 实锤）。
+      # 与本机 2026-10-18 的工具链补丁同思路：换绝对路径 clang++，isysroot 用 MacOSX.sdk
+      # 符号链接（= xcode-select 默认 SDK），彻底摆脱 SDK 别名与版本号拼法。
+      # 幂等：缓存里的 hxcpp 已打过补丁时 sed 无匹配，无副作用。
+      - name: 修补 hxcpp mac 工具链（摆脱 SDK 别名解析）
+        run: |
+          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
+          sed -i '' \
+            -e 's|xcrun --sdk macosx\${MACOSX_VER} clang++|/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++|g' \
+            -e 's|MacOSX\${MACOSX_VER}.sdk|MacOSX.sdk|g' \
+            "$HXCPP_DIR/toolchain/mac-toolchain.xml"
+          echo "剩余 xcrun SDK 别名引用: $(grep -c 'xcrun --sdk macosx' "$HXCPP_DIR/toolchain/mac-toolchain.xml" || true)"
+          echo "默认 SDK 引用: $(grep -c 'MacOSX.sdk' "$HXCPP_DIR/toolchain/mac-toolchain.xml" || true)"
+
       - name: 恢复 SDL3 lime 源码树缓存
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
