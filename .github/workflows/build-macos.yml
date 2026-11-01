@@ -114,16 +114,35 @@ jobs:
           restore-keys: |
             hxcpp-macos-${{ matrix.arch }}-v1-
 
+      # 构建输出 tee 落盘；失败时把错误转 ::error:: 注解（公开 API 可读，日志接口拿不到）
       - name: 构建 macOS x86_64
         if: matrix.arch == 'x64'
-        run: ./compile-mac.sh
+        run: |
+          set -o pipefail
+          ./compile-mac.sh 2>&1 | tee /tmp/mac-build.log
 
       - name: 构建 macOS arm64
         if: matrix.arch == 'arm64'
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
-          haxelib run lime build macos -release -arm64
+          set -o pipefail
+          haxelib run lime build macos -release -arm64 2>&1 | tee /tmp/mac-build.log
+
+      - name: 失败时提取编译错误到注解
+        if: failure()
+        run: |
+          grep -i -B2 -A6 "error" /tmp/mac-build.log 2>/dev/null | tail -60 \
+            | tr '\n' '\001' | sed 's/\x01/ ⏎ /g' | fold -w 850 | tail -8 \
+            | while IFS= read -r line; do
+                [ -n "$line" ] && echo "::error::${line}"
+              done
+          tail -40 /tmp/mac-build.log 2>/dev/null \
+            | tr '\n' '\001' | sed 's/\x01/ ⏎ /g' | fold -w 850 | tail -2 \
+            | while IFS= read -r line; do
+                [ -n "$line" ] && echo "::error::[tail] ${line}"
+              done
+          exit 0
 
       - name: ad-hoc 签名
         run: codesign --force --deep -s - export/release/macos/bin/Meteoric.app
