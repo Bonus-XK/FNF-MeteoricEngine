@@ -1,13 +1,21 @@
 # ============================================================
-# Meteoric Engine 全端构建工作流（CI 提速版）
+# Meteoric Engine 全端构建编排器
 # 触发: push / pull_request / 手动（workflow_dispatch）
-# 构建: Android / Windows x64 / Windows x86 / macOS x86_64 / macOS arm64
+# 构建: Android / Windows x64+x86 / macOS x86_64+arm64（四个平台 workflow 聚合）
 #
-# 提速要点（2026-08）:
-#   1) haxelib 依赖与 /tmp/lime-full（SDL3 lime 源码树）进 actions/cache，
-#      命中时跳过“现场组装 SDL3 lime”的拉取/解压/打补丁（原为每次全量）；
-#   2) macOS 拆成 x64 / arm64 两个并行 job（原来串行双架构 + 全程 Rosetta）；
-#   3) setup-lime-sdl3.sh 网络重试收紧（max-time 1200→300s，重试 10→4/5→3）。
+# 结构（2026-11，Seiun Engine 式拆分）:
+#   - 各平台构建拆到 .github/workflows/build-{android,windows,macos}.yml
+#     （workflow_call 可复用 + 可单独手动派发），本文件只做编排与发布；
+#   - hxcpp 编译缓存（HXCPP_COMPILE_CACHE）在各平台 workflow 内，跨 run 增量编译；
+#   - Windows 额外产出崩溃符号 artifact（.map + 配对 exe + build-info，90 天），
+#     供 CrashHandler 的 native_crash 报告做符号化定位；
+#   - 构建全部成功后自动发布 Pre-release（PR 不发布），产物带版本号 + SHA256SUMS。
+#
+# 历史提速要点（2026-08，保留）:
+#   1) haxelib 依赖与 /tmp/lime-full（SDL3 lime 源码树）进 actions/cache；
+#   2) macOS 拆成 x64 / arm64 两个并行矩阵 job；
+#   3) setup-lime-sdl3.sh 网络重试收紧。
+# 中国镜像（Gitee 镜像 + 加速域名注入 release 说明）：待建仓后接入，见 release 说明模板留桩。
 # ============================================================
 name: 构建（Build）
 
@@ -30,388 +38,30 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
 jobs:
-  # ---------- Android ----------
   android:
     name: Android (arm64)
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
+    uses: ./.github/workflows/build-android.yml
+    secrets: inherit
 
-      - name: 安装 Haxe/Neko
-        run: bash ci/setup-haxe-ci.sh
-
-      - name: 恢复 haxelib 依赖缓存
-        uses: actions/cache@v4
-        with:
-          path: $HOME/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
-
-      - name: 安装 Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: 安装 Android SDK
-        # android-actions/setup-android@v3 已失效：它去安装 Google 早已下架的 legacy 「tools」包
-        # → `Warning: Failed to find package 'tools'` → 该 action 抛错（runner：Node 24 +
-        # 预装 cmdline-tools/16.0）。runner 已预装完整 SDK，这里只补一个 cmdline-tools/latest
-        # 软链供**后续步骤**（未改动的「安装 NDK 21.4 与平台」）使用，不安装任何额外 SDK 包。
-        run: |
-          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-          export ANDROID_SDK_ROOT="$SDK"
-          export ANDROID_HOME="$SDK"
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-          ls "$SDK/cmdline-tools" 2>/dev/null || true
-          if [ ! -e "$SDK/cmdline-tools/latest" ]; then
-            VER="$(ls -d "$SDK"/cmdline-tools/*/ 2>/dev/null | head -1)"
-            [ -n "$VER" ] && ln -s "$VER" "$SDK/cmdline-tools/latest"
-          fi
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" --version
-
-      - name: 安装 NDK 21.4 与平台
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager || true)"; fi
-          echo "sdkmanager: $SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          "$SDKMANAGER" --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
-
-      - name: 安装 haxelib 依赖
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          bash ci/install-deps.sh
-
-      - name: 恢复 SDL3 lime 源码树缓存
-        uses: actions/cache@v4
-        with:
-          path: /tmp/lime-full
-          key: limefull-${{ runner.os }}-android-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
-
-      - name: 组装 SDL3 lime（缓存未命中才现场组装）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          if [ -d /tmp/lime-full/project ]; then
-            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
-            haxelib dev lime /tmp/lime-full
-          else
-            GH_PROXY="" bash ci/setup-lime-sdl3.sh
-          fi
-
-      - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          cd /tmp/lime-full
-          export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/21.4.7075529"
-          export ANDROID_SETUP=true
-          neko run.n rebuild lime android
-
-      - name: 缓存 Gradle 发行版
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/wrapper/dists
-          key: gradle-dists-7.4.2-${{ runner.os }}
-
-      - name: 预下载 Gradle 7.4.2 发行版（services.gradle.org 偶发断流：断点续传 + 多重试）
-        run: |
-          set -e
-          # 哈希目录名 = wrapper 对 distributionUrl 的确定性哈希（本机 ~/.gradle 已核实）
-          DIST_DIR="$HOME/.gradle/wrapper/dists/gradle-7.4.2-bin/48ivgl02cpt2ed3fh9dbalvx8"
-          mkdir -p "$DIST_DIR"
-          if [ ! -s "$DIST_DIR/gradle-7.4.2-bin.zip" ]; then
-            echo "==> 预下载 gradle-7.4.2-bin.zip ..."
-            for i in $(seq 1 10); do
-              if curl -fL --connect-timeout 30 --max-time 600 --retry 5 --retry-all-errors --retry-delay 3 \
-                   -C - -o "$DIST_DIR/gradle-7.4.2-bin.zip" \
-                   https://services.gradle.org/distributions/gradle-7.4.2-bin.zip; then
-                echo "==> Gradle 发行版下载成功（第 $i 次尝试）"
-                break
-              fi
-              echo "==> Gradle 下载失败（第 $i 次），5 秒后重试..."
-              sleep 5
-            done
-          fi
-          test -s "$DIST_DIR/gradle-7.4.2-bin.zip"
-          echo "==> Gradle 发行版就绪："
-          ls -la "$DIST_DIR"
-
-      - name: 缓存 Gradle 依赖模块（AGP/Kotlin 类路径，防 Maven Central 限流）
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches/modules-2
-          key: gradle-modules-${{ runner.os }}-v1
-
-      - name: 构建 Android APK
-        run: |
-          # Maven Central 偶发 429（Too Many Requests）导致类路径解析失败：重试一轮再放弃
-          for i in 1 2; do
-            if ./compile-android.sh; then
-              exit 0
-            fi
-            echo "==> Android 构建失败（第 $i 次），20 秒后重试..."
-            sleep 20
-          done
-          exit 1
-
-      - name: 上传 APK
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-android-arm64
-          path: export/release/android/bin/app/build/outputs/apk/debug/Meteoric-debug.apk
-
-  # ---------- Windows x64 + x86 ----------
   windows:
     name: Windows (x64 + x86)
-    runs-on: macos-14
-    timeout-minutes: 120
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
 
-      - name: 安装 Haxe/Neko
-        run: bash ci/setup-haxe-ci.sh
-
-      - name: 恢复 haxelib 依赖缓存
-        uses: actions/cache@v4
-        with:
-          path: $HOME/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
-
-      - name: 安装 mingw-w64 交叉工具链（与本地开发环境一致）
-        run: |
-          brew install mingw-w64
-          echo "$(brew --prefix mingw-w64)/bin" >> "$GITHUB_PATH"
-          x86_64-w64-mingw32-g++ --version | head -1
-          i686-w64-mingw32-g++ --version | head -1
-
-      - name: 安装 haxelib 依赖
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          bash ci/install-deps.sh
-
-      - name: 恢复 SDL3 lime 源码树缓存
-        uses: actions/cache@v4
-        with:
-          path: /tmp/lime-full
-          key: limefull-${{ runner.os }}-windows-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
-
-      - name: 组装 SDL3 lime（缓存未命中才现场组装）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          if [ -d /tmp/lime-full/project ]; then
-            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
-            haxelib dev lime /tmp/lime-full
-          else
-            GH_PROXY="" bash ci/setup-lime-sdl3.sh
-          fi
-
-      - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
-          cp ci/hxcpp-mac-cross/BuildTool.hx "$HXCPP_DIR/tools/hxcpp/BuildTool.hx"
-          cp ci/hxcpp-mac-cross/mingw-toolchain.xml "$HXCPP_DIR/toolchain/mingw-toolchain.xml"
-          cd "$HXCPP_DIR"
-          haxe -cp tools/hxcpp -neko hxcpp.n -main BuildTool -D neko_v1 -debug
-          ls -la hxcpp.n
-
-      - name: 重建 lime Windows ndll（x64 + x86 手动 hxcpp，避免 -arch x86 bug）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          cd /tmp/lime-full/project
-          # x64 (x86_64-w64-mingw32-g++)
-          haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M64 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
-            -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
-            -Drebuild=1 -Dlime-native -Dmingw
-          # x86 (i686-w64-mingw32-g++；必须显式 -DHXCPP_M32，否则 hxcpp 按宿主默认 m64 编出 x64）
-          haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M32 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
-            -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
-            -Drebuild=1 -Dlime-native -Dmingw
-
-      - name: 构建 Windows x64
-        run: ./compile-windows.sh
-
-      - name: 验证 x64 exe 图标注入（.rsrc 资源段防线）
-        run: |
-          x86_64-w64-mingw32-objdump -h export/release/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
-            || { echo "错误：Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入（见 Main.hx @:buildXml）"; exit 1; }
-          echo "[verify] Meteoric.exe 含 .rsrc 图标资源段"
-
-      - name: 构建 Windows x86
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
-          haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
-
-      - name: 验证 x86 exe 图标注入（.rsrc 资源段防线）
-        run: |
-          x86_64-w64-mingw32-objdump -h export/32bit/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
-            || { echo "错误：x86 Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入"; exit 1; }
-          echo "[verify] x86 Meteoric.exe 含 .rsrc 图标资源段"
-
-      - name: 上传 x64
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-windows-x64
-          path: export/release/windows/bin/
-
-      - name: 上传 x86
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-windows-x86
-          path: export/32bit/windows/bin/
-
-  # ---------- macOS x86_64（独立 job，与 arm64 并行） ----------
-  macos-x64:
-    name: macOS (x86_64)
-    runs-on: macos-14
-    timeout-minutes: 120
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
-
-      - name: 安装 Haxe/Neko（Rosetta 运行 x86_64）
-        run: bash ci/setup-haxe-ci.sh
-
-      - name: 恢复 haxelib 依赖缓存
-        uses: actions/cache@v4
-        with:
-          path: $HOME/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
-
-      - name: 安装 haxelib 依赖
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          bash ci/install-deps.sh
-
-      - name: 恢复 SDL3 lime 源码树缓存
-        uses: actions/cache@v4
-        with:
-          path: /tmp/lime-full
-          key: limefull-${{ runner.os }}-macos-x64-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
-
-      - name: 组装 SDL3 lime（缓存未命中才现场组装）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          if [ -d /tmp/lime-full/project ]; then
-            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
-            haxelib dev lime /tmp/lime-full
-          else
-            GH_PROXY="" bash ci/setup-lime-sdl3.sh
-          fi
-
-      - name: 重建 lime macOS ndll（x86_64）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          cd /tmp/lime-full
-          neko run.n rebuild lime mac
-
-      - name: 构建 macOS x86_64
-        run: ./compile-mac.sh
-
-      - name: ad-hoc 签名（x86_64）
-        run: codesign --force --deep -s - export/release/macos/bin/Meteoric.app
-
-      - name: 归档 x86_64 版
-        run: |
-          rm -rf export/release/macos-x64
-          mkdir -p export/release/macos-x64
-          cp -R export/release/macos/bin/Meteoric.app export/release/macos-x64/
-
-      - name: 上传 x86_64
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-macos-x64
-          path: export/release/macos-x64/
-
-  # ---------- macOS arm64（独立 job，与 x64 并行） ----------
-  macos-arm64:
-    name: macOS (arm64)
-    runs-on: macos-14
-    timeout-minutes: 120
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
-
-      - name: 安装 Haxe/Neko（Rosetta 运行 x86_64；引擎 C++ 用原生 arm64 clang）
-        run: bash ci/setup-haxe-ci.sh
-
-      - name: 恢复 haxelib 依赖缓存
-        uses: actions/cache@v4
-        with:
-          path: $HOME/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
-
-      - name: 安装 haxelib 依赖
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          bash ci/install-deps.sh
-
-      - name: 恢复 SDL3 lime 源码树缓存
-        uses: actions/cache@v4
-        with:
-          path: /tmp/lime-full
-          key: limefull-${{ runner.os }}-macos-arm64-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
-
-      - name: 组装 SDL3 lime（缓存未命中才现场组装）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          if [ -d /tmp/lime-full/project ]; then
-            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
-            haxelib dev lime /tmp/lime-full
-          else
-            GH_PROXY="" bash ci/setup-lime-sdl3.sh
-          fi
-
-      - name: 重建 lime macOS ndll（arm64）
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          cd /tmp/lime-full
-          neko run.n rebuild lime mac -arm64
-          cp ndll/MacArm64/lime-64.ndll ndll/MacArm64/lime.ndll
-
-      - name: 构建 macOS arm64
-        run: |
-          export PATH="$HOME/haxe:$HOME/neko:$PATH"
-          export NEKOPATH="$HOME/neko"
-          haxelib run lime build macos -release -arm64
-          codesign --force --deep -s - export/release/macos/bin/Meteoric.app
-          rm -rf export/release/macos-arm64
-          mkdir -p export/release/macos-arm64
-          cp -R export/release/macos/bin/Meteoric.app export/release/macos-arm64/
-
-      - name: 上传 arm64
-        uses: actions/upload-artifact@v5
-        with:
-          name: meteoric-macos-arm64
-          path: export/release/macos-arm64/
+  macos:
+    name: macOS (x86_64 + arm64)
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
 
   # ---------- 发布 Pre-release ----------
-  # 四个构建 job 全部成功后自动创建 GitHub Pre-release（PR 不发布）
+  # 三个平台 workflow 全部成功后自动创建 GitHub Pre-release（PR 不发布）
   release:
     name: 发布 Pre-release
-    needs: [android, windows, macos-x64, macos-arm64]
+    needs: [android, windows, macos]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -419,7 +69,7 @@ jobs:
       contents: write
     steps:
       - name: 检出代码（读取 source/Main.hx 版本号）
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: 确定版本号（优先手动输入，否则读 source/Main.hx 的 meVersion；统一追加构建日期）
         id: version
@@ -436,7 +86,7 @@ jobs:
           echo "发布版本: v$VERSION"
 
       - name: 下载全部构建产物
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: release-artifacts
 
@@ -450,15 +100,17 @@ jobs:
           test -d release-artifacts/meteoric-macos-arm64/Meteoric.app
           echo "五端产物齐全 ✓"
 
-      - name: 打包产物（zip/apk 单文件，避免目录上传问题）
+      - name: 打包产物（zip/apk 单文件；自标识命名 <平台>-<版本>）
         run: |
           set -e
           mkdir -p dist
-          cp release-artifacts/meteoric-android-arm64/Meteoric-debug.apk dist/Meteoric-Android-arm64.apk
-          (cd release-artifacts/meteoric-windows-x64 && zip -qry ../../dist/Meteoric-Windows-x64.zip .)
-          (cd release-artifacts/meteoric-windows-x86 && zip -qry ../../dist/Meteoric-Windows-x86.zip .)
-          (cd release-artifacts/meteoric-macos-x64 && zip -qry ../../dist/Meteoric-macOS-x86_64.zip Meteoric.app)
-          (cd release-artifacts/meteoric-macos-arm64 && zip -qry ../../dist/Meteoric-macOS-arm64.zip Meteoric.app)
+          cp release-artifacts/meteoric-android-arm64/Meteoric-debug.apk "dist/Meteoric-Android-arm64-$VERSION.apk"
+          (cd release-artifacts/meteoric-windows-x64 && zip -qry "../../dist/Meteoric-Windows-x64-$VERSION.zip" .)
+          (cd release-artifacts/meteoric-windows-x86 && zip -qry "../../dist/Meteoric-Windows-x86-$VERSION.zip" .)
+          (cd release-artifacts/meteoric-macos-x64 && zip -qry "../../dist/Meteoric-macOS-x86_64-$VERSION.zip" Meteoric.app)
+          (cd release-artifacts/meteoric-macos-arm64 && zip -qry "../../dist/Meteoric-macOS-arm64-$VERSION.zip" Meteoric.app)
+          # SHA256 校验和（Seiun 式自校验发布：用户下载后可核对完整性）
+          (cd dist && sha256sum *.apk *.zip > SHA256SUMS.txt)
           ls -la dist/
 
       - name: 发布 Pre-release（同名旧版先删除，实现覆盖）
@@ -466,14 +118,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete "v$VERSION" --yes --cleanup-tag 2>/dev/null || true
-          printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n- Windows x64 / Windows x86（zip，解压即用）\n- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n- Android arm64（APK）\n\n由 GitHub Actions 自动构建\n' > /tmp/release-notes.md
+          # 中国镜像留桩：建好 Gitee 镜像仓 / 加速域名后，在此向说明追加镜像链接
+          # （参照 Seiun 的 append-mirror-links composite action 做法）。
+          printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n- Windows x64 / Windows x86（zip，解压即用）\n- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n- Android arm64（APK）\n\nSHA256 见 SHA256SUMS.txt\n\n构建信息：commit %s · run %s/%s\n' \
+            "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" > /tmp/release-notes.md
           gh release create "v$VERSION" \
             --prerelease \
             --title "Pre-release v$VERSION" \
             --notes-file /tmp/release-notes.md \
-            dist/Meteoric-Android-arm64.apk \
-            dist/Meteoric-Windows-x64.zip \
-            dist/Meteoric-Windows-x86.zip \
-            dist/Meteoric-macOS-x86_64.zip \
-            dist/Meteoric-macOS-arm64.zip
+            dist/Meteoric-Android-arm64-"$VERSION".apk \
+            dist/Meteoric-Windows-x64-"$VERSION".zip \
+            dist/Meteoric-Windows-x86-"$VERSION".zip \
+            dist/Meteoric-macOS-x86_64-"$VERSION".zip \
+            dist/Meteoric-macOS-arm64-"$VERSION".zip \
+            dist/SHA256SUMS.txt
           echo "已发布: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"

@@ -1,0 +1,166 @@
+# Android (arm64) 构建工作流 —— 可被 build.yml 编排（workflow_call），也可单独派发。
+# 步骤来源：原 build.yml android job 逐字搬运（2026-08 提速版），叠加：
+#   1) hxcpp 编译缓存（HXCPP_COMPILE_CACHE，key 含 lime 树哈希——lime 头文件变了必须重编）；
+#   2) actions 按完整 commit SHA 固定；产物上传加 if-no-files-found: error + 14 天保留。
+name: 构建 Android (arm64)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # hxcpp 编译缓存目录：BuildTool 按内容哈希复用 .o，跨 run 增量编译
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp-cache
+
+jobs:
+  android:
+    name: Android (arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: 安装 Haxe/Neko
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 安装 Android SDK
+        # android-actions/setup-android@v3 已失效：它去安装 Google 早已下架的 legacy 「tools」包
+        # → `Warning: Failed to find package 'tools'` → 该 action 抛错（runner：Node 24 +
+        # 预装 cmdline-tools/16.0）。runner 已预装完整 SDK，这里只补一个 cmdline-tools/latest
+        # 软链供**后续步骤**（未改动的「安装 NDK 21.4 与平台」）使用，不安装任何额外 SDK 包。
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          export ANDROID_SDK_ROOT="$SDK"
+          export ANDROID_HOME="$SDK"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          ls "$SDK/cmdline-tools" 2>/dev/null || true
+          if [ ! -e "$SDK/cmdline-tools/latest" ]; then
+            VER="$(ls -d "$SDK"/cmdline-tools/*/ 2>/dev/null | head -1)"
+            [ -n "$VER" ] && ln -s "$VER" "$SDK/cmdline-tools/latest"
+          fi
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --version
+
+      - name: 安装 NDK 21.4 与平台
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager || true)"; fi
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "ndk;21.4.7075529" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-android-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      - name: 重建 lime Android ndll（SDL3 静态编译进 liblime）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/21.4.7075529"
+          export ANDROID_SETUP=true
+          neko run.n rebuild lime android
+
+      # key 里含 lime 树哈希：lime 头文件/补丁一变，引擎 C++ 必须全量重编，缓存应整体换代；
+      # restore-keys 前缀回退保证平时增量复用（hxcpp 缓存内部按内容哈希判定有效性）。
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-android-arm64-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-android-arm64-v1-
+
+      - name: 缓存 Gradle 发行版
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dists-7.4.2-${{ runner.os }}
+
+      - name: 预下载 Gradle 7.4.2 发行版（services.gradle.org 偶发断流：断点续传 + 多重试）
+        run: |
+          set -e
+          # 哈希目录名 = wrapper 对 distributionUrl 的确定性哈希（本机 ~/.gradle 已核实）
+          DIST_DIR="$HOME/.gradle/wrapper/dists/gradle-7.4.2-bin/48ivgl02cpt2ed3fh9dbalvx8"
+          mkdir -p "$DIST_DIR"
+          if [ ! -s "$DIST_DIR/gradle-7.4.2-bin.zip" ]; then
+            echo "==> 预下载 gradle-7.4.2-bin.zip ..."
+            for i in $(seq 1 10); do
+              if curl -fL --connect-timeout 30 --max-time 600 --retry 5 --retry-all-errors --retry-delay 3 \
+                   -C - -o "$DIST_DIR/gradle-7.4.2-bin.zip" \
+                   https://services.gradle.org/distributions/gradle-7.4.2-bin.zip; then
+                echo "==> Gradle 发行版下载成功（第 $i 次尝试）"
+                break
+              fi
+              echo "==> Gradle 下载失败（第 $i 次），5 秒后重试..."
+              sleep 5
+            done
+          fi
+          test -s "$DIST_DIR/gradle-7.4.2-bin.zip"
+          echo "==> Gradle 发行版就绪："
+          ls -la "$DIST_DIR"
+
+      - name: 缓存 Gradle 依赖模块（AGP/Kotlin 类路径，防 Maven Central 限流）
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.gradle/caches/modules-2
+          key: gradle-modules-${{ runner.os }}-v1
+
+      - name: 构建 Android APK
+        run: |
+          # Maven Central 偶发 429（Too Many Requests）导致类路径解析失败：重试一轮再放弃
+          for i in 1 2; do
+            if ./compile-android.sh; then
+              exit 0
+            fi
+            echo "==> Android 构建失败（第 $i 次），20 秒后重试..."
+            sleep 20
+          done
+          exit 1
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-android-arm64
+          path: export/release/android/bin/app/build/outputs/apk/debug/Meteoric-debug.apk
+          if-no-files-found: error
+          retention-days: 14

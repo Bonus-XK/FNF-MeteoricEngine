@@ -1,0 +1,117 @@
+# macOS (x86_64 + arm64) 构建工作流 —— 可被 build.yml 编排（workflow_call），也可单独派发。
+# 来源：原 build.yml 的 macos-x64 / macos-arm64 两个 job 合并为 matrix（步骤逐字保留，
+# 分叉点用 if: matrix.arch 区分）。叠加：hxcpp 编译缓存（按架构分 key）+ 上传加固。
+# 两架构并存的历史原因：
+#   - x64 job 在 arm64 runner 上以 Rosetta 跑 x86_64 Haxe/Neko（引擎 C++ 同样 x86_64）；
+#   - arm64 job 的 Haxe/Neko 也走 Rosetta，但引擎 C++ 用原生 arm64 clang；
+#   - arm64 ndll 需要显式 -arm64 并把 lime-64.ndll 拷为 lime.ndll（lime 的命名约定）。
+name: 构建 macOS (x86_64 + arm64)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp-cache
+
+jobs:
+  macos:
+    name: macOS (${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }})
+    runs-on: macos-14
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: 安装 Haxe/Neko（Rosetta 运行 x86_64；arm64 job 的引擎 C++ 用原生 clang）
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-macos-${{ matrix.arch }}-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      - name: 重建 lime macOS ndll（x86_64）
+        if: matrix.arch == 'x64'
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          neko run.n rebuild lime mac
+
+      - name: 重建 lime macOS ndll（arm64）
+        if: matrix.arch == 'arm64'
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          neko run.n rebuild lime mac -arm64
+          cp ndll/MacArm64/lime-64.ndll ndll/MacArm64/lime.ndll
+
+      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-macos-${{ matrix.arch }}-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-macos-${{ matrix.arch }}-v1-
+
+      - name: 构建 macOS x86_64
+        if: matrix.arch == 'x64'
+        run: ./compile-mac.sh
+
+      - name: 构建 macOS arm64
+        if: matrix.arch == 'arm64'
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          haxelib run lime build macos -release -arm64
+
+      - name: ad-hoc 签名
+        run: codesign --force --deep -s - export/release/macos/bin/Meteoric.app
+
+      - name: 归档
+        run: |
+          rm -rf export/release/macos-${{ matrix.arch }}
+          mkdir -p export/release/macos-${{ matrix.arch }}
+          cp -R export/release/macos/bin/Meteoric.app export/release/macos-${{ matrix.arch }}/
+
+      - name: 上传
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-macos-${{ matrix.arch }}
+          path: export/release/macos-${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 14

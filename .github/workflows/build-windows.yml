@@ -1,0 +1,191 @@
+# Windows (x64 + x86) 构建工作流 —— 可被 build.yml 编排（workflow_call），也可单独派发。
+# 步骤来源：原 build.yml windows job 逐字搬运，叠加：
+#   1) hxcpp 编译缓存（x64/x86 共用一个内容寻址缓存）；
+#   2) 崩溃符号产物：链接期 -Wl,-Map 产出 ApplicationMain.map（见 Main.hx @:buildXml），
+#      与配对 exe + build-info.txt 一起作为 symbols artifact 保留 90 天——
+#      CrashHandler 的 native_crash 报告只有运行时地址，配 map 才能定位到函数；
+#      符号永不进游戏 zip（map 几十 MB，用户不需要）。
+#   3) .rsrc 图标注入防线；actions 按 SHA 固定；产物 14 天保留 + if-no-files-found: error。
+name: 构建 Windows (x64 + x86)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp-cache
+
+jobs:
+  windows:
+    name: Windows (x64 + x86)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: 安装 Haxe/Neko
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 mingw-w64 交叉工具链（与本地开发环境一致）
+        run: |
+          brew install mingw-w64
+          echo "$(brew --prefix mingw-w64)/bin" >> "$GITHUB_PATH"
+          x86_64-w64-mingw32-g++ --version | head -1
+          i686-w64-mingw32-g++ --version | head -1
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-windows-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      - name: 应用 hxcpp mac→windows 交叉补丁（官方 4.3.2 不支持 mac 交叉编 windows）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          HXCPP_DIR="$HOME/haxelib/hxcpp/4,3,2"
+          cp ci/hxcpp-mac-cross/BuildTool.hx "$HXCPP_DIR/tools/hxcpp/BuildTool.hx"
+          cp ci/hxcpp-mac-cross/mingw-toolchain.xml "$HXCPP_DIR/toolchain/mingw-toolchain.xml"
+          cd "$HXCPP_DIR"
+          haxe -cp tools/hxcpp -neko hxcpp.n -main BuildTool -D neko_v1 -debug
+          ls -la hxcpp.n
+
+      - name: 重建 lime Windows ndll（x64 + x86 手动 hxcpp，避免 -arch x86 bug）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full/project
+          # x64 (x86_64-w64-mingw32-g++)
+          haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M64 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
+            -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
+            -Drebuild=1 -Dlime-native -Dmingw
+          # x86 (i686-w64-mingw32-g++；必须显式 -DHXCPP_M32，否则 hxcpp 按宿主默认 m64 编出 x64）
+          haxelib run hxcpp Build.xml -Dwindows -DHXCPP_M32 -Dlime-openal -Dlime-curl -Dlime-harfbuzz \
+            -Dlime-cairo -Dlime-opengl -Dlime-vorbis -Dlime-cffi -Dlime-threads -Dnative -Dtools=8.2.2 \
+            -Drebuild=1 -Dlime-native -Dmingw
+
+      # x64/x86 共用内容寻址缓存（hxcpp 按内容哈希区分两架构的 .o）；
+      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代。
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-windows-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-windows-v1-
+
+      - name: 构建 Windows x64
+        run: ./compile-windows.sh
+
+      - name: 验证 x64 exe 图标注入（.rsrc 资源段防线）
+        run: |
+          x86_64-w64-mingw32-objdump -h export/release/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
+            || { echo "错误：Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入（见 Main.hx @:buildXml）"; exit 1; }
+          echo "[verify] Meteoric.exe 含 .rsrc 图标资源段"
+
+      - name: 收集 x64 崩溃符号（map + 配对 exe + build-info）
+        run: |
+          mkdir -p export/release/windows/symbols
+          cp export/release/windows/obj/ApplicationMain.map export/release/windows/symbols/ApplicationMain.map
+          cp export/release/windows/bin/Meteoric.exe export/release/windows/symbols/windows-x64.exe
+          {
+            echo "app=Meteoric"
+            echo "target=windows-x64"
+            echo "version=$(sed -n "s/.*meVersion:String = '\([^']*\)'.*/\1/p" source/Main.hx | head -1)"
+            echo "commit=${{ github.sha }}"
+            echo "run=${{ github.run_id }}-${{ github.run_attempt }}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > export/release/windows/symbols/build-info.txt
+          ls -la export/release/windows/symbols/
+          test -s export/release/windows/symbols/ApplicationMain.map || { echo "错误：x64 map 缺失（崩溃报告将无法符号化）"; exit 1; }
+          test -s export/release/windows/symbols/windows-x64.exe || { echo "错误：x64 配对 exe 缺失"; exit 1; }
+
+      - name: 构建 Windows x86
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
+          haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
+
+      - name: 验证 x86 exe 图标注入（.rsrc 资源段防线）
+        run: |
+          x86_64-w64-mingw32-objdump -h export/32bit/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
+            || { echo "错误：x86 Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入"; exit 1; }
+          echo "[verify] x86 Meteoric.exe 含 .rsrc 图标资源段"
+
+      - name: 收集 x86 崩溃符号（map + 配对 exe + build-info）
+        run: |
+          mkdir -p export/32bit/windows/symbols
+          cp export/32bit/windows/obj/ApplicationMain.map export/32bit/windows/symbols/ApplicationMain.map
+          cp export/32bit/windows/bin/Meteoric.exe export/32bit/windows/symbols/windows-x86.exe
+          {
+            echo "app=Meteoric"
+            echo "target=windows-x86"
+            echo "version=$(sed -n "s/.*meVersion:String = '\([^']*\)'.*/\1/p" source/Main.hx | head -1)"
+            echo "commit=${{ github.sha }}"
+            echo "run=${{ github.run_id }}-${{ github.run_attempt }}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > export/32bit/windows/symbols/build-info.txt
+          ls -la export/32bit/windows/symbols/
+          test -s export/32bit/windows/symbols/ApplicationMain.map || { echo "错误：x86 map 缺失（崩溃报告将无法符号化）"; exit 1; }
+          test -s export/32bit/windows/symbols/windows-x86.exe || { echo "错误：x86 配对 exe 缺失"; exit 1; }
+
+      - name: 上传 x64
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-windows-x64
+          path: export/release/windows/bin/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 上传 x86
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-windows-x86
+          path: export/32bit/windows/bin/
+          if-no-files-found: error
+          retention-days: 14
+
+      # 崩溃符号 90 天：比游戏本体活得久——玩家群里的崩溃报告往往几周后才有人贴上来
+      - name: 上传 x64 崩溃符号（90 天）
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-windows-x64-symbols
+          path: export/release/windows/symbols/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: 上传 x86 崩溃符号（90 天）
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-windows-x86-symbols
+          path: export/32bit/windows/symbols/
+          if-no-files-found: error
+          retention-days: 90
