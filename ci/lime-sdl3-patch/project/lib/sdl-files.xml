@@ -427,8 +427,11 @@
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_dbus.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_evdev_capabilities.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_threadprio.c" />
-            <!-- core/unix：poll 封装 -->
+            <!-- core/unix：poll 封装 + appid（SDL_x11window 引用 SDL_GetExeName/SDL_GetAppID） -->
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/unix/SDL_appid.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/unix/SDL_poll.c" />
+            <!-- 文件对话框 dummy（SDL_dialog.c 无条件引用驱动符号，见配置注释） -->
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/dialog/dummy/SDL_dummydialog.c" />
             <!-- 文件系统 / locale / URL / 电源 -->
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/unix/SDL_sysfilesystem.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/locale/unix/SDL_syslocale.c" />

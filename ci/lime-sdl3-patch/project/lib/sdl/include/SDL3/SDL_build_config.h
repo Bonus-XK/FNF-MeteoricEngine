@@ -748,6 +748,13 @@ typedef unsigned int uintptr_t;
 /* 文件系统：unix（XDG 目录） */
 #undef SDL_FILESYSTEM_ANDROID
 #define SDL_FILESYSTEM_UNIX 1
+/* 摄像头：不启用（dummy 由全局默认提供）——android 驱动必须 undef，
+ * 否则 SDL_camera.c 的 bootstrap 数组引用 ANDROIDCAMERA_bootstrap 而源文件
+ * 只在 android 编（链接悬空，2026-11-01 CI 实锤） */
+#undef SDL_CAMERA_DRIVER_ANDROID
+/* 文件对话框：SDL_dialog.c 无条件引用 SDL_SYS_ShowFileDialogWithProperties，
+ * Linux 无原生驱动 → dummy 兜底（配合 sdl-files.xml 的 dialog/dummy 条目） */
+#define SDL_DIALOG_DUMMY 1
 /* 平台杂项（url 打开等）由 SDL_PLATFORM_UNIX 自动启用 */
 #endif /* SDL_PLATFORM_LINUX */
 /* ============ linux 平台驱动配置结束 ============ */
