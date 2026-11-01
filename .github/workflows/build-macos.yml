@@ -32,6 +32,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
+      # x64 job 的 x86_64 Haxe/Neko 工具链依赖 Rosetta 2；macos-26 镜像不保证预装
+      # （Apple 已宣布弃用 Rosetta），显式装一次（已装时为幂等 no-op）
+      - name: 确保 Rosetta 2 就位（x86_64 工具链依赖）
+        run: |
+          /usr/bin/pgrep -q oahd && echo "Rosetta 已在运行" || {
+            echo "Rosetta 未安装，正在安装..."
+            softwareupdate --install-rosetta --agree-to-license
+          }
+
       - name: 安装 Haxe/Neko（Rosetta 运行 x86_64；arm64 job 的引擎 C++ 用原生 clang）
         run: bash ci/setup-haxe-ci.sh
 
