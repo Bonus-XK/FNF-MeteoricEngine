@@ -25,6 +25,9 @@ env:
 jobs:
   ios:
     name: iOS (arm64, unsigned)
+    # SDL3-on-iOS 观察期：失败不阻塞编排器发布（可复用 workflow 调用 job 本身
+    # 不允许 continue-on-error，所以放在被调用 workflow 的 job 内部实现非阻塞）
+    continue-on-error: true
     runs-on: macos-14
     timeout-minutes: 180
     steps:

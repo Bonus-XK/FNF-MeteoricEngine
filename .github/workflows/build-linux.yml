@@ -23,6 +23,9 @@ env:
 jobs:
   linux:
     name: Linux (x86_64)
+    # SDL3-on-Linux 观察期：失败不阻塞编排器发布（可复用 workflow 调用 job 本身
+    # 不允许 continue-on-error，所以放在被调用 workflow 的 job 内部实现非阻塞）
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

@@ -60,16 +60,16 @@ jobs:
     secrets: inherit
 
   # ---------- SDL3 移植观察期新增端（非阻塞） ----------
-  # 失败不影响发布；红了的排查入口 = 对应 workflow 单独派发跑一遍看日志。
+  # 失败不影响发布（continue-on-error 写在子 workflow 的 job 内——可复用 workflow
+  # 调用 job 不允许 continue-on-error，放这里会让 GitHub 把整个 job 当普通 job
+  # 解析而拒绝整个编排器）；红了的排查入口 = 对应 workflow 单独派发跑一遍看日志。
   linux:
     name: Linux (x86_64)
-    continue-on-error: true
     uses: ./.github/workflows/build-linux.yml
     secrets: inherit
 
   ios:
     name: iOS (未签名 IPA)
-    continue-on-error: true
     uses: ./.github/workflows/build-ios.yml
     secrets: inherit
 
