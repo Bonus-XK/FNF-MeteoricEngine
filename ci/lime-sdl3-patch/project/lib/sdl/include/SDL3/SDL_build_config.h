@@ -691,4 +691,83 @@ typedef unsigned int uintptr_t;
 #endif /* SDL_PLATFORM_WIN32 */
 /* ============ windows 平台驱动配置结束 ============ */
 
+/* ============ linux 平台驱动配置覆盖（SDL3 移植，2026-11） ============
+ * 桌面 Linux：X11 + 桌面 OpenGL(GLX) + PulseAudio/ALSA + evdev 手柄。
+ * Wayland 走 XWayland（不直接编 wayland 后端，省掉 wayland/xkbcommon/libdecor 头依赖）。
+ * 不启用 udev/IME（ibus/fcitx）：手柄热插拔走 inotify 回退，CJK 输入法后续按需补。 */
+#if defined(SDL_PLATFORM_LINUX)
+/* 音频：PulseAudio（桌面默认）+ ALSA（直连硬件/无 pulse 环境）；关闭 android 驱动 */
+#undef SDL_AUDIO_DRIVER_OPENSLES
+#undef SDL_AUDIO_DRIVER_AAUDIO
+#define SDL_AUDIO_DRIVER_PULSEAUDIO 1
+#define SDL_AUDIO_DRIVER_ALSA 1
+/* 视频：X11 + 桌面 OpenGL（GLX）；关闭 android 驱动与移动 GLES/EGL 路径 */
+#undef SDL_VIDEO_DRIVER_ANDROID
+#define SDL_VIDEO_DRIVER_X11 1
+#define SDL_VIDEO_DRIVER_X11_XCURSOR 1
+#define SDL_VIDEO_DRIVER_X11_XDBE 1
+#define SDL_VIDEO_DRIVER_X11_XFIXES 1
+#define SDL_VIDEO_DRIVER_X11_XINPUT2 1
+#define SDL_VIDEO_DRIVER_X11_XINPUT2_SUPPORTS_MULTITOUCH 1
+#define SDL_VIDEO_DRIVER_X11_XRANDR 1
+#define SDL_VIDEO_DRIVER_X11_XSCRNSAVER 1
+#define SDL_VIDEO_DRIVER_X11_XSHAPE 1
+#define SDL_VIDEO_DRIVER_X11_XSYNC 1
+/* 摇杆：Linux evdev（udev 运行时可选不编，热插拔走 inotify 回退） */
+#undef SDL_JOYSTICK_ANDROID
+#define SDL_JOYSTICK_LINUX 1
+#define SDL_INPUT_LINUXEV 1
+/* 手柄震动：Linux evdev force-feedback */
+#undef SDL_HAPTIC_ANDROID
+#define SDL_HAPTIC_LINUX 1
+/* 进程：POSIX */
+#undef SDL_PROCESS_DUMMY
+#define SDL_PROCESS_POSIX 1
+/* 传感器：无原生 → DUMMY */
+#undef SDL_SENSOR_ANDROID
+#define SDL_SENSOR_DUMMY 1
+/* 电源：linux（/sys class power_supply + UPower/dbus） */
+#undef SDL_POWER_ANDROID
+#define SDL_POWER_LINUX 1
+/* 文件系统：unix（XDG 目录） */
+#undef SDL_FILESYSTEM_ANDROID
+#define SDL_FILESYSTEM_UNIX 1
+/* 平台杂项（url 打开等）由 SDL_PLATFORM_UNIX 自动启用 */
+#endif /* SDL_PLATFORM_LINUX */
+/* ============ linux 平台驱动配置结束 ============ */
+
+/* ============ ios 平台驱动配置覆盖（SDL3 移植，2026-11） ============
+ * iOS/tvOS 走 UIKit + OpenGL ES（EGL），音频 CoreAudio，手柄 MFi（GameController）。
+ * 不启用 Metal 渲染 / CoreMotion 传感器 / 摄像头 / 对话框（SDL3.2 无 UIKit 对话框驱动）。 */
+#if defined(SDL_PLATFORM_IOS)
+/* 音频：CoreAudio；关闭 android 驱动 */
+#undef SDL_AUDIO_DRIVER_OPENSLES
+#undef SDL_AUDIO_DRIVER_AAUDIO
+#define SDL_AUDIO_DRIVER_COREAUDIO 1
+/* 视频：UIKit；保持默认的 GLES2 + EGL 渲染路径 */
+#undef SDL_VIDEO_DRIVER_ANDROID
+#define SDL_VIDEO_DRIVER_UIKIT 1
+/* 摇杆：MFi（SDL3 的 mfijoystick 同时覆盖 macOS/iOS，GameController 框架由 lime iOS 模板预链） */
+#undef SDL_JOYSTICK_ANDROID
+#define SDL_JOYSTICK_MFI 1
+/* 手柄震动：MFi 后端内置处理，独立 haptic 子系统用 DUMMY 兜底 */
+#undef SDL_HAPTIC_ANDROID
+#define SDL_HAPTIC_DUMMY 1
+/* 进程：POSIX */
+#undef SDL_PROCESS_DUMMY
+#define SDL_PROCESS_POSIX 1
+/* 传感器：CoreMotion 不启用 → DUMMY */
+#undef SDL_SENSOR_ANDROID
+#define SDL_SENSOR_DUMMY 1
+/* 电源：UIKit */
+#undef SDL_POWER_ANDROID
+#define SDL_POWER_UIKIT 1
+/* 文件系统：Cocoa（SDL3 的实现覆盖 iOS：沙盒 Documents/Bundle 路径） */
+#undef SDL_FILESYSTEM_ANDROID
+#define SDL_FILESYSTEM_COCOA 1
+/* 摄像头：不启用（dummy 由全局默认提供） */
+#undef SDL_CAMERA_DRIVER_ANDROID
+#endif /* SDL_PLATFORM_IOS */
+/* ============ ios 平台驱动配置结束 ============ */
+
 #endif /* SDL_build_config_h_ */

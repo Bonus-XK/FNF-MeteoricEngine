@@ -74,6 +74,9 @@ mkdir -p "$LIME_DIR/src/lime/_internal/backend/native"
 cp ci/lime-sdl3-patch/src/lime/_internal/backend/native/NativeAudioSource.hx \
    "$LIME_DIR/src/lime/_internal/backend/native/NativeAudioSource.hx"
 cp -R ci/lime-sdl3-patch/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java "$LIME_DIR/templates/android/template/app/src/main/java/org/haxe/lime/GameActivity.java"
+# iOS 应用入口：SDL3 删除了 SDL_uikit_main.c，Main.mm 改走 SDL_RunApp 契约（SDL3 移植，见补丁内注释）
+cp "ci/lime-sdl3-patch/templates/ios/template/{{app.file}}/Classes/Main.mm" \
+   "$LIME_DIR/templates/ios/template/{{app.file}}/Classes/Main.mm"
 
 echo "==> [3/6] 对齐定制库版本（pixman/cairo/harfbuzz/openal/curl/efsw）"
 # 注意：浅克隆（--depth 1）后 checkout tag 会失败（tag 不在浅历史），

@@ -486,6 +486,21 @@
 				<lib name="-lpthread" />
 				<lib name="-lrt" />
 
+				<!-- SDL3 X11/PulseAudio/ALSA/桌面 GL：SDL 静态编进 lime ndll，
+				     其驱动的系统库必须在链接期显式给出（与 SDL_build_config.h 的
+				     SDL_PLATFORM_LINUX 段、sdl-files.xml 的 linux 段三方对齐）。
+				     X11 子库按启用的 X11_* 子特性给：XCURSOR/XFIXES/XI/XRANDR/XSS/XSHAPE(Xext)/XSYNC(Xext)。 -->
+				<lib name="-lX11" />
+				<lib name="-lXcursor" />
+				<lib name="-lXext" />
+				<lib name="-lXfixes" />
+				<lib name="-lXi" />
+				<lib name="-lXrandr" />
+				<lib name="-lXss" />
+				<lib name="-lGL" />
+				<lib name="-lpulse" />
+				<lib name="-lasound" />
+
 				<lib name="-lgc" if="LIME_NEKO" />
 				<lib name="-lm" if="LIME_NEKO" />
 
