@@ -1,0 +1,132 @@
+# Linux (x86_64) 构建工作流 —— 可被 build.yml 编排（workflow_call），也可单独派发。
+# SDL3 lime 的 Linux 首次落地（2026-11）：
+#   - SDL 的 X11/PulseAudio/ALSA/evdev 驱动由 ci/lime-sdl3-patch 提供：
+#     SDL_build_config.h 的 SDL_PLATFORM_LINUX 覆盖段 + sdl-files.xml 的 linux 源文件段
+#     + Build.xml linux 链接段（-lX11 系/-lpulse/-lasound/-lGL）——三处必须同步改；
+#   - Wayland 走 XWayland，不直接编 wayland 后端；udev/IME 未启用（inotify 回退）；
+#   - SDL3-on-Linux 是整个移植中唯一无法本地验证的环节，全链路以 CI 实跑为准。
+# 产物 tar.gz（保留执行位），解压后运行 bin/Meteoric；用户机器需有
+# libX11/libXcursor/libXext/libXfixes/libXi/libXrandr/libXss/libGL/libpulse/libasound
+# —— 全部是 Linux 桌面发行版的标准组件。
+name: 构建 Linux (x86_64)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp-cache
+
+jobs:
+  linux:
+    name: Linux (x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: 安装 Haxe/Neko
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 SDL3 Linux 系统依赖（X11/PulseAudio/ALSA/GL 开发头）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxi-dev \
+            libxrandr-dev libxss-dev libgl1-mesa-dev libpulse-dev libasound2-dev
+          gcc --version | head -1
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/lime-full
+          key: limefull-${{ runner.os }}-linux-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      - name: 重建 lime Linux ndll（SDL3 静态编入）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          neko run.n rebuild lime linux
+          ls -la ndll/Linux64/
+          # lime 构建期按 lime.ndll 找引擎 ndll（发行包预拷的是官方 SDL2 时代的）；
+          # 重建产物若叫 lime-64.ndll 则按 lime 的命名约定补拷
+          [ -f ndll/Linux64/lime.ndll ] || cp ndll/Linux64/lime-64.ndll ndll/Linux64/lime.ndll
+
+      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-linux-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-linux-v1-
+
+      # 同 compile-mac.sh 的构建期指纹块（抽到 ci/refresh-gitinfo.sh 供 Linux/iOS 复用）
+      - name: 刷新 GitInfoData（FPS 显示用构建指纹）
+        run: bash ci/refresh-gitinfo.sh
+
+      - name: 构建 Linux x86_64
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          haxelib run lime build linux -release
+
+      - name: 验证产物与动态链接完整性（缺库即硬失败）
+        run: |
+          BIN=$(find export/release -path "*linux/bin/Meteoric" -type f | head -1)
+          [ -n "$BIN" ] || { echo "错误：未找到 Linux 可执行文件"; find export -name "Meteoric*" -type f | head; exit 1; }
+          echo "[verify] 可执行文件: $BIN"
+          file "$BIN"
+          MISSING=$(ldd "$BIN" | grep "not found" || true)
+          if [ -n "$MISSING" ]; then
+            echo "$MISSING"
+            echo "错误：存在未满足的动态库依赖（SDL3 Linux 链接段与 CI/运行时库不匹配）"
+            exit 1
+          fi
+          echo "[verify] 动态库依赖完整"
+
+      - name: 归档（tar.gz 保留执行位）
+        run: |
+          BIN=$(find export/release -path "*linux/bin/Meteoric" -type f | head -1)
+          APPDIR=$(dirname "$BIN")
+          OUT="export/release/linux-artifact"
+          rm -rf "$OUT" && mkdir -p "$OUT"
+          tar czf "$OUT/Meteoric-Linux-x64.tar.gz" -C "$APPDIR/.." bin
+          tar tzf "$OUT/Meteoric-Linux-x64.tar.gz"
+          ls -la "$OUT"
+
+      - name: 上传
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-linux-x64
+          path: export/release/linux-artifact/
+          if-no-files-found: error
+          retention-days: 14
