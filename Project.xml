@@ -44,8 +44,11 @@
 	<define name="HSCRIPT_ALLOWED" if="desktop || mobile" />
 	<define name="LUA_ALLOWED" if="desktop || mobile" unless="hl"/>
 	<define name="ACHIEVEMENTS_ALLOWED" />
-	<!-- 安卓禁用视频：hxCodec 预编译的 VLC 库为 4KB 对齐，不符合 Android 15+ 的 16KB 页对齐要求 -->
-	<define name="VIDEOS_ALLOWED" if="windows || linux" unless="32bits || win32build"/>
+	<!-- 安卓禁用视频：hxCodec 预编译的 VLC 库为 4KB 对齐，不符合 Android 15+ 的 16KB 页对齐要求。
+	     Linux 同样禁用：hxCodec 3.0.2 只带 Windows/macOS 的 VLC 运行时（dll/MacOS+dll/Windows），
+	     没有 Linux 的 libvlc 与链接配置——强行启用需要系统 libvlc 且无法保证用户机器存在，
+	     待「Linux 打包 libvlc」立项后再放开。 -->
+	<define name="VIDEOS_ALLOWED" if="windows" unless="32bits || win32build"/>
 	<define name="TITLE_SCREEN_EASTER_EGG" if="officialBuild"/> <!-- DELETE THE if="officialBuild" for enabling this on an unofficial build -->
 
 	<!-- ____________________________ Window Settings ___________________________ -->
@@ -94,6 +97,9 @@
 	     不传 -D arm64 时本元素不生效，行为与原来完全一致（走 host 架构）。 -->
 	<architecture name="arm64" if="arm64" />
 
+	<!-- iOS：部署目标 13.0（未签名 device 构建走 CI 的 -nosign；lime 默认 13.6，显式声明防上游漂移）。
+	     iOS 图标无需按尺寸提供：lime 的 IOSPlatform 用 project.icons 自动缩放生成全套 AppIcon。 -->
+	<config:ios deployment="13.0" />
 	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
 
