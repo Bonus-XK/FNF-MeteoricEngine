@@ -353,10 +353,7 @@ class CameraHudDomain
 
 		if (ps.gf != null && PlayState.SONG.notes[sec].gfSection)
 		{
-			ps.camFollow.setPosition(ps.gf.getMidpoint().x, ps.gf.getMidpoint().y);
-			ps.camFollow.x += ps.gf.cameraPosition[0] + ps.girlfriendCameraOffset[0];
-			ps.camFollow.y += ps.gf.cameraPosition[1] + ps.girlfriendCameraOffset[1];
-			ps.tweenCamIn();
+			moveCameraToGF(ps);
 			ps.callOnScripts('onMoveCamera', ['gf']);
 			return;
 		}
@@ -486,5 +483,196 @@ class CameraHudDomain
 		var presets:Map<String, Float> = ClientPrefs.camSmoothPresets;
 		var v:Null<Float> = (ClientPrefs.data != null && presets != null) ? presets.get(ClientPrefs.data.camSmooth) : null;
 		return (v == null || v <= 0) ? 2.4 : v; // 兜底 = 原引擎强度（1.22s）
+	}
+
+	// ===================== Camera Freedom Kit（镜头自由化） =====================
+	//
+	// 「丝滑移镜」原理（Codename Engine 同款，用官方 flixel 5.2.2 原生实现）：
+	//  - scroll 补间进行时，HostDomain 把 FlxG.camera.followLerp 门控为 0 →
+	//    flixel updateFollow 步长为 0，跟随不会与补间打架（Codename 用自家 fork 的
+	//    followEnabled=false 达成同一效果）；补完把 camFollow 同步到终点，follow 从新落点继续，不回弹。
+	//  - zoom 补间进行时，HostDomain 对该相机跳过 camZooming 衰减回落，且补间开始即
+	//    同步 defaultCamZoom / defaultHudZoom 基线 → 补完不会被顶拍衰减抢回去。
+	// 全部纯增量 API：不被调用时不登记任何 tween，每帧门控退化为一次 Map.exists 查询。
+
+	/** 跟随 GF（moveCameraSection 的 gf 分支提为独立入口，供 cameraSetTarget('gf') / Move Camera 事件复用）。 */
+	public static function moveCameraToGF(ps:PlayState)
+	{
+		if (ps.gf == null || ps.camFollow == null) return;
+		ps.camFollow.setPosition(ps.gf.getMidpoint().x, ps.gf.getMidpoint().y);
+		ps.camFollow.x += ps.gf.cameraPosition[0] + ps.girlfriendCameraOffset[0];
+		ps.camFollow.y += ps.gf.cameraPosition[1] + ps.girlfriendCameraOffset[1];
+		ps.tweenCamIn();
+	}
+
+	/** 相机名 → 相机实例：保留 camhud/camother 别名语义，其余先查自定义注册表再回落 camGame。 */
+	public static function cameraFromName(ps:PlayState, name:String):FlxCamera
+	{
+		if (name != null)
+		{
+			switch (name.toLowerCase())
+			{
+				case 'hud' | 'camhud': return ps.camHUD;
+				case 'other' | 'camother': return ps.camOther;
+			}
+			var custom:FlxCamera = scripting.lua.LuaUtils.getCustomCamera(name);
+			if (custom != null) return custom;
+		}
+		return ps.camGame;
+	}
+
+	/** 相机名 → 补间登记表键：内建相机归一为 game/hud/other，自定义相机用其注册名（小写）。 */
+	static function cameraKeyFor(ps:PlayState, name:String):String
+	{
+		if (name != null)
+		{
+			var lower:String = name.toLowerCase();
+			switch (lower)
+			{
+				case 'hud' | 'camhud': return 'hud';
+				case 'other' | 'camother': return 'other';
+				case 'game' | 'camgame': return 'game';
+			}
+			if (scripting.lua.LuaUtils.getCustomCamera(name) != null) return lower;
+		}
+		return 'game';
+	}
+
+	/**
+	 * 镜头位置补间（Camera Freedom Kit 核心）。
+	 * camName：'game' / 'hud' / 'other' 或 registerCamera 注册的自定义相机名；
+	 * duration <= 0 = 瞬移；ease 为空 = linear。终点公式与 flixel focusOn 一致
+	 *（camFollow 是 1×1 对象，midpoint 偏 +0.5），补完与 follow 落点逐像素吻合。
+	 */
+	public static function tweenCameraScroll(ps:PlayState, camName:String, x:Float, y:Float, duration:Float, ?ease:String)
+	{
+		var cam:FlxCamera = cameraFromName(ps, camName);
+		if (cam == null) return;
+		var key:String = cameraKeyFor(ps, camName);
+		cancelScrollTween(ps, key);
+
+		// 跟随目标同步到终点（HUD/other/自定义相机没有跟随目标）
+		if (cam == ps.camGame && ps.camFollow != null)
+			ps.camFollow.setPosition(x, y);
+
+		var endX:Float = x - cam.width * 0.5 + 0.5;
+		var endY:Float = y - cam.height * 0.5 + 0.5;
+
+		if (duration <= 0)
+		{
+			cam.scroll.set(endX, endY);
+			return;
+		}
+
+		var easeFn:EaseFunction = getEase(ease);
+		var twn:FlxTween = FlxTween.tween(cam.scroll, {x: endX, y: endY}, duration, {
+			ease: easeFn,
+			onComplete: function(_)
+			{
+				ps.cameraScrollTweens.remove(key);
+			}
+		});
+		if (twn != null) ps.cameraScrollTweens.set(key, twn);
+	}
+
+	/**
+	 * 镜头 zoom 补间。game 相机同步 defaultCamZoom、hud 同步 defaultHudZoom（衰减基线跟上，
+	 * 补完不漂移）；补间期间 HostDomain 对该相机跳过 camZooming 衰减。
+	 */
+	public static function tweenCameraZoom(ps:PlayState, camName:String, zoom:Float, duration:Float, ?ease:String)
+	{
+		var cam:FlxCamera = cameraFromName(ps, camName);
+		if (cam == null) return;
+		var key:String = cameraKeyFor(ps, camName);
+		cancelZoomTween(ps, key);
+
+		if (key == 'game') ps.defaultCamZoom = zoom;
+		else if (key == 'hud') ps.defaultHudZoom = zoom;
+
+		if (duration <= 0)
+		{
+			cam.zoom = zoom;
+			return;
+		}
+
+		var easeFn:EaseFunction = getEase(ease);
+		var twn:FlxTween = FlxTween.tween(cam, {zoom: zoom}, duration, {
+			ease: easeFn,
+			onComplete: function(_)
+			{
+				ps.cameraZoomTweens.remove(key);
+			}
+		});
+		if (twn != null) ps.cameraZoomTweens.set(key, twn);
+	}
+
+	/** HostDomain 每帧查询：FlxG.camera（= camGame）的 scroll 补间是否在身（门控 followLerp）。 */
+	public static function holdsScrollTween(ps:PlayState):Bool
+	{
+		return ps.cameraScrollTweens.exists('game');
+	}
+
+	/** 脚本版「Camera Follow Pos」：把跟随点钉在 (x,y)，停止小节跟随。 */
+	public static function setCameraFollowPos(ps:PlayState, x:Float, y:Float)
+	{
+		if (ps.camFollow == null) return;
+		ps.isCameraOnForcedPos = true;
+		ps.camFollow.setPosition(x, y);
+	}
+
+	/** 解除强制跟随点，恢复小节跟随。 */
+	public static function resetCameraFollowPos(ps:PlayState)
+	{
+		ps.isCameraOnForcedPos = false;
+	}
+
+	/** 取消镜头补间：camName 为空 = 全部（重开/死亡/销毁时用），否则只取消该相机的。 */
+	public static function cancelCameraTweens(ps:PlayState, ?camName:String)
+	{
+		if (camName == null)
+		{
+			var scrollKeys:Array<String> = [];
+			for (k in ps.cameraScrollTweens.keys()) scrollKeys.push(k);
+			for (k in scrollKeys) cancelScrollTween(ps, k);
+
+			var zoomKeys:Array<String> = [];
+			for (k in ps.cameraZoomTweens.keys()) zoomKeys.push(k);
+			for (k in zoomKeys) cancelZoomTween(ps, k);
+		}
+		else
+		{
+			var key:String = cameraKeyFor(ps, camName);
+			cancelScrollTween(ps, key);
+			cancelZoomTween(ps, key);
+		}
+	}
+
+	static function cancelScrollTween(ps:PlayState, key:String)
+	{
+		var old:FlxTween = ps.cameraScrollTweens.get(key);
+		if (old != null)
+		{
+			old.cancel();
+			old.destroy();
+			ps.cameraScrollTweens.remove(key);
+		}
+	}
+
+	static function cancelZoomTween(ps:PlayState, key:String)
+	{
+		var old:FlxTween = ps.cameraZoomTweens.get(key);
+		if (old != null)
+		{
+			old.cancel();
+			old.destroy();
+			ps.cameraZoomTweens.remove(key);
+		}
+	}
+
+	/** ease 名解析（与 doTween 系列同口径）；空 = linear（FlxTween 默认）。 */
+	static function getEase(?ease:String):EaseFunction
+	{
+		if (ease == null || ease.trim().length == 0) return null;
+		return scripting.lua.LuaUtils.getTweenEaseByString(ease);
 	}
 }

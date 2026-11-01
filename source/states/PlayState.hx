@@ -168,6 +168,14 @@ class PlayState extends MusicBeatState
 	public var modchartSaves:Map<String, FlxSave> = new Map<String, FlxSave>();
 	#end
 
+	// ===== Camera Freedom Kit：镜头补间登记表（键 = 相机名 game/hud/other/自定义名）=====
+	// camGame 有 scroll 补间在身时，HostDomain 门控 followLerp（跟随插值步长为 0，与补间不打架）；
+	// 相机有 zoom 补间在身时，HostDomain 对它跳过 camZooming 衰减回落。
+	public var cameraScrollTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
+	public var cameraZoomTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
+	// HUD 缩放衰减基线（原实现写死 1，提为变量后默认值不变 = 零行为变化）
+	public var defaultHudZoom:Float = 1;
+
 	public var BF_X:Float = 770;
 	public var BF_Y:Float = 100;
 	public var DAD_X:Float = 100;
@@ -656,7 +664,7 @@ class PlayState extends MusicBeatState
 		healthLoss = ClientPrefs.getGameplaySetting('healthloss');
 		instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
 		practiceMode = ClientPrefs.getGameplaySetting('practice');
-		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
+		cpuControlled = ClientPrefs.getGameplaySetting('botplay') || backend.DebugLaunch.botplay; // --meteoric-botplay
 		usedAutoplay = cpuControlled;
 		usedGodMode = false; // 上帝模式（practice）正常记分，只是不会死
 
@@ -2579,6 +2587,9 @@ class PlayState extends MusicBeatState
 					if (t.endSoundName != null) goTheme.endSoundName = t.endSoundName;
 				});
 
+				// Camera Freedom Kit：死亡接管镜头前解除补间（GameOverSubstate 会重新 follow camGame）
+				CameraHudDomain.cancelCameraTweens(this);
+
 				// Psych 1.0.4：deathDelay > 0 时延迟打开 Game Over（Weekend 1 Blazin 用 0.15s）
 				if (GameOverSubstate.deathDelay > 0)
 				{
@@ -2612,6 +2623,14 @@ class PlayState extends MusicBeatState
 	public function moveCamera(isDad:Bool) CameraHudDomain.moveCamera(this, isDad);
 
 	public function tweenCamIn() CameraHudDomain.tweenCamIn(this);
+
+	// ===== Camera Freedom Kit：镜头控制（实现见 CameraHudDomain，HScript 可直接调用）=====
+	public function tweenCameraScroll(camName:String, x:Float, y:Float, duration:Float, ?ease:String) CameraHudDomain.tweenCameraScroll(this, camName, x, y, duration, ease);
+	public function tweenCameraZoom(camName:String, zoom:Float, duration:Float, ?ease:String) CameraHudDomain.tweenCameraZoom(this, camName, zoom, duration, ease);
+	public function setCameraFollowPos(x:Float, y:Float) CameraHudDomain.setCameraFollowPos(this, x, y);
+	public function resetCameraFollowPos() CameraHudDomain.resetCameraFollowPos(this);
+	public function cancelCameraTweens(?camName:String) CameraHudDomain.cancelCameraTweens(this, camName);
+	public function moveCameraToGF() CameraHudDomain.moveCameraToGF(this);
 
 	public function finishSong(?ignoreNoteOffset:Bool = false):Void HostDomain.finishSong(this, ignoreNoteOffset);
 
@@ -2717,6 +2736,7 @@ class PlayState extends MusicBeatState
 		if (finishTimer != null) { finishTimer.cancel(); finishTimer = null; }
 		if (songSpeedTween != null) { songSpeedTween.cancel(); songSpeedTween = null; }
 		if (cameraTwn != null) { cameraTwn.cancel(); cameraTwn = null; }
+		CameraHudDomain.cancelCameraTweens(this); // 镜头补间（Camera Freedom Kit）一并解除
 
 		// 清掉残留的倒计时贴图
 		if (countdownReady != null) { remove(countdownReady); countdownReady.destroy(); countdownReady = null; }
@@ -2847,6 +2867,7 @@ class PlayState extends MusicBeatState
 	{
 		// 清空旧的音符、事件与判定条
 		KillNotes();
+		CameraHudDomain.cancelCameraTweens(this); // 回溯重开：镜头补间解除，跟随从复位的小节重新开始
 		if (keepStrumsOnRestart)
 		{
 			// 回溯重开：判定线箭头全程在场，直接复位为静态，不重新绘制
@@ -3433,7 +3454,11 @@ class PlayState extends MusicBeatState
 		luaArray = [];
 		FunkinLua.customFunctions.clear();
 		scripting.lua.ObjectBridge.clearRegistry(); // Lua 对象桥句柄注册表随脚本一起释放
+		scripting.lua.LuaUtils.clearCustomCameras(); // 自定义相机（Camera Freedom Kit）随本局销毁
 		#end
+
+		// 镜头补间登记表（Camera Freedom Kit）随状态销毁清空
+		CameraHudDomain.cancelCameraTweens(this);
 
 		#if HSCRIPT_ALLOWED
 		for (script in hscriptArray)

@@ -289,6 +289,108 @@ class EventDomain
 					}
 				}
 
+			case 'Move Camera':
+				// Camera Freedom Kit：丝滑移镜。value1 = 目标（'dad'/'bf'/'gf'/'x,y' 舞台绝对点）；
+				// value2 = '步数,缓动'（默认 4,quadInOut；'snap' = 瞬移）。缓动名与 doTween 系列同口径。
+				// 角色目标经 moveCamera/moveCameraToGF 落点（含角色/舞台偏移，且经过可取消的 onCameraMove）。
+				var mvSpec:String = (value1 == null) ? '' : value1.trim().toLowerCase();
+				var mvX:Float = 0;
+				var mvY:Float = 0;
+				var mvResolved:Bool = false;
+				if (mvSpec.indexOf(',') != -1)
+				{
+					var mvPair:Array<String> = mvSpec.split(',');
+					var mvPx:Float = mvPair[0] != null ? Std.parseFloat(mvPair[0].trim()) : Math.NaN;
+					var mvPy:Float = mvPair[1] != null ? Std.parseFloat(mvPair[1].trim()) : Math.NaN;
+					if (!Math.isNaN(mvPx) && !Math.isNaN(mvPy))
+					{
+						mvX = mvPx; mvY = mvPy; mvResolved = true;
+					}
+				}
+				else
+				{
+					switch (mvSpec)
+					{
+						case 'gf' | 'girlfriend':
+							if (ps.gf != null)
+							{
+								ps.moveCameraToGF();
+								mvX = ps.camFollow.x; mvY = ps.camFollow.y; mvResolved = true;
+							}
+						case 'bf' | 'boyfriend':
+							ps.moveCamera(false);
+							mvX = ps.camFollow.x; mvY = ps.camFollow.y; mvResolved = true;
+						case 'dad':
+							ps.moveCamera(true);
+							mvX = ps.camFollow.x; mvY = ps.camFollow.y; mvResolved = true;
+					}
+				}
+				if (!mvResolved)
+				{
+					trace('[Move Camera] Unknown target: ' + value1);
+				}
+				else if (ps.camFollow != null)
+				{
+					var mvSteps:Float = 4;
+					var mvEase:String = 'quadInOut';
+					var mvSpec2:String = (value2 == null) ? '' : value2.trim().toLowerCase();
+					if (mvSpec2 == 'snap')
+					{
+						mvSteps = 0;
+					}
+					else if (mvSpec2 != '')
+					{
+						var mvParts:Array<String> = mvSpec2.split(',');
+						var mvS:Float = mvParts[0] != null ? Std.parseFloat(mvParts[0].trim()) : Math.NaN;
+						if (!Math.isNaN(mvS)) mvSteps = mvS;
+						if (mvParts[1] != null && mvParts[1].trim() != '') mvEase = mvParts[1].trim();
+					}
+					ps.isCameraOnForcedPos = false; // 补完恢复小节跟随（要永久钉住请改用 Camera Follow Pos）
+					ps.tweenCameraScroll('game', mvX, mvY, (Conductor.stepCrochet / 1000) * Math.max(0, mvSteps), mvEase);
+				}
+
+			case 'Set Camera Zoom':
+				// Camera Freedom Kit：直接设定镜头 zoom（区别于 Add Camera Zoom 的累加），
+				// 同时改写缩放基线（defaultCamZoom / defaultHudZoom，补完不漂移）。
+				// value1 = 目标 zoom；value2 = 'game/hud,步数,缓动'（默认 game,4,quadInOut；步数 0 = 瞬时）
+				if (flValue1 != null)
+				{
+					var szTarget:Float = flValue1;
+					var szCam:String = 'game';
+					var szSteps:Float = 4;
+					var szEase:String = 'quadInOut';
+					var szSpec:String = (value2 == null) ? '' : value2.trim().toLowerCase();
+					if (szSpec != '')
+					{
+						var szParts:Array<String> = szSpec.split(',');
+						if (szParts[0] != null && szParts[0].trim() != '') szCam = szParts[0].trim();
+						var szS:Float = szParts[1] != null ? Std.parseFloat(szParts[1].trim()) : Math.NaN;
+						if (!Math.isNaN(szS)) szSteps = szS;
+						if (szParts[2] != null && szParts[2].trim() != '') szEase = szParts[2].trim();
+					}
+					ps.tweenCameraZoom(szCam, szTarget, (Conductor.stepCrochet / 1000) * Math.max(0, szSteps), szEase);
+				}
+
+			case 'Camera Flash':
+				// Camera Freedom Kit：镜头闪光。value1 = 颜色（如 'FFFFFF'）；
+				// value2 = '步数,相机名'（默认 4,camGame）。受「闪光灯效」设置门控。
+				if (value1 != null && value1.trim() != '' && ClientPrefs.data.flashing)
+				{
+					var cfSteps:Float = 4;
+					var cfCam:String = 'camGame';
+					var cfSpec:String = (value2 == null) ? '' : value2.trim();
+					if (cfSpec != '')
+					{
+						var cfParts:Array<String> = cfSpec.split(',');
+						var cfS:Float = cfParts[0] != null ? Std.parseFloat(cfParts[0].trim()) : Math.NaN;
+						if (!Math.isNaN(cfS)) cfSteps = cfS;
+						if (cfParts[1] != null && cfParts[1].trim() != '') cfCam = cfParts[1].trim();
+					}
+					var cfCamera:FlxCamera = LuaUtils.cameraFromString(cfCam);
+					if (cfCamera != null)
+						cfCamera.flash(CoolUtil.colorFromString(value1), (Conductor.stepCrochet / 1000) * Math.max(0, cfSteps), null, true);
+				}
+
 			case 'Alt Idle Animation':
 				var char:Character = ps.dad;
 				switch(value1.toLowerCase().trim()) {

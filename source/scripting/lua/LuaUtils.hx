@@ -464,10 +464,76 @@ class LuaUtils
 		return "unknown";
 	}
 
+	// ===== Camera Freedom Kit：脚本自定义相机注册表 =====
+	// registerCamera(name) 创建的 FlxCamera 登记在此，cameraFromString 按名解析；
+	// 生命周期 = 本局 PlayState（clearCustomCameras 在 PlayState.destroy 调用）。
+	public static var customCameras:Map<String, FlxCamera> = new Map<String, FlxCamera>();
+
+	/** 按名取自定义相机（未注册返回 null）。 */
+	public static function getCustomCamera(name:String):FlxCamera
+	{
+		if (name == null) return null;
+		return customCameras.get(name.toLowerCase());
+	}
+
+	/**
+	 * 创建并注册一个自定义相机（重名幂等：返回已有实例）。
+	 * 追加到 FlxG.cameras.list 尾部 = 绘制在最上层（位于 camOther 之上）；不作为默认绘制目标。
+	 * bgColor 为空 = 全透明。宽高 <= 0 时取 FlxG.width/height。
+	 * 保留名（game/hud/other 及别名）拒绝注册，返回 null。
+	 */
+	public static function registerCamera(name:String, ?width:Int, ?height:Int, ?bgColor:Null<Int>):FlxCamera
+	{
+		if (name == null || name.trim().length == 0) return null;
+		var lower:String = name.toLowerCase();
+		switch (lower)
+		{
+			case 'game' | 'camgame' | 'hud' | 'camhud' | 'other' | 'camother':
+				return null;
+		}
+		if (customCameras.exists(lower)) return customCameras.get(lower);
+
+		var cam:FlxCamera = new FlxCamera(0, 0,
+			(width == null || width <= 0) ? FlxG.width : width,
+			(height == null || height <= 0) ? FlxG.height : height);
+		cam.bgColor = bgColor == null ? 0 : bgColor;
+		FlxG.cameras.add(cam, false);
+		customCameras.set(lower, cam);
+		return cam;
+	}
+
+	/** 注销并销毁自定义相机。 */
+	public static function removeCamera(name:String):Bool
+	{
+		if (name == null) return false;
+		var lower:String = name.toLowerCase();
+		var cam:FlxCamera = customCameras.get(lower);
+		if (cam == null) return false;
+		customCameras.remove(lower);
+		if (FlxG.cameras.list.indexOf(cam) != -1)
+			FlxG.cameras.remove(cam); // 默认 Destroy=true，无需再手动 destroy
+		return true;
+	}
+
+	/** 清空全部自定义相机（本局结束/状态销毁时调用）。 */
+	public static function clearCustomCameras():Void
+	{
+		if (customCameras == null) return;
+		var names:Array<String> = [];
+		for (n in customCameras.keys()) names.push(n);
+		for (n in names) removeCamera(n);
+	}
+
 	public static function cameraFromString(cam:String):FlxCamera {
-		switch(cam.toLowerCase()) {
-			case 'camhud' | 'hud': return PlayState.instance.camHUD;
-			case 'camother' | 'other': return PlayState.instance.camOther;
+		if (cam != null)
+		{
+			switch(cam.toLowerCase()) {
+				case 'camhud' | 'hud': return PlayState.instance.camHUD;
+				case 'camother' | 'other': return PlayState.instance.camOther;
+			}
+			// Camera Freedom Kit：先查脚本注册的自定义相机，再回落 camGame（未注册的未知串行为不变）
+			var custom:FlxCamera = getCustomCamera(cam);
+			if (custom != null) return custom;
 		}
 		return PlayState.instance.camGame;
 	}

@@ -130,6 +130,9 @@ class HostDomain
 		#end
 
 		var ret:Dynamic = ps.callOnScripts('onEndSong', null, true);
+		// ⚠ llua 语义：Lua 侧 onEndSong `return true` = 拦截结算（Psych 0.6.3 语义，映射到 Function_Stop 族）。
+		// 拦截时本函数走下方 return true 穿透返回，调用方不重试 —— 此时 endingSong/canPause 已置位，
+		// 模组脚本必须自行 restartSong 或退出，否则曲末会停留（无结算、无暂停）。这是 Psych 原有行为，勿「修复」。
 		if(ret != FunkinLua.Function_Stop && !ps.transitioning)
 		{
 			ps.playbackRate = 1;
@@ -790,7 +793,7 @@ class HostDomain
 		ps.healthLoss = ClientPrefs.getGameplaySetting('healthloss');
 		ps.instakillOnMiss = ClientPrefs.getGameplaySetting('instakill');
 		ps.practiceMode = ClientPrefs.getGameplaySetting('practice');
-		ps.cpuControlled = ClientPrefs.getGameplaySetting('botplay');
+		ps.cpuControlled = ClientPrefs.getGameplaySetting('botplay') || DebugLaunch.botplay; // --meteoric-botplay
 
 		if (ps.cpuControlled) ps.usedAutoplay = true;
 
@@ -1579,7 +1582,8 @@ class HostDomain
 		// 现改用设置档位提供的强度（0.3s / 0.5s / 0.8s），公式形状与帧率无关性均保持不变。
 		// 暂停/过场/外部接管（cameraSpeed=0）时写 0 → flixel 步长为 0，镜头钉住不动。
 		FlxG.camera.followLerp = 0;
-		if(!ps.inCutscene && !ps.paused) {
+		// Camera Freedom Kit：camGame 有 scroll 补间在身时保持 0（flixel updateFollow 步长为 0，与补间不打架）
+		if(!ps.inCutscene && !ps.paused && !CameraHudDomain.holdsScrollTween(ps)) {
 			FlxG.camera.followLerp = FlxMath.bound(elapsed * ps.cameraSmoothSpeed() * ps.cameraSpeed * ps.playbackRate / (FlxG.updateFramerate / 60), 0, 1);
 		}
 
@@ -1766,8 +1770,11 @@ class HostDomain
 
 		if (ps.camZooming)
 		{
-			FlxG.camera.zoom = FlxMath.lerp(ps.defaultCamZoom, FlxG.camera.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
-			ps.camHUD.zoom = FlxMath.lerp(1, ps.camHUD.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
+			// Camera Freedom Kit：被 zoom 补间接管的相机跳过回落（补间开始时基线已同步，补完不漂移）
+			if (!ps.cameraZoomTweens.exists('game'))
+				FlxG.camera.zoom = FlxMath.lerp(ps.defaultCamZoom, FlxG.camera.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
+			if (!ps.cameraZoomTweens.exists('hud'))
+				ps.camHUD.zoom = FlxMath.lerp(ps.defaultHudZoom, ps.camHUD.zoom, FlxMath.bound(1 - (elapsed * 3.125 * ps.camZoomingDecay * ps.playbackRate), 0, 1));
 		}
 
 		// Watch calls removed for performance
