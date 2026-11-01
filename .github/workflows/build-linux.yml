@@ -95,7 +95,9 @@ jobs:
           export NEKOPATH="$HOME/neko"
           cd /tmp/lime-full
           set -o pipefail
-          neko run.n rebuild lime linux 2>&1 | tee /tmp/ndll-build.log
+          # -64：lime 的 linux rebuild 默认 64+32 两趟，32 位趟要 gcc-multilib 且
+          # 我们只发布 64 位产物——传 -64 跳过（LinuxPlatform.rebuild 的 targetFlags）
+          neko run.n rebuild lime linux -64 2>&1 | tee /tmp/ndll-build.log
           ls -la ndll/Linux64/
           # lime 构建期按 lime.ndll 找引擎 ndll（发行包预拷的是官方 SDL2 时代的）；
           # 重建产物若叫 lime-64.ndll 则按 lime 的命名约定补拷
