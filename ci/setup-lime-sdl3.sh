@@ -171,6 +171,10 @@ else
 fi
 
 echo "==> [7/8] 拷贝发行版预编译 ndll（git 源码不含二进制 ndll；tools 处理图标/图像需要 host 版 lime.ndll）"
+# ⚠ 这些预编译 ndll 是 vanilla lime 8.2.2 的官方产物（SDL2 时代）。它们只为
+#   lime 工具链本身服务（host 侧处理图标/图像）；每个目标平台的 liblime 必须由
+#   各平台 workflow 用本 fork 源码重建覆盖——iOS 曾因漏重建整包链接到官方
+#   SDL2 库（SDL_UIKitRunApp vs SDL_RunApp 链接失败，2026-11-01）。
 if [ -d "$HAXELIB_LIME/ndll" ]; then
   cp -R "$HAXELIB_LIME/ndll/." "$LIME_DIR/ndll/"
   echo "已拷贝: $HAXELIB_LIME/ndll → $LIME_DIR/ndll/（后续 rebuild 会覆盖目标平台）"

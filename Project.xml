@@ -97,9 +97,12 @@
 	     不传 -D arm64 时本元素不生效，行为与原来完全一致（走 host 架构）。 -->
 	<architecture name="arm64" if="arm64" />
 
-	<!-- iOS：部署目标 13.0（未签名 device 构建走 CI 的 -nosign；lime 默认 13.6，显式声明防上游漂移）。
+	<!-- iOS：部署目标 15.0（未签名 device 构建走 CI 的 -nosign）。
+	     下限由新版 Xcode 决定：IPHONEOS_DEPLOYMENT_TARGET 低于 15.0 会被 Xcode 27 直接
+	     拒绝构建（"range of supported deployment target versions is 15.0 to 27.1.x"，
+	     本地实测）；CI 的 macos-14（Xcode 15）无此下限，15.0 两边通吃。
 	     iOS 图标无需按尺寸提供：lime 的 IOSPlatform 用 project.icons 自动缩放生成全套 AppIcon。 -->
-	<config:ios deployment="13.0" />
+	<config:ios deployment="15.0" />
 	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
 

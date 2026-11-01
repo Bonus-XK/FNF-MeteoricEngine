@@ -9,7 +9,11 @@
 #     共用 #if mobile 虚拟按键体系。
 # 产出「未签名 device IPA」：AltStore / Sideloadly / 爱思助手侧载时自动重签；
 # TestFlight / App Store 需要开发者账号签名 —— 账号证书问题，不是代码问题。
-# 注意：iOS 全量静态编译（无 ndll），首次冷编很慢；hxcpp 缓存命中后增量。
+# ⚠ 必须先重建 liblime.iphoneos-64.a：lime 发行包自带的预编译 iOS 库是 SDL2 时代
+#   的官方产物（SDL_UIKitRunApp / ios9 target），不重建 = 整个 app 跑在 vanilla
+#   lime 8.2.2 上（SDL2 后端、无 Meteoric 补丁），与新 Main.mm 的 SDL3 契约直接
+#   链接失败（_SDL_RunApp undefined，2026-11-01 CI/本地双复现）。
+# IOSPlatform 对 liblime 只拷贝不自动构建，缺了不会自己建。
 name: 构建 iOS (未签名 IPA)
 
 on:
@@ -67,6 +71,19 @@ jobs:
           else
             GH_PROXY="" bash ci/setup-lime-sdl3.sh
           fi
+
+      # 发行包预编译的 liblime.iphoneos-64.a 是 vanilla lime 8.2.2（SDL2 后端、
+      # ios9 target）——必须用本 fork 的 SDL3 源码重建覆盖，否则 app 等于跑在
+      # 官方 lime 上（见文件头注释）。IOSPlatform 只拷贝不自动构建。
+      # 注意：lime 8.2.2 的 rebuild 会同时编设备 arm64 与模拟器 x86_64 两个变体
+      # （command=="rebuild" 时写死双建），模拟器产物我们用不到但无法跳过。
+      - name: 重建 lime iOS 静态库（arm64 设备 + x86_64 模拟器）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          cd /tmp/lime-full
+          neko run.n rebuild lime ios
+          ls -la ndll/iPhone/
 
       # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
       - name: 恢复 hxcpp 编译缓存
