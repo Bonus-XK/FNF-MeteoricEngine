@@ -46,10 +46,10 @@ install hxp 1.3.1
 echo "==> 安装 git 依赖"
 haxelib git hscript-meteoric https://github.com/Bonus-XK/hscript-meteoric.git 2>/dev/null || \
   haxelib git hscript-meteoric https://github.com/Bonus-XK/hscript-meteoric.git
-haxelib git discord_rpc https://github.com/Aidan63/linc_discord-rpc main 2>/dev/null || \
-  haxelib git discord_rpc https://github.com/Aidan63/linc_discord-rpc
+# discord_rpc 已不再安装：引擎 7a45997（2026-10-17）整体移除 DiscordRPC，仅剩两个
+# 空回调占位（脚本契约冻结），全仓库无引用 —— 装了也进不了构建，纯 CI 下载死重。
 haxelib git linc_luajit https://github.com/superpowers04/linc_luajit main 2>/dev/null || \
   haxelib git linc_luajit https://github.com/superpowers04/linc_luajit
 
 echo "==> 依赖安装完成"
-haxelib list | grep -E "^(flixel|openfl|lime|hxcpp|SScript|hscript-meteoric|hscript|hxCodec|discord_rpc|linc_luajit|tjson)" | head -14
+haxelib list | grep -E "^(flixel|openfl|lime|hxcpp|SScript|hscript-meteoric|hscript|hxCodec|linc_luajit|tjson)" | head -13
