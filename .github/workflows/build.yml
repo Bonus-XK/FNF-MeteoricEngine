@@ -245,12 +245,24 @@ jobs:
       - name: 构建 Windows x64
         run: ./compile-windows.sh
 
+      - name: 验证 x64 exe 图标注入（.rsrc 资源段防线）
+        run: |
+          x86_64-w64-mingw32-objdump -h export/release/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
+            || { echo "错误：Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入（见 Main.hx @:buildXml）"; exit 1; }
+          echo "[verify] Meteoric.exe 含 .rsrc 图标资源段"
+
       - name: 构建 Windows x86
         run: |
           export PATH="$HOME/haxe:$HOME/neko:$PATH"
           export NEKOPATH="$HOME/neko"
           # 注意：-D key=value 必须连写（lime 分离式会把整个 "key=value" 当 key）
           haxelib run lime build windows -release -mingw -D win32build -DMINGW_DW2_SRC="$GITHUB_WORKSPACE/ci/mingw-dlls"
+
+      - name: 验证 x86 exe 图标注入（.rsrc 资源段防线）
+        run: |
+          x86_64-w64-mingw32-objdump -h export/32bit/windows/bin/Meteoric.exe | grep -q '\.rsrc' \
+            || { echo "错误：x86 Meteoric.exe 不含 .rsrc 资源段 —— 图标未注入"; exit 1; }
+          echo "[verify] x86 Meteoric.exe 含 .rsrc 图标资源段"
 
       - name: 上传 x64
         uses: actions/upload-artifact@v5
