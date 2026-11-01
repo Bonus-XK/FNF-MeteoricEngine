@@ -31,7 +31,8 @@ import flixel.input.touch.FlxTouch;
 // 并入 haxe 文件组，链接时资源表进入 exe。必须挂在 Main 上：独立空类会被
 // --dce full 丢弃（实测 4.2.5），Main 是入口模块必然生成。
 #if windows
-@:buildXml('<files id="haxe"><file name="../../../../art/icon.rc" /></files>')
+@:buildXml('<files id="haxe"><file name="../../../../art/icon.rc" /></files>
+<linker id="exe"><flag value="-Wl,-Map=ApplicationMain.map" if="mingw" /></linker>')
 #end
 class Main extends Sprite
 {
