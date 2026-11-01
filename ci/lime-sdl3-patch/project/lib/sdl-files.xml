@@ -420,9 +420,9 @@
              IME 后续按需补。X11 直链（无 DYNAMIC dlopen）。 -->
         <section if="linux">
 
-            <!-- 音频：PulseAudio + ALSA -->
+            <!-- 音频：PulseAudio + ALSA（SDL3 的 ALSA 文件保留 SDL2 时代的旧名 SDL_alsa_audio.c） -->
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/audio/pulseaudio/SDL_pulseaudio.c" />
-            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/audio/alsa/SDL_alsa.c" />
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/audio/alsa/SDL_alsa_audio.c" />
             <!-- core/linux：dbus（电源 UPower 依赖）+ evdev capabilities（手柄依赖）+ 线程优先级 -->
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_dbus.c" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/core/linux/SDL_evdev_capabilities.c" />
