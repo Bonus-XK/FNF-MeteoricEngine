@@ -1,0 +1,111 @@
+# iOS (未签名 IPA) 构建工作流 —— 可被 build.yml 编排（workflow_call），也可单独派发。
+# SDL3 lime 的 iOS 首次落地（2026-11）：
+#   - SDL 的 UIKit/CoreAudio/MFi 驱动由 ci/lime-sdl3-patch 提供：
+#     SDL_build_config.h 的 SDL_PLATFORM_IOS 覆盖段 + sdl-files.xml 的 ios 源文件段；
+#   - 应用入口走 SDL_RunApp 契约（lime 的 SDL2 时代 Main.mm 由
+#     ci/lime-sdl3-patch/templates/ios 覆盖，setup-lime-sdl3.sh 拷入）；
+#   - linc_luajit 自带 iPhone 预编译静态库（libluajit.iphoneos-64.a），无需源码编译；
+#   - hxCodec 被 VIDEOS_ALLOWED 门控自动排除（iOS 不在允许集）；触控基建与安卓
+#     共用 #if mobile 虚拟按键体系。
+# 产出「未签名 device IPA」：AltStore / Sideloadly / 爱思助手侧载时自动重签；
+# TestFlight / App Store 需要开发者账号签名 —— 账号证书问题，不是代码问题。
+# 注意：iOS 全量静态编译（无 ndll），首次冷编很慢；hxcpp 缓存命中后增量。
+name: 构建 iOS (未签名 IPA)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp-cache
+
+jobs:
+  ios:
+    name: iOS (arm64, unsigned)
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: 安装 Haxe/Neko
+        run: bash ci/setup-haxe-ci.sh
+
+      - name: 恢复 haxelib 依赖缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: $HOME/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('ci/install-deps.sh') }}
+
+      - name: 安装 haxelib 依赖
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          bash ci/install-deps.sh
+
+      - name: 恢复 SDL3 lime 源码树缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/lime-full
+          # 与 macOS 工作流分 key：iOS 只需要源码树 + 发行包 host ndll（lime 工具用），
+          # 不需要重建 macOS ndll；分 key 避免与 mac 构建互相覆盖缓存
+          key: limefull-${{ runner.os }}-ios-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**') }}
+
+      - name: 组装 SDL3 lime（缓存未命中才现场组装）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          if [ -d /tmp/lime-full/project ]; then
+            echo "==> lime-full 缓存命中，跳过组装，仅关联 dev"
+            haxelib dev lime /tmp/lime-full
+          else
+            GH_PROXY="" bash ci/setup-lime-sdl3.sh
+          fi
+
+      # key 含 lime 树哈希：lime 头文件一变，引擎 C++ 全量重编，缓存整体换代
+      - name: 恢复 hxcpp 编译缓存
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .hxcpp-cache
+          key: hxcpp-ios-v1-${{ hashFiles('ci/setup-lime-sdl3.sh', 'ci/lime-sdl3-patch/**', 'ci/install-deps.sh', 'source/**/*.hx', 'Project.xml') }}
+          restore-keys: |
+            hxcpp-ios-v1-
+
+      # 同 compile-mac.sh 的构建期指纹块（抽到 ci/refresh-gitinfo.sh 供 Linux/iOS 复用）
+      - name: 刷新 GitInfoData（FPS 显示用构建指纹）
+        run: bash ci/refresh-gitinfo.sh
+
+      # -nosign → xcodebuild CODE_SIGNING_ALLOWED=NO（IOSHelper 内建支持）
+      - name: 构建 iOS（未签名 device 构建）
+        run: |
+          export PATH="$HOME/haxe:$HOME/neko:$PATH"
+          export NEKOPATH="$HOME/neko"
+          haxelib run lime build ios -release -nosign
+
+      - name: 打包未签名 IPA（Payload/Meteoric.app）
+        run: |
+          set -e
+          APP=$(find export/release/ios/build -type d -name "Meteoric.app" | head -1)
+          [ -n "$APP" ] || { echo "错误：未找到 Meteoric.app"; find export/release/ios -name "*.app" -o -name "*.ipa" | head; exit 1; }
+          echo "[verify] .app: $APP"
+          file "$APP/Meteoric" || true
+          OUT="export/release/ios-artifact"
+          rm -rf "$OUT" && mkdir -p "$OUT/Payload"
+          cp -R "$APP" "$OUT/Payload/Meteoric.app"
+          (cd "$OUT" && zip -qry Meteoric-iOS-unsigned.ipa Payload)
+          # 防线：IPA 必须非空且主二进制存在
+          test -s "$OUT/Meteoric-iOS-unsigned.ipa" || { echo "错误：IPA 为空"; exit 1; }
+          test -x "$OUT/Payload/Meteoric.app/Meteoric" || { echo "错误：IPA 内缺主二进制"; exit 1; }
+          unzip -l "$OUT/Meteoric-iOS-unsigned.ipa" | head -8
+          ls -la "$OUT"
+
+      - name: 上传
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: meteoric-ios
+          path: export/release/ios-artifact/
+          if-no-files-found: error
+          retention-days: 14
