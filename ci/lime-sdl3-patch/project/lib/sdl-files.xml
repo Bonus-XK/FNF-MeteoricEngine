@@ -185,7 +185,7 @@
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/SDL_filesystem.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/android/SDL_sysfilesystem.c" if="android" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/cocoa/SDL_sysfilesystem.m" if="mac" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/posix/SDL_sysfsops.c" if="android || linux || mac || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/posix/SDL_sysfsops.c" if="android || linux || mac || ios || rpi" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/windows/SDL_sysfilesystem.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/filesystem/windows/SDL_sysfsops.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/gpu/SDL_gpu.c" />
@@ -234,7 +234,7 @@
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/joystick/windows/SDL_windows_gaming_input.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/joystick/windows/SDL_windowsjoystick.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/joystick/windows/SDL_xinputjoystick.c" if="windows" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/loadso/dlopen/SDL_sysloadso.c" if="android || linux || mac || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/loadso/dlopen/SDL_sysloadso.c" if="android || linux || mac || ios || rpi" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/loadso/windows/SDL_sysloadso.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/locale/SDL_locale.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/locale/android/SDL_syslocale.c" if="android" />
@@ -315,12 +315,12 @@
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/SDL_thread.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/generic/SDL_syscond.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/generic/SDL_sysrwlock.c" if="windows" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_syscond.c" if="android || linux || mac || rpi" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_sysmutex.c" if="android || linux || mac || rpi" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_sysrwlock.c" if="android || linux || mac || rpi" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_syssem.c" if="android || linux || mac || rpi" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_systhread.c" if="android || linux || mac || rpi" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_systls.c" if="android || linux || mac || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_syscond.c" if="android || linux || mac || ios || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_sysmutex.c" if="android || linux || mac || ios || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_sysrwlock.c" if="android || linux || mac || ios || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_syssem.c" if="android || linux || mac || ios || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_systhread.c" if="android || linux || mac || ios || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/pthread/SDL_systls.c" if="android || linux || mac || ios || rpi" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/windows/SDL_syscond_cv.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/windows/SDL_sysmutex.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/windows/SDL_sysrwlock_srw.c" if="windows" />
@@ -328,14 +328,14 @@
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/windows/SDL_systhread.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/thread/windows/SDL_systls.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/time/SDL_time.c" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/time/unix/SDL_systime.c" if="android || linux || mac || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/time/unix/SDL_systime.c" if="android || linux || mac || ios || rpi" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/time/windows/SDL_systime.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/timer/SDL_timer.c" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/timer/unix/SDL_systimer.c" if="android || linux || mac || rpi" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/timer/unix/SDL_systimer.c" if="android || linux || mac || ios || rpi" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/timer/windows/SDL_systimer.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/SDL_tray_utils.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/cocoa/SDL_tray.m" if="mac" />
-        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/dummy/SDL_tray.c" if="android" />
+        <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/dummy/SDL_tray.c" if="android || ios" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/tray/windows/SDL_tray.c" if="windows" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/SDL_RLEaccel.c" />
         <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/SDL_blit.c" />
@@ -483,6 +483,7 @@
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitmetalview.m" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitmodes.m" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitopengles.m" />
+            <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitpen.m" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitopenglview.m" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitvideo.m" />
             <file name="${NATIVE_TOOLKIT_PATH}/sdl/src/video/uikit/SDL_uikitview.m" />

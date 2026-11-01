@@ -713,6 +713,13 @@ typedef unsigned int uintptr_t;
 #define SDL_VIDEO_DRIVER_X11_XSCRNSAVER 1
 #define SDL_VIDEO_DRIVER_X11_XSHAPE 1
 #define SDL_VIDEO_DRIVER_X11_XSYNC 1
+/* XGetEventData/XGenericEventCookie：现代 X11（≥1.6）都支持。不定义它，
+ * SDL_x11xinput2.h 会自带一份 XGenericEventCookie 前置声明——与系统 Xlib.h
+ * 的匿名 struct typedef 冲突（typedef 出一个新 tag 的不完整类型），编译爆
+ * "conflicting types"（CI 首跑实锤）。 */
+#define SDL_VIDEO_DRIVER_X11_SUPPORTS_GENERIC_EVENTS 1
+/* XkbLookupKeysym：现代 X11 必有，键盘映射走 XKB 路径 */
+#define SDL_VIDEO_DRIVER_X11_HAS_XKBLOOKUPKEYSYM 1
 /* 摇杆：Linux evdev（udev 运行时可选不编，热插拔走 inotify 回退） */
 #undef SDL_JOYSTICK_ANDROID
 #define SDL_JOYSTICK_LINUX 1
@@ -747,6 +754,10 @@ typedef unsigned int uintptr_t;
 /* 视频：UIKit；保持默认的 GLES2 + EGL 渲染路径 */
 #undef SDL_VIDEO_DRIVER_ANDROID
 #define SDL_VIDEO_DRIVER_UIKIT 1
+/* OpenGL：EAGL（iOS 原生），不用 EGL——Apple SDK 没有 EGL 头，Android 默认段的
+ * SDL_VIDEO_OPENGL_EGL 必须关掉（同 mac 覆盖段；漏关会在 offscreen 驱动的
+ * SDL_egl_c.h 链上炸 'EGL/egl.h' file not found，2026-11-01 本地实测）。 */
+#undef SDL_VIDEO_OPENGL_EGL
 /* 摇杆：MFi（SDL3 的 mfijoystick 同时覆盖 macOS/iOS，GameController 框架由 lime iOS 模板预链） */
 #undef SDL_JOYSTICK_ANDROID
 #define SDL_JOYSTICK_MFI 1
