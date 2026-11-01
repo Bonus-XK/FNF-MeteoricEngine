@@ -21,7 +21,8 @@ env:
 jobs:
   windows:
     name: Windows (x64 + x86)
-    runs-on: macos-14
+    # macos-26：macos-14 镜像 2026-11-02 退役；mingw-w64 交叉工具链经 brew 装机即用
+    runs-on: macos-26
     timeout-minutes: 120
     steps:
       - name: 检出代码

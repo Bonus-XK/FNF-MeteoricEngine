@@ -32,7 +32,10 @@ jobs:
     # SDL3-on-iOS 观察期：失败不阻塞编排器发布（可复用 workflow 调用 job 本身
     # 不允许 continue-on-error，所以放在被调用 workflow 的 job 内部实现非阻塞）
     continue-on-error: true
-    runs-on: macos-14
+    # macos-26：macos-14 镜像 2026-11-02 退役（brownout 实锤）；选 26 而非 15 是因为
+    # project.xml 的 MACOSX_VER=26.5 需要 MacOSX26.5.sdk（macos-26 默认 Xcode 26.6 捆 SDK 26.5；
+    # macos-15 最高只有 SDK 26.2）
+    runs-on: macos-26
     timeout-minutes: 180
     steps:
       - name: 检出代码

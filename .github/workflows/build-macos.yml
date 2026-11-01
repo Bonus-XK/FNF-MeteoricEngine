@@ -20,7 +20,9 @@ env:
 jobs:
   macos:
     name: macOS (${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }})
-    runs-on: macos-14
+    # macos-26：macos-14 镜像 2026-11-02 退役；26 自带 MacOSX26.5.sdk（MACOSX_VER 所需），
+    # Rosetta 2 在 macOS 26 仍提供（x64 job 的 x86_64 Haxe 工具链依赖它）
+    runs-on: macos-26
     timeout-minutes: 120
     strategy:
       fail-fast: false
