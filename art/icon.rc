@@ -1,0 +1,4 @@
+// Windows exe 图标资源（hxcpp 经 windres 编译，工作目录 = export/*/windows/obj，
+// 故 ico 用相对 obj 的路径；本文件由 source/Main.hx 的 @:buildXml 注入构建）。
+// IDI_ICON1 是 Explorer/任务栏取图的约定资源名。
+IDI_ICON1 ICON "../../../../art/icon.ico"

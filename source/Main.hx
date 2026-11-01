@@ -25,6 +25,14 @@ import backend.PerfProbe;
 import flixel.input.touch.FlxTouch;
 #end
 
+// Windows 图标注入（交叉编译专用）：lime 的 ReplaceVistaIcon 仅 Windows 宿主运行，
+// macOS 交叉编译恒跳过 → exe 无图标。hxcpp 的 mingw 工具链原生支持 .rc 资源
+// （HXCPP_MINGW_RC_EXE=windres），@:buildXml 把 art/icon.rc（引用同目录 icon.ico）
+// 并入 haxe 文件组，链接时资源表进入 exe。必须挂在 Main 上：独立空类会被
+// --dce full 丢弃（实测 4.2.5），Main 是入口模块必然生成。
+#if windows
+@:buildXml('<files id="haxe"><file name="../../../../art/icon.rc" /></files>')
+#end
 class Main extends Sprite
 {
 	var game = {
