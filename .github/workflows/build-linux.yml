@@ -23,9 +23,7 @@ env:
 jobs:
   linux:
     name: Linux (x86_64)
-    # SDL3-on-Linux 观察期：失败不阻塞编排器发布（可复用 workflow 调用 job 本身
-    # 不允许 continue-on-error，所以放在被调用 workflow 的 job 内部实现非阻塞）
-    continue-on-error: true
+    # 2026-11-02 转正：移入编排器 release.needs，成为发布阻塞端（观察期结束）
     # 钉 24.04：ubuntu-latest 正在滚动迁移到 26（job 注解实锤），gcc 大版本跳变
     # 会让 vendored C 库成片炸；Linux 原生编译对宿主工具链最敏感，钉住。
     runs-on: ubuntu-24.04

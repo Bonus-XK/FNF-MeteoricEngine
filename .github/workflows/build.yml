@@ -59,10 +59,9 @@ jobs:
     uses: ./.github/workflows/build-macos.yml
     secrets: inherit
 
-  # ---------- SDL3 移植观察期新增端（非阻塞） ----------
-  # 失败不影响发布（continue-on-error 写在子 workflow 的 job 内——可复用 workflow
-  # 调用 job 不允许 continue-on-error，放这里会让 GitHub 把整个 job 当普通 job
-  # 解析而拒绝整个编排器）；红了的排查入口 = 对应 workflow 单独派发跑一遍看日志。
+  # ---------- Linux / iOS（2026-11-02 转正） ----------
+  # SDL3 移植观察期结束：两端连续绿灯且产物已随 v1.2.0-20261102-0728 发布，
+  # 现为发布阻塞端（continue-on-error 已随转正移除）。
   linux:
     name: Linux (x86_64)
     uses: ./.github/workflows/build-linux.yml
@@ -74,11 +73,10 @@ jobs:
     secrets: inherit
 
   # ---------- 发布 Pre-release ----------
-  # 三个已验证平台全部成功后自动创建 GitHub Pre-release（PR 不发布）；
-  # Linux / iOS 产物存在才附带发布（可选端）。
+  # 五个平台全部成功后自动创建 GitHub Pre-release（PR 不发布）。
   release:
     name: 发布 Pre-release
-    needs: [android, windows, macos]
+    needs: [android, windows, macos, linux, ios]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -115,20 +113,9 @@ jobs:
           test -f release-artifacts/meteoric-windows-x86/Meteoric.exe
           test -d release-artifacts/meteoric-macos-x64/Meteoric.app
           test -d release-artifacts/meteoric-macos-arm64/Meteoric.app
-          echo "五端产物齐全 ✓"
-          # Linux / iOS 可选端：存在才校验（观察期）
-          if [ -d release-artifacts/meteoric-linux-x64 ]; then
-            test -f release-artifacts/meteoric-linux-x64/Meteoric-Linux-x64.tar.gz
-            echo "Linux x86_64 产物已就位 ✓"
-          else
-            echo "（本 run 无 Linux 产物 —— Linux job 可能未通过）"
-          fi
-          if [ -d release-artifacts/meteoric-ios ]; then
-            test -f release-artifacts/meteoric-ios/Meteoric-iOS-unsigned.ipa
-            echo "iOS 未签名 IPA 产物已就位 ✓"
-          else
-            echo "（本 run 无 iOS 产物 —— iOS job 可能未通过）"
-          fi
+          test -f release-artifacts/meteoric-linux-x64/Meteoric-Linux-x64.tar.gz
+          test -f release-artifacts/meteoric-ios/Meteoric-iOS-unsigned.ipa
+          echo "七端产物齐全 ✓"
 
       - name: 打包产物（zip/apk 单文件；自标识命名 <平台>-<版本>）
         run: |
@@ -139,13 +126,8 @@ jobs:
           (cd release-artifacts/meteoric-windows-x86 && zip -qry "../../dist/Meteoric-Windows-x86-$VERSION.zip" .)
           (cd release-artifacts/meteoric-macos-x64 && zip -qry "../../dist/Meteoric-macOS-x86_64-$VERSION.zip" Meteoric.app)
           (cd release-artifacts/meteoric-macos-arm64 && zip -qry "../../dist/Meteoric-macOS-arm64-$VERSION.zip" Meteoric.app)
-          # Linux / iOS 可选端：存在才打包
-          if [ -f release-artifacts/meteoric-linux-x64/Meteoric-Linux-x64.tar.gz ]; then
-            cp release-artifacts/meteoric-linux-x64/Meteoric-Linux-x64.tar.gz "dist/Meteoric-Linux-x64-$VERSION.tar.gz"
-          fi
-          if [ -f release-artifacts/meteoric-ios/Meteoric-iOS-unsigned.ipa ]; then
-            cp release-artifacts/meteoric-ios/Meteoric-iOS-unsigned.ipa "dist/Meteoric-iOS-unsigned-$VERSION.ipa"
-          fi
+          cp release-artifacts/meteoric-linux-x64/Meteoric-Linux-x64.tar.gz "dist/Meteoric-Linux-x64-$VERSION.tar.gz"
+          cp release-artifacts/meteoric-ios/Meteoric-iOS-unsigned.ipa "dist/Meteoric-iOS-unsigned-$VERSION.ipa"
           # SHA256 校验和（Seiun 式自校验发布：用户下载后可核对完整性）
           (cd dist && sha256sum $(ls | grep -v '^SHA256SUMS\.txt$') > SHA256SUMS.txt)
           ls -la dist/
@@ -157,17 +139,15 @@ jobs:
           gh release delete "v$VERSION" --yes --cleanup-tag 2>/dev/null || true
           # 中国镜像留桩：建好 Gitee 镜像仓 / 加速域名后，在此向说明追加镜像链接
           # （参照 Seiun 的 append-mirror-links composite action 做法）。
-          # 平台清单动态生成（Linux / iOS 可选端，产物存在才列出）
+          # 平台清单（五端全为发布阻塞端）
           NOTES=/tmp/release-notes.md
           {
             printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n'
             printf -- '- Windows x64 / Windows x86（zip，解压即用）\n'
             printf -- '- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n'
             printf -- '- Android arm64（APK）\n'
-            [ -f "dist/Meteoric-Linux-x64-$VERSION.tar.gz" ] && \
-              printf -- '- Linux x86_64（tar.gz，解压后运行 bin/Meteoric；视频支持暂缺）\n'
-            [ -f "dist/Meteoric-iOS-unsigned-$VERSION.ipa" ] && \
-              printf -- '- iOS（未签名 IPA，AltStore/Sideloadly 侧载自动重签）\n'
+            printf -- '- Linux x86_64（tar.gz，解压后运行 bin/Meteoric；视频支持暂缺）\n'
+            printf -- '- iOS（未签名 IPA，AltStore/Sideloadly 侧载自动重签）\n'
             printf '\nSHA256 见 SHA256SUMS.txt\n\n构建信息：commit %s · run %s/%s\n' \
               "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}"
           } > "$NOTES"
