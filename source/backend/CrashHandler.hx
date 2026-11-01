@@ -40,7 +40,9 @@ typedef LogEntry =
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
-#include <mach-o/dyld.h>
+#if defined(__APPLE__)
+	#include <mach-o/dyld.h> // macOS 专属：_dyld_get_image_header 取主可执行 Mach-O 头
+#endif
 #include <stdint.h>
 #include <dlfcn.h>
 #include <sys/ucontext.h>
@@ -147,10 +149,20 @@ static void meteoric_native_sig_handler(int sig, siginfo_t* si, void* uctx) {
 	bl += snprintf(body + bl, sizeof(body) - bl, "信号       : %d (%s)\\n", sig, sigName);
 	bl += snprintf(body + bl, sizeof(body) - bl, "PC/SP/FP   : 0x%llx / 0x%llx / 0x%llx\\n",
 		(unsigned long long)pc, (unsigned long long)sp, (unsigned long long)fp);
-	// 进程加载基址（主可执行文件的 Mach-O 头）：配合 atos 可以把报告里的
-	// 运行时地址换算成「文件偏移」，从而解析出函数名（ASLR 每次启动不同，必须记录）。
+	// 进程加载基址：配合符号化工具把报告里的运行时地址换算成「文件偏移」，
+	// 从而解析出函数名（ASLR 每次启动不同，必须记录）。
+	// macOS = 主可执行文件的 Mach-O 头（配 atos）；Android/Linux = 本编译单元
+	// 所在共享库的加载基址（配 llvm-symbolizer），dladdr 语义两平台一致。
+	#if defined(__APPLE__)
+	uintptr_t meteoricLoadBase = (uintptr_t)_dyld_get_image_header(0);
+	#else
+	Dl_info meteoricDlb;
+	uintptr_t meteoricLoadBase = 0;
+	if (dladdr((void*)(uintptr_t)&meteoric_os_cstr, &meteoricDlb) && meteoricDlb.dli_fbase)
+		meteoricLoadBase = (uintptr_t)meteoricDlb.dli_fbase;
+	#endif
 	bl += snprintf(body + bl, sizeof(body) - bl, "加载基址   : 0x%llx\\n",
-		(unsigned long long)(uintptr_t)_dyld_get_image_header(0));
+		(unsigned long long)meteoricLoadBase);
 	if (stage && stage[0])
 		bl += snprintf(body + bl, sizeof(body) - bl, "最后阶段   : %.300s\\n", stage);
 	else
