@@ -265,6 +265,16 @@ class MeteoricProfile
 		}
 	}
 
+	// ===================== 【全界面帧拍】 =====================
+	// [PROFILE] 行只在 PlayState.update 驱动时落盘，菜单/子状态没有数据。frameTick
+	// 由 FPS.__enterFrame 每帧调用（全部状态都会走），这里带独立累加器，每 1s 落一行
+	// [PROFILE-FRAME]（含当前状态类名 + GC 池读数）—— 任何界面都能做帧耗时/分配速率 A/B。
+	static var _fmAcc:Float = 0;
+	static var _fmN:Int = 0;
+	static var _fmMax:Float = 0;
+	static var _fmLastLog:Float = 0;
+	static var _fmLastState:String = null;
+
 	public static inline function frameTick():Void
 	{
 		var t:Float = tick();
@@ -276,6 +286,35 @@ class MeteoricProfile
 			var ms:Float = d * 1000;
 			_fSamples.push(ms);
 			_fBuckets[_fBucketOf(ms)]++;
+
+			// —— 全界面帧拍累加（独立于 end() 重置的 _fAcc）——
+			_fmAcc += d;
+			_fmN++;
+			if (d > _fmMax) _fmMax = d;
+			if (t - _fmLastLog >= 1.0)
+			{
+				var st:String = (FlxG.state != null) ? Type.getClassName(Type.getClass(FlxG.state)) : '?';
+				// 状态切换瞬间把上一步积累归到新状态名会误导：状态名与上次不同时丢弃本窗口
+				if (st == _fmLastState && _fmN > 0)
+				{
+					var sb:StringBuf = new StringBuf();
+					sb.add('[PROFILE-FRAME] ' + st
+						+ ' frame_avg=' + Math.round(_fmAcc / _fmN * 1000000) + 'us'
+						+ ' frame_max=' + Math.round(_fmMax * 1000000) + 'us'
+						+ ' n=' + _fmN);
+					#if cpp
+					try { sb.add(' mem=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT) / 1048576) + 'mb'); } catch (e:Dynamic) {}
+					try { sb.add(' memR=' + Std.int(cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED) / 1048576) + 'mb'); } catch (e:Dynamic) {}
+					#end
+					var rss:Float = PerfProbe.processRSS();
+					if (rss >= 0) sb.add(' ram=' + Std.int(rss) + 'mb');
+					trace(sb.toString());
+					logToFile(sb.toString());
+				}
+				_fmLastState = st;
+				_fmAcc = 0; _fmN = 0; _fmMax = 0;
+				_fmLastLog = t;
+			}
 		}
 		_frameStart = t;
 	}
