@@ -228,6 +228,14 @@ class PlayState extends MusicBeatState
 	var _ssCamForced:Bool = false;
 	var _ssReady:Bool = false;
 	var _ssEpoch:Int = -1;
+	// 【性能】cameraX/cameraY/botPlay 的脚本侧值去重缓存（去重逻辑在 HostDomain.update，
+	// 与上方 _ss* 同一套 epoch 机制联动：epoch 变化 → _ssCamInit 复位 → 全量重推一次）
+	var _ssCamX:Float = 0;
+	var _ssCamY:Float = 0;
+	var _ssBot:Bool = false;
+	var _ssCamInit:Bool = false;
+	// 【性能】时间文字整秒缓存：秒数未变时不重建字符串/不赋值（HostDomain.update）
+	var _lastTimeSec:Int = -999999;
 
 	// 结算拆卸锁（Meteoric Fix 续）：endSong 拆卸人物/判定线后置位；
 	// update() 立即早退（结算转场/关闭回调的窗口期 PlayState 仍会被驱动，
@@ -2485,7 +2493,8 @@ class PlayState extends MusicBeatState
 		// Render Mode 抓帧（内部按 targetFPS 节流）。放在 update 末尾是刻意的：
 		// Flixel 的绘制发生在 ENTER_FRAME 的 update 之后，所以此刻帧缓冲里是**上一帧**
 		// 已完成的画面 —— 恒定滞后一帧（60fps 下 16ms），音画对齐见 VideoRecorder.start 注释。
-		backend.VideoRecorder.update(haxe.Timer.stamp());
+		// 【性能】时间戳改由 VideoRecorder 内部在通过录制守卫后才取：未录制时不做 syscall。
+		backend.VideoRecorder.update();
 	}
 
 	@:noCompletion public function meteoSuper_update(elapsed:Float) return super.update(elapsed);

@@ -1462,6 +1462,10 @@ class HostDomain
 	static var _gcBreathLast:Float = 0;
 
 	static var _xkLastPos:Float = -1;
+	// 【性能】onUpdate/onUpdatePost 每帧派发共用参数数组：[elapsed] 字面量是逐帧分配点
+	//（高帧率下持续喂 GC）。数组只在调用链内被解包传参，Lua/HScript 收到的是元素值、
+	// 不持有数组引用；派发是同步串行的，复用无重入风险。
+	static var _updArgs:Array<Dynamic> = [0.0];
 	public static function update(ps:PlayState, elapsed:Float)
 	{
 		#if METEORIC_PROFILE
@@ -1501,7 +1505,8 @@ class HostDomain
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseBegin('scriptOnUpdate');
 		#end
-		ps.callOnScripts('onUpdate', [elapsed]);
+		_updArgs[0] = elapsed;
+		ps.callOnScripts('onUpdate', _updArgs);
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseEnd('scriptOnUpdate');
 		#end
@@ -1671,6 +1676,7 @@ class HostDomain
 		{
 			ps._ssReady = true;
 			ps._ssEpoch = ps.scriptEpoch;
+			ps._ssCamInit = false; // 新脚本/重载后 cameraX/Y/botPlay 也走一次全量重推
 			ps._ssCDecStep = ps.curDecStep;
 			ps._ssCDecBeat = ps.curDecBeat;
 			ps._ssHealth = ps.health;
@@ -1756,7 +1762,16 @@ class HostDomain
 			if(secondsTotal < 0) secondsTotal = 0;
 
 			if(ClientPrefs.data.timeBarType != '歌曲名称')
-				ps.timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
+			{
+				// 【性能】剩余/已过时间按整秒变化：秒数不变时跳过字符串构建与 TextField 赋值
+				//（此前是每帧一次 formatTime 分配，高帧率下持续的 GC 喂食点）。
+				// 显示结果与逐帧赋值完全一致（OpenFL 同值赋本就无重排版，这里连字符串都不再建）。
+				if (secondsTotal != ps._lastTimeSec)
+				{
+					ps._lastTimeSec = secondsTotal;
+					ps.timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
+				}
+			}
 		}
 
 		// 歌曲收尾兜底：音乐 onComplete（空音频/流式音频可能永不触发）与"歌曲位置越过时长"
@@ -2028,13 +2043,33 @@ class HostDomain
 		}
 		#end
 
-		ps.setOnScripts('cameraX', ps.camFollow.x);
-		ps.setOnScripts('cameraY', ps.camFollow.y);
+		// 【性能】cameraX/cameraY/botPlay 走值去重（与上方 _ss 块同思路）：镜头 lerp 收敛后
+		// 这些值逐帧恒定，重复 set 是纯动态调用开销。脚本加载（scriptEpoch 变化）时经
+		// _ssCamInit=false 在上方重置分支全量重推，新脚本首次读取仍能拿到当前值。
+		if (!ps._ssCamInit)
+		{
+			ps._ssCamInit = true;
+			ps._ssCamX = ps.camFollow.x;
+			ps._ssCamY = ps.camFollow.y;
+			ps._ssBot = ps.cpuControlled;
+			ps.setOnScripts('cameraX', ps.camFollow.x);
+			ps.setOnScripts('cameraY', ps.camFollow.y);
+			ps.setOnScripts('botPlay', ps.cpuControlled);
+		}
+		else
+		{
+			var camX:Float = ps.camFollow.x;
+			if (camX != ps._ssCamX) { ps._ssCamX = camX; ps.setOnScripts('cameraX', camX); }
+			var camY:Float = ps.camFollow.y;
+			if (camY != ps._ssCamY) { ps._ssCamY = camY; ps.setOnScripts('cameraY', camY); }
+			if (ps.cpuControlled != ps._ssBot) { ps._ssBot = ps.cpuControlled; ps.setOnScripts('botPlay', ps.cpuControlled); }
+		}
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseBegin('scriptOnUpdatePost');
 		#end
 		ps.setOnScripts('botPlay', ps.cpuControlled);
-		ps.callOnScripts('onUpdatePost', [elapsed]);
+		_updArgs[0] = elapsed;
+		ps.callOnScripts('onUpdatePost', _updArgs);
 		#if METEORIC_PROFILE
 		backend.MeteoricProfile.phaseEnd('scriptOnUpdatePost');
 		#end

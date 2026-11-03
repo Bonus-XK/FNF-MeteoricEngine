@@ -339,13 +339,18 @@ class Scripting
 		}
 	}
 
+	// 【性能】状态/子状态每帧 'update' 派发共用参数数组：[elapsed] 字面量是逐帧分配点。
+	// 派发同步串行、脚本只收到元素值不持有数组引用，复用无重入风险。
+	static var _stateUpdArgs:Array<Dynamic> = [0.0];
+
 	/** 状态每帧更新。 */
 	@:keep
 	public static function onStateUpdate(state:MusicBeatState, elapsed:Float):Void
 	{
 		if (!stateScriptsEnabled()) return;
 		if (state == null || state.scriptingGroup == null) return;
-		state.scriptingGroup.call('update', [elapsed]);
+		_stateUpdArgs[0] = elapsed;
+		state.scriptingGroup.call('update', _stateUpdArgs);
 	}
 
 	/** 子状态每帧更新。 */
@@ -354,7 +359,8 @@ class Scripting
 	{
 		if (!stateScriptsEnabled()) return;
 		if (state == null || state.scriptingGroup == null) return;
-		state.scriptingGroup.call('update', [elapsed]);
+		_stateUpdArgs[0] = elapsed;
+		state.scriptingGroup.call('update', _stateUpdArgs);
 	}
 
 	/** 状态销毁：脚本收 destroy 回调。 */

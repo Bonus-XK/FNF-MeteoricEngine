@@ -661,12 +661,14 @@ class VideoRecorder
 	/**
 	 * 每帧调用。内部按 targetFPS 节流 —— 游戏跑 600+fps 时不能真的每秒抓 600 帧，
 	 * 既拖慢自己也会让 ffmpeg 侧堆积。
-	 * @param now 由 haxe.Timer.stamp() 取的当前秒数
+	 * @param now 当前秒数（haxe.Timer.stamp() 口径）。省略时在**通过录制守卫后**才取 ——
+	 *            未录制时调用方每帧传入 haxe.Timer.stamp() 是一次无谓的 syscall。
 	 */
-	public static function update(now:Float):Void
+	public static function update(?now:Float):Void
 	{
 		#if (sys && !android)
 		if (!isRecording || stdinOut == null) return;
+		if (now == null) now = haxe.Timer.stamp();
 		if (now < nextFrameAt) return;
 		// 落后太多（卡帧）就重置基准，避免「补帧风暴」瞬间抓几十帧
 		if (now - nextFrameAt > frameInterval * 4) nextFrameAt = now;

@@ -145,9 +145,11 @@ class MusicBeatState extends FlxUIState
 
 		if(FlxG.save.data != null) FlxG.save.data.fullscreen = FlxG.fullscreen;
 		
-		stagesFunc(function(stage:BaseStage) {
-			stage.update(elapsed);
-		});
+		// 【性能】内联展开 stagesFunc：本方法每帧调用，闭包捕获 elapsed 会逐帧分配
+		//（高帧率下是纯 GC 喂食）。循环守卫与 stagesFunc 完全一致，语义不变。
+		for (stage in stages)
+			if (stage != null && stage.exists && stage.active)
+				stage.update(elapsed);
 
 		super.update(elapsed);
 
