@@ -62,6 +62,9 @@ class FreeplayState extends MusicBeatState
 	var lerpRating:Float = 0;
 	var intendedScore:Float = 0; // Int64 分数在 lerp 动画边界转 Float（Double 精确到 2^53）
 	var intendedRating:Float = 0;
+	// 【性能】分数/准确率文字重建缓存（update 里只在数值变化时才重建文本）
+	var _lastScoreShown:Float = -1;
+	var _lastRatingShown:Float = -1;
 
 	var grpSongs:FlxTypedGroup<Alphabet>;
 	var iconArray:Array<HealthIcon> = [];
@@ -466,17 +469,28 @@ class FreeplayState extends MusicBeatState
 		if (Math.abs(lerpRating - intendedRating) <= 0.01)
 			lerpRating = intendedRating;
 
-		var ratingSplit:Array<String> = Std.string(CoolUtil.floorDecimal(lerpRating * 100, 2)).split('.');
-		if(ratingSplit.length < 2) { //No decimals, add an empty space
-			ratingSplit.push('');
+		// 【性能】分数/准确率文字只在数值变化时重建：原实现每帧做 split/while 补零/join
+		// + 两次字符串拼接赋值，是菜单态最集中的 GC 喂食点（静止时数值恒定 → 完全跳过）。
+		// 文本内容与原逐帧重建逐字一致；语言切换会重建本状态，缓存随实例失效，无脏读。
+		if (lerpScore != _lastScoreShown)
+		{
+			_lastScoreShown = lerpScore;
+			scoreText.text = Lang.tOr('freeplay.bestScore', '历史最高分：') + lerpScore;
 		}
+		if (lerpRating != _lastRatingShown)
+		{
+			_lastRatingShown = lerpRating;
+			var ratingSplit:Array<String> = Std.string(CoolUtil.floorDecimal(lerpRating * 100, 2)).split('.');
+			if(ratingSplit.length < 2) { //No decimals, add an empty space
+				ratingSplit.push('');
+			}
 
-		while(ratingSplit[1].length < 2) { //Less than 2 decimals in it, add decimals then
-			ratingSplit[1] += '0';
+			while(ratingSplit[1].length < 2) { //Less than 2 decimals in it, add decimals then
+				ratingSplit[1] += '0';
+			}
+
+			ratingText.text = Lang.tOr('freeplay.accuracy', '准确率：') + ratingSplit.join('.') + '%';
 		}
-
-		scoreText.text = Lang.tOr('freeplay.bestScore', '历史最高分：') + lerpScore;
-		ratingText.text = Lang.tOr('freeplay.accuracy', '准确率：') + ratingSplit.join('.') + '%';
 
 		updateTexts(elapsed);
 
@@ -946,7 +960,7 @@ class FreeplayState extends MusicBeatState
 			grpSongs.members[i].visible = grpSongs.members[i].active = false;
 			iconArray[i].visible = iconArray[i].active = false;
 		}
-		_lastVisibles = [];
+		_lastVisibles.resize(0); // 【性能】原 `= []` 每帧新建数组；resize(0) 清空复用容量，零分配
 
 		var min:Int = Math.round(Math.max(0, Math.min(songs.length, lerpSelected - DRAW_DISTANCE)));
 		var max:Int = Math.round(Math.max(0, Math.min(songs.length, lerpSelected + DRAW_DISTANCE)));
