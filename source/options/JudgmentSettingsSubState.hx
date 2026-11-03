@@ -81,6 +81,12 @@ class JudgmentSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('毫秒加权准确率',
+			'开启后，准确率权重按实际毫秒偏差在判定档位间连续插值：正中 1.0，贴边降到下一档锚点（Sick→Good→Bad→Shit）。\n关闭时回到离散锚点权重（Sick=1 / Good=0.67 / Bad=0.34 / Shit=0），与旧版逐位一致。\n旧回放文件不受此开关影响，永远按录制时口径复现。',
+			'msWeightedAccuracy',
+			'bool');
+		addOption(option);
+
 		var option:Option = new Option('Phigros 式评级',
 			'只把**评级**换成 Phigros 的档位：φ / V（全连）/ S / A / B / C / F，分档依据是准确率。\n'
 			+ '准确率 =（Sick/Marvelous + Good×0.65）÷ 谱面音符总数。\n'

@@ -3,11 +3,13 @@ package substates;
 import backend.BackupFormat;
 import backend.ClientPrefs;
 import backend.Controls;
+import backend.CustomFadeTransition;
 import backend.Lang;
 import backend.CoolUtil;
 import backend.DesignTokens;
 import backend.SaveMover;
 import backend.WheelScroll;
+import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -121,6 +123,14 @@ class BackupSubState extends MusicBeatSubstate
 	override function create()
 	{
 		super.create();
+
+		// 进场转场：基类 MusicBeatSubstate.create 不挂转场层，而本页经
+		// MusicBeatState.switchState 当**顶层界面**切换（唯一入口 OptionsState.enterBackupScreen），
+		// 不补挂的话出曲方向的淡出没有对应的进场淡入。逻辑与 MusicBeatState.create 同款：
+		// skipNextTransOut 是引擎级「下一次跳过进场转场」标志，读取后必须复位。
+		var skip:Bool = FlxTransitionableState.skipNextTransOut;
+		if (!skip) openSubState(new CustomFadeTransition(0.7, true));
+		FlxTransitionableState.skipNextTransOut = false;
 
 		// 主题色变更 → 开关轨道（像素图）必须原地重绘，否则换主题后开关还是旧色。
 		// DesignTokens 的监听表是静态的，契约要求 destroy 里摘除。
@@ -370,7 +380,9 @@ class BackupSubState extends MusicBeatSubstate
 		FlxG.sound.play(Paths.sound('cancelMenu'), 0.6);
 		if (musicWasPlaying && FlxG.sound.music != null) FlxG.sound.music.play();
 		options.OptionsState.onPlayState = false;
-		FlxG.switchState(new options.OptionsState());
+		// 统一走 MusicBeatState.switchState（与入口对称，淡入淡出样式下黑场衔接）；
+		// 进场转场见下方 create() 里补挂的那段说明。
+		MusicBeatState.switchState(new options.OptionsState());
 	}
 
 	/** 行的固定命中区域：整行整宽（不依赖文本宽度），点击/悬停永远对得上。 */

@@ -454,6 +454,8 @@ class Note extends FlxSprite
 	public var rating:String = 'unknown';
 	public var ratingMod:Float = 0; //9 = unknown, 0.25 = shit, 0.5 = bad, 0.75 = good, 1 = sick
 	public var ratingDisabled:Bool = false;
+	// 归一化 |ms 偏差|（msWeightedAccuracy 插值用，与现行判定器同源口径）；-1 = 无有效偏差（旧回放文件无 ms 字段）
+	public var judgedDiff:Float = -1;
 
 	public var texture(default, set):String = null;
 

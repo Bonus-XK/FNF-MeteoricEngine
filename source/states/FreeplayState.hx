@@ -65,6 +65,7 @@ class FreeplayState extends MusicBeatState
 
 	var grpSongs:FlxTypedGroup<Alphabet>;
 	var iconArray:Array<HealthIcon> = [];
+	var iconBumpTween:FlxTween; // 切歌时选中图标弹跳（放大→弹回原尺寸）
 	var lerpSelected:Float = 0;
 	var _lastVisibles:Array<Int> = [];
 
@@ -385,6 +386,11 @@ class FreeplayState extends MusicBeatState
 		fly(diffText);
 		fly(bottomPanel);
 		fly(bottomHint);
+
+		// 飞散同时把整屏压向黑：0.16s（与调用方的切换定时器严格对齐，切屏瞬间恰好全黑）。
+		// 之前只飞元素、歌曲色背景满屏不动，随后整屏瞬变成加载界面 —— 色块跳变，观感生硬。
+		// 压黑后衔接：飞散 → 全黑 → LoadingState 黑幕淡出浮现（LoadingState.create 尾部）。
+		FlxG.camera.fade(FlxColor.BLACK, 0.16, false, null, true);
 	}
 
 	function makePanel(x:Float, y:Float, w:Float, h:Float, ?radius:Float = 20, ?fill:Null<Int> = null, ?border:Null<Int> = null):FlxSprite
@@ -770,6 +776,8 @@ class FreeplayState extends MusicBeatState
 			{
 				if(!LoadingState.loadSongAndSwitchState(new PlayState(), songLowercase, poop, songLowercase, true, new FreeplayState()))
 				{
+					// 切换失败：出场 fade 已把整屏压黑，先反向淡出恢复可见，再显示错误提示
+					FlxG.camera.fade(FlxColor.BLACK, 0.25, true, null, true);
 					missingText.text = Lang.tOr('freeplay.missingChart', '在加载铺面文件时出错：\n缺失的文件：data/') + songLowercase + '/' + poop;
 					missingText.screenCenter(Y);
 					missingText.visible = true;
@@ -1037,6 +1045,16 @@ class FreeplayState extends MusicBeatState
 			iconArray[i].alpha = 0.6;
 		}
 		iconArray[curSelected].alpha = 1;
+
+		// 选中图标弹跳：放大后弹回（普切歌曲的"落到这首歌"反馈）。
+		// 快速滚动（instant）跳过——连续 tween 会被下一格 cancel，纯开销（与 bg.color instant 分支同理）。
+		if (!instant && iconArray[curSelected] != null)
+		{
+			var bumpIcon:HealthIcon = iconArray[curSelected];
+			if (iconBumpTween != null) iconBumpTween.cancel();
+			bumpIcon.scale.set(1.18, 1.18);
+			iconBumpTween = FlxTween.tween(bumpIcon.scale, {x: 1, y: 1}, 0.2, {ease: FlxEase.quadOut});
+		}
 
 		for (item in grpSongs.members)
 		{

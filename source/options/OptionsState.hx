@@ -734,22 +734,21 @@ class OptionsState extends MusicBeatState
 
 	#if desktop
 	/**
-	 * 【容器界面入口 · 唯一入口】从设置进入「容器」管理页。
+	 * 【容器界面入口 · 唯一入口】从设置进入「备份」管理页。
 	 *
-	 * 为什么单独抽成入口函数、而不是就地 `MusicBeatState.switchState(...)`：
-	 *   `MusicBeatState.switchState()` 会先挂 `CustomFadeTransition(0.6,false)` 出场转场，
-	 *   而转场层在**新状态 create() 完成之前**屏上是空的（`FlxGame.switchState()`：
-	 *   cameras.reset() → bitmap.clearCache() → 旧状态 destroy() → 新状态 create()），
-	 *   玩家看到的就是「先黑一下，容器界面再跳出来」。容器页自带整屏不透明背景（menuDesat），
-	 *   并不需要出场转场遮丑；进曲那条路（`LoadingState.loadAndSwitchState`）同理。
+	 * 历史：这里曾用 `FlxG.switchState()` 硬切 —— 当初是为了规避「转场层空窗」：
+	 * `MusicBeatState.switchState()` 的出场转场挂在旧状态上，旧状态 destroy 到新状态
+	 * create 完成之间屏幕裸奔（`FlxGame.switchState()`：cameras.reset() → bitmap.clearCache()
+	 * → 旧状态 destroy() → 新状态 create()），横幅类样式下观感是「先黑一下再跳出来」。
 	 *
-	 * 做法：用 `FlxG.switchState()` 直接换状态，**不再挂出场转场** ⇒ 不存在"转场层空窗"。
-	 * ⚠ 若以后要恢复转场：不要只把这一行换回 `MusicBeatState.switchState`，那正是本次要修的症状。
+	 * 2026-11-03 起「淡入淡出」样式（CustomFadeTransition.MODE_FADE，默认）用全屏黑幕
+	 * 衔接两个界面，空窗期落在全黑里不可见 —— 硬切特判不再必要，统一切换路径恢复平滑过渡。
+	 * 横幅类样式（移动/陨星/星辉）下空窗与其它切换点一致，不再是本页独有的更差观感。
 	 */
 	function enterBackupScreen():Void
 	{
 		OptionsState.onPlayState = false;
-		FlxG.switchState(new substates.BackupSubState());
+		MusicBeatState.switchState(new substates.BackupSubState());
 	}
 
 	function enterContainersMenu():Void
@@ -759,12 +758,9 @@ class OptionsState extends MusicBeatState
 		// roster[i].label 是**已翻译**的，硬编码中文在英文界面下匹配不上，
 		// 返回设置页时会掉回第一个分区。
 		pendingSelectLabel = Lang.tOr('options.category.containers', '容器');
-		// ① 明确要求"这次不要入场转场"：`MusicBeatState.create()` 里是
-		//    `if(!skip) openSubState(new CustomFadeTransition(0.7, true))`，
-		//    而 `skip` 取自 `FlxTransitionableState.skipNextTransOut`（引擎自带开关）。
-		FlxTransitionableState.skipNextTransOut = true;
-		// ② 直接换状态：不进 `MusicBeatState.startTransition`（那会挂出场转场 → 空窗黑屏）
-		FlxG.switchState(new states.ContainersMenuState());
+		// 统一走 MusicBeatState.switchState：出场转场 + 设置页 create() 里的进场转场成对出现
+		//（「转场层空窗」的历史顾虑见 enterBackupScreen 注释，淡入淡出样式下已消解）。
+		MusicBeatState.switchState(new states.ContainersMenuState());
 	}
 	#end
 

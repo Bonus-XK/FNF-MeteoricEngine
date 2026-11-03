@@ -84,7 +84,10 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 		// ---- 磨砂面板 ----
 		var panel:FlxSprite = makePanel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 20);
+		panel.alpha = 0;
 		add(panel);
+		// 入场淡入（与 PauseSettingsSubstate 同款参数，打开不再瞬现）
+		FlxTween.tween(panel, {alpha: 1}, 0.25, {ease: FlxEase.quartInOut});
 
 		// ---- 选中高亮条 ----
 		selectorBar = makePanel(PANEL_X + 16, ROW_START_Y - 4, PANEL_W - 32, 40, 12, DesignTokens.rowHighlight, null);

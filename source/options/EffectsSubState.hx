@@ -12,11 +12,11 @@ class EffectsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
-		var option:Option = new Option('自定义过场动画',
-		    '选择过场动画的样式（三种）：移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光效淡入淡出。',
-			'CustomFade',
-			'string',
-			[CustomFadeTransition.MODE_MOVE, CustomFadeTransition.MODE_METEOR, CustomFadeTransition.MODE_STAR]);
+	var option:Option = new Option('自定义过场动画',
+	    '选择过场动画的样式（四种）：淡入淡出 = 全屏黑幕渐隐渐显；移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光晕绽放后收束。',
+		'CustomFade',
+		'string',
+		[CustomFadeTransition.MODE_FADE, CustomFadeTransition.MODE_MOVE, CustomFadeTransition.MODE_METEOR, CustomFadeTransition.MODE_STAR]);
 		addOption(option);
 
 		var option:Option = new Option('过场动画文字',

@@ -34,7 +34,7 @@ class SaveVariables {
 	@:keep public var showScrollSpeed:Bool = true; // FPS 计数器下方显示当前滚动速度（颜色随速度变化）
 	@:keep public var showNPS:Bool = false; // FPS 计数器下方显示每秒收到的音符数（NPS）
 	@:keep public var flashing:Bool = true;
-	@:keep public var CustomFade:String = '移动';
+	@:keep public var CustomFade:String = '淡入淡出';
 	@:keep public var CustomFadeText:Bool = true;
 	@:keep public var autoPause:Bool = true;
 	@:keep public var antialiasing:Bool = true;
@@ -326,6 +326,12 @@ class SaveVariables {
 	//   true  = Phigros ACC =（Sick/Marvelous + Good×0.65）÷ 总音符
 	// 两者权重不同，同一局会得到不同数字；这里独立开关，想用哪个用哪个。
 	@:keep public var phigrosAccuracy:Bool = false;
+	// ms 加权准确率（默认开——2026-11 用户明确选择，覆盖「新功能默认关」既有约束；开关即完整回退路径）：
+	//   true  = 命中权重按实际毫秒偏差在判定档位边界间连续插值（正中=1.0，贴边=下一档锚点），
+	//           段边界处数值与旧口径相同，仅档位内部产生区分。实现见 backend/AccuracyDomain.hx。
+	//   false = 旧离散口径（sick=1/good=0.67/bad=0.34/shit=0），数值与旧版逐位一致。
+	// 旧回放文件（无 ms 字段）不受此开关影响，永远按锚点权重复现录制时的旧口径。
+	@:keep public var msWeightedAccuracy:Bool = true;
 	@:keep public var mobileControlsMode:Int = 0; // 移动端触控板模式：0右手 1左手 2自定义 3双手 4判定区 5无按键
 	// 主题色（Meteoric 主题色功能）：固定 10 色色板的索引，0=青（默认）。
 	// 令牌派生见 backend/DesignTokens.hx；越界索引在 applyTheme 内夹取回 0，不会崩。
@@ -911,10 +917,9 @@ class ClientPrefs {
 		if (data.noteJudgment == '新版' || data.noteJudgment == '旧判定')
 			data.noteJudgment = (data.noteJudgment == '新版') ? 'KE 判定' : 'PE 判定';
 
-		// 过场动画样式旧值迁移：'淡入淡出' -> '星辉'
-		// （旧版只有「移动 / 淡入淡出」两项；新版扩为「移动 / 陨星 / 星辉 / 分段」，
-		//   '淡入淡出' 对应的就是新的星辉样式。不迁移会命中 switch 的 default → 被静默改成「移动」）
-		if (data.CustomFade == '淡入淡出') data.CustomFade = '星辉';
+		// [2026-11-03] 过场动画样式「淡入淡出」重新实现为独立样式（全屏黑幕渐隐渐显，见
+		// CustomFadeTransition.MODE_FADE），不再是废弃值 —— 原迁移行（'淡入淡出' -> '星辉'）删除。
+		// 该迁移针对的是 2026-09 星辉引入前的旧存档，活跃存档早已迁移完成，删除无副作用。
 
 		// FPS 版本行旧值迁移：「FPS引擎版本」选项已由 FPS 显示项编辑器的 Ver/Git 两项取代。
 		// 旧存档 showVer=false（当年 = 版本/提交行全不显示）→ 从 fpsStatsList 剥离 'Ver' 与

@@ -14,7 +14,8 @@ typedef ReplayEvent =
 	s:Int,   // 谱面序号（Note.chartSeq），-1 = 空按（无对应音符）
 	t:Float, // 时间（ms）：命中 = 音符 strumTime；空按 = 按键瞬间
 	d:Int,   // 轨道 0-3
-	r:String // sick/good/bad/shit/sus/hurt/mp
+	r:String, // sick/good/bad/shit/sus/hurt/mp
+	?m:Float // 归一化 |ms 偏差|（msWeightedAccuracy 插值用；旧文件无此字段 → 回放回退锚点权重 = 旧口径数值）
 }
 
 typedef ReplayInput =
@@ -44,6 +45,7 @@ class Replay
 	// ---- 回放派生数据（buildDerived 后使用） ----
 	public var hitSeqs:Map<Int, String> = new Map();    // chartSeq -> sus/hurt/评分
 	public var ratingSeqs:Map<Int, String> = new Map(); // chartSeq -> 评分（非长条/伤害）
+	public var msSeqs:Map<Int, Float> = new Map();      // chartSeq -> 归一化 |ms 偏差|（仅新文件有；空表 = 旧文件）
 	public var pressMisses:Array<ReplayEvent> = [];     // 空按（按时间升序）
 
 	public function new(?songName:String = '', ?diff:String = '')
@@ -52,9 +54,11 @@ class Replay
 		difficulty = diff;
 	}
 
-	public function addEvent(seq:Int, t:Float, d:Int, r:String):Void
+	public function addEvent(seq:Int, t:Float, d:Int, r:String, ?m:Float):Void
 	{
-		events.push({s: seq, t: t, d: d, r: r});
+		var ev:ReplayEvent = {s: seq, t: t, d: d, r: r};
+		if (m != null) ev.m = m; // 旧调用/无有效偏差不写字段，保持与旧文件结构一致
+		events.push(ev);
 	}
 
 	public function recordInput(t:Float, d:Int, up:Bool):Void
@@ -73,6 +77,7 @@ class Replay
 	{
 		hitSeqs = new Map();
 		ratingSeqs = new Map();
+		msSeqs = new Map();
 		pressMisses = [];
 		for (e in events)
 		{
@@ -80,6 +85,7 @@ class Replay
 			{
 				hitSeqs.set(e.s, e.r);
 				if (e.r != 'sus' && e.r != 'hurt') ratingSeqs.set(e.s, e.r);
+				if (e.m != null) msSeqs.set(e.s, e.m);
 			}
 			else
 				pressMisses.push(e);
@@ -135,7 +141,7 @@ class Replay
 		if (raw.percent != null) replay.percent = raw.percent;
 		if (raw.events != null)
 			for (e in (raw.events:Array<Dynamic>))
-				replay.addEvent(e.s, e.t, e.d, e.r);
+				replay.addEvent(e.s, e.t, e.d, e.r, e.m); // 旧文件无 m → null → 不写字段
 		if (raw.inputs != null)
 			for (e in (raw.inputs:Array<Dynamic>))
 				replay.recordInput(e.t, e.d, e.u);

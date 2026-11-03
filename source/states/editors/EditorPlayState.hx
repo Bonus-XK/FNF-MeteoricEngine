@@ -1,6 +1,7 @@
 package states.editors;
 import backend.Lang;
 
+import backend.AccuracyDomain;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
@@ -478,7 +479,8 @@ class EditorPlayState extends MusicBeatSubstate
 		//tryna do MS based judgment due to popular demand
 		var daRating:Rating = Conductor.judgeNote(ratingsData, noteDiff / playbackRate);
 
-		totalNotesHit += daRating.ratingMod;
+		// ms 加权准确率：编辑器试玩恒 PE 判定（同上方 judgeNote 口径），与主局共用同一插值曲线
+		totalNotesHit += AccuracyDomain.hitWeight(playbackRate, noteDiff / playbackRate, daRating, false);
 		note.ratingMod = daRating.ratingMod;
 		if(!note.ratingDisabled) daRating.hits++;
 		note.rating = daRating.name;

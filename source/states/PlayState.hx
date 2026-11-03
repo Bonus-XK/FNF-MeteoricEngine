@@ -12,6 +12,7 @@ import backend.Lang;
 // "function triggerEvent" - Called when the song hits your event's timestamp, this is probably what you were looking for
 
 import backend.Achievements;
+import backend.AccuracyDomain;
 import backend.Highscore;
 import backend.StageData;
 import backend.WeekData;
@@ -537,6 +538,7 @@ class PlayState extends MusicBeatState
 	var currentReplay:Replay = null;                // 本局录制数据
 	var replayHitSeqs:Map<Int, String> = null;      // 回放：应命中的音符（chartSeq -> 事件类型/评分）
 	var replayRatingSeqs:Map<Int, String> = null;   // 回放：评分查找（chartSeq -> 评分名）
+	var replayMsSeqs:Map<Int, Float> = null;        // 回放：归一化 |ms 偏差|（chartSeq -> m；旧回放文件为空表）
 	var replayPressMisses:Array<ReplayEvent> = [];  // 回放：空按事件（按时间升序，旧版回放用）
 	var replayPressPtr:Int = 0;                     // 回放：空按事件游标
 	var replayInputs:Array<ReplayInput> = [];       // 回放 v2：按键事件流（按下/抬起）
@@ -686,6 +688,7 @@ class PlayState extends MusicBeatState
 				currentReplay.buildDerived();
 				replayHitSeqs = currentReplay.hitSeqs;
 				replayRatingSeqs = currentReplay.ratingSeqs;
+				replayMsSeqs = currentReplay.msSeqs;
 				replayPressMisses = currentReplay.pressMisses;
 				replayPressPtr = 0;
 				replayInputs = currentReplay.inputs != null ? currentReplay.inputs : [];
@@ -3031,6 +3034,10 @@ class PlayState extends MusicBeatState
 		}
 		// botplay 命中时间由其排期时刻定义（=音符自身 strumTime），帧延迟不影响评级
 		var noteDiff:Float = cpuControlled ? 0 : Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
+		// ms 加权准确率：归一化偏差与现行判定器严格同源（PE=含 offset、除 playbackRate；KE=原始 |diff|，不含 offset）
+		// botplay diff=0 → 权重 1.0，与旧口径恒 Sick 等价
+		var keJudge:Bool = ClientPrefs.data.noteJudgment == 'KE 判定';
+		note.judgedDiff = cpuControlled ? 0 : (keJudge ? Math.abs(note.strumTime - Conductor.songPosition) : noteDiff / playbackRate);
 		vocals.volume = 1;
 
 		var placement:Float =  FlxG.width * 0.35;
@@ -3045,10 +3052,13 @@ class PlayState extends MusicBeatState
 			var replayRating:String = replayRatingSeqs.get(note.chartSeq);
 			for (r in ratingsData)
 				if (r.name == replayRating) { daRating = r; break; }
+			// 归一化偏差同样取录制时保存的值（新回放文件带 ms 字段）；
+			// 旧文件无 ms → judgedDiff 复位 -1 → hitWeight 回退锚点权重 = 精确复现旧口径数值
+			note.judgedDiff = (replayMsSeqs != null && replayMsSeqs.exists(note.chartSeq)) ? replayMsSeqs.get(note.chartSeq) : -1;
 		}
 		if (daRating == null)
 		{
-			daRating = (ClientPrefs.data.noteJudgment == 'KE 判定') ? judgeRatingKE(note) : Conductor.judgeNote(ratingsData, noteDiff / playbackRate);
+			daRating = keJudge ? judgeRatingKE(note) : Conductor.judgeNote(ratingsData, noteDiff / playbackRate);
 			// 非顶格评级采样（前 40 条，之后零开销）
 			if (daRating.name != 'marvelous' && daRating.name != 'sick' && offRatingProbe < 40)
 			{
@@ -3062,7 +3072,8 @@ class PlayState extends MusicBeatState
 
 		var scoreMult:Int = (cappedMult != null) ? cappedMult : Std.int(note.density);
 		if (cappedMult == null && scoreMult < 1) scoreMult = 1; // 未传封顶值（如 Miss 弹窗）走原 density 语义
-		totalNotesHit += daRating.ratingMod * scoreMult;
+		// ms 加权准确率：开关开 → 按归一化偏差连续插值；关/旧回放无 ms → 旧锚点 ratingMod（数值逐位不变）
+		totalNotesHit += AccuracyDomain.hitWeight(playbackRate, note.judgedDiff, daRating, keJudge) * scoreMult;
 		note.ratingMod = daRating.ratingMod;
 		if(!note.ratingDisabled) daRating.hits += scoreMult;
 		note.rating = daRating.name;

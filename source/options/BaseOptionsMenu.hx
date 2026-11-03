@@ -290,7 +290,65 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		#end
 
 		changeSelection();
+		playRowEntrance();
 		FlxG.mouse.visible = true;
+	}
+
+	/**
+	 * 首次构建后的行级入场动画（stagger：逐行淡入 + 下落 10px 回位，与暂停菜单飞入同一动效语言）。
+	 * 只在构造期播这一次：refreshRows 的后续刷新（选中变化/语言切换/rowsDirty 重建）不重播。
+	 * 手法：先记录 refreshRows 刚设好的稳定态（alpha/位置）→ 归零 → stagger tween 回记录值。
+	 * tween 目标就是稳定值 —— 即使动画中途被选中变化打断（refreshRows 直接写稳定 alpha），
+	 * 结果也只是动画提前结束，状态始终正确。
+	 */
+	function playRowEntrance():Void
+	{
+		var step:Float = 0.028; // 每行错开
+		var dur:Float = 0.22;
+		for (r in 0...ROWS_VISIBLE)
+		{
+			if (r >= rows.length) break;
+			var row:FlxText = rows[r];
+			if (!row.visible) continue; // 空行（超出选项数）不播
+			var delay:Float = r * step;
+
+			// 行文本：记录稳定 alpha/y → 归零下沉 → 回放
+			var rowAlpha:Float = row.alpha;
+			var rowY:Float = row.y;
+			row.alpha = 0;
+			row.y = rowY + 10;
+			FlxTween.tween(row, {alpha: rowAlpha, y: rowY}, dur, {ease: FlxEase.quadOut, startDelay: delay});
+
+			// 值文本（可见时同步入场）
+			var val:FlxText = valueTexts[r];
+			if (val != null && val.visible)
+			{
+				var valAlpha:Float = val.alpha;
+				val.alpha = 0;
+				FlxTween.tween(val, {alpha: valAlpha}, dur, {ease: FlxEase.quadOut, startDelay: delay});
+			}
+
+			// 布尔开关（可见时同步入场；像素图开关按 sprite 逐个回放）
+			var sw:objects.ToggleSwitch = switchCols[r];
+			if (sw != null && sw.track != null && sw.track.visible)
+			{
+				for (spr in sw.sprites)
+				{
+					if (spr == null || !spr.visible) continue;
+					var a:Float = spr.alpha;
+					spr.alpha = 0;
+					FlxTween.tween(spr, {alpha: a}, dur, {ease: FlxEase.quadOut, startDelay: delay});
+				}
+			}
+		}
+
+		// 选中高亮条最后落位
+		if (selectorBar != null && selectorBar.visible)
+		{
+			var barAlpha:Float = selectorBar.alpha;
+			selectorBar.alpha = 0;
+			FlxTween.tween(selectorBar, {alpha: barAlpha}, dur, {ease: FlxEase.quadOut, startDelay: ROWS_VISIBLE * step});
+		}
 	}
 
 	public function addOption(option:Option) {

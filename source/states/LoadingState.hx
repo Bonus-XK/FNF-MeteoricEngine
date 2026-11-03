@@ -190,6 +190,16 @@ class LoadingState extends MusicBeatState
 		else
 			startLoading();
 		#end
+
+		// ---- 进场黑幕：从全黑淡出浮现加载界面 ----
+		// 与 Freeplay 出场的整屏压黑衔接（startFreeplayOut 尾部 camera.fade 0.16s 压到全黑后切屏）：
+		// 之前本界面瞬现，色块跳变。放在 add 顺序最末 = 覆盖所有元素的最上层。
+		// 加载完成进 PlayState 的瞬切是既有优化（加载完立即进入目标状态），刻意不动。
+		var fadeInMask:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+		fadeInMask.scrollFactor.set();
+		fadeInMask.alpha = 1;
+		add(fadeInMask);
+		FlxTween.tween(fadeInMask, {alpha: 0}, 0.3, {ease: FlxEase.quadOut, onComplete: function(_) { fadeInMask.visible = false; }});
 	}
 
 	function startLoading()

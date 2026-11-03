@@ -15,7 +15,8 @@ import openfl.utils.Assets;
  * 引擎过场动画（转场界面）。
  *
  * 样式由 `ClientPrefs.data.CustomFade` 决定（设置 → 效果 → 过场动画样式）：
- *   MOVE  「移动」 —— 左右横幅水平推入/推出（原版行为，默认）
+ *   FADE  「淡入淡出」—— 全屏黑幕渐隐渐显（黑场衔接消解「转场层空窗」，默认）
+ *   MOVE  「移动」 —— 左右横幅水平推入/推出（原版行为）
  *   METEOR「陨星」 —— 程序化流星斜落 → 撞击环形闪光 → 横幅推入
  *   STAR  「星辉」 —— 程序化径向光晕 + 星芒爆发
  *
@@ -32,6 +33,7 @@ class CustomFadeTransition extends FlxSubState
 	public static var finishCallback:Void->Void;
 	public static var nextCamera:FlxCamera;
 
+	public static inline var MODE_FADE:String = '淡入淡出';
 	public static inline var MODE_MOVE:String = '移动';
 	public static inline var MODE_METEOR:String = '陨星';
 	public static inline var MODE_STAR:String = '星辉';
@@ -51,6 +53,7 @@ class CustomFadeTransition extends FlxSubState
 	static final PHASE_PANELS:Int = 5; // 移动：横幅推入
 	static final PHASE_SETTLE:Int = 6; // 收尾停顿
 	static final PHASE_OUT:Int = 7;    // 出场（三种样式共用）
+	static final PHASE_FADE_OUT:Int = 8; // 淡入淡出：黑幕渐显（仅 FADE 出场）
 
 	// 相位时长（秒）
 	static final T_WAIT:Float = 0.08;
@@ -60,6 +63,11 @@ class CustomFadeTransition extends FlxSubState
 	static final T_PANELS:Float = 0.58;
 	static final T_SETTLE:Float = 0.14;
 	static final T_OUT:Float = 0.42;
+	static final T_FADE_OUT:Float = 0.45; // 淡入淡出：黑幕渐显
+
+	// 淡入淡出样式：全屏黑幕。进场终点/出场终点都是完全不透明，
+	// 两个界面交接处的「转场层空窗」（旧状态已毁、新状态 create 未完成）落在全黑里，肉眼不可见。
+	var fadeMask:FlxSprite;
 
 	var isTransIn:Bool = false;
 	var duration:Float;
@@ -110,6 +118,8 @@ class CustomFadeTransition extends FlxSubState
 
 		switch (ClientPrefs.data.CustomFade)
 		{
+			case MODE_FADE:
+				createFade();
 			case MODE_METEOR:
 				createMeteor();
 			case MODE_STAR:
@@ -118,14 +128,31 @@ class CustomFadeTransition extends FlxSubState
 				createMove();
 		}
 
-		addThemeAccent();
-		themeListener = function() refreshThemeColors();
-		DesignTokens.addThemeListener(themeListener);
+		// 淡入淡出没有主题色元素（纯黑幕），不挂底部色条，也不注册主题监听
+		if (ClientPrefs.data.CustomFade != MODE_FADE)
+		{
+			addThemeAccent();
+			themeListener = function() refreshThemeColors();
+			DesignTokens.addThemeListener(themeListener);
+		}
 
 		phase = isTransIn ? PHASE_OUT : PHASE_WAIT;
 		phaseT = 0;
 
 		super.create();
+	}
+
+	// ============================================================
+	//  样式 0：淡入淡出（纯黑幕，无素材、无文字）
+	// ============================================================
+
+	function createFade():Void
+	{
+		// 全屏纯黑遮罩。makeGraphic 同尺寸同色共享位图安全：本层只改 alpha，不改 pixels。
+		fadeMask = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+		fadeMask.scrollFactor.set();
+		fadeMask.alpha = isTransIn ? 1 : 0;
+		add(fadeMask);
 	}
 
 	// ============================================================
@@ -326,6 +353,7 @@ class CustomFadeTransition extends FlxSubState
 			case PHASE_PANELS: T_PANELS;
 			case PHASE_SETTLE: T_SETTLE;
 			case PHASE_OUT: duration * 0.85;
+			case PHASE_FADE_OUT: T_FADE_OUT;
 			default: 0;
 		}
 	}
@@ -337,13 +365,14 @@ class CustomFadeTransition extends FlxSubState
 			case PHASE_WAIT:
 				switch (ClientPrefs.data.CustomFade)
 				{
+					case MODE_FADE: phase = PHASE_FADE_OUT;
 					case MODE_METEOR: phase = PHASE_FALL;
 					case MODE_STAR: phase = PHASE_BLOOM;
 					default: phase = PHASE_PANELS;
 				}
 			case PHASE_FALL: phase = PHASE_IMPACT;
 			case PHASE_IMPACT, PHASE_BLOOM, PHASE_PANELS: phase = PHASE_SETTLE;
-			case PHASE_SETTLE, PHASE_OUT: phase = PHASE_NONE;
+			case PHASE_SETTLE, PHASE_OUT, PHASE_FADE_OUT: phase = PHASE_NONE;
 			default: phase = PHASE_NONE;
 		}
 		phaseT = 0;
@@ -403,6 +432,7 @@ class CustomFadeTransition extends FlxSubState
 				if (ClientPrefs.data.CustomFade == MODE_STAR) paintBloom(1.0);
 			case PHASE_OUT:
 				var e2:Float = FlxEase.quintIn(p);
+				if (fadeMask != null) fadeMask.alpha = 1 - e2; // 淡入淡出进场：黑幕从全遮渐显出新界面
 				if (loadLeft != null) loadLeft.x = -FlxG.width * e2;
 				if (loadRight != null) loadRight.x = FlxG.width * e2;
 				if (WaterMark != null) WaterMark.x = 50 - 1280 * e2;
@@ -412,6 +442,9 @@ class CustomFadeTransition extends FlxSubState
 					paintBloom(1.0 - e2);
 					for (r in rayGroup) r.alpha = Math.max(0, 0.3 * (1 - p * 1.3));
 				}
+			case PHASE_FADE_OUT:
+				// 淡入淡出出场：黑幕从透明渐显到全遮（quadIn 前慢后快，收在"完全黑"上）
+				if (fadeMask != null) fadeMask.alpha = FlxEase.quadIn(FlxMath.bound(p, 0, 1));
 			default:
 				// PHASE_WAIT / PHASE_NONE：不动
 		}
@@ -576,6 +609,9 @@ class CustomFadeTransition extends FlxSubState
 			var cb:Void->Void = finishCallback;
 			finishCallback = null;
 			cb(); // 只把新状态排队进 FlxG._requestedState（真正交换在下一帧）
+			if (ClientPrefs.data.CustomFade == MODE_FADE) return; // 淡入淡出：黑幕保持全遮挂到交换帧，随旧状态销毁。
+			// 若此刻 close，本帧 draw 时转场层已移除而旧状态还在 —— 全黑中会裸露一帧旧界面，破坏淡入连续感。
+			// 横幅类样式不受此影响（横幅退出后本就要露出旧界面半拍），维持原 close 语义。
 			close(); // 关键：这一帧结束前必须收掉转场层，否则残留
 		}
 		else

@@ -694,9 +694,10 @@ class ContainersMenuState extends MusicBeatState
 		selectedSomethin = true;
 		FlxG.sound.play(Paths.sound('cancelMenu'));
 		OptionsState.onPlayState = false;
-		// 与入口对称：同样跳过设置页自己的入场转场（它有整屏背景，不需要转场遮丑）
-		FlxTransitionableState.skipNextTransOut = true;
-		FlxG.switchState(new OptionsState());
+		// 统一走 MusicBeatState.switchState（与入口对称）：
+		// 出场转场 + 设置页 create() 的进场转场成对出现；「转场层空窗」的历史顾虑
+		// 见 OptionsState.enterBackupScreen 注释 —— 淡入淡出样式下黑场衔接，不可见。
+		MusicBeatState.switchState(new OptionsState());
 	}
 
 	override function destroy()

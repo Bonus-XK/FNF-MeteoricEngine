@@ -182,6 +182,7 @@ source/backend/CrashHandler.hx	）---	1	分隔符/标点片段（连接已翻译
 source/backend/CustomFadeTransition.hx	星辉	1	MODE_* 是 static inline var 存档值
 source/backend/CustomFadeTransition.hx	移动	1	MODE_* 是 static inline var 存档值
 source/backend/CustomFadeTransition.hx	陨星	1	MODE_* 是 static inline var 存档值
+source/backend/CustomFadeTransition.hx	淡入淡出	1	MODE_* 是 static inline var 存档值
 source/backend/DesignTokens.hx	品红	1	主题名：显示走 themeNameAt()
 source/backend/DesignTokens.hx	橙	1	主题名：显示走 themeNameAt()
 source/backend/DesignTokens.hx	粉	1	主题名：显示走 themeNameAt()
@@ -589,6 +590,7 @@ source/options/EffectsSubState.hx	自定义过场动画	1	Option 兜底原文：
 source/options/EffectsSubState.hx	迅捷 0.3s	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	过场动画文字	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	选择过场动画的样式（三种）：移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光效淡入淡出。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/EffectsSubState.hx	选择过场动画的样式（四种）：淡入淡出 = 全屏黑幕渐隐渐显；移动 = 左右横幅水平推拉；陨星 = 面板推拉并伴随斜向主题色光带掠过；星辉 = 满屏光晕绽放后收束。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	选择进入暂停界面时播放的音乐：	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	镜头缓动	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/EffectsSubState.hx	镜头缩放	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
@@ -1003,3 +1005,5 @@ source/substates/ResultsSubState.hx	　	1	分隔符/标点片段（连接已翻�
 source/substates/ResultsSubState.hx	：	1	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	· 	2	分隔符/标点片段（连接已翻译文本，含中英括号成对拆分）
 source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志（trace / Sys.println / FlxG.log / [Tag] 前缀，release 不可见）
+source/options/JudgmentSettingsSubState.hx	毫秒加权准确率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/JudgmentSettingsSubState.hx	开启后，准确率权重按实际毫秒偏差在判定档位间连续插值：正中 1.0，贴边降到下一档锚点（Sick→Good→Bad→Shit）。\\n关闭时回到离散锚点权重（Sick=1 / Good=0.67 / Bad=0.34 / Shit=0），与旧版逐位一致。\\n旧回放文件不受此开关影响，永远按录制时口径复现。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue

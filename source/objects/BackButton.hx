@@ -10,6 +10,8 @@ class BackButton
 	public var glow:FlxSprite; // 悬停发光层（放在 spr 下层）
 	var hovered:Bool = false;
 	var glowTween:FlxTween;
+	var labelBaseY:Float = 0;   // 按压弹回的基准位（构造期定，press 时下沉后弹回）
+	var pressTween:FlxTween;
 	var awake:Bool = false; // 鼠标移动唤醒：避免界面打开时鼠标恰好停在按钮上直接发光
 	var lastX:Float = 0;
 	var lastY:Float = 0;
@@ -39,6 +41,7 @@ class BackButton
 		label.textField.height = 56;
 		label.y += Math.max(0, (SIZE - label.textField.textHeight) / 2);
 		label.scrollFactor.set();
+		labelBaseY = label.y;
 		lastX = FlxG.mouse.screenX;
 		lastY = FlxG.mouse.screenY;
 	}
@@ -52,6 +55,12 @@ class BackButton
 
 	public function setHovered(mx:Float, my:Float)
 	{
+		var v:Bool = over(mx, my);
+		// 按压检测（自动，调用点零改动）：悬停中按下即播反馈。
+		// 必须放在 hovered==v 早退**之前**——鼠标已停在按钮上时 hovered 不再变化，
+		// 早退会吞掉这一帧的 justPressed。
+		// 触摸路径（clickPressed）不经过 FlxG.mouse.justPressed，移动端无按压反馈（可接受，功能不受影响）。
+		if (v && awake && FlxG.mouse.justPressed) pressVisual();
 		if (!awake)
 		{
 			var dx:Float = mx - lastX;
@@ -62,7 +71,6 @@ class BackButton
 		lastX = mx;
 		lastY = my;
 
-		var v:Bool = over(mx, my);
 		if (hovered == v) return;
 		hovered = v;
 		if (v)
@@ -77,5 +85,14 @@ class BackButton
 			glow.alpha = 0;
 			spr.color = 0xFFD5D9DF;
 		}
+	}
+
+	/** 按压反馈："<" 下沉 2px 弹回 + 边框白闪。纯视觉，不影响命中与点击判定。 */
+	public function pressVisual():Void
+	{
+		if (pressTween != null) pressTween.cancel();
+		label.y = labelBaseY + 2;
+		pressTween = FlxTween.tween(label, {y: labelBaseY}, 0.14, {ease: FlxEase.quadOut});
+		FlxTween.color(spr, 0.16, 0xFFFFFFFF, hovered ? 0xFFFFFFFF : 0xFFD5D9DF);
 	}
 }

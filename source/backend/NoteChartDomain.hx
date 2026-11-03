@@ -1086,9 +1086,14 @@ class NoteChartDomain
 				ps.combo += hitMult;
 				if (ps.combo > ps.maxCombo) ps.maxCombo = ps.combo; // 最高连击追踪
 				ps.popUpScore(note, hitMult); // 传入已封顶的 density：计分/评级/命中同源封顶
-				// 回放录制：主音符命中（评分取本局真实判定结果）
+				// 回放录制：主音符命中（评分取本局真实判定结果；ms 加权准确率另录归一化偏差，无有效值时不写字段）
 				if (ps.recordingReplay && !ps.cpuControlled && ps.currentReplay != null)
-					ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
+				{
+					if (note.judgedDiff >= 0)
+						ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating, note.judgedDiff);
+					else
+						ps.currentReplay.addEvent(note.chartSeq, note.strumTime, note.noteData, note.rating);
+				}
 			}
 			hitHealthDelta = note.hitHealth * ps.healthGain * hitMult;
 			ps.health += hitHealthDelta;
