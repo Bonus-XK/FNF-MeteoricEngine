@@ -227,6 +227,11 @@ class LuaGraphEditorState extends MusicBeatState
 	var previewOpen:Bool = false;
 	var previewAll:Array<String> = [];
 	var previewScroll:Int = 0;
+	// 【性能】预览重建失效标记：预览为模态（打开期间编辑器输入全部暂停），唯一持续的输入是
+	// 滚动 —— 原实现 updatePreview 每帧无条件 rebuildPreview（整篇 codegen+split+validate +
+	// 销毁重建 ~24 个显示对象 + 全屏 makeGraphic 位图重分配/GPU 重上传）。现在只在滚动输入
+	// 或内容失效（writeAll / 弹窗选择改文档）时重建，静止帧零开销。
+	var previewDirty:Bool = false;
 	var previewSprites:Array<FlxSprite> = [];
 	var previewTexts:Array<FlxText> = [];
 
@@ -1872,7 +1877,12 @@ class LuaGraphEditorState extends MusicBeatState
 		var value:String = popupAll[idx];
 		var cb:String->Void = popupPick;
 		closePopup();
-		if (cb != null) cb(value);
+		if (cb != null)
+		{
+			cb(value);
+			// 弹窗选择可能改文档（模板填充等）：预览内容随之失效（打开状态下下一帧重建）
+			previewDirty = true;
+		}
 	}
 
 	// ==================================================================
@@ -1949,11 +1959,17 @@ class LuaGraphEditorState extends MusicBeatState
 			closePreview();
 			return;
 		}
-		if (FlxG.keys.justPressed.PAGEDOWN || FlxG.keys.justPressed.DOWN) previewScroll += 4;
-		if (FlxG.keys.justPressed.PAGEUP || FlxG.keys.justPressed.UP) previewScroll -= 4;
-		if (FlxG.mouse.wheel != 0) previewScroll -= Std.int(FlxG.mouse.wheel) * 3;
+		var scrollChanged:Bool = false;
+		if (FlxG.keys.justPressed.PAGEDOWN || FlxG.keys.justPressed.DOWN) { previewScroll += 4; scrollChanged = true; }
+		if (FlxG.keys.justPressed.PAGEUP || FlxG.keys.justPressed.UP) { previewScroll -= 4; scrollChanged = true; }
+		if (FlxG.mouse.wheel != 0) { previewScroll -= Std.int(FlxG.mouse.wheel) * 3; scrollChanged = true; }
 		if (previewScroll < 0) previewScroll = 0;
-		rebuildPreview();
+		// 【性能】滚动输入或内容失效才重建（见 previewDirty 字段注释）
+		if (scrollChanged || previewDirty)
+		{
+			previewDirty = false;
+			rebuildPreview();
+		}
 	}
 
 	function closePreview():Void
@@ -2097,7 +2113,7 @@ class LuaGraphEditorState extends MusicBeatState
 			LuaGraphIO.saveAll(doc, lua);
 			dirty = false;
 			refreshStatus();
-			if (previewOpen) rebuildPreview();
+			if (previewOpen) previewDirty = true; // 内容已变：下一帧 updatePreview 重建（避免保存瞬间双重全量重建）
 			setStatus(Lang.tOr('lg.savedTo', '已生成并保存：mods/') + Mods.currentModDirectory + '/scripts/' + name + Lang.tOr('lg.luaFileOpen', '.lua（') + LuaCodeGen.countLines(lua)
 				+ Lang.tOr('lg.savedTail', ' 行）与 ') + name + LuaGraphIO.GRAPH_EXT);
 		}

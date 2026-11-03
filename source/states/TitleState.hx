@@ -652,15 +652,23 @@ class TitleState extends MusicBeatState
 		super.update(elapsed);
 	}
 
+	// 【性能】themeDark 结果缓存：呼吸色每帧调用 themeDark（内部 2 次 interpolate + 位运算，
+	// hxcpp 上 Null<FlxColor> 还要装箱分配），而暗端输入只在主题色变化时才变。
+	var _themeDarkKey:Int = -1;
+	var _themeDarkVal:FlxColor = 0xFF000000;
+
 	/**
 	 * 由当前主题色派生"暗端"：向黑插值 55%（α 保留主色原值）。
 	 * 用于 titleText 的呼吸脉动（亮主题色 ↔ 暗主题色），替代原先写死的深蓝 0xFF3333CC。
 	 */
 	function themeDark(primary:FlxColor):FlxColor
 	{
+		if (primary == _themeDarkKey) return _themeDarkVal;
+		_themeDarkKey = primary;
 		var mixed:Null<FlxColor> = FlxColor.interpolate(primary, (FlxColor.BLACK : FlxColor), 0.55);
 		var c:FlxColor = (mixed == null) ? primary : mixed;
-		return (c & 0x00FFFFFF) | (primary & 0xFF000000); // 保留主色 α，只改 RGB
+		_themeDarkVal = (c & 0x00FFFFFF) | (primary & 0xFF000000); // 保留主色 α，只改 RGB
+		return _themeDarkVal;
 	}
 
 	// 开屏文字：逐行淡入上滑（大字标题用主题色高亮，普通文字白色，信息行灰色）

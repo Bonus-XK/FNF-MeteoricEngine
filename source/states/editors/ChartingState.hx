@@ -150,6 +150,17 @@ class ChartingState extends MusicBeatState
 	private static var lastSong:String = '';
 
 	var bpmTxt:FlxText;
+	// 【性能】bpmTxt 输入签名缓存：文本随 songPosition 播放中逐帧变化是必要的，
+	// 但暂停/静止时六段 Std.string 拼接逐帧重建是纯浪费（编辑器常态是暂停编辑）。
+	// 任一输入变化才重建；显示结果与逐帧重建逐字一致。
+	var _bpmTxtSigPos:Float = -1;
+	var _bpmTxtSigLen:Float = -1;
+	var _bpmTxtSigSec:Int = -1;
+	var _bpmTxtSigBeat:Float = -1;
+	var _bpmTxtSigStep:Int = -1;
+	var _bpmTxtSigQuant:Int = -1;
+	// 【性能】playedSound 复用缓冲（原每帧 new Array + push）
+	var _playedSound:Array<Bool> = [];
 
 	var camPos:FlxObject;
 	var strumLine:FlxSprite;
@@ -1894,17 +1905,34 @@ Ctrl+点击事件音符可选中'), 12, 0xFF7C8198);
 		FlxG.sound.music.pitch = playbackSpeed;
 		vocals.pitch = playbackSpeed;
 
-		bpmTxt.text =
-		Std.string(FlxMath.roundDecimal(Conductor.songPosition / 1000, 2)) + " / " + Std.string(FlxMath.roundDecimal(FlxG.sound.music.length / 1000, 2)) +
-		"\nSection: " + curSec +
-		"\n\nBeat: " + Std.string(curDecBeat).substring(0,4) +
-		"\n\nStep: " + curStep +
-		"\n\nBeat Snap: " + quantization + "th";
+		{
+			// 【性能】输入签名比对：全部输入未变（暂停/静止编辑）时跳过整段字符串重建
+			var sigPos:Float = FlxMath.roundDecimal(Conductor.songPosition / 1000, 2);
+			var sigLen:Float = FlxMath.roundDecimal(FlxG.sound.music.length / 1000, 2);
+			if (sigPos != _bpmTxtSigPos || sigLen != _bpmTxtSigLen || curSec != _bpmTxtSigSec
+				|| curDecBeat != _bpmTxtSigBeat || curStep != _bpmTxtSigStep || quantization != _bpmTxtSigQuant)
+			{
+				_bpmTxtSigPos = sigPos;
+				_bpmTxtSigLen = sigLen;
+				_bpmTxtSigSec = curSec;
+				_bpmTxtSigBeat = curDecBeat;
+				_bpmTxtSigStep = curStep;
+				_bpmTxtSigQuant = quantization;
+				bpmTxt.text =
+				Std.string(sigPos) + " / " + Std.string(sigLen) +
+				"\nSection: " + curSec +
+				"\n\nBeat: " + Std.string(curDecBeat).substring(0,4) +
+				"\n\nStep: " + curStep +
+				"\n\nBeat Snap: " + quantization + "th";
+			}
+		}
 
 		// Extra Keys：编辑器内部存储 = 绝对列号（col<keys 玩家），±keys 换算显示侧
 		var editorKeys:Int = ExtraKeys.songKeys;
-		var playedSound:Array<Bool> = [];
-		for (i in 0...editorKeys) playedSound.push(false); //Prevents ouchy GF sex sounds
+		// 【性能】复用缓冲：原每帧 new Array + push（编辑器每帧分配点）
+		var playedSound:Array<Bool> = _playedSound;
+		playedSound.resize(editorKeys);
+		for (i in 0...editorKeys) playedSound[i] = false; //Prevents ouchy GF sex sounds
 		curRenderedNotes.forEachAlive(function(note:Note) {
 			note.alpha = 1;
 			if(curSelectedNote != null) {

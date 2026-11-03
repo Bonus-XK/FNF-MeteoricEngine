@@ -580,6 +580,14 @@ class ContainersMenuState extends MusicBeatState
 		toggleBtn.label.color = on ? ACCENT() : TEXT_DIM;
 	}
 
+	// 【性能】状态行重建守卫：无会话时全部输入（错误/提示引用、开关、会话有无）不变 → 整帧跳过。
+	// 原实现每帧 5-8 次拼接 + 3-7 次 Lang 查找（GC 喂食）。会话进行中 statusLine 含 waitSeconds
+	// 倒数（秒级变化）且相关字段私有、无法完整签名 —— 保留逐帧构建（本就是秒级动态内容）。
+	var _sigActive:Bool = false;
+	var _sigErr:String = null;
+	var _sigInfo:String = null;
+	var _sigEnabled:Bool = false;
+
 	/**
 	 * 状态行统一刷新。
 	 * 修复：原实现在 update() 里每帧写 `ContainerSession.active ? statusLine() : '容器功能：…'`，
@@ -588,6 +596,15 @@ class ContainersMenuState extends MusicBeatState
 	 */
 	function updateStatusText():Void
 	{
+		var sess:Bool = ContainerSession.active;
+		if (!sess && sess == _sigActive && statusError == _sigErr && statusInfo == _sigInfo
+			&& ClientPrefs.data.containersEnabled == _sigEnabled)
+			return; // 静止帧：无任何输入变化
+		_sigActive = sess;
+		_sigErr = statusError;
+		_sigInfo = statusInfo;
+		_sigEnabled = ClientPrefs.data.containersEnabled;
+
 		if (statusError != null)
 		{
 			statusText.text = '⚠ ' + statusError;
@@ -595,7 +612,7 @@ class ContainersMenuState extends MusicBeatState
 			return;
 		}
 		statusText.color = TEXT_DIM;
-		if (ContainerSession.active)
+		if (sess)
 		{
 			statusText.text = ContainerSession.statusLine();
 			return;

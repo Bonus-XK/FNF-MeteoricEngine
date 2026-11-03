@@ -266,7 +266,12 @@ class StoryMenuState extends MusicBeatState
 
 		lerpScore = Math.floor(FlxMath.lerp(lerpScore, intendedScore, FlxMath.bound(elapsed * 30, 0, 1)));
 		if (Math.abs(intendedScore - lerpScore) < 10) lerpScore = intendedScore;
-		scoreText.text = Lang.tOr('story.weekScore', "本周分数：") + lerpScore;
+		// 【性能】分数文字只在数值变化时重建（lerp 收敛后逐帧恒定 → 完全跳过拼接与 Lang 查找）
+		if (lerpScore != _lastScoreShown)
+		{
+			_lastScoreShown = lerpScore;
+			scoreText.text = Lang.tOr('story.weekScore', "本周分数：") + lerpScore;
+		}
 
 		if (!movedBack && !selectedWeek)
 		{
@@ -424,11 +429,14 @@ class StoryMenuState extends MusicBeatState
 
 		super.update(elapsed);
 
-		grpLocks.forEach(function(lock:FlxSprite)
+		// 【性能】内联展开 forEach 闭包：捕获 this 的闭包逐帧分配（hxcpp）。
+		// 语义与 forEach 一致（不判 alive —— grpLocks 全员常驻）。
+		for (lock in grpLocks.members)
 		{
+			if (lock == null) continue;
 			lock.y = grpWeekText.members[lock.ID].y;
 			lock.visible = (lock.y > FlxG.height / 2);
-		});
+		}
 	}
 
 	function selectWeek()
@@ -541,6 +549,8 @@ class StoryMenuState extends MusicBeatState
 
 	var lerpScore:Float = 0;
 	var intendedScore:Float = 0; // Int64 分数在 lerp 动画边界转 Float（Double 精确到 2^53）
+	// 【性能】分数文字重建缓存（update 里只在数值变化时才重建）
+	var _lastScoreShown:Float = -1;
 
 	function changeWeek(change:Int = 0):Void
 	{

@@ -96,6 +96,11 @@ class LoadingState extends MusicBeatState
 	var errorText:FlxText;
 	var dotsTimer:Float = 0;
 	var dotsCount:Int = 0;
+	// 【性能】点串常量（0~3 个点）与重建缓存：原每帧循环拼接 + 每帧赋值
+	static final DOTS:Array<String> = ['', '.', '..', '...'];
+	var _lastDotsCount:Int = -1;
+	var _lastChartLoaded:Bool = false;
+	var _lastPercentShown:Int = -1;
 
 	function new(target:FlxState, stopMusic:Bool, directory:String)
 	{
@@ -894,10 +899,15 @@ class LoadingState extends MusicBeatState
 			dotsTimer = 0;
 			dotsCount = (dotsCount + 1) % 4;
 		}
-		var dots:String = '';
-		for (i in 0...dotsCount) dots += '.';
-		if (!loadFailed)
-			statusText.text = (chartLoaded ? Lang.tOr('loading.startingSoon', '即将开始') : Lang.tOr('loading.parsingChart', '正在解析谱面')) + dots;
+		// 【性能】预生成 4 档点串常量：原每帧循环拼接（0.35s 才变一档，其余帧纯浪费）；
+		// 文本只在 dotsCount/chartLoaded 变化时重建，内容与原逐帧拼接逐字一致。
+		if (dotsCount != _lastDotsCount || chartLoaded != _lastChartLoaded)
+		{
+			_lastDotsCount = dotsCount;
+			_lastChartLoaded = chartLoaded;
+			if (!loadFailed)
+				statusText.text = (chartLoaded ? Lang.tOr('loading.startingSoon', '即将开始') : Lang.tOr('loading.parsingChart', '正在解析谱面')) + DOTS[dotsCount];
+		}
 
 		if(callbacks != null) {
 			// 加载完成后直接补满到 100%，避免渐进接近拖慢进入时机
@@ -908,7 +918,13 @@ class LoadingState extends MusicBeatState
 				var targetShit:Float = FlxMath.remapToRange(callbacks.numRemaining / callbacks.length, 1, 0, 0, 1);
 				loadProgress += 0.5 * (targetShit - loadProgress);
 			}
-			percentText.text = Std.int(loadProgress * 100) + '%';
+			// 【性能】整数百分比未变时跳过字符串构建与赋值
+			var pctShown:Int = Std.int(loadProgress * 100);
+			if (pctShown != _lastPercentShown)
+			{
+				_lastPercentShown = pctShown;
+				percentText.text = pctShown + '%';
+			}
 		}
 	}
 	
