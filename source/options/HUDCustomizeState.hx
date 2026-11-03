@@ -389,29 +389,44 @@ class HUDCustomizeState extends MusicBeatState
 	function refreshBorders():Void
 	{
 		for (i in 0...elements.length)
-		{
-			var r:FlxRect = getElementRect(elements[i]);
-			var col:Int = (i == curSelected) ? 0xFF00E5FF : 0x55FFFFFF;
-			var bars:Array<FlxSprite> = borders[i];
-			bars[0].setPosition(r.x, r.y);
-			bars[0].setGraphicSize(Std.int(r.width), 3);
-			bars[1].setPosition(r.x, r.y + r.height - 3);
-			bars[1].setGraphicSize(Std.int(r.width), 3);
-			bars[2].setPosition(r.x, r.y);
-			bars[2].setGraphicSize(3, Std.int(r.height));
-			bars[3].setPosition(r.x + r.width - 3, r.y);
-			bars[3].setGraphicSize(3, Std.int(r.height));
-			for (b in bars) b.color = col;
-
-			var lbl:FlxText = labels[i];
-			lbl.setPosition(r.x, r.y - 26);
-			lbl.color = (i == curSelected) ? 0xFF00E5FF : 0xFFFFFFFF;
-		}
+			refreshBordersFor(i);
 	}
+
+	/** 刷新单个元素的边框与标签（refreshBorders 的分片：拖动帧只调这一个，见调用点注释）。 */
+	function refreshBordersFor(i:Int):Void
+	{
+		var r:FlxRect = getElementRect(elements[i]);
+		var col:Int = (i == curSelected) ? 0xFF00E5FF : 0x55FFFFFF;
+		var bars:Array<FlxSprite> = borders[i];
+		bars[0].setPosition(r.x, r.y);
+		bars[0].setGraphicSize(Std.int(r.width), 3);
+		bars[1].setPosition(r.x, r.y + r.height - 3);
+		bars[1].setGraphicSize(Std.int(r.width), 3);
+		bars[2].setPosition(r.x, r.y);
+		bars[2].setGraphicSize(3, Std.int(r.height));
+		bars[3].setPosition(r.x + r.width - 3, r.y);
+		bars[3].setGraphicSize(3, Std.int(r.height));
+		for (b in bars) b.color = col;
+
+		var lbl:FlxText = labels[i];
+		lbl.setPosition(r.x, r.y - 26);
+		lbl.color = (i == curSelected) ? 0xFF00E5FF : 0xFFFFFFFF;
+	}
+
+	// 【性能】提示文本整数签名：偏移整数与选中项未变时不重建拼串（拖动期间亚像素帧全跳过）
+	var _hintX:Int = -999999;
+	var _hintY:Int = -999999;
+	var _hintSel:Int = -999999;
 
 	function updateHint():Void
 	{
 		var off:Array<Float> = hudGetOffset(elements[curSelected]);
+		var ix:Int = Std.int(off[0]);
+		var iy:Int = Std.int(off[1]);
+		if (ix == _hintX && iy == _hintY && curSelected == _hintSel) return;
+		_hintX = ix;
+		_hintY = iy;
+		_hintSel = curSelected;
 		hintText.text = Lang.tOr('hudCustomize.current', '当前：') + elementNames[elements[curSelected]]
 			+ Lang.tOr('hudCustomize.offsetX', '  ·  偏移 X ') + Std.int(off[0]) + ' / Y ' + Std.int(off[1])
 			+ Lang.tOr('hudCustomize.hint2', '  ·  拖动或方向键调整  ·  R 重置全部  ·  ESC 完成');
@@ -487,7 +502,9 @@ class HUDCustomizeState extends MusicBeatState
 			applyDrag(mx - lastMouseX, my - lastMouseY);
 			lastMouseX = mx;
 			lastMouseY = my;
-			refreshBorders();
+			// 【性能】拖动帧只重算当前元素的边框：其余元素位置未变，整页重算会多出
+			// 十几个 FlxRect 分配 + score/watermark/judgement 的 textWidth 强制排版。
+			refreshBordersFor(curSelected);
 			updateHint();
 		}
 		if (FlxG.mouse.justReleased && dragging)

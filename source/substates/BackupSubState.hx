@@ -348,6 +348,8 @@ class BackupSubState extends MusicBeatSubstate
 	{
 		for (sw in switchCols)
 			if (sw != null) sw.refreshTheme();
+		// 【性能】主题色变化：值文本格式缓存全量失效（applyValue 的 setFormat 用 DesignTokens.primary）
+		for (i in 0..._lastValText.length) _lastValText[i] = null;
 		refreshAll();
 	}
 
@@ -391,13 +393,16 @@ class BackupSubState extends MusicBeatSubstate
 		return new FlxRect(PANEL_X + 16, ROW_START_Y + i * ROW_GAP - HIT_PAD, PANEL_W - 32, ROW_GAP + HIT_PAD * 2);
 	}
 
-	/** 鼠标 y 落在第几行；不在任何行上返回 -1。 */
+	/** 鼠标 y 落在第几行；不在任何行上返回 -1。
+	 *  【性能】标量比较替代 rowRect()：原每帧最多 new 9 个 FlxRect（悬空时全量分配）。 */
 	function rowAt(mx:Float, my:Float):Int
 	{
+		var rx:Float = PANEL_X + 16;
+		var rw:Float = PANEL_W - 32;
 		for (i in 0...rows.length)
 		{
-			var r:FlxRect = rowRect(i);
-			if (mx >= r.x && mx <= r.x + r.width && my >= r.y && my <= r.y + r.height) return i;
+			var ry:Float = ROW_START_Y + i * ROW_GAP - HIT_PAD;
+			if (mx >= rx && mx <= rx + rw && my >= ry && my <= ry + ROW_GAP + HIT_PAD * 2) return i;
 		}
 		return -1;
 	}
@@ -517,6 +522,12 @@ class BackupSubState extends MusicBeatSubstate
 	 *    ② 必须有 FIT_MAX_STEPS 硬上界 —— `'…' + substr(1)` 每轮把省略号加回来、
 	 *       长度恒定不变，所以只判 `t.length > 4` 是**死循环**（100% CPU 卡死）。
 	 */
+	// 【性能】值文本格式缓存（applyValue 原来无条件 setFormat → setTextFormat 触发整段重排 +
+	// 位图重绘；悬停扫过列表时 refreshAll 对全部行逐帧调用，是本界面最贵的路径）。
+	// 仅在值实际变化时重建；主题切换经 rethemeNow 全量失效，保证换色仍生效。
+	var _lastValText:Array<String> = [];
+	var _lastValLong:Array<Bool> = [];
+
 	function applyValue(val:FlxText, i:Int):Void
 	{
 		var r:BackupRow = rows[i];
@@ -526,10 +537,18 @@ class BackupSubState extends MusicBeatSubstate
 			return;
 		}
 		val.visible = true;
+		if (_lastValText.length <= i) { _lastValText.resize(i + 1); _lastValLong.resize(i + 1); }
 		if (r.longValue)
 		{
-			val.setFormat(Paths.font('future.ttf'), VALUE_SMALL_SIZE, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			var t:String = (r.value == null || r.value.length == 0) ? '-' : r.value;
+			if (_lastValText[i] == t && _lastValLong[i])
+			{
+				val.x = VALUE_RIGHT - val.width;
+				return;
+			}
+			_lastValText[i] = t;
+			_lastValLong[i] = true;
+			val.setFormat(Paths.font('future.ttf'), VALUE_SMALL_SIZE, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			val.text = t;
 
 			// 第一遍：按实测整串宽度**一次性**估出能放下的字符数（比例估算，留 8% 余量给字宽不均）
@@ -556,6 +575,13 @@ class BackupSubState extends MusicBeatSubstate
 		}
 		else
 		{
+			if (_lastValText[i] == r.value && !_lastValLong[i])
+			{
+				val.x = VALUE_RIGHT - val.width;
+				return;
+			}
+			_lastValText[i] = r.value;
+			_lastValLong[i] = false;
 			val.setFormat(Paths.font('future.ttf'), ROW_TEXT_SIZE, DesignTokens.primary, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			val.text = r.value;
 		}

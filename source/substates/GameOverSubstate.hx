@@ -107,11 +107,14 @@ class GameOverSubstate extends MusicBeatSubstate
 
 	public var startedDeath:Bool = false;
 	var isFollowingAlready:Bool = false;
+	// 【性能】onUpdate/onUpdatePost 每帧派发共用参数数组（原 [elapsed] 字面量逐帧分配）
+	var _updArgs:Array<Dynamic> = [0.0];
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
 
-		PlayState.instance.callOnScripts('onUpdate', [elapsed]);
+		_updArgs[0] = elapsed;
+		PlayState.instance.callOnScripts('onUpdate', _updArgs);
 
 		#if mobile
 		// virtualpad A/B 键判定（走 stage tap 队列兜底，安卓构建 FlxG.touches 为空也能触发）
@@ -182,7 +185,8 @@ class GameOverSubstate extends MusicBeatSubstate
 		{
 			Conductor.syncToMusic();
 		}
-		PlayState.instance.callOnScripts('onUpdatePost', [elapsed]);
+		_updArgs[0] = elapsed;
+		PlayState.instance.callOnScripts('onUpdatePost', _updArgs);
 	}
 
 	var isEnding:Bool = false;

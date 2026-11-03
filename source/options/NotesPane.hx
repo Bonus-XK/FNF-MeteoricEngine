@@ -686,7 +686,8 @@ class NotesPane extends SettingsCanvas
 				}
 			else if (holdingOnObj == colorWheel)
 			{
-				var center:FlxPoint = new FlxPoint(colorWheel.x + colorWheel.width / 2, colorWheel.y + colorWheel.height / 2);
+				// 【性能】center/mouse 复用池化点（见 pointerFlxPoint 旁注释），拖拽帧零分配
+				var center:FlxPoint = _wheelCenter.set(colorWheel.x + colorWheel.width / 2, colorWheel.y + colorWheel.height / 2);
 				var mouse:FlxPoint = pointerFlxPoint();
 				var hue:Float = FlxMath.wrap(FlxMath.wrap(Std.int(mouse.degreesTo(center)), 0, 360) - 90, 0, 360);
 				var sat:Float = FlxMath.bound(mouse.dist(center) / colorWheel.width * 2, 0, 1);
@@ -746,10 +747,16 @@ class NotesPane extends SettingsCanvas
 		if (!controls.controllerMode) return FlxG.mouse.y;
 		return controllerPointer.y;
 	}
+	// 【性能】色轮拖拽路径复用点对象：原每帧 new FlxPoint ×2（center 字面量 + getScreenPosition 无目标参数）
+	var _wheelCenter:FlxPoint = FlxPoint.get();
+	var _ptrPoint:FlxPoint = FlxPoint.get();
+
 	function pointerFlxPoint():FlxPoint
 	{
-		if (!controls.controllerMode) return FlxG.mouse.getScreenPosition();
-		return controllerPointer.getScreenPosition();
+		// 复用 _ptrPoint（零分配）。显式传 FlxG.camera：与 NoteOffsetState/FPSStatsEditorState
+		// 等既有调用点同款 camera-first 形态，不依赖两套 getScreenPosition 签名的解析歧义。
+		if (!controls.controllerMode) return FlxG.mouse.getScreenPosition(FlxG.camera, _ptrPoint.set(0, 0));
+		return controllerPointer.getScreenPosition(_ptrPoint.set(0, 0));
 	}
 
 	function centerHexTypeLine()

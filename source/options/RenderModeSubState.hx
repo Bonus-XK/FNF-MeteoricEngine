@@ -29,6 +29,10 @@ class RenderModeSubState extends BaseOptionsMenu
 	/** 动态行名/说明的已绘制快照：变化才置 rowsDirty，避免每帧无谓重绘。 */
 	var paintedRow:String = '';
 	var paintedDesc:String = '';
+	// 【性能】downloading 态的整 MB 缓存（externalStep 每帧驱动的拼串守卫）
+	var _lastDlMB:Int = -1;
+	var _lastDlRowText:String = null;
+	var _lastDlDescText:String = null;
 
 	public function new()
 	{
@@ -184,9 +188,21 @@ class RenderModeSubState extends BaseOptionsMenu
 			switch (st)
 			{
 				case 'downloading':
-					rowText = Lang.tOr('ffmpeg.ui.dl', '下载中 ') + Std.int(VideoRecorder.installCurMB) + 'MB';
-					descText = Lang.tOr('ffmpeg.ui.descDl',
-						'正在把官方静态构建下载到引擎目录 ffmpeg/ 文件夹（下载完自动解压安装，无需重启引擎）。期间可以照常改本页其它设置。');
+					// 【性能】整 MB 未变时跳过拼接：externalStep 每帧驱动，原实现每帧 Lang 查表 + 拼串
+					//（paintedRow 比对只拦住重绘，拦不住字符串构造本身）。
+					var mb:Int = Std.int(VideoRecorder.installCurMB);
+					if (mb == _lastDlMB)
+					{
+						rowText = _lastDlRowText;
+						descText = _lastDlDescText;
+					}
+					else
+					{
+						_lastDlMB = mb;
+						_lastDlRowText = rowText = Lang.tOr('ffmpeg.ui.dl', '下载中 ') + mb + 'MB';
+						_lastDlDescText = descText = Lang.tOr('ffmpeg.ui.descDl',
+							'正在把官方静态构建下载到引擎目录 ffmpeg/ 文件夹（下载完自动解压安装，无需重启引擎）。期间可以照常改本页其它设置。');
+					}
 				case 'unpacking':
 					rowText = Lang.tOr('ffmpeg.ui.unpack', '解压安装中…');
 					descText = Lang.tOr('ffmpeg.ui.descUnpack',

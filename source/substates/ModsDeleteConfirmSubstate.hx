@@ -80,15 +80,13 @@ class ModsDeleteConfirmSubstate extends MusicBeatSubstate
 		clickPressed = FlxG.mouse.justReleased && !Main.touchWasDragging();
 		#end
 
-		for (btn in [confirmBtn, cancelBtn])
-		{
-			btn.setHovered(FlxG.mouse.screenX, FlxG.mouse.screenY);
-			if (clickPressed && btn.over(FlxG.mouse.screenX, FlxG.mouse.screenY))
-			{
-				btn.onClick();
-				return;
-			}
-		}
+		// 【性能】展开数组字面量：原每帧 new 2 元素数组
+		var mx:Float = FlxG.mouse.screenX;
+		var my:Float = FlxG.mouse.screenY;
+		confirmBtn.setHovered(mx, my);
+		if (clickPressed && confirmBtn.over(mx, my)) { confirmBtn.onClick(); return; }
+		cancelBtn.setHovered(mx, my);
+		if (clickPressed && cancelBtn.over(mx, my)) { cancelBtn.onClick(); return; }
 
 		if (FlxG.keys.justPressed.ENTER) confirm();
 		if (FlxG.keys.justPressed.ESCAPE || FlxG.keys.justPressed.BACKSPACE) cancel();

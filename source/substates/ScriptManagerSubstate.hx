@@ -352,12 +352,13 @@ class ScriptManagerSubstate extends MusicBeatSubstate
 
 	function getHoveredID(mouseX:Float, mouseY:Float):Int
 	{
+		// 【性能】标量比较替代 getRowRect()：原每帧最多 new 8 个 FlxRect（悬停命中高频路径）
 		for (i in 0...MAX_VISIBLE)
 		{
 			var idx:Int = scrollOffset + i;
 			if (idx >= scriptList.length) break;
-			var rowRect:FlxRect = getRowRect(i);
-			if (mouseX >= rowRect.x && mouseX <= rowRect.x + rowRect.width && mouseY >= rowRect.y && mouseY <= rowRect.y + rowRect.height)
+			var ry:Float = ROW_START_Y + i * ROW_GAP;
+			if (mouseX >= ROW_X && mouseX <= VALUE_RIGHT && mouseY >= ry && mouseY <= ry + ROW_GAP)
 				return idx;
 		}
 		return -1;

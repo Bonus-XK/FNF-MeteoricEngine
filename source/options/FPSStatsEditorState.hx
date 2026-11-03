@@ -177,14 +177,39 @@ class FPSStatsEditorState extends MusicBeatState
 	// ===== 数据视图 =====
 
 	// 行序视图（单一来源，交互与刷新共用）：启用项按清单顺序在前，未启用项按默认顺序在后
+	// 【性能】CSV 解析缓存：原 update 悬停分支每帧两次全量解析（split(',') + 逐 token trim + 新数组）。
+	// 以 fpsStatsList 字符串**引用**为失效键 —— Haxe 字符串不可变，toggleItem/moveItem 重写清单时
+	// 引用必变 → 自然失效；变更方拿到的缓存数组用完即弃（先 join 重写再失效重建），不会外泄变更。
+	var _listCache:Array<String> = null;
+	var _listKey:String = null;
+	var _layoutCache:Array<String> = null;
+	var _layoutKey:String = null;
+
+	function fpsList():Array<String>
+	{
+		var key:String = ClientPrefs.data.fpsStatsList;
+		if (_listCache == null || _listKey != key)
+		{
+			_listKey = key;
+			_listCache = FPS.parseFpsStats();
+		}
+		return _listCache;
+	}
+
 	function rowLayout():Array<String>
 	{
-		var list:Array<String> = FPS.parseFpsStats();
-		var rows:Array<String> = [];
-		for (id in list) rows.push(id);
-		for (id in EDITABLE)
-			if (list.indexOf(id) < 0) rows.push(id);
-		return rows;
+		var key:String = ClientPrefs.data.fpsStatsList;
+		if (_layoutCache == null || _layoutKey != key)
+		{
+			var list:Array<String> = fpsList();
+			var rows:Array<String> = [];
+			for (id in list) rows.push(id);
+			for (id in EDITABLE)
+				if (list.indexOf(id) < 0) rows.push(id);
+			_layoutKey = key;
+			_layoutCache = rows;
+		}
+		return _layoutCache;
 	}
 
 	// 显示项名（字面量 key，i18n 校验器可核对）
@@ -203,7 +228,7 @@ class FPSStatsEditorState extends MusicBeatState
 
 	function refreshList():Void
 	{
-		var list:Array<String> = FPS.parseFpsStats();
+		var list:Array<String> = fpsList();
 		var layout:Array<String> = rowLayout();
 
 		if (curSelected < 0) curSelected = 0;
@@ -264,7 +289,7 @@ class FPSStatsEditorState extends MusicBeatState
 	// 开关该行显示项（写入清单 + 立即落盘；FPS.hx 下个 tick 自动重排）
 	function toggleItem(row:Int):Void
 	{
-		var list:Array<String> = FPS.parseFpsStats();
+		var list:Array<String> = fpsList();
 		var id:String = rowLayout()[row - 1];
 
 		if (list.indexOf(id) >= 0)
@@ -291,7 +316,7 @@ class FPSStatsEditorState extends MusicBeatState
 			FlxG.sound.play(Paths.sound('cancelMenu'), 0.4);
 			return;
 		}
-		var list:Array<String> = FPS.parseFpsStats();
+		var list:Array<String> = fpsList();
 		var id:String = rowLayout()[row - 1];
 		var k:Int = list.indexOf(id);
 		if (k < 0)
@@ -401,7 +426,7 @@ class FPSStatsEditorState extends MusicBeatState
 
 			// 悬停高亮（选中行之外重算基色/悬停色，含未启用行灰显）
 			var layout:Array<String> = rowLayout();
-			var list:Array<String> = FPS.parseFpsStats();
+			var list:Array<String> = fpsList();
 			for (i in 0...ROWS)
 			{
 				if (i == curSelected) continue;
