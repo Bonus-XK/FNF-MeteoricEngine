@@ -3680,6 +3680,8 @@ class GameHUD
 	var _lastJudgBad:Int = -1;
 	var _lastJudgShit:Int = -1;
 	var _lastJudgTotal:Int = -1;
+	// 判定侧边栏 5Hz 刷新节流（botplay/密集批下数值签名守卫每帧失效的兜底）
+	var _lastJudgRefresh:Float = 0;
 	var _lastJudgMarv:Bool = false;
 
 	public function new(st:PlayState)
@@ -4023,6 +4025,17 @@ class GameHUD
 		judgementField.y = FlxG.height / 2 - 65 + jcOff[1];
 		judgementField.visible = !ClientPrefs.data.hideHud && ClientPrefs.data.showJudgementCounter;
 		if (!judgementField.visible) return;
+
+		// —— 【5Hz 刷新节流】botplay/密集批下 Hits 每帧都在涨，下方的数值签名守卫每帧
+		//    失效 → 每帧 StringBuf 重建 + text 赋值重排 + setTextFormat×3，OpenFL 侧整段
+		//    文字重排 + 260×220 纹理重传（~228KB/帧 × 高帧率 ≈ 百 MB/s 级总线流量），且全部
+		//    发生在 present 前的 OpenFL 渲染段（flixel draw 探针看不见，表现为 frame 里
+		//    update/draw 之外的「神秘时间」）。与 HUD 刷新口径对齐（RecalculateRating 的
+		//    HUD 节流同为 4Hz）：统计面板以 5Hz 跳变，读数无差；手动游玩命中后的计数
+		//    显示延迟至多 200ms（该面板是统计面板，非即时判定反馈）。——
+		var nowJ:Float = haxe.Timer.stamp();
+		if (nowJ - _lastJudgRefresh < 0.2) return;
+		_lastJudgRefresh = nowJ;
 
 		// —— 内容缓存：命中数/连击/评级没变时，text 与着色都无需重写。
 		//    原实现每帧无条件 setTextFormat×3（OpenFL 每次都会置 __dirty/__layoutDirty，
