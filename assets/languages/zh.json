@@ -245,7 +245,7 @@
   "option.hudOnly": "只显示 HUD",
   "optionDesc.hudOnly": "开启后仅渲染音符与 HUD（角色/舞台/雨效等全场景不渲染，舞台脚本也跳过），帧率大幅提升；\n依赖舞台视觉或舞台脚本的模组请保持关闭",
   "option.enableGC": "启用 GC",
-  "optionDesc.enableGC": "关闭可消除 GC 尖峰（内存可能上升）；默认开启与旧版一致",
+  "optionDesc.enableGC": "关闭后游玩期不再有任何 GC 停顿（进曲回收、每 20 秒呼吸阀、录制回收全部跳过），彻底消除 GC 尖峰；\n代价：引用环垃圾与 GC 池随游玩缓慢上涨，巨型谱连续多轮后内存明显升高，建议此时重启游戏。默认开启与旧版一致",
   "option.opponentLightStrum": "对手箭头点亮",
   "optionDesc.opponentLightStrum": "对手命中时 strum 是否高亮 confirm；关闭省一点绘制",
   "option.botLightStrum": "自动游玩箭头点亮",

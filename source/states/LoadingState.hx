@@ -947,6 +947,8 @@ class LoadingState extends MusicBeatState
 		// 自适应阈值：堆内（含未回收垃圾）>256MB 才付 major 的停顿代价——小曲加载后
 		// 堆仅百余 MB，直接跳过零开销；巨型谱才会触发（停顿发生在加载屏上，感知最弱）。
 		#if cpp
+		// 「启用 GC=关」时同样跳过：加载屏上的 major 也是可感知顿挫，用户有权关掉
+		if (ClientPrefs.data.enableGC)
 		{
 			var heapNow:Float = cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT);
 			if (heapNow > 256 * 1024 * 1024)

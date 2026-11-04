@@ -95,6 +95,9 @@ class PerfControl
 	public static function collectGarbage():Bool
 	{
 		#if cpp
+		// 尊重「启用 GC」开关：用户显式关闭时不再强制回收（hxcpp 的 enable(false)
+		// 只挡分配路径的自动回收，挡不住手动 run(true)——须在此显式检查）
+		if (!ClientPrefs.data.enableGC) return false;
 		try
 		{
 			cpp.vm.Gc.run(true);

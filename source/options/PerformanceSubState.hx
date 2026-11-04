@@ -139,9 +139,16 @@ class PerformanceSubState extends BaseOptionsMenu
 		addOption(option);
 
 		option = new Option('启用 GC',
-			'关闭可消除 GC 尖峰（内存可能上升）；默认开启与旧版一致',
+			'关闭后游玩期不再有任何 GC 停顿（进曲回收、每 20 秒呼吸阀、录制回收全部跳过），彻底消除 GC 尖峰；\n代价：引用环垃圾与 GC 池随游玩缓慢上涨，巨型谱连续多轮后内存明显升高，建议此时重启游戏。默认开启与旧版一致',
 			'enableGC',
 			'bool');
+		// 即时生效：hxcpp 的 enable(false) 只挡分配路径自动回收，全项目手动 run(true)
+		// 调用点均已加守卫——这里同步全局开关，不等下一次进曲
+		option.onChange = function() {
+			#if cpp
+			try { cpp.vm.Gc.enable(ClientPrefs.data.enableGC); } catch (e:Dynamic) {}
+			#end
+		};
 		addOption(option);
 
 		option = new Option('对手箭头点亮',

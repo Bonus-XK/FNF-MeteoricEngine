@@ -722,7 +722,7 @@ class VideoRecorder
 					return;
 				}
 				payload = img.data.toBytes();
-				if (frameCount > 0 && frameCount % 30 == 0) cpp.vm.Gc.run(true); // 约每 0.5s 收一次（major GC，同 PlayState:1062 用法）
+				if (frameCount > 0 && frameCount % 30 == 0 && ClientPrefs.data.enableGC) cpp.vm.Gc.run(true); // 约每 0.5s 收一次（major GC，同 PlayState:1062 用法）；尊重「启用 GC」开关
 			}
 
 			stdinOut.writeBytes(payload, 0, payload.length);

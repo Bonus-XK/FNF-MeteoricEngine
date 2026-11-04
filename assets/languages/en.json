@@ -245,7 +245,7 @@
   "option.hudOnly": "HUD Only",
   "optionDesc.hudOnly": "When on, only notes and the HUD are rendered (characters, stages, rain and the rest of the scene are skipped, as are stage scripts), greatly raising framerate;\nkeep it off for mods that rely on stage visuals or stage scripts.",
   "option.enableGC": "Enable GC",
-  "optionDesc.enableGC": "Turning it off removes GC spikes (memory may rise); on by default to match previous behavior.",
+  "optionDesc.enableGC": "When off, no GC pauses during gameplay (post-load collect, the 20-second breathing valve and recorder collects are all skipped), eliminating GC spikes entirely;\nthe cost: reference-cycle garbage and the GC pool grow slowly over a session — after several runs of a giant chart memory can climb noticeably, so restart the game at that point. Defaults to on, matching previous behavior.",
   "option.opponentLightStrum": "Light Opponent Strum",
   "optionDesc.opponentLightStrum": "Whether the strum highlights confirm when the opponent hits; off saves a little drawing.",
   "option.botLightStrum": "Light Bot Strum",

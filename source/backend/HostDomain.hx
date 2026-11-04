@@ -1487,7 +1487,10 @@ class HostDomain
 
 		#if cpp
 		// 【GC 呼吸阀】首次进入设水位，之后每 20s 强制 major（落在本帧 update 内，profile 可见）
-		if (ClientPrefs.data.gcBreathing)
+		// ⚠ hxcpp 的 Gc.enable(false) 只挡分配路径的自动回收，不挡手动 run(true)
+		//（源码级确认：sgInternalEnable 仅在 Immix 分配路径消费）——「启用 GC=关」时
+		// 必须在此跳过强制 major，否则性能页开关形同虚设（2026-11-04 用户实测反馈）。
+		if (ClientPrefs.data.gcBreathing && ClientPrefs.data.enableGC)
 		{
 			var gcT0:Float = backend.MeteoricProfile.tickNow();
 			var nowBreath:Float = Sys.time();
