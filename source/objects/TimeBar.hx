@@ -78,11 +78,22 @@ class TimeBar extends FlxSpriteGroup
 		{
 			checkForHollowShape();
 
-			// bg 置于填充之下：0.6.3 模组的 timeBar.png 是实心底框（无镂空），
-			// 若 bg 在最上层会盖住彩色填充导致时间条变灰白
 			add(bg);
 			add(leftBar);
 			add(rightBar);
+			// 【分层对齐 Psych 0.7.1h HealthBar（add leftBar/rightBar/bg）】贴图镂空
+			//（现代 timeBar.png：边框 + 内部孔洞）→ 贴图在最上层：孔洞透出填充、
+			// 边框纹理盖在填充上（进度条压在贴图下）。
+			// 贴图实心（0.6.3 模组底框，无镂空，hollowShape=false）→ 保持 bg 在最下：
+			// 0.6.3 兼容模式——实心贴图若在上会盖死彩色填充（时间条变灰白），
+			// 此时进度条压在贴图上。
+			if (hollowShape)
+			{
+				remove(bg);
+				add(bg);
+			}
+			trace('[TimeBar] 图=' + bg.graphic.key + ' ' + Std.int(bg.width) + 'x' + Std.int(bg.height)
+				+ ' hollow=' + hollowShape + ' 分层=' + (hollowShape ? '贴图在上(Psych0.7)' : '贴图在下(0.6.3兼容)'));
 		}
 		regenerateClips();
 	}
