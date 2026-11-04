@@ -1462,6 +1462,9 @@ class HostDomain
 	static var _gcBreathLast:Float = 0;
 
 	static var _xkLastPos:Float = -1;
+	// 【曲终冻结兜底】音频停播 + pos 零推进的计时器（谱面尾 > 音频长时 Conductor 冻结）
+	static var _endFreezeT:Float = -1;
+	static var _endFreezePos:Float = -1;
 	// 【性能】onUpdate/onUpdatePost 每帧派发共用参数数组：[elapsed] 字面量是逐帧分配点
 	//（高帧率下持续喂 GC）。数组只在调用链内被解包传参，Lua/HScript 收到的是元素值、
 	// 不持有数组引用；派发是同步串行的，复用无重入风险。
@@ -1777,10 +1780,37 @@ class HostDomain
 		// 歌曲收尾兜底：音乐 onComplete（空音频/流式音频可能永不触发）与"歌曲位置越过时长"
 		// 双保险 —— 任意歌曲到达 max(音频长度, 谱面末尾) 都正常结算；正常运行下
 		// onComplete 先触发并置 endingSong/finishingSong，本分支不会重复执行。
+		// 第三兜底（2026-11-04 griefer Parts 实测）：Conductor 跟音频时钟，谱面尾部超出
+		// 音频长度时 FlxG.sound.music.time 冻结在音频长 → pos 永远追不上 songLength
+		//（pos 冻在 351526/351722、场上 886 个活对象、bot 永不结算）。此时音符也无法
+		// 过线（判定按 pos），"等音符清空"永不可达 —— 改用冻结计时：音频已停播且 pos
+		// 连续 2s 零推进 → 直接收尾。空窗段音频仍在播（playing=true）不触发；
+		// 正常曲 onComplete 置 endingSong 先于本兜底，无冲突。
 		if (!ps.endingSong && !ps.finishingSong && !ps.startingSong && !ps.paused && !ps.rewinding && !ps.inCutscene && ps.songLength > 0
 			&& Conductor.songPosition >= ps.songLength)
 		{
 			ps.finishSong();
+		}
+		else if (!ps.endingSong && !ps.finishingSong && !ps.startingSong && !ps.paused && !ps.rewinding && !ps.inCutscene
+			&& ps.startedCountdown && FlxG.sound.music != null && !FlxG.sound.music.playing)
+		{
+			var curEndPos:Float = Conductor.songPosition;
+			if (_endFreezePos != curEndPos)
+			{
+				_endFreezePos = curEndPos;
+				_endFreezeT = 0;
+			}
+			else
+			{
+				_endFreezeT += elapsed;
+				if (_endFreezeT >= 2.0)
+					ps.finishSong();
+			}
+		}
+		else
+		{
+			_endFreezeT = -1;
+			_endFreezePos = -1;
 		}
 
 		if (ps.camZooming)
