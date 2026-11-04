@@ -353,6 +353,8 @@ class PlayState extends MusicBeatState
 	// 【性能】densePerfMode 档长条尾段步距倍数（spawnHoldTail 用）：尾段每段一次 new Note
 	// （未池化），墙段实测 spawn 阶段 332-634µs/帧；步距 ×4 → 段数与分配 ÷4。
 	// 判定零影响（sustain miss 在 noteMissCommon 被抑制，段只是视觉裁剪单元）；
+	// 仅自动游玩/回放生效（spawnHoldTail 内与 splash 节流同款条件）——段同时是长条
+	// 「过线即缩」的视觉单元，手动游玩粒度变粗会肉眼可见（2026-11-04 用户反馈）；
 	// 非 dense 档不受影响（步距原值）。isSustainEnds 仍是最后一段，样式与原来一致。
 	public static inline var DENSE_TAIL_SEG_STEPS:Int = 4;
 	// 达上限时延迟进场窗口：距判定线仍 > 该值的箭头先不生成（不消失、可判定、可打，
@@ -2266,9 +2268,14 @@ class PlayState extends MusicBeatState
 		var stepCrochet:Float = ((60 / SONG.bpm) * 1000) / 4;
 		// 【性能】densePerfMode 档长条尾段步距 ×4（DENSE_TAIL_SEG_STEPS，字段注释见类顶部声明区）：
 		// 尾段每段一次 new Note（未池化），墙段实测 spawn 阶段 332-634µs/帧。段数与分配 ÷4。
-		// 判定零影响：sustain 的 miss 在 noteMissCommon 被抑制，段只是视觉裁剪单元；
-		// 裁剪粒度 1 个 16 分音符 → 4 个（墙段密度下不可辨）。非 dense 档步距原值（逐位一致）。
-		var segPeriod:Float = PlayState.densePerfMode ? stepCrochet * DENSE_TAIL_SEG_STEPS : stepCrochet;
+		// 判定零影响：sustain 的 miss 在 noteMissCommon 被抑制，段只是视觉裁剪单元。
+		// ⚠ 段同时是长条「过线即缩」的视觉单元：步距 ×4 = 缩短跳变粒度粗 4 倍
+		//（高 BPM 下一段 ≈ 300ms 残留，2026-11-04 用户手动游玩实测反馈「长条不能被
+		// 正确销毁」——bot 测试秒按看不出此问题）。因此视觉降级只对自动游玩/回放生效
+		//（与 splash 节流同款条件）；手动游玩恢复 16 分音符粒度，墙段 spawn 分配的
+		// 代价只在手动极限场景付回。
+		var segPeriod:Float = (PlayState.densePerfMode && (cpuControlled || replayMode))
+			? stepCrochet * DENSE_TAIL_SEG_STEPS : stepCrochet;
 		var floorSus:Int = Math.floor(holdLen / segPeriod);
 		if (floorSus < 0) floorSus = 0;
 
