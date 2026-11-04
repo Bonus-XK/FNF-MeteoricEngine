@@ -1864,6 +1864,12 @@ class HostDomain
 						// 语义与 forEachAlive 完全一致（先取后 ++、循环条件实时读长度、移除节点不回溯）
 						var noteSpeed:Float = ps.songSpeed / ps.playbackRate;
 						var killWindow:Float = ps.cpuControlled ? ClientPrefs.data.botplayKillWindow : ps.noteKillOffset;
+						// 【性能】视野纵向边界（一次/帧）：长条尾的 clipToStrumNote 只有与视野相交才有意义。
+						// 探针实测（stupid-griefer Parts 墙段）：clip 占 notes 循环 ~55%（306-377µs），
+						// 而 set_clipRect→set_frame 每次自赋值都急切 clipTo+resetFrameSize+dirty。
+						// 离屏段的裁剪是纯浪费——进屏当帧恢复，视觉零差；margin 覆盖箭头尺寸与 zoom 波动。
+						var viewTop:Float = FlxG.camera.scroll.y - 150;
+						var viewBot:Float = FlxG.camera.scroll.y + FlxG.camera.height + 150;
 						var ni:Int = 0;
 						while (ni < ps.notes.members.length)
 						{
@@ -1904,7 +1910,8 @@ class HostDomain
 								if (daNote.isSustainNote && strum != null && strum.sustainReduce)
 								{
 									daNote.wasGoodHit = true; // 副本纯视觉：满足裁剪条件
-									daNote.clipToStrumNote(strum);
+									if (daNote.y + daNote.height > viewTop && daNote.y < viewBot)
+										daNote.clipToStrumNote(strum);
 								}
 								if (!ps.rewinding && songPos - daNote.strumTime > killWindow)
 									ps.notes.invalidateNote(daNote);
@@ -1960,7 +1967,8 @@ class HostDomain
 								}
 							}
 
-							if(daNote.isSustainNote && strum != null && strum.sustainReduce) daNote.clipToStrumNote(strum);
+							if(daNote.isSustainNote && strum != null && strum.sustainReduce
+								&& daNote.y + daNote.height > viewTop && daNote.y < viewBot) daNote.clipToStrumNote(strum);
 
 							// Kill extremely late notes and cause misses
 							// （已入自动命中队列的音符本帧免杀：逾期 1 帧由 processBotHits 记账，杜绝"入队后被击杀丢弃"）

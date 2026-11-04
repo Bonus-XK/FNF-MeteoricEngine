@@ -350,6 +350,11 @@ class PlayState extends MusicBeatState
 	// 与 perfLimitNotes 无关——后者走 countLiving() 的 density 加权计数（一簇可达数百，
 	// 直接用作对象上限会破坏判定）；这里按 NoteGroup.aliveObjectCount 的真实精灵数计数。
 	static inline var DENSE_OBJ_CAP:Int = 800;
+	// 【性能】densePerfMode 档长条尾段步距倍数（spawnHoldTail 用）：尾段每段一次 new Note
+	// （未池化），墙段实测 spawn 阶段 332-634µs/帧；步距 ×4 → 段数与分配 ÷4。
+	// 判定零影响（sustain miss 在 noteMissCommon 被抑制，段只是视觉裁剪单元）；
+	// 非 dense 档不受影响（步距原值）。isSustainEnds 仍是最后一段，样式与原来一致。
+	public static inline var DENSE_TAIL_SEG_STEPS:Int = 4;
 	// 达上限时延迟进场窗口：距判定线仍 > 该值的箭头先不生成（不消失、可判定、可打，
 	// 只是进场更贴线），窗口内（快到线）即使超限也放行，保证判定零影响。
 	// 取 60ms=自动游玩击杀窗（6ms）的 10 倍：延迟进场必然早于排期命中弹出，无竞态；
@@ -2259,7 +2264,12 @@ class PlayState extends MusicBeatState
 		var holdLen:Float = target.holdLength;
 		if (Math.isNaN(holdLen) || holdLen <= 0) return;
 		var stepCrochet:Float = ((60 / SONG.bpm) * 1000) / 4;
-		var floorSus:Int = Math.floor(holdLen / stepCrochet);
+		// 【性能】densePerfMode 档长条尾段步距 ×4（DENSE_TAIL_SEG_STEPS，字段注释见类顶部声明区）：
+		// 尾段每段一次 new Note（未池化），墙段实测 spawn 阶段 332-634µs/帧。段数与分配 ÷4。
+		// 判定零影响：sustain 的 miss 在 noteMissCommon 被抑制，段只是视觉裁剪单元；
+		// 裁剪粒度 1 个 16 分音符 → 4 个（墙段密度下不可辨）。非 dense 档步距原值（逐位一致）。
+		var segPeriod:Float = PlayState.densePerfMode ? stepCrochet * DENSE_TAIL_SEG_STEPS : stepCrochet;
+		var floorSus:Int = Math.floor(holdLen / segPeriod);
 		if (floorSus < 0) floorSus = 0;
 
 		var prev:Note = arrow;
@@ -2267,7 +2277,7 @@ class PlayState extends MusicBeatState
 		for (i in 0...segCount)
 		{
 			// Extra Keys：位打包低 8 位 = lane（旧 `& 3` 会把 lane≥4 截断成 0-3）
-			var seg:Note = new Note(target.strumTime + stepCrochet * i, target.noteData & 255,
+			var seg:Note = new Note(target.strumTime + segPeriod * i, target.noteData & 255,
 				prev, true, false, PlayState.instance);
 			// 字段（与安卓 generateChartNotes 直建路径同款）
 			seg.chartSeq = _segmentSeqBase++;

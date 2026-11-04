@@ -2022,6 +2022,26 @@ class Note extends FlxSprite
 		_lastValidChecked = '';
 	}
 
+	// 【性能】无旋转音符的视野判定快路径：原实现每次走 getScreenBounds（矩形构建+origin 变换
+	// +getRotatedBounds 三角函数/四点变换）+ containsRect。符号化采样（stupid-griefer Parts 墙段）
+	// 实测 Note.draw ~110/258 样本、isOnScreen+getRotatedBounds 是其中一大块，~2000 音符 × 每帧。
+	// angle==0 时旋转不变 —— 直接按未旋转包围盒算屏幕坐标并与相机视野比较，
+	// 比较边界/开闭区间与 containsRect 逐条一致（viewMarginLeft/Right/Top/Bottom 同源）。
+	override public function isOnScreen(?camera:FlxCamera):Bool
+	{
+		var cam:FlxCamera = camera != null ? camera : FlxG.camera;
+		if (angle == 0 && !pixelPerfectPosition && !isPixelPerfectRender(cam))
+		{
+			var sx:Float = x - Std.int(cam.scroll.x * scrollFactor.x) - offset.x + origin.x - origin.x * scale.x;
+			var sy:Float = y - Std.int(cam.scroll.y * scrollFactor.y) - offset.y + origin.y - origin.y * scale.y;
+			var sw:Float = frameWidth * (scale.x < 0 ? -scale.x : scale.x);
+			var sh:Float = frameHeight * (scale.y < 0 ? -scale.y : scale.y);
+			return sx + sw > cam.viewMarginLeft && sx < cam.viewMarginRight
+				&& sy + sh > cam.viewMarginTop && sy < cam.viewMarginBottom;
+		}
+		return super.isOnScreen(cam);
+	}
+
 	public function followStrumNote(myStrum:StrumNote, fakeCrochet:Float, songSpeed:Float = 1)
 	{
 		var strumX:Float = myStrum.x;
