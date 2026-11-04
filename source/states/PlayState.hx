@@ -1024,7 +1024,7 @@ class PlayState extends MusicBeatState
 		// 小图标跳动：清空上一局的每帧状态（hop 位移 / squash 相位 / 交替奇偶 / 上一档位），
 		// 必须在 hud.build() 之后、第一次 GameHUD.update 之前 —— 否则重进曲目会带着旧位移起跳。
 		IconBop.reset();
-		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong + (replayMode ? Lang.tOr('win.playingReplay', ' [回放]') : '');
+		Lib.application.window.title = Lang.tOr('win.playing', "NovaComet Engine - Playing: ") + curSong + (replayMode ? Lang.tOr('win.playingReplay', ' [回放]') : '');
 
 		strumLineNotes.cameras = [camHUD];
 		grpNoteSplashes.cameras = [camHUD];
@@ -2973,7 +2973,7 @@ class PlayState extends MusicBeatState
 
 		RecalculateRating();
 
-		Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + curSong;
+		Lib.application.window.title = Lang.tOr('win.playing', "NovaComet Engine - Playing: ") + curSong;
 		// 重建完成（音符/判定线/人物全部就绪），解锁 update
 		_visualsTorn = false;
 		// 从全屏设置页（自定义界面/调整延迟与Combo）返回：重载后的曲目先挂起在暂停菜单，

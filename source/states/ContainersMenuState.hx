@@ -121,7 +121,7 @@ class ContainersMenuState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		WeekData.setDirectoryFromWeek();
 
-		Lib.application.window.title = Lang.tOr('win.containers', "FNF':Meteoric Engine - Containers");
+		Lib.application.window.title = Lang.tOr('win.containers', "NovaComet Engine - Containers");
 
 		// 背景 = menuDesat 染**当前主题色**（令牌 menuTint，取值 = 本主题 primary，
 		// 见 DesignTokens.MENU_TINTS）。本行缺失时菜单贴图保持原始品红，

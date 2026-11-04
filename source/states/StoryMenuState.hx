@@ -80,7 +80,7 @@ class StoryMenuState extends MusicBeatState
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 
-		Lib.application.window.title = Lang.tOr('win.selectWeek', "FNF':Meteoric Engine - Select Week:");
+		Lib.application.window.title = Lang.tOr('win.selectWeek', "NovaComet Engine - Select Week:");
 
 		PlayState.isStoryMode = true;
 		WeekData.reloadWeekFiles(true);

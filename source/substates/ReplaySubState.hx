@@ -121,7 +121,7 @@ class ReplaySubState extends MusicBeatSubstate
 		#end
 
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = Lang.tOr('replay.windowTitle', "FNF':Meteoric Engine - 回放列表");
+		Lib.application.window.title = Lang.tOr('replay.windowTitle', "NovaComet Engine - 回放列表");
 
 		reloadList();
 	}

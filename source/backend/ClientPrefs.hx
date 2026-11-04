@@ -21,7 +21,7 @@ class SaveVariables {
 	// 存档值即中文档位名（与 fpsColor 同规范，显示层翻译走 optionValue.fpsStyle.*）
 	@:keep public var fpsStyle:String = '方块';
 	// FPS 计数器显示项与顺序（CSV）：'Mem'/'Peak'/'CPU'/'Ver'/'Git' 的子集排列；FPS 数字固定主行，不在清单内。
-	// 'Ver' = 引擎版本行（Meteoric Engine vX.X.X）；'Git' = 提交信息行（#N hash 分支*）—— 两个独立开关。
+	// 'Ver' = 引擎版本行（NovaComet Engine vX.X.X）；'Git' = 提交信息行（#N hash 分支*）—— 两个独立开关。
 	// 由 options.FPSStatsEditorState 编辑；方块/经典两种样式共用同一张清单。空串 = 只显示 FPS 本体。
 	@:keep public var fpsStatsList:String = 'Mem,Peak,CPU,Ver,Git';
 	// 帧率上限档位：120/240/480/无上限（移动端默认 120 防过热）

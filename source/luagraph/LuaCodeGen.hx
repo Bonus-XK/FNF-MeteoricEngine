@@ -59,7 +59,7 @@ class LuaCodeGen
 
 		var head:Array<String> = [];
 		head.push('-- ============================================================');
-		head.push(Lang.tOr('lg.gen.by', '--  Meteoric Engine · Lua 图形化编程（积木块 → Lua）'));
+		head.push(Lang.tOr('lg.gen.by', '--  NovaComet Engine · Lua 图形化编程（积木块 → Lua）'));
 		head.push(Lang.tOr('lg.gen.scriptName', '--  脚本名称：') + (doc.name == null ? '' : doc.name));
 		head.push(Lang.tOr('lg.gen.notice', '--  说明：本区块由编辑器全量重写；需要手写代码请用文件底部的自定义代码区。'));
 		head.push(MANAGED_BEGIN);

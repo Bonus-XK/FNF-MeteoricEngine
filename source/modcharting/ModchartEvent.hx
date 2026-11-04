@@ -1,6 +1,6 @@
 package modcharting;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 
 class ModchartEvent
 {

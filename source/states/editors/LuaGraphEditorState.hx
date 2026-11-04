@@ -252,7 +252,7 @@ class LuaGraphEditorState extends MusicBeatState
 	{
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('lg.windowTitle', "FNF':Meteoric Engine - Lua 图形化编程");
+		Lib.application.window.title = Lang.tOr('lg.windowTitle', "NovaComet Engine - Lua 图形化编程");
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.scrollFactor.set();

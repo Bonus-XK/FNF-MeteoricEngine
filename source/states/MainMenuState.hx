@@ -110,7 +110,7 @@ class MainMenuState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		baseWindowTitle = "FNF':Meteoric Engine - Main Menu";
+		baseWindowTitle = "NovaComet Engine - Main Menu";
 		Lib.application.window.title = baseWindowTitle;
 
 		if (curSelected >= optionShit.length) curSelected = 0;
@@ -238,7 +238,7 @@ class MainMenuState extends MusicBeatState
 		// ---- 版本信息（左下角；完整保留新版显示：版本号 + 可点击 GitHub 新版本链接） ----
 		if (TitleState.mainUpdateCheck)
 		{
-			verText = new FlxText(40, 560, 0, 'Meteoric Engine v' + Main.meVersion + Lang.tOr('menu.oldVersion', '（旧版本）'), 16);
+			verText = new FlxText(40, 560, 0, 'NovaComet Engine v' + Main.meVersion + Lang.tOr('menu.oldVersion', '（旧版本）'), 16);
 			verText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			verText.borderSize = 2;
 			verText.scrollFactor.set();
@@ -253,7 +253,7 @@ class MainMenuState extends MusicBeatState
 		}
 		else
 		{
-			verText = new FlxText(40, 560, 0, 'Meteoric Engine v' + Main.meVersion, 16);
+			verText = new FlxText(40, 560, 0, 'NovaComet Engine v' + Main.meVersion, 16);
 			verText.setFormat(Paths.font('future.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			verText.borderSize = 2;
 			verText.scrollFactor.set();

@@ -142,7 +142,7 @@ static void meteoric_native_sig_handler(int sig, siginfo_t* si, void* uctx) {
 	char body[4096];
 	int bl = 0;
 	bl += snprintf(body + bl, sizeof(body) - bl, "============================================================\\n");
-	bl += snprintf(body + bl, sizeof(body) - bl, "  Meteoric Engine - Native Crash Report\\n");
+	bl += snprintf(body + bl, sizeof(body) - bl, "  NovaComet Engine - Native Crash Report\\n");
 	bl += snprintf(body + bl, sizeof(body) - bl, "============================================================\\n");
 	bl += snprintf(body + bl, sizeof(body) - bl, "时间       : %s\\n", tbuf);
 	bl += snprintf(body + bl, sizeof(body) - bl, "平台/系统   : %s\\n", meteoric_os_cstr());
@@ -393,9 +393,9 @@ class CrashHandler
 	{
 		#if android
 		// 安卓：lime 的 window.alert 未实现（调了会抛异常 → 静默扇退），改用系统 Toast
-		try { extension.androidtools.widget.Toast.makeText(Lang.tOr('crash.toastPrefix', 'Meteoric Engine 发生错误，崩溃日志已保存：') + error, 1); } catch (e:Dynamic) {}
+		try { extension.androidtools.widget.Toast.makeText(Lang.tOr('crash.toastPrefix', 'NovaComet Engine 发生错误，崩溃日志已保存：') + error, 1); } catch (e:Dynamic) {}
 		#else
-		try { openfl.Lib.application.window.alert(buildMessage(source, error), 'Meteoric Engine - Error'); } catch (e:Dynamic) {}
+		try { openfl.Lib.application.window.alert(buildMessage(source, error), 'NovaComet Engine - Error'); } catch (e:Dynamic) {}
 		#end
 		Sys.exit(1);
 	}
@@ -437,7 +437,7 @@ class CrashHandler
 		#if !html5
 		var lines:Array<String> = [];
 		lines.push('============================================================');
-		lines.push('  Meteoric Engine - Crash Report (Haxe)');
+		lines.push('  NovaComet Engine - Crash Report (Haxe)');
 		lines.push('============================================================');
 		lines.push('时间       : ' + Date.now().toString());
 		lines.push('平台/系统   : ' + platformInfo());
@@ -474,7 +474,7 @@ class CrashHandler
 		lines.push('');
 		lines.push('===== 系统报告 =====');
 		lines.push('--- 引擎 ---');
-		lines.push('引擎        : Meteoric Engine v' + Main.meVersion + ' (Psych 0.7.1h 基座)');
+		lines.push('引擎        : NovaComet Engine v' + Main.meVersion + ' (Psych 0.7.1h 基座)');
 		lines.push('构建特性    : ' + buildDefines());
 		lines.push('HAXE/FLIXEL : FlxG ' + flixel.FlxG.VERSION);
 		lines.push('--- 系统 / 设备 ---');

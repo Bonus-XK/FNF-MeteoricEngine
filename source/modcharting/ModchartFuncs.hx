@@ -17,7 +17,7 @@ import scripting.lua.FunkinLua;
 
 using StringTools;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // Lua 绑定：注册进 FunkinLua 的 implement 体系（每个脚本独立注册，与引擎其它函数组一致）。
 //
 // 门禁语义：函数永远注册（mod 脚本调用不报错），但 modchartsEnabled 关闭时全部空转

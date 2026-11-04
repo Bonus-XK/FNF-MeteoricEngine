@@ -12,7 +12,7 @@ import states.PlayState;
 
 using StringTools;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 上游按多引擎条件编译，本移植只保留 Meteoric（Psych 0.7.1h 基座）一条路径。
 
 class ModchartUtil

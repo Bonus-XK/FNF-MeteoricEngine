@@ -171,7 +171,7 @@ class LoadingState extends MusicBeatState
 		add(statusText);
 
 		// ---- 底部版本 ----
-		var versionText:FlxText = new FlxText(0, FlxG.height - 32, FlxG.width, 'Meteoric Engine', 14);
+		var versionText:FlxText = new FlxText(0, FlxG.height - 32, FlxG.width, 'NovaComet Engine', 14);
 		versionText.setFormat(Paths.font('future.ttf'), 14, 0xFF5A6472, CENTER);
 		versionText.scrollFactor.set();
 		add(versionText);

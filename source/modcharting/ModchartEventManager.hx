@@ -2,7 +2,7 @@ package modcharting;
 
 import backend.Conductor;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 按拍排程的模表事件队列（Lua 的 set()/ease() 与 modchart.json 的 events 都走这里）。
 
 class ModchartEventManager

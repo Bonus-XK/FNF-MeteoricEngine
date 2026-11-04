@@ -7,7 +7,7 @@ import backend.Conductor;
 import objects.Note;
 import states.PlayState;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 注意：
 //  - ModifierType 枚举与 ModifierSubValue 必须保持本模块顶层（Haxe 限制：类内不能再定义类/枚举）；
 //  - 所有内建修饰器类都标 @:keep：startMod 走 Type.resolveClass 动态实例化，没有编辑器的静态

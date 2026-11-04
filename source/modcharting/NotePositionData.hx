@@ -3,7 +3,7 @@ package modcharting;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
 import flixel.util.FlxPool;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 每音符/每判定线每帧的位置数据（池化，避免逐帧 GC）。
 
 class NotePositionData implements IFlxDestroyable

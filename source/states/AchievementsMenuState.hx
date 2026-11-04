@@ -68,7 +68,7 @@ class AchievementsMenuState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('win.achievements', "FNF':Meteoric Engine - Achievements");
+		Lib.application.window.title = Lang.tOr('win.achievements', "NovaComet Engine - Achievements");
 
 		// ---- 背景 ----
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));

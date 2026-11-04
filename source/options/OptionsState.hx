@@ -213,7 +213,7 @@ class OptionsState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('settings.windowTitleFull', "FNF':Meteoric Engine - 设置菜单");
+		Lib.application.window.title = Lang.tOr('settings.windowTitleFull', "NovaComet Engine - 设置菜单");
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;

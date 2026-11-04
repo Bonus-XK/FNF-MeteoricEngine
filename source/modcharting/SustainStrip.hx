@@ -5,7 +5,7 @@ import openfl.geom.Vector3D;
 import objects.Note;
 import flixel.FlxStrip;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 长条网格：模表渲染器接管绘制时，用 FlxStrip 世界空间顶点替代引擎自绘的长条。
 
 class SustainStrip extends FlxStrip

@@ -107,7 +107,7 @@ class FreeplayState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('win.selectSong', "FNF':Meteoric Engine - Select Song");
+		Lib.application.window.title = Lang.tOr('win.selectSong', "NovaComet Engine - Select Song");
 		PlayState.queuedReplay = null; // 清除可能残留的回放请求
 
 		persistentUpdate = true;
@@ -879,7 +879,7 @@ class FreeplayState extends MusicBeatState
 		vocals.volume = 0.7;
 		instPlaying = curSelected;
 		previewActive = true;
-		Lib.application.window.title = Lang.tOr('win.selectSongColon', "FNF':Meteoric Engine - Select Song: ") + curSelected;
+		Lib.application.window.title = Lang.tOr('win.selectSongColon', "NovaComet Engine - Select Song: ") + curSelected;
 
 		// 灵动岛：展开为播放器并注入交互回调
 		if (previewTray != null)

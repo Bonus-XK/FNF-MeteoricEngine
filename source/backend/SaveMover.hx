@@ -196,7 +196,7 @@ class SaveMover
 		var out:Dynamic = {};
 		out.version = 1;
 		out.timestamp = Date.now();
-		out.engine = 'Meteoric Engine ' + Main.meVersion;
+		out.engine = 'NovaComet Engine ' + Main.meVersion;
 		out.commit = backend.GitInfo.summary();
 		out.settings = captureSettingsJson();
 		out.keybinds = captureKeybindsJson();

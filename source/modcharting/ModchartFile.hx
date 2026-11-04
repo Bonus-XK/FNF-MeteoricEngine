@@ -17,7 +17,7 @@ import hscript.Expr;
 import lime.utils.Assets;
 using StringTools;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // modchart.json 加载 + customMods/*.hx（hscript 自定义修饰器）。
 // 文件位置约定（与上游 Psych 一致）：mods/<mod>/data/<谱面>/modchart.json 优先，资源内 data/<谱面>/modchart.json 兜底。
 

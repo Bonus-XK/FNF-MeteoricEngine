@@ -51,7 +51,7 @@ class LuaClass
 	#end
 
 	public static var classCode(default, null) =
-			'-- Meteoric Engine Lua Class System\n'
+			'-- NovaComet Engine Lua Class System\n'
 		+ 		'local classRegistry = {}\n'
 		+ 		'local instanceMetas = {}\n'
 		+ 		'\n'

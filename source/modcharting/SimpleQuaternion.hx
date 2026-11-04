@@ -3,7 +3,7 @@ package modcharting;
 import flixel.math.FlxAngle;
 import openfl.geom.Vector3D;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 移植时修复上游两个已知问题：
 //  1) transformVector 原为空壳（原样返回输入向量，未做任何旋转）——此处实现 q*v*q⁻¹；
 //  2) conjugate 原未取反 x 分量。

@@ -378,7 +378,7 @@ class PauseSubState extends MusicBeatSubstate
 
 		regenMenu(true); // 首次打开：菜单项逐项飞入
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = Lang.tOr('pause.windowTitle', "FNF':Meteoric Engine - 暂停");
+		Lib.application.window.title = Lang.tOr('pause.windowTitle', "NovaComet Engine - 暂停");
 
 		trace('[PAUSE] 新暂停界面已加载 | 画布=' + FlxG.width + 'x' + FlxG.height + ' | 菜单项=' + menuItems.length);
 		trace('[PAUSE] 信息文本最右缘=' + (blueballedTxt.x + blueballedTxt.width) + ' | 安全上限=' + SAFE_RIGHT);
@@ -579,7 +579,7 @@ class PauseSubState extends MusicBeatSubstate
 				{
 					mouseActive = true;
 					close();
-					Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
+					Lib.application.window.title = Lang.tOr('win.playing', "NovaComet Engine - Playing: ") + PlayState.SONG.song;
 					tp.put();
 					return;
 				}
@@ -644,7 +644,7 @@ class PauseSubState extends MusicBeatSubstate
 			{
 				mouseActive = true;
 				close();
-				Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
+				Lib.application.window.title = Lang.tOr('win.playing', "NovaComet Engine - Playing: ") + PlayState.SONG.song;
 				return;
 			}
 			mousePos.put();
@@ -758,7 +758,7 @@ class PauseSubState extends MusicBeatSubstate
 			{
 				case ID_RESUME:
 					close();
-					Lib.application.window.title = Lang.tOr('win.playing', "FNF':Meteoric Engine - Playing: ") + PlayState.SONG.song;
+					Lib.application.window.title = Lang.tOr('win.playing', "NovaComet Engine - Playing: ") + PlayState.SONG.song;
 					#if METEORIC_PROFILE
 					trace('[TITLE] resume set lib="' + Lib.application.window.title + '" limeSame=' + (lime.app.Application.current.window == Lib.application.window));
 					#end

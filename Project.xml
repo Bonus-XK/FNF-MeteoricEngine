@@ -16,7 +16,7 @@
 
 	<!-- _________________________ Application Settings _________________________ -->
 
-	<app title="FNF':Meteoric Engine" file="Meteoric" packageName="com.bonusxk.meteoric" package="com.bonusxk.meteoric" main="Main" version="1.2.0" company="Bonus-XK" />
+	<app title="NovaComet Engine" file="Meteoric" packageName="com.bonusxk.meteoric" package="com.bonusxk.meteoric" main="Main" version="1.2.0" company="Bonus-XK" />
 
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />

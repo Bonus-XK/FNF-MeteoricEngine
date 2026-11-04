@@ -13,7 +13,7 @@ import modcharting.Modifier; // 模块 import：Modifier/ModifierType 及子类�
 
 using StringTools;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 核心机制：接管绘制 —— 藏起引擎的音符/判定线组（visible=false 只关绘制不关逻辑），
 // 每帧对每个成员跑修饰器管线算出位置数据，再按 z 排序手动 draw。
 // 音符的生成、判定、丢失、结算完全不受影响。

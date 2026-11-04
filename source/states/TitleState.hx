@@ -97,7 +97,7 @@ class TitleState extends MusicBeatState
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 		
-        Lib.application.window.title = Lang.tOr('win.intro', "FNF':Meteoric Engine - Intro");
+        Lib.application.window.title = Lang.tOr('win.intro', "NovaComet Engine - Intro");
 
 		#if LUA_ALLOWED
 		Mods.pushGlobalMods();
@@ -745,7 +745,7 @@ class TitleState extends MusicBeatState
 					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
 					FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
-					createCoolText(['Meteoric Engine'], 40, 64, DesignTokens.primary);
+					createCoolText(['NovaComet Engine'], 40, 64, DesignTokens.primary);
 				case 3:
 					addMoreText('by Real-bonuX', 40, 26, 0xFFFFFFFF);
 				case 4:

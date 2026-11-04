@@ -367,7 +367,7 @@ class FPS extends TextField
 				out.push('${prefix}CPU: ${Math.round(_cpuPct)}%');
 				#end
 			case 'Ver': // 引擎版本信息行（commit/提交信息由 'Git' 项独立控制）
-				out.push('${prefix}Meteoric Engine v${Main.meVersion}');
+				out.push('${prefix}NovaComet Engine v${Main.meVersion}');
 			case 'Git': // 提交信息行：commit 数 / 短 hash / 分支名 / 未提交标记，编译期由 GitInfo 烘焙（运行时零开销）
 				var gi:String = backend.GitInfo.summary();
 				if (gi != "-" && gi.length > 0) out.push('${prefix}$gi');

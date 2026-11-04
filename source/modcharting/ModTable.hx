@@ -6,7 +6,7 @@ import backend.Conductor;
 import states.PlayState;
 import modcharting.Modifier; // 模块 import：XModifier/YModifier 等子类型靠它进裸名作用域
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 修饰器注册表：按 [playfield][lane] 预计算命中表，逐帧管线里只查表不遍历全修饰器。
 
 class ModTable

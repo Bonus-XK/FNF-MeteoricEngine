@@ -4,7 +4,7 @@ import backend.ExtraKeys;
 import objects.Note;
 import states.PlayState;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // 移植增强：键数一律以 ExtraKeys.songKeys 为准（Meteoric 原生 1~12 键），
 // 判定线缩放从真实 StrumNote 读取（含 laneScale），不再硬编码 0.7。
 

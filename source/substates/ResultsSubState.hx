@@ -572,7 +572,7 @@ class ResultsSubState extends MusicBeatSubstate
 		buildMenu(PANEL_X, MENU_Y, PANEL_W);
 
 		FlxG.mouse.visible = true;
-		Lib.application.window.title = Lang.tOr('results.windowTitle', "FNF':Meteoric Engine - 结算");
+		Lib.application.window.title = Lang.tOr('results.windowTitle', "NovaComet Engine - 结算");
 
 		loadUIscripts('results');
 	}

@@ -89,7 +89,7 @@ class MasterEditorMenu extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('win.editorsMenu', "FNF':Meteoric Engine - Editors Menu");
+		Lib.application.window.title = Lang.tOr('win.editorsMenu', "NovaComet Engine - Editors Menu");
 
 		// Lua 图形化编辑器为桌面端功能（拖拽 + 键盘）：Android 上直接隐藏该条目，
 		// 避免暴露一个用不了的界面（其它 7 项行为不变）。

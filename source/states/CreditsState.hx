@@ -93,7 +93,7 @@ class CreditsState extends MusicBeatState
 		// 进入界面时自动清理 RAM（先清理再加载，避免误删当前界面资源）
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
-		Lib.application.window.title = Lang.tOr('win.credits', "FNF':Meteoric Engine - Credits");
+		Lib.application.window.title = Lang.tOr('win.credits', "NovaComet Engine - Credits");
 
 		persistentUpdate = true;
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
@@ -199,8 +199,8 @@ class CreditsState extends MusicBeatState
 
 		// ---- 数据 ----
 		var defaultList:Array<Array<String>> = [ //Name - Icon name - Description - Link - BG Color
-			["Meteoric Engine Credits"],
-			['Real-bonuX',		'bxk',		Lang.tOr('credits.bonuxDesc', 'Meteoric Engine的主创作者，\n是个12岁的初中生awa'),								'https://space.bilibili.com/3461572190013717',	'FCFBFC'],
+			["NovaComet Engine Credits"],
+			['Real-bonuX',		'bxk',		Lang.tOr('credits.bonuxDesc', 'NovaComet Engine的主创作者，\n是个12岁的初中生awa'),								'https://space.bilibili.com/3461572190013717',	'FCFBFC'],
 			[''],
 			["Funkin' Crew"],
 			['ninjamuffin99',	'ninjamuffin99',	Lang.tOr('credits.fnfMainProgrammer', "FNF的主程序员"),							'https://twitter.com/ninja_muffin99',	'CF2D2D'],

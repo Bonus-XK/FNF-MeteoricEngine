@@ -52,7 +52,7 @@ class ContainerLauncher
 		//   编译期直接 `Unknown identifier`）；`\$` 不是合法转义，唯一写法就是 `$$`。
 		//   项目内已多次踩这个坑（wrapper.sh 的 `$APP_PID_FILE`、`echo $$` 都是同源问题）。
 		var ps:String = '';
-		ps += '# Meteoric Engine 容器前台化脚本 (Windows) —— 每次启动重写，请勿手工修改\n';
+		ps += '# NovaComet Engine 容器前台化脚本 (Windows) —— 每次启动重写，请勿手工修改\n';
 		ps += '# 容器: ' + info.displayName + '\n';
 		ps += '$$ErrorActionPreference = "SilentlyContinue"\n';
 		ps += '$$pidFile = ' + psQuote(pidPath) + '\n';
@@ -144,7 +144,7 @@ class ContainerLauncher
 
 		var s:String = '';
 		s += '@echo off\r\n';
-		s += 'rem Meteoric Engine 容器包装器 (Windows) —— 每次启动重写，请勿手工修改\r\n';
+		s += 'rem NovaComet Engine 容器包装器 (Windows) —— 每次启动重写，请勿手工修改\r\n';
 		s += 'rem 容器: ' + info.displayName + '  (' + info.folder + ')\r\n';
 		s += 'rem 注意：本脚本依赖 cmd 的「父进程等待子进程退出」语义来捕获退出码。\r\n';
 		// enabledelayedexpansion：下面 :me_watch 标签循环里必须用 !VAR! 而不是 %VAR% ——
@@ -295,7 +295,7 @@ class ContainerLauncher
 
 		var s:String = '';
 		s += '#!/bin/sh\n';
-		s += '# Meteoric Engine 容器包装器（每次启动重写，请勿手工修改）\n';
+		s += '# NovaComet Engine 容器包装器（每次启动重写，请勿手工修改）\n';
 		s += '# 容器: ' + info.displayName + '  (' + info.folder + ')\n';
 		s += 'set -u\n';
 		s += 'HOST_PID=' + hostPid + '\n';
@@ -458,7 +458,7 @@ class ContainerLauncher
 		//   实际落盘才是 `$VAR`（项目内已多次踩坑，cpp 二进制实测）。
 		var s:String = '';
 		s += '#!/bin/sh\n';
-		s += '# Meteoric Engine 容器前台化脚本（每次启动重写，请勿手工修改）\n';
+		s += '# NovaComet Engine 容器前台化脚本（每次启动重写，请勿手工修改）\n';
 		s += '# 容器: ' + info.displayName + '\n';
 		s += 'set -u\n';
 		s += 'PID_FILE="' + pidPath + '"\n';

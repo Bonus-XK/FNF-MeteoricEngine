@@ -1,6 +1,6 @@
 package modcharting;
 
-// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 Meteoric Engine。
+// 基于 FNF-Modcharting-Tools v1.0.1（TheZoroForce007，Apache-2.0）移植适配 NovaComet Engine。
 // Playfield：一个独立的音符图层（x/y/z 偏移 + 整层透明度），叠加在基准位之上。
 
 class Playfield

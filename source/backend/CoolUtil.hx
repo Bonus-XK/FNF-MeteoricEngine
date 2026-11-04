@@ -207,7 +207,7 @@ class CoolUtil
 			if (on)
 			{
 				if (!sys.FileSystem.exists(p))
-					sys.io.File.saveContent(p, 'Meteoric Engine 携带模式：删除本文件即可恢复正常存档路径。');
+					sys.io.File.saveContent(p, 'NovaComet Engine 携带模式：删除本文件即可恢复正常存档路径。');
 				return true;
 			}
 			if (sys.FileSystem.exists(p)) sys.FileSystem.deleteFile(p);

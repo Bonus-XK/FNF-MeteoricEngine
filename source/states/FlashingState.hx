@@ -23,7 +23,7 @@ class FlashingState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(bg);
 
-		Lib.application.window.title = "FNF':Meteoric Engine - <!>Warning";
+		Lib.application.window.title = "NovaComet Engine - <!>Warning";
 		
 		warnText = new FlxText(0, 0, FlxG.width,
 			Lang.tOr('flashing.warning', "<!>警告\n

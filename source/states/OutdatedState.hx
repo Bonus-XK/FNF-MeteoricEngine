@@ -77,7 +77,7 @@ class OutdatedState extends MusicBeatState
 		Paths.clearUnusedMemory();
 		super.create();
 
-		Lib.application.window.title = Lang.tOr('win.outdated', "FNF':Meteoric Engine - Outdated Version");
+		Lib.application.window.title = Lang.tOr('win.outdated', "NovaComet Engine - Outdated Version");
 		leftState = false;
 
 		// ---- 背景：系统域（menuDesat 染主题色 + 压暗遮罩）----
@@ -128,7 +128,7 @@ class OutdatedState extends MusicBeatState
 		content.add(makeText(px + half, rowY + 26, half, remoteVer, 32, DesignTokens.primary));
 
 		// ---- 说明文字（次级色，不抢标题） ----
-		content.add(makeText(px + PAD, rowY + 96, PANEL_W - PAD * 2, Lang.tOr('update.desc', '请尽快升级到最新的 Meteoric Engine，以获得新功能与问题修复。'), 20, 0xFFD7D7E0));
+		content.add(makeText(px + PAD, rowY + 96, PANEL_W - PAD * 2, Lang.tOr('update.desc', '请尽快升级到最新的 NovaComet Engine，以获得新功能与问题修复。'), 20, 0xFFD7D7E0));
 
 		// ---- 两个按钮（旧版的文字链接 → 真按钮）----
 		var btnY:Float = py + PANEL_H - 208;
