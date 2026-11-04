@@ -72,6 +72,14 @@ class InterfaceSettingsSubState extends BaseOptionsMenu
 			'bool');
 		addOption(option);
 
+		var option:Option = new Option('时间条贴图层级',
+			'经典样式（timeBar.png）中贴图与彩色填充的叠放：自动检测=按贴图是否镂空判定（镂空贴图在上、实心底框在下）；贴图在上=强制贴图盖在填充上（Psych 0.7 观感，适合镂空贴图）；贴图在下=强制填充压在贴图上（0.6.3 观感）',
+			'timeBarImageLayer',
+			'string',
+			['auto', 'top', 'bottom']);
+		option.displayOptions = ['自动检测', '贴图在上', '贴图在下'];
+		addOption(option);
+
 		var option:Option = new Option('时间条颜色跟随对方',
 			'开启后，时间条填充色跟随对方角色血量条颜色（过暗/过亮时自动兜底）；关闭时使用当前主题色。'
 			+ '两种时间条样式均受此开关控制',

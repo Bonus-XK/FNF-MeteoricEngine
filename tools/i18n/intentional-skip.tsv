@@ -1008,3 +1008,8 @@ source/substates/ScriptManagerSubstate.hx	脚本切换失败：$e	1	诊断日志
 source/options/JudgmentSettingsSubState.hx	毫秒加权准确率	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/JudgmentSettingsSubState.hx	开启后，准确率权重按实际毫秒偏差在判定档位间连续插值：正中 1.0，贴边降到下一档锚点（Sick→Good→Bad→Shit）。\\n关闭时回到离散锚点权重（Sick=1 / Good=0.67 / Bad=0.34 / Shit=0），与旧版逐位一致。\\n旧回放文件不受此开关影响，永远按录制时口径复现。	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
 source/options/PerformanceSubState.hx	关闭后游玩期不再有任何 GC 停顿（进曲回收、每 20 秒呼吸阀、录制回收全部跳过），彻底消除 GC 尖峰；\\n代价：引用环垃圾与 GC 池随游玩缓慢上涨，巨型谱连续多轮后内存明显升高，建议此时重启游戏。默认开启与旧版一致	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	经典样式（timeBar.png）中贴图与彩色填充的叠放：自动检测=按贴图是否镂空判定（镂空贴图在上、实心底框在下）；贴图在上=强制贴图盖在填充上（Psych 0.7 观感，适合镂空贴图）；贴图在下=强制填充压在贴图上（0.6.3 观感）	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	时间条贴图层级	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	自动检测	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	贴图在上	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue
+source/options/InterfaceSettingsSubState.hx	贴图在下	1	Option 兜底原文：Option 构造函数统一走 option/optionDesc/optionValue

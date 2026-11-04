@@ -81,19 +81,26 @@ class TimeBar extends FlxSpriteGroup
 			add(bg);
 			add(leftBar);
 			add(rightBar);
-			// 【分层对齐 Psych 0.7.1h HealthBar（add leftBar/rightBar/bg）】贴图镂空
-			//（现代 timeBar.png：边框 + 内部孔洞）→ 贴图在最上层：孔洞透出填充、
-			// 边框纹理盖在填充上（进度条压在贴图下）。
-			// 贴图实心（0.6.3 模组底框，无镂空，hollowShape=false）→ 保持 bg 在最下：
-			// 0.6.3 兼容模式——实心贴图若在上会盖死彩色填充（时间条变灰白），
-			// 此时进度条压在贴图上。
-			if (hollowShape)
+			// 【分层】用户显式开关优先（性能/界面设置「时间条贴图层级」）：
+			//   top    = 贴图恒在最上层（Psych 0.7.1h HealthBar 官方分层：孔洞透出填充、
+			//            边框纹理盖在填充上；实心贴图选此项会盖死填充——用户自选）
+			//   bottom = 贴图恒在最下层（0.6.3 观感：进度条压在贴图上）
+			//   auto   = 按贴图形态判定：镂空（hollow=true）贴图在上；实心贴图在下
+			//            （0.6.3 底框若在上会盖死彩色填充使时间条变灰白）
+			var layerPref:String = ClientPrefs.data.timeBarImageLayer;
+			var imageOnTop:Bool = switch (layerPref)
+			{
+				case 'top': true;
+				case 'bottom': false;
+				default: hollowShape;
+			}
+			if (imageOnTop)
 			{
 				remove(bg);
 				add(bg);
 			}
-			trace('[TimeBar] 图=' + bg.graphic.key + ' ' + Std.int(bg.width) + 'x' + Std.int(bg.height)
-				+ ' hollow=' + hollowShape + ' 分层=' + (hollowShape ? '贴图在上(Psych0.7)' : '贴图在下(0.6.3兼容)'));
+			trace('[TimeBar] img=' + bg.graphic.key + ' ' + Std.int(bg.width) + 'x' + Std.int(bg.height)
+				+ ' hollow=' + hollowShape + ' layer=' + layerPref + ' imageOnTop=' + imageOnTop);
 		}
 		regenerateClips();
 	}

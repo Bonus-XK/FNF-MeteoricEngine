@@ -178,6 +178,7 @@ class SaveVariables {
 	@:keep public var iconBopMigrated:Bool = false;
 	@:keep public var timeBarType:String = '剩余时间';
 	@:keep public var newTimeBarStyle:Bool = false;
+	@:keep public var timeBarImageLayer:String = 'auto'; // 时间条贴图层级：auto=按贴图镂空检测 / top=贴图恒在上（Psych 0.7 观感）/ bottom=贴图恒在下（0.6.3 观感）
 	@:keep public var timeBarOpponentColors:Bool = false; // 时间条填充色跟随对方角色血量颜色（贴图样式下生效）
 	@:keep public var noReset:Bool = false;
 	@:keep public var restartNoChartReload:Bool = false;
