@@ -523,7 +523,7 @@ class CustomFadeTransition extends FlxSubState
 
 	function makeTexts():Void
 	{
-		WaterMark = new FlxText(isTransIn ? 50 : -900, 720 - 50 - 50 * 2, 0, 'ME ENGINE V' + Main.meVersion, 50);
+		WaterMark = new FlxText(isTransIn ? 50 : -900, 720 - 50 - 50 * 2, 0, 'NOVACOMET ENGINE V' + Main.meVersion, 50);
 		WaterMark.scrollFactor.set();
 		WaterMark.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		WaterMark.antialiasing = ClientPrefs.data.antialiasing;
