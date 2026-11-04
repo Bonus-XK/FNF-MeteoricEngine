@@ -938,6 +938,26 @@ class LoadingState extends MusicBeatState
 		if (stopMusic && FlxG.sound.music != null)
 			FlxG.sound.music.stop();
 
+		// 【GC 洪峰回收】谱面解析（Parts 合并谱的瞬时分配可达 GB 级）与巨型 spritesheet
+		// 解码的垃圾此刻全部挤在 GC 池里等 major；游玩期 GC 压力低、major 几乎不触发，
+		// 而池一旦扩上去只增不还（hxcpp 扩池不缩）→ 进曲后 memR/ram 长期高位驻留
+		//（实测 2026-11-04 griefer Parts：进曲瞬间 mem=1892mb、多轮游玩后池平台 3.1GB）。
+		// 在加载屏尚在显示的此刻主动回收：活对象（角色位图/谱面数据/音频缓冲）不受影响，
+		// 洪峰垃圾立即析构、原生缓冲随 finalizer 归还 OS。
+		// 自适应阈值：堆内（含未回收垃圾）>256MB 才付 major 的停顿代价——小曲加载后
+		// 堆仅百余 MB，直接跳过零开销；巨型谱才会触发（停顿发生在加载屏上，感知最弱）。
+		#if cpp
+		{
+			var heapNow:Float = cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_CURRENT);
+			if (heapNow > 256 * 1024 * 1024)
+			{
+				var gcT0:Float = haxe.Timer.stamp();
+				try { cpp.vm.Gc.run(true); } catch (eG:Dynamic) {}
+				trace('[LOAD] post-load major GC: ' + Std.int((haxe.Timer.stamp() - gcT0) * 1000) + 'ms (heap=' + Std.int(heapNow / 1048576) + 'mb)');
+			}
+		}
+		#end
+
 		// 跳过进出加载界面的过渡动画，加载完立即进入目标状态
 		FlxTransitionableState.skipNextTransIn = true;
 		FlxTransitionableState.skipNextTransOut = true;
