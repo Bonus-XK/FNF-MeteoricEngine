@@ -296,6 +296,52 @@ class ShaderFunctions
 			return false;
 			#end
 		});
+
+		// ── 全局后处理 shader（根级 filter，跨界面常驻；模组负责 removeGlobalShader）──
+		funk.addLocalCallback("setGlobalShader", function(name:String, ?params:Dynamic = null) {
+			#if (!flash && sys)
+			return shaders.GlobalShaderHandler.enable(name, params);
+			#else
+			FunkinLua.luaTrace("setGlobalShader: Platform unsupported for Global Shader!", false, false, FlxColor.RED);
+			return false;
+			#end
+		});
+		Lua_helper.add_callback(lua, "removeGlobalShader", function() {
+			#if (!flash && sys)
+			shaders.GlobalShaderHandler.disable();
+			return true;
+			#else
+			return false;
+			#end
+		});
+		Lua_helper.add_callback(lua, "setGlobalShaderFloat", function(prop:String, value:Float) {
+			#if (!flash && sys)
+			return shaders.GlobalShaderHandler.setFloat(prop, value);
+			#else
+			return false;
+			#end
+		});
+		Lua_helper.add_callback(lua, "getGlobalShaderFloat", function(prop:String) {
+			#if (!flash && sys)
+			return shaders.GlobalShaderHandler.getFloat(prop);
+			#else
+			return null;
+			#end
+		});
+		Lua_helper.add_callback(lua, "isGlobalShaderActive", function() {
+			#if (!flash && sys)
+			return shaders.GlobalShaderHandler.isActive();
+			#else
+			return false;
+			#end
+		});
+		Lua_helper.add_callback(lua, "getGlobalShaderName", function() {
+			#if (!flash && sys)
+			return shaders.GlobalShaderHandler.getActiveName();
+			#else
+			return null;
+			#end
+		});
 	}
 	
 	#if (!flash && sys)

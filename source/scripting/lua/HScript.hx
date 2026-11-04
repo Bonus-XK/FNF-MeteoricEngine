@@ -489,6 +489,15 @@ class HScript
 		set('Countdown', backend.BaseStage.Countdown);
 		#if (!flash && sys)
 		set('FlxRuntimeShader', flixel.addons.display.FlxRuntimeShader);
+		// 全局后处理 shader（CRT 等）：类本身 + 与 Lua 同名的便捷函数
+		set('GlobalShaderHandler', shaders.GlobalShaderHandler);
+		set('setGlobalShader', function(name:String, ?params:Dynamic = null) return shaders.GlobalShaderHandler.enable(name, params));
+		set('removeGlobalShader', function() { shaders.GlobalShaderHandler.disable(); return true; });
+		set('setGlobalShaderFloat', function(prop:String, value:Float) return shaders.GlobalShaderHandler.setFloat(prop, value));
+		set('getGlobalShaderFloat', function(prop:String) return shaders.GlobalShaderHandler.getFloat(prop));
+		// 状态查询也走闭包：hscript 对暴露类不能调静态方法（实测 GlobalShaderHandler.isActive() 报未知错误）
+		set('isGlobalShaderActive', function() return shaders.GlobalShaderHandler.isActive());
+		set('getGlobalShaderName', function() return shaders.GlobalShaderHandler.getActiveName());
 		#end
 		set('ShaderFilter', openfl.filters.ShaderFilter);
 		set('StringTools', StringTools);
