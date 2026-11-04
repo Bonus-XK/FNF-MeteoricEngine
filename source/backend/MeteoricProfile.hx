@@ -59,6 +59,8 @@ class MeteoricProfile
 	static var _gapAcc:Float = 0;
 	static var _gapMax:Float = 0;
 	static var _gapN:Int = 0;
+	// 【大位图明细】>32MB 位图的逐张盘点节拍（每 15s 一次，避免逐秒刷屏）
+	static var _bmpDetailTick:Int = 0;
 
 	// 子阶段累计
 	static var _phT:Float = 0;
@@ -472,6 +474,48 @@ class MeteoricProfile
 				}
 				catch (eB:Dynamic) {}
 				if (nC > 0) sb.add(' bmpN=' + nC + ' bmpMB=' + Std.int(pix / 1048576));
+				// 【大位图明细】每 15s 一次：列出 >32MB 的位图 key + 尺寸——巨型 spritesheet
+				//（8192×8192 角色图 = 256MB/张）占位的直接证据，定位内存大户不再靠猜。
+				_bmpDetailTick++;
+				if (_bmpDetailTick >= 15)
+				{
+					_bmpDetailTick = 0;
+					var tops:Array<String> = [];
+					try
+					{
+						var cacheD:Map<String, Dynamic> = Reflect.field(FlxG.bitmap, '_cache');
+						if (cacheD != null)
+							for (k in cacheD.keys())
+							{
+								var g2:Dynamic = cacheD.get(k);
+								if (g2 != null && g2.bitmap != null)
+								{
+									var mb2:Float = g2.width * g2.height * 4 / 1048576;
+									if (mb2 > 32)
+									{
+										var keyS:String = Std.string(k);
+										if (keyS.length > 40) keyS = '...' + keyS.substr(keyS.length - 40);
+										tops.push(keyS + ' ' + g2.width + 'x' + g2.height + '=' + Std.int(mb2) + 'MB');
+									}
+								}
+							}
+					}
+					catch (eT:Dynamic) {}
+					if (tops.length > 0)
+					{
+						tops.sort(function(aS:String, bS:String):Int {
+							// ⚠ 本函数在 inline 的 end() 体内：类型错误会内联展开到每个调用方。
+							// hxcpp 静态平台 Int 不能与 null 比较 → 必须经 Null<Int> 中转。
+							var aN:Null<Int> = Std.parseInt(aS.substr(aS.lastIndexOf('=') + 1));
+							var bN:Null<Int> = Std.parseInt(bS.substr(bS.lastIndexOf('=') + 1));
+							var aV:Int = (aN != null) ? aN : 0;
+							var bV:Int = (bN != null) ? bN : 0;
+							return bV - aV;
+						});
+						if (tops.length > 8) tops.resize(8);
+						sb.add(' [bmpTop ' + tops.join(', ') + ']');
+					}
+				}
 			}
 			#end
 			// 【GC 保留内存】MEM_INFO_RESERVED = 当前存活 + 已申请未归还 OS 的池（含大块）。
