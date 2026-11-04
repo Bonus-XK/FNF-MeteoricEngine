@@ -5,7 +5,7 @@
 
 ## 为什么需要它
 
-Meteoric 的 Lua 层（`llua/Convert.hx`）无法把 Haxe 类实例传进 Lua——`Convert.toLua`
+NovaComet 的 Lua 层（`llua/Convert.hx`）无法把 Haxe 类实例传进 Lua——`Convert.toLua`
 遇到 FlxSprite / Character / FlxCamera 等对象一律压 nil。所以传统 Lua 只能靠
 字符串路径间接操作（`setProperty('boyfriend.x', 100)`），每次读写都要重新解析路径，
 且无法持有对象引用、无法链式调用、无法调用返回对象的方法。

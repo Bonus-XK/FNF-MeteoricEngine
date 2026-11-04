@@ -595,7 +595,7 @@ class MainMenuState extends MusicBeatState
 			if (clickPressed && overLink)
 			{
 				mouseActive = true;
-				CoolUtil.browserLoad('https://github.com/Bonus-XK/FNF-MeteoricEngine/releases');
+				CoolUtil.browserLoad('https://github.com/Bonus-XK/FNF-NovaCometEngine/releases');
 			}
 		}
 

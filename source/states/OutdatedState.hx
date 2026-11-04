@@ -316,7 +316,7 @@ class OutdatedState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('confirmMenu'), 0.7);
 		fadeOut(function()
 		{
-			CoolUtil.browserLoad("https://github.com/Bonus-XK/FNF-MeteoricEngine/releases");
+			CoolUtil.browserLoad("https://github.com/Bonus-XK/FNF-NovaCometEngine/releases");
 			MusicBeatState.switchState(new MainMenuState());
 		});
 	}

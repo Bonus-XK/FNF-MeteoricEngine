@@ -11,9 +11,9 @@
 
 | Job | 产物 | 上传 Artifact 名 |
 |-----|------|-----------------|
-| Android | `Meteoric-debug.apk`（arm64） | `meteoric-android-arm64` |
+| Android | `NovaComet-debug.apk`（arm64） | `meteoric-android-arm64` |
 | Windows | x64 + x86 完整 bin 目录（含依赖 DLL） | `meteoric-windows-x64` / `meteoric-windows-x86` |
-| macOS | x86_64 + arm64 两个 `Meteoric.app` | `meteoric-macos-x64` / `meteoric-macos-arm64` |
+| macOS | x86_64 + arm64 两个 `NovaComet.app` | `meteoric-macos-x64` / `meteoric-macos-arm64` |
 
 ## 工作原理
 

@@ -16,9 +16,9 @@
   Vulkan 需要 OpenFL 层移植，**不做**，等上游。
 - lime 8.4 的 Vulkan 绑定是**窗口耦合**的：`VK.createInstance` 必须传 `VulkanRenderContext`
   （只有 Vulkan 窗口才有）。探测可用性 = 真开一个隐藏 Vulkan 窗口。
-- **上游 develop 的 SDL 子模块仍是 SDL2（2.32.10）**；SDL3 是 Meteoric 自己移植的
+- **上游 develop 的 SDL 子模块仍是 SDL2（2.32.10）**；SDL3 是 NovaComet 自己移植的
   （`ci/lime-sdl3-patch`，SDL 3.2.8）。→ P2 是把 8.4 的 Vulkan 增量**移植进 SDL3 树**，
-  而不是把 Meteoric 补丁覆盖到 8.4 上（后者会把 Vulkan 覆盖没）。
+  而不是把 NovaComet 补丁覆盖到 8.4 上（后者会把 Vulkan 覆盖没）。
 - macOS 上 Vulkan 必须走 **MoltenVK**（Vulkan→Metal 翻译层）。SDL 的 Vulkan 加载器
   在 mac 上会依次找 `libvulkan.1.dylib` / `libMoltenVK.dylib` —— 直放 MoltenVK dylib
   + `DYLD_LIBRARY_PATH` 即可，不需要完整 Vulkan SDK。
@@ -93,10 +93,10 @@ haxelib dev lime <dir>
    `<haxedef name="lime-vulkan" />`），否则 RendererBackend 探测永远落在回退分支。
 4. pixman 0.46.4 与 develop 的 pixman-files.xml 不匹配（`pixman_region64f_rectangles`
    链接失败）→ 在 `project/lib/pixman-files.xml` 的 region32 行后加一行
-   `pixman-region64f.c`（借自 Meteoric 补丁的解法，已验证）。
+   `pixman-region64f.c`（借自 NovaComet 补丁的解法，已验证）。
 运行：`DYLD_LIBRARY_PATH=<MoltenVK dylib 所在目录> ./VKSandbox.app/Contents/MacOS/VKSandbox`
 
-## P2：lime-meteoric（develop + Meteoric 补丁重放）—— ✅ 2026-10-25 完成并真机验证
+## P2：lime-meteoric（develop + NovaComet 补丁重放）—— ✅ 2026-10-25 完成并真机验证
 
 **验证结果**（mac arm64 / Apple M4 / MoltenVK 1.4.2）：
 - ndll（release/debug，`-Dlime-vulkan`）构建 EXIT=0；
@@ -110,7 +110,7 @@ haxelib dev lime <dir>
 2. SDL3 仍有 `SDL_WINDOW_VULKAN` 窗口标志且**必须设置**（SDL_video.c：带标志建窗自动
    LoadLibrary，失败=窗口创建干净失败；`SDL_Vulkan_CreateSurface` 也检查它）。
    「SDL3 删了该标志」是误记。
-3. Meteoric 的 SDL_build_config.h **src 副本**未开 `SDL_VIDEO_VULKAN`（include 副本开了，
+3. NovaComet 的 SDL_build_config.h **src 副本**未开 `SDL_VIDEO_VULKAN`（include 副本开了，
    两份不一致！）→ cocoa 驱动无 Vulkan，报「Vulkan support is either not configured in SDL」。
 4. `SDL_cocoavulkan` 链接缺 `QuartzCore`（CAMetalLayer）。
 5. SDL3 把 **loader 层扩展** `VK_KHR_portability_enumeration` 无条件列入 mac 必需扩展；
@@ -156,18 +156,18 @@ haxelib dev lime /usr/local/lib/haxe/lib/lime/8,2,2          # 回滚
 **基座**：`~/Documents/lime-meteoric`（develop 8.4.0 已组装，见上）。**不是** overlay
 `ci/lime-sdl3-patch`（那是 8.2.2 基座，直接覆盖会把 8.4 的 Vulkan / SDLMenu / Mac 窗口代码抹掉）。
 
-**上游改动过、需三方合并的 22 个文件**（8.2.2-stock ↔ Meteoric ↔ 8.4 三方）：
+**上游改动过、需三方合并的 22 个文件**（8.2.2-stock ↔ NovaComet ↔ 8.4 三方）：
 
 | 文件 | 难点 |
 |---|---|
-| `project/src/backend/sdl/SDLWindow.cpp/.h` | **核心**：以 Meteoric SDL3 版为基，回移植 8.4 的 Vulkan 增量（`WINDOW_FLAG_VULKAN`、`VulkanRenderer` 创建、surface/drawable/instance-extension 辅助） |
-| `project/src/backend/sdl/SDLApplication.cpp/.h` | 墙钟帧循环（HiResMs/nextUpdate double/WaitEventTimeout + `MeteoricFrameLoopPatch.cpp`）。8.4 该文件**无** vulkan 内容（已查证），MeteorIC 版可直接作基，但要过一遍 8.4 的其它上游修复 |
+| `project/src/backend/sdl/SDLWindow.cpp/.h` | **核心**：以 NovaComet SDL3 版为基，回移植 8.4 的 Vulkan 增量（`WINDOW_FLAG_VULKAN`、`VulkanRenderer` 创建、surface/drawable/instance-extension 辅助） |
+| `project/src/backend/sdl/SDLApplication.cpp/.h` | 墙钟帧循环（HiResMs/nextUpdate double/WaitEventTimeout + `NovaCometFrameLoopPatch.cpp`）。8.4 该文件**无** vulkan 内容（已查证），MeteorIC 版可直接作基，但要过一遍 8.4 的其它上游修复 |
 | `project/src/backend/sdl/SDLSystem.cpp` | 222 行差异照搬 + 上游 diff 复核 |
-| `project/Build.xml` | 以 8.4 为基（含 `LIME_VULKAN` 门控 + `VKRenderer.cpp` 条目），合入 Meteoric 构建定制；SDLMenu/Tray 选 Stub 版（SDL 3.2.8 无 tray API） |
-| `project/lib/sdl-files.xml`（938 行差异） | Meteoric 的 SDL3 源清单直接用 |
+| `project/Build.xml` | 以 8.4 为基（含 `LIME_VULKAN` 门控 + `VKRenderer.cpp` 条目），合入 NovaComet 构建定制；SDLMenu/Tray 选 Stub 版（SDL 3.2.8 无 tray API） |
+| `project/lib/sdl-files.xml`（938 行差异） | NovaComet 的 SDL3 源清单直接用 |
 | 其余 files.xml / custom configs | 版本对齐重放（pixman/openal/curl/freetype/harfbuzz 等） |
 
-**8.4 新增、Meteoric 补丁没有的 5 个文件**（需 SDL3 化或走 Stub）：
+**8.4 新增、NovaComet 补丁没有的 5 个文件**（需 SDL3 化或走 Stub）：
 `SDLMenu.cpp/.h`、`SDLMenuStub.cpp`、`SDLTrayIcon.h`、`SDLWindowMac.mm`（mac 窗口定制，重点核对与 SDL3 的 API 兼容）。
 
 **顺序**：先 mac arm64（本地可全验）→ 引擎 `haxelib dev` 切到 lime-meteoric →

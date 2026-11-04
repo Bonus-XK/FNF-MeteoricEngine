@@ -1,4 +1,4 @@
-# Meteoric Engine 更新日志
+# NovaComet Engine 更新日志
 
 > 版本：1.2.0
 
@@ -257,7 +257,7 @@
   `tools/boundary/overlay_ledger.py`（上游覆盖层台账）。
 ## 1.2.0（打击特效预览 + 皮肤解析修复 + CNE 模组兼容）
 
-- **【新增】「CNE 模组兼容」：Codename Engine 格式的 mod 可直接在 Meteoric 里加载**（设置 → 编程 → **CNE 模组兼容**，
+- **【新增】「CNE 模组兼容」：Codename Engine 格式的 mod 可直接在 NovaComet 里加载**（设置 → 编程 → **CNE 模组兼容**，
   **默认关**；关闭时 mod 加载路径与改动前完全一致）。与上一轮落地的「CNE 式 HScript 编程层」是两条独立的线：
   `cneScripting` 管脚本能不能跑，`cneModCompat` 管 CNE 布局能不能读进来。覆盖：
   - **谱面转换**：`songs/<song>/charts/[<variant>/]<难度>.json`（`codenameChart`）→ **psych_v1**。新增
@@ -269,7 +269,7 @@
     `Scroll Speed Change`↔`Change Scroll Speed`、`Add Camera Zoom`、`Play Animation`、自定义事件透传；
     `No Anim Note`/`Alt Anim Note` 别名到 Psych 内建 `No Animation`/`Alt Animation`。
     ⚠ 两条刻意的"不照搬"：① 不用 CNE `FNFLegacyParser.encode` 的 0.6.x「相对 mustHitSection」老语义
-    （Meteoric/Psych 1.0.4 的 psych_v1 是绝对列号，照搬会把对手段音符翻到玩家侧，见 `PlayState.hx:2156-2198`）；
+    （NovaComet/Psych 1.0.4 的 psych_v1 是绝对列号，照搬会把对手段音符翻到玩家侧，见 `PlayState.hx:2156-2198`）；
     ② 指定难度缺谱时**不**回退 `normal`（CNE 自己直接报缺谱，静默换难度会让玩家玩到错谱）。
   - **音频**：Psych 路径 `songs/<song>/Inst.ogg` 缺失时回退 CNE `songs/<song>/song/Inst|Voices<suffix>[-<难度>]`
     （`.ogg` 优先、`.mp3` 兜底）；`suffix` 取 `meta.json` 的 `instSuffix`/`vocalsSuffix`，难度取当前难度（小写优先）；
@@ -284,7 +284,7 @@
   - **zip 包**：`mods/<名>.zip`（CNE 根级即 mod 根）被识别为 mod；首次访问透明解包到 `mods/_cnestage/<名>/`
     （指纹 = 体积 + mtime；Mod 列表刷新时 `CneModCompat.clearCaches()` 让运行中替换的 zip 重新解包；
     同名真实文件夹优先；`_cnestage` 已登记进 `Mods.ignoreModFolders`；zip mod 的启用状态在开关关闭时也不会被 `modsList.txt` 重写抹掉）。
-    之所以是"落盘暂存"而不是内存挂载：Meteoric/Psych 的资源管线全是真实文件路径
+    之所以是"落盘暂存"而不是内存挂载：NovaComet/Psych 的资源管线全是真实文件路径
     （`sys.io.File` / `FileSystem` / `FlxGraphic.fromFile` / `Sound.fromFile`），内存挂载等于重写整条资源管线
     （CNE 的 `AssetsLibraryList` + `__proxy` 那套）；暂存目录可随时整个删掉，下次自动重建。
   - **Mod 列表**：卡片与右侧信息区标注「CNE 格式」，开关未开时提示开关位置（`states/ModsMenuState.hx`）。
@@ -493,7 +493,7 @@
      `FlxG.bitmap` 缓存里）。空画布下按 Del/切分类反复操作最明显。
      新增 `disposeSprite()` / `disposeAll()`：摘除 + `destroy()`，并对**纯 FlxSprite** 显式
      `FlxG.bitmap.removeIfNoUse(graphic)` —— `FlxSprite.destroy()` 只做 `graphic = null` + `useCount--`
-     （haxelib `FlxSprite.hx:1490-1502`），不会摘缓存；而 Meteoric 版 `FlxText.set_graphic` 已自带
+     （haxelib `FlxSprite.hx:1490-1502`），不会摘缓存；而 NovaComet 版 `FlxText.set_graphic` 已自带
      `removeIfNoUse`（`FlxText.hx:739`），故对文本不再二次摘除（避免重复调用）。
      覆盖点：`rebuildCanvas`（顺序：先摘除全部成员 → 按 `canvasBits` 销毁 texts/chips → 清空
      `spr.texts/chips` 引用 → 销毁底图；顺序颠倒会对同一对象二次 destroy）、`clearGhost`、`clearDropHints`、
@@ -518,7 +518,7 @@
 - **本轮验证（第一版界面缺陷修复 ①-⑩，全部为真产物验证）**
   - 编译：`./compile-mac.sh` 共 8 次 **EXIT=0 / 0 error**（post-build 每次均还原墙钟版 `lime.ndll`
     `cd890285f1d3def18d9f5aafc04a198d` + 重签）；另跑本仓库只读模式 `./compile-mac.sh typecheck`
-    **✔ 通过且 app 未被改动**。最后产物 `Meteoric`：20176320 字节，mtime > 全部源码修改时间。
+    **✔ 通过且 app 未被改动**。最后产物 `NovaComet`：20176320 字节，mtime > 全部源码修改时间。
   - 引擎内自检（`ME_LUAGRAPH_SELFTEST=1`，零行为影响的门控入口）。**已实测观测到**（build 6/7 运行日志）：
     `hint fit: row1=505/636 row2=564/636 truncated=no barBottom=710` ｜ `edit ok … undoRedoMatch=yes` ｜
     `stack delete ok: before=2 afterDelete=1 afterUndo=2 restored=yes` ｜
@@ -833,7 +833,7 @@
 
   **真正的根因（三份 ndll 二进制比对）**：
 
-  | 文件 | 大小 | Meteoric/SDL3 标记 | 墙钟补丁 |
+  | 文件 | 大小 | NovaComet/SDL3 标记 | 墙钟补丁 |
   |---|---|---|---|
   | `export/release/windows/bin/lime.ndll`（64 位在用的） | 8,281,088 | 无 | 无 |
   | `export/32bit/windows/bin/lime.ndll`（8/18 构建） | 10,638,336 | 有 | 有 |
@@ -845,7 +845,7 @@
   配上 100000 哨兵就是启动死循环 → 于是才有了"摘档位"这个治标处置。
 
   **修复（原生 + 引擎 + 构建三层）**：
-  ① **原生能力标记**：`ci/lime-sdl3-patch/.../MeteoricFrameLoopPatch.cpp`（新增）导出纯 C 符号
+  ① **原生能力标记**：`ci/lime-sdl3-patch/.../NovaCometFrameLoopPatch.cpp`（新增）导出纯 C 符号
      `lime_meteoric_frame_loop_patch`（返回 1 = 本次构建来自带墙钟补丁的 SDL3 树）。
      ⚠ 不用 `DEFINE_PRIME*` 注册 cffi 原语：hxcpp 规定一个模块只能有一次且需 `IMPLEMENT_API`，
      而 `src/ExternalInterface.cpp` 已占用，多一个就报一大片
@@ -924,7 +924,7 @@
   | 包装器 | `wrapper.sh`（POSIX shell） | `wrapper.bat`（cmd，新增 `buildWrapperWindows()`） |
   | 宿主让位 | 缩窗 1×1 + `visible=false` + `kill -STOP` | `visible=false`，**不挂起**（`suspendHost()` 在 Windows 上是空操作） |
   | 唤醒 | wrapper `kill -CONT <hostPid>` | 宿主每帧 poll `exit.txt`（`Phase.Running` 变成主力路径） |
-  | 宿主 pid | **必须**（失败即拒绝启动） | 不需要（`launch()` 里 `hostPid = 0`），顺带避开「宿主与目标同名 Meteoric.exe」误杀 |
+  | 宿主 pid | **必须**（失败即拒绝启动） | 不需要（`launch()` 里 `hostPid = 0`），顺带避开「宿主与目标同名 NovaComet.exe」误杀 |
   | 退出码 | `wait $ME_APP` → `$?` | `start "" /B /WAIT` → `%ERRORLEVEL%`（含"为空/非数字→-1"兜底） |
   | 前台化 | `activate.sh` + System Events（需授权） | `activate.ps1` + `WScript.Shell.AppActivate`（无需授权） |
   | 默认热键 | **Ctrl+C**（组合键） | **F10**（单键）；Windows 上宿主全局收键，Ctrl+C 在 FNF 里是常用操作会误触 |
@@ -959,7 +959,7 @@
   （编译期 `Unknown identifier`）；全部按项目惯例写 `$$`。
 
   **验证状态（诚实标注）**：macOS 与 Windows 两个目标 **类型检查零错误**；Windows 交叉编译
-  **exit 0**，产物 `Meteoric.exe`（09-11 19:27）内 `ContainerProcess`×3、`buildWrapperWindows`×2、
+  **exit 0**，产物 `NovaComet.exe`（09-11 19:27）内 `ContainerProcess`×3、`buildWrapperWindows`×2、
   `buildActivatorWindows`×2、`wrapper.bat`、`activate.ps1`、`tasklist`、`taskkill`×3、`AppActivate`、
   `start "" /B /WAIT`、`wmic`、`forceKill`×5、`targetReallyGone`×2 全部在位；
   `wrapper.sh` / `activate.sh` 经 `sh -n` 语法校验。
@@ -979,7 +979,7 @@
   「组合键：先按住 CONTROL，再按 C；单独按任一键都不会退出」。
 
   ② **容器窗口无法聚焦（点标题栏能弄到最前、随即掉焦）—— 让位方式 + 前台化时序双错**：
-  - **让位方式错**：原实现「缩成 1×1」，但缩小的窗口**仍是 key window**，macOS 认为 Meteoric 仍占据前台，
+  - **让位方式错**：原实现「缩成 1×1」，但缩小的窗口**仍是 key window**，macOS 认为 NovaComet 仍占据前台，
     目标引擎的激活请求被判为后台应用抢焦点而拒绝。改为 `window.visible = false`（SDL_HideWindow），
     SDL 才会交出窗口级焦点（`lime.ui.Window.set_visible` → `SDLWindow::SetVisible` 已核实链路；
     旧注释“隐藏窗口会连菜单栏一起摘掉”是错的，那只发生在应用级隐藏）。
@@ -1023,7 +1023,7 @@
   `Ctrl + C` 这类"宿主侧全局热键"与该模式**物理互斥**（目标引擎内按 Ctrl+C 只会触发它自己进程里的
   `requestQuit()`，写进它自己的 runtime 目录 = 空操作）。经确认，退出方式以**关闭目标引擎窗口**为准
   （wrapper watchdog 已验证能正确收尾）。`CONTAINERS.md` 第 3 节改写为「退出容器（怎么回来）」并说明
-  热键仅在 Meteoric 窗口仍为前台时有效；容器界面详情区文案同步改为「退出容器：直接关掉目标引擎窗口」。
+  热键仅在 NovaComet 窗口仍为前台时有效；容器界面详情区文案同步改为「退出容器：直接关掉目标引擎窗口」。
 
   **本轮实测证据（第二次运行，全部来自用户机器的真实日志）**：`[ME] launch: … hostPid=22884 wait=1.4s`
   （证明日志覆盖缺陷已修，上一轮这行会被抹掉）；`[ME] activator: frontmost ok (pid 22892, try 1)`
@@ -1036,13 +1036,13 @@
   （测试目录与临时二进制已清理，测试期间抢走的前台已还原。）
 
 
-- **多版本容器（Containers）：把别的引擎装进 Meteoric 里一键切换**：新增容器机制——玩家把任意版本的目标引擎（Psych 0.6.3 / 0.7.3 / 1.0.4、SeiunEngine 等）整个丢进 `mods/_containers/<名称>/`，补一个 `container.json`，即可在游戏内切过去跑它的 mod，退出后 Meteoric 自动回来并重启。改动：① 新增 `source/backend/ContainerManifestParser.hx`（清单解析，**永不抛异常**：字段缺失/类型错/JSON 损坏一律折成 `problem` 文案给界面红字）+ `ContainerManifest.hx`/`ContainerManifestData.hx`/`ContainerResourceSpec.hx`/`ContainerInfo.hx`/`Phase.hx`（**一类型一文件**——Haxe 一个文件只有一个顶层类型会提升为模块名，纯 typedef 文件不提升，混装会连环 `Type not found`，已用最小复现实证）；② 新增 `source/backend/ContainerStore.hx`（目录发现 `appRoot`/`modsRoot`/`containersRoot`、容器扫描、`resources/` → 目标引擎资源根的 staging（**只增不改**：不写目标引擎配置、不改主程序、工作目录设为该资源根以适配 Psych 0.6.3 的相对 `mods/`）、执行位与 `Info.plist` 可执行文件探测、文件系统小工具）；③ 新增 `source/backend/ContainerLauncher.hx`（生成 `wrapper.sh`、拉起目标引擎、`container.log` 日志、`app.pid`/`exit.txt`/`cmd.txt`/`phase.txt` 状态文件、shell 引用转义）；④ 新增 `source/backend/ContainerSession.hx`（会话状态机 IDLE→LAUNCHING→HIDING→STOPPING→RUNNING→RETURNING；窗口焦点用 `onFocusIn/onFocusOut` 自行记账——lime 的 `Window` 没有 `focused` 字段；热键查询用 `FlxKeyManager.checkStatus`——`FlxG.keys` 本身不可调用）；⑤ 新增 `source/states/ContainersMenuState.hx`（系统域 MD3 界面：圆角面板 + 列表 + 详情/自检 + 操作条，键盘/鼠标/触控三套输入，滚轮走 WheelScroll 限速）；⑥ `Main.hx` 新增 `onContainerFrame`（桌面端 ENTER_FRAME 驱动会话，宿主被 SIGSTOP 后由该帧接上收尾）；⑦ `ClientPrefs` 新增 `containersEnabled`（默认 false = 老玩家零感知）与 `containerExitKeys`（默认 Ctrl+C，**容器专属字段**，不动 `keyBinds` 表结构以免老存档 `controls_v3` 出现空洞）+ `normalizeLoadedKeys()`（JSON 往返后把 FlxKey 从裸 int/键名还原，名字走 `FlxKey.fromStringMap`；与 `normalizeLoadedMaps` 同因同治）；⑧ `OptionsState` 新增「容器」分类（`#if desktop`，**唯一入口**；从容器界面返回时按标签 `pendingSelectLabel` 恢复选中，不依赖 static 索引）；⑨ `Mods.ignoreModFolders` 登记 `'_containers'`——`getModDirectories()` 只按该白名单过滤，**没有**「下划线前缀自动跳过」这条规则（实测确认），不登记的话 `mods/_containers` 会被扫成一个名为 "_containers" 的假模组；⑩ `compile-mac.sh` 新增容器目录构建保全（构建会重置 Resources，容器是 GB 级玩家数据，独立快照 `tools/user_containers_prev/` 兜底）；⑪ 新增 `CONTAINERS.md`（清单字段表 / 目录布局 / 热键 / 实现概要 / 已知边界 / 排错表）。
+- **多版本容器（Containers）：把别的引擎装进 NovaComet 里一键切换**：新增容器机制——玩家把任意版本的目标引擎（Psych 0.6.3 / 0.7.3 / 1.0.4、SeiunEngine 等）整个丢进 `mods/_containers/<名称>/`，补一个 `container.json`，即可在游戏内切过去跑它的 mod，退出后 NovaComet 自动回来并重启。改动：① 新增 `source/backend/ContainerManifestParser.hx`（清单解析，**永不抛异常**：字段缺失/类型错/JSON 损坏一律折成 `problem` 文案给界面红字）+ `ContainerManifest.hx`/`ContainerManifestData.hx`/`ContainerResourceSpec.hx`/`ContainerInfo.hx`/`Phase.hx`（**一类型一文件**——Haxe 一个文件只有一个顶层类型会提升为模块名，纯 typedef 文件不提升，混装会连环 `Type not found`，已用最小复现实证）；② 新增 `source/backend/ContainerStore.hx`（目录发现 `appRoot`/`modsRoot`/`containersRoot`、容器扫描、`resources/` → 目标引擎资源根的 staging（**只增不改**：不写目标引擎配置、不改主程序、工作目录设为该资源根以适配 Psych 0.6.3 的相对 `mods/`）、执行位与 `Info.plist` 可执行文件探测、文件系统小工具）；③ 新增 `source/backend/ContainerLauncher.hx`（生成 `wrapper.sh`、拉起目标引擎、`container.log` 日志、`app.pid`/`exit.txt`/`cmd.txt`/`phase.txt` 状态文件、shell 引用转义）；④ 新增 `source/backend/ContainerSession.hx`（会话状态机 IDLE→LAUNCHING→HIDING→STOPPING→RUNNING→RETURNING；窗口焦点用 `onFocusIn/onFocusOut` 自行记账——lime 的 `Window` 没有 `focused` 字段；热键查询用 `FlxKeyManager.checkStatus`——`FlxG.keys` 本身不可调用）；⑤ 新增 `source/states/ContainersMenuState.hx`（系统域 MD3 界面：圆角面板 + 列表 + 详情/自检 + 操作条，键盘/鼠标/触控三套输入，滚轮走 WheelScroll 限速）；⑥ `Main.hx` 新增 `onContainerFrame`（桌面端 ENTER_FRAME 驱动会话，宿主被 SIGSTOP 后由该帧接上收尾）；⑦ `ClientPrefs` 新增 `containersEnabled`（默认 false = 老玩家零感知）与 `containerExitKeys`（默认 Ctrl+C，**容器专属字段**，不动 `keyBinds` 表结构以免老存档 `controls_v3` 出现空洞）+ `normalizeLoadedKeys()`（JSON 往返后把 FlxKey 从裸 int/键名还原，名字走 `FlxKey.fromStringMap`；与 `normalizeLoadedMaps` 同因同治）；⑧ `OptionsState` 新增「容器」分类（`#if desktop`，**唯一入口**；从容器界面返回时按标签 `pendingSelectLabel` 恢复选中，不依赖 static 索引）；⑨ `Mods.ignoreModFolders` 登记 `'_containers'`——`getModDirectories()` 只按该白名单过滤，**没有**「下划线前缀自动跳过」这条规则（实测确认），不登记的话 `mods/_containers` 会被扫成一个名为 "_containers" 的假模组；⑩ `compile-mac.sh` 新增容器目录构建保全（构建会重置 Resources，容器是 GB 级玩家数据，独立快照 `tools/user_containers_prev/` 兜底）；⑪ 新增 `CONTAINERS.md`（清单字段表 / 目录布局 / 热键 / 实现概要 / 已知边界 / 排错表）。
 
   **运行机制（关键设计，非权宜之计）**：宿主 `kill -STOP` 自己 → 目标引擎独占屏幕 → wrapper（`nohup … &` 后台化，独立于宿主生命周期）在目标引擎退出后 `kill -CONT` 唤醒宿主 → 宿主恢复窗口尺寸并 `FlxG.resetGame()` 整机重启。之所以必须用 wrapper 而不是宿主自己 `wait`：宿主一旦被 STOP 就不可能再去 wait 子进程；唤醒信号由 wrapper 发出，所以目标引擎崩溃 / 被 Ctrl+C 强杀 / 秒退，宿主都一定会回来（另有 watchdog：宿主进程消失则不留孤儿容器；退出文件 40×0.25s 超时兜底）。全程**文件通信**，宿主侧零线程、零阻塞读 —— 规避本项目已确认的「工作线程分配 hxcpp GC 对象破坏堆」风险（同 `LoadingState.hx` 的处理结论）。视觉让位用**缩窗口到 1×1** 而非 `window.visible = false`：macOS 上隐藏窗口会连应用菜单栏一起摘掉且恢复时机受 SDL 事件循环影响不可控。
 
   **实测验证（非纸面推演）**：① 用与 `ContainerLauncher` 逐行同构的模板真跑一遍——目标引擎 pid 正确落到 `app.pid`（不是宿主 pid）、`cmd.txt` 触发 TERM→宽限→KILL 升级链、退出码正确写入 `exit.txt`（实测 7）、`phase.txt` 落 `idle`；② `kill -STOP` 宿主后目标引擎自然退出：宿主进程状态 `S → T → S`（**挂起→唤醒闭环成立**）、`exit.txt=0`；③ 把 Haxe 源里的 `s += '...'` 按 Haxe 语义（**`$$` = 字面 `$`**）展开成真实 wrapper 文本后 `sh -n` 语法检查通过。
 
-  **隔离性**：容器目录 `mods/_containers/` 由 `Mods.ignoreModFolders` 显式排除 ⇒ 容器内 mod 不会出现在 Meteoric 的 Mod 列表，也不进 `modsList.txt`。
+  **隔离性**：容器目录 `mods/_containers/` 由 `Mods.ignoreModFolders` 显式排除 ⇒ 容器内 mod 不会出现在 NovaComet 的 Mod 列表，也不进 `modsList.txt`。
 
   **边界（已在 CONTAINERS.md 明示）**：本轮只做 macOS（Android 端按需求舍弃，相关入口全部 `#if desktop`）；目标引擎是**独立进程 + 独立窗口**，不做真窗口内嵌（那需要逐个第三方引擎改窗口/渲染层源码，与「现成发行包丢进去就能用」互斥）；首次切换会弹一次 macOS「自动化」授权用于自动前台化（拒绝仅需手动点一下目标引擎窗口）。
 
@@ -1072,7 +1072,7 @@
   （避免两个实例抢窗口）。
   ④ 「打开容器文件夹」改「打开日志/容器目录」：默认打开当前选中容器的 `runtime/`
   （`container.log` / `exit.txt` / `wrapper.sh` 都在这里，排障第一现场）。
-  ⑤ **硬约束入档：容器目录名必须纯 ASCII**。实测把 Meteoric 1.1.0 的 `.app` 放进名为
+  ⑤ **硬约束入档：容器目录名必须纯 ASCII**。实测把 NovaComet 1.1.0 的 `.app` 放进名为
   `示例-psych-0.6.3` 的容器后，每次启动都在 `lime.text.Font::__fromFile → NativeCFFI.lime_font_load_file`
   抛 `Error : Invalid UTF16` 秒退（退出码 255）；把**字节完全相同**的 app 复制到纯 ASCII 路径后
   立即正常。已逐项排除文件清单/大小/md5、扩展属性、代码签名、架构、字体与 manifest 内容。
@@ -1100,14 +1100,14 @@
 - **Obsolescence-spam v5.4：命中击杀延迟移除（批内 O(n²)→帧末 O(n)）**：定位 `notes_avg` 300us+ 的另一主因——`processBotHits` 每命中调用 `invalidateNote` → `FlxGroup.remove(n,true)` 是 **indexOf + splice（O(成员数)）**（flixel 5.2.2 `FlxGroup.hx:401/408` 实证），每帧数百命中 × ~900 成员 ≈ 每帧数十万次指针搬移。改动（`NoteGroup.hx` + `PlayState.hx`）：新增 `beginBatchKill/endBatchKill`——批内 `invalidateNote` 只做状态复位并登记 `Note.batchKillPending`（同一帧防重复登记），命中批 + 兄弟副本扫全部结束后**一次 O(n) 过滤**重建 `members`（`@:privateAccess length=w` 保持长度同步，存活顺序不变）；批外所有调用点（回收窗/重开/回溯）保持原即时剔除路径，零行为变化。
 - **Obsolescence-spam v5.3：命中热点收敛（密集自动游玩安静命中档）**：新 profile 直方图定位——`notes_avg` 从 24~47us 涨到 300~380us（每帧数百命中 × 逐命中开销），主峰 1.0~1.25ms + 2~5ms 长尾（大命中批帧），`1.25~1.5:0` 空洞=非渲染抖动而是命中批处理。改动（全部仅 `densePerfMode && (cpuControlled || replayMode)` 生效，计分/命中/评级计数/溅射节流不受影响）：① `goodNoteHit` 跳过 `stagesFunc` 逐命中闭包（每命中一次闭包分配 + 派发）；② `popUpScore` 的 `RecalculateRating`（7×setOnScripts + callOnScripts('onRecalculateRating') + updateScore 字符串重建）改为每 250ms 结算一次——HUD 仍有 4Hz 刷新，`endSong` 的 RecalculateRating 保证结算值精确；③ 密集自动游玩强制免评级/连击/数字弹窗（等同 lessBotLag：弹窗精灵+FlxTween 每秒数百个，GC 关闭时 destroy 只断引用不回收内存，长期游玩线性上涨，也是 2~5ms 长尾来源）。手动游玩零变化。
 
-- **Obsolescence-spam v5.2：帧率波段抖动（700~1000 乱跳）定位与节流**：墙钟帧循环（`ci/lime-sdl3-patch` SDLApplication.cpp）已确认零限速（`catchup>=4 → nextUpdate=currentUpdate+framePeriod`），抖动来自真实帧耗时的 100ms 级波段；主嫌疑=标题栏 FPS 模式（存档 `fpsInTitleBar=true`）下 `FPS.updateWindowTitle` 每 100ms 一次 `NSWindow.title` 写入（主线程 WindowServer IPC + 合成器打点）。改动：① **标题写入节流 500ms**（`source/openfl/display/FPS.hx`：`_titleSetInterval=0.5`，FPS 数字仍 100ms 计算、内存/CPU 数据仍 1s 采样；0=关闭节流）；② **MeteoricProfile 帧时直方图**（`source/backend/MeteoricProfile.hx`：每窗口输出 `frame_p50/p90/p99` + 10 档分布 `hist=[<0.5:…,0.5-0.75:…,…]`）——下次 `./compile-mac.sh profile` 复测，直方图可直接判定：双峰（快慢帧交替）→ 合成器/呈现节奏；长尾（绝大多数帧很快、个别尖峰）→ 单帧开销源。③ 判定线/063 溅射/对象上限/落盘去重/CHECK_POINTER 等 v5.x 改动保持。
+- **Obsolescence-spam v5.2：帧率波段抖动（700~1000 乱跳）定位与节流**：墙钟帧循环（`ci/lime-sdl3-patch` SDLApplication.cpp）已确认零限速（`catchup>=4 → nextUpdate=currentUpdate+framePeriod`），抖动来自真实帧耗时的 100ms 级波段；主嫌疑=标题栏 FPS 模式（存档 `fpsInTitleBar=true`）下 `FPS.updateWindowTitle` 每 100ms 一次 `NSWindow.title` 写入（主线程 WindowServer IPC + 合成器打点）。改动：① **标题写入节流 500ms**（`source/openfl/display/FPS.hx`：`_titleSetInterval=0.5`，FPS 数字仍 100ms 计算、内存/CPU 数据仍 1s 采样；0=关闭节流）；② **NovaCometProfile 帧时直方图**（`source/backend/NovaCometProfile.hx`：每窗口输出 `frame_p50/p90/p99` + 10 档分布 `hist=[<0.5:…,0.5-0.75:…,…]`）——下次 `./compile-mac.sh profile` 复测，直方图可直接判定：双峰（快慢帧交替）→ 合成器/呈现节奏；长尾（绝大多数帧很快、个别尖峰）→ 单帧开销源。③ 判定线/063 溅射/对象上限/落盘去重/CHECK_POINTER 等 v5.x 改动保持。
 
 - **Obsolescence-spam v5.1：hxcpp/Note 热路径榨干**：① **release 移除指针校验/栈行号/栈回溯**（`Project.xml`：`HXCPP_CHECK_POINTER/HXCPP_STACK_LINE/HXCPP_STACK_TRACE` 改为仅 debug 生效）——hxcpp 4.3.2 的 `HXCPP_CHECK_POINTER` 让**每一个 Haxe 对象指针解引用**走空值检查+NullReference 分支（`include/hx/Object.h` mPtr getter），是音符逐帧循环/quad 合批等热路径的固定开销，release 移除是经典大项；CrashHandler Haxe 侧阶段日志不受影响，原生地址仍可 atos；② **Note 快绘制路径去冗余**（`Note.hx` draw）：tile 渲染下 `calcFrame(false)` 是纯 no-op（`FlxSprite.calcFrame` 在 `FlxG.renderTile && !force` 直接 return），逐音符每帧白调一次——改为仅 `useFramePixels && dirty` 时 `calcFrame(true)`，语义等价；③ **followStrumNote 属性写去重**（`Note.hx`）：方向角恒 0、alpha 恒 1 的密集音符跳过值未变的 setter 写入（set_angle 每次重算弧度/标记 dirty、alpha 写同样开销），每音符每帧省 1~2 次属性写；④ `--dce full`、`HXCPP_LINK_OPTIMIZE`、`HXCPP_GC_BIG_BLOCKS` 已确认保持。未动（风险/观感权衡，待用户拍板）：音符对象池重启用（曾引发原生崩溃 SIGSEGV）、密集谱强制关 antialiasing、角色/舞台裁剪。
 
 - **Obsolescence-spam v5：判定线回退 + NoteSplash 换 PE 0.6.3 经典皮肤 + 密集对象硬上限**：依据实测 `profile.txt`（v4 后曲末爆发段 2.15~2.19ms/约 460 FPS，峰帧 51ms）与 320MB 原谱统计（v4 视觉档同屏对象峰值 1,319 @T≈420.4s；截图 6:46 ≈406s 仅 ~270 对象，非渲染瓶颈）。改动：① **判定线回退**：`StrumNote` 静态帧恢复素材原色（灰蓝毛胚），仅按下/击中走 RGB 列色——v4 把 static 纳入 RGB 着色后，默认 NOTE_assets 静态帧（实测中心 RGB(135,163,173)，非白色）经通道加权输出粉白/浅青/浅绿/浅粉，即"判定线变色"根因；与 Psych 0.7.3/PE 0.6.3/原版一致；② **NoteSplash 换 PE 0.6.3 经典贴图**：新增 `noteSplashes-063`（png/xml/txt，预染色四色 紫/蓝/绿/红），`defaultNoteSplash` 指向它；该皮肤跳过 PixelSplashShader（`shader=null` raw 直出）——RGB 通道加权默认 blob 贴图是"五颜六色"来源，raw 直出同时省去每颗溅射的 shader 绑定；自定义 splashSkin 仍走原 RGB 路径；保留密集谱每轨 250ms 溅射节流；③ **密集谱对象硬上限 800**（仅 densePerfMode 自动生效、不写存档）：场上精灵对象数（`NoteGroup.aliveObjectCount` 自维护，**非** density 加权 `countLiving()`——后者一簇可达数百，直接复用会破坏判定）达到 800 时，距判定线 > 60ms（=击杀窗 6ms 的 10 倍，无排期竞态；溢出 ~70 颗，实际场上 ~870）的箭头延迟进场（不消失、可判定、可打，墙更贴线）；非密集谱恒关闭；④ **CrashHandler 落盘去重**：`PlayState.noteSpawn:start` 原条件 `currentSpawnId==0` 在空段每帧成立 → 每帧 `File.saveContent`（每秒 ~1000 次磁盘写，空段 1000→800 帧回归的直接来源）；`popUpScore:start` 原每命中落盘一次（团灭段每秒数千次）。两处收敛为每曲各记一次（与 `CrashHandler.mark` "约 10 次/曲" 的设计意图一致），快速重开时随 `generateChartNotes` 复位。
 
 
-- **曲终结算崩溃修复（自动游玩/回放路径）**：`update` 中 boyfriend 待机恢复块（`PlayState.hx:3462`，仅在 botplay/replay 分支执行）缺少 `endingSong` 守卫——`finishSong→endSong` 启动转场/角色拆卸后同一帧继续走到该行，`boyfriend.animation.curAnim` 已被置空，内联的 `getAnimationName()` 抛 Null Object Reference（日志：`MeteoricEngine_2026-09-05_23'48'39.txt`，栈 `PlayState.hx:3462`，阶段 `PlayState.endSong`）。修复：该块与 `keysCheck` 内同型块（`PlayState.hx:5474` 附近）均加 `!endingSong && !finishingSong` 守卫 + `animation/curAnim` 非空校验。
+- **曲终结算崩溃修复（自动游玩/回放路径）**：`update` 中 boyfriend 待机恢复块（`PlayState.hx:3462`，仅在 botplay/replay 分支执行）缺少 `endingSong` 守卫——`finishSong→endSong` 启动转场/角色拆卸后同一帧继续走到该行，`boyfriend.animation.curAnim` 已被置空，内联的 `getAnimationName()` 抛 Null Object Reference（日志：`NovaCometEngine_2026-09-05_23'48'39.txt`，栈 `PlayState.hx:3462`，阶段 `PlayState.endSong`）。修复：该块与 `keysCheck` 内同型块（`PlayState.hx:5474` 附近）均加 `!endingSong && !finishingSong` 守卫 + `animation/curAnim` 非空校验。
 - **0:00 卡结算修复（谱面目录名 ≠ JSON song 字段 / 空音频 resync 死循环）**：`data/Obsolescence-spam/` 内 `song="Obsolescence"` 时，PlayState 按 song 名找音频必然 `MISSING SOUND` → 空 Sound（length=0）。其连锁反应：`stepHit` 漂移检测 `|music.time(恒0) - songPosition| > 20ms` 在歌曲位置一越过 20ms 即成立 → `resyncVocals()` 用 `music.time=0` 回写 `songPosition` → **每 2~4 帧把歌曲时钟拉回 0** → 音符永不生成、HUD 恒 0:00、无法结算（逐帧日志 + `Conductor.songPosition` setter 调用栈实证 `PlayState.resyncVocals ← stepHit ← MusicBeatState.update`）。修复：① `resyncVocals`/`stepHit` 在 `music.length<=0` 时跳过同步（无音频可同步，绝不动时钟）；② 按 song 名加载失败时回退 `chartFolder` 目录音频（与 Freeplay 试听/预加载同路径），人声同步兜底；③ `generateChartNotes` 记录谱面末尾 `chartEndTimeMs`，`startSong` 取 `max(音频长度, 谱面末尾)`；④ `update` 中"歌曲位置越过 `songLength` 即 `finishSong`"作为全歌曲收尾兜底（不再依赖 `onComplete`），`finishSong` 加 `finishingSong` 防重入。
 - **拖入安装 Mod 崩溃修复（20GB 级 mod / 2.1GB 谱面 JSON）**：文件夹安装不再在工作线程逐文件 `File.copy`（数十万次 Haxe 级读写 + 跨线程字符串消息 → Release 堆损坏 abort / Debug `hxcpp CriticalError`），改为后台线程执行系统原生命令（macOS `ditto` / Windows `xcopy` / Linux `cp -R`），工作线程零 Haxe 对象分配；`ZipExtractor` 全体消息改 `safeSend` 并全函数 try/catch，杜绝异常逃出线程闭包；临时目录清理改回主线程；`onDropFile` 入口加 `CrashHandler.mark('ModInstaller:drop')` 与兜底 try/catch；文件夹拷超时按目录字节数动态预估（30MB/s 下限 + 120s 保底，上限 30 分钟），不再固定 30 秒误杀大 mod。
 - **暂停/结算入场动效收敛**：Pause / Results（含联机精简版）由 `FlxEase.quartInOut 0.4s + 逐行 startDelay`（最长可见延迟 1.15s）统一为 `quadOut 0.25s` 同步淡入，去掉逐行 stagger；修复合规项 P1-1
@@ -1165,11 +1165,11 @@
 - [稳定性 · 性能 · 兼容](#稳定性--性能--兼容)
 - [版本与发布](#版本与发布)
 - [v1.1.0 更新总览](#v110-更新总览)
-- [Meteoric Reboot 1 —— 环境搭建与基础优化](#meteoric-reboot-1--环境搭建与基础优化)
-- [Meteoric Reboot 2 —— 交互与字体](#meteoric-reboot-2--交互与字体)
-- [Meteoric Reboot 3 —— 界面全面重构](#meteoric-reboot-3--界面全面重构)
-- [Meteoric Reboot 4 —— 玩法、性能与编辑器](#meteoric-reboot-4--玩法性能与编辑器)
-- [Meteoric Reboot 5 —— 安卓端与模组兼容](#meteoric-reboot-5--安卓端与模组兼容)
+- [NovaComet Reboot 1 —— 环境搭建与基础优化](#meteoric-reboot-1--环境搭建与基础优化)
+- [NovaComet Reboot 2 —— 交互与字体](#meteoric-reboot-2--交互与字体)
+- [NovaComet Reboot 3 —— 界面全面重构](#meteoric-reboot-3--界面全面重构)
+- [NovaComet Reboot 4 —— 玩法、性能与编辑器](#meteoric-reboot-4--玩法性能与编辑器)
+- [NovaComet Reboot 5 —— 安卓端与模组兼容](#meteoric-reboot-5--安卓端与模组兼容)
 - [后续维护 —— 回放重写 / HUD 重构 / 稳定性](#后续维护--回放重写--hud-重构--稳定性)
 
 ---
@@ -1181,7 +1181,7 @@
 - **JS 引擎优化融合（9 项）**：HUD Only / Allow GC / Strum 呼吸灯 / 弹窗开关 / Less Botplay Lag / No Hit Lua Calls，全部默认原版行为
 - **渲染修复**：「提前渲染音符」全朝左 bug、血条图标飞出 0.8s 回位、RGBPalette 移动端空指针
 - **安卓**：CastNote 轻量管线接通（226 万音符大谱面）、Android 12 存储（`.meteoric` 释放）、设置 ◀▶ 长按连续调节
-- **开发工具**：MeteoricProfile 性能探针（`-D METEORIC_PROFILE`）、GL 错误监控（Seiun 移植）；移除高开销 FPS 波动图
+- **开发工具**：NovaCometProfile 性能探针（`-D METEORIC_PROFILE`）、GL 错误监控（Seiun 移植）；移除高开销 FPS 波动图
 - **构建基础设施**：SDL3 lime 补丁更新（高精度计时 / 高 DPI 模式文件）、CI 缓存与重试调整
 
 ---
@@ -1229,7 +1229,7 @@
 
 ### 🧰 开发与诊断工具
 
-- **MeteoricProfile**：每帧耗时探针（编译定义 `-D METEORIC_PROFILE` 启用，默认零开销 inline）
+- **NovaCometProfile**：每帧耗时探针（编译定义 `-D METEORIC_PROFILE` 启用，默认零开销 inline）
 - **GlErrorWatchdog**（Seiun 移植）：渲染帧轮询 `glGetError()`，GL 错误写入 CrashHandler 结构化日志环，不再静默
 - **CrashHandler**：结构化日志环（最近 60 条游戏日志）随崩溃报告输出，对接以上探针与 GL 监控
 
@@ -1326,7 +1326,7 @@
 
 ## v1.1.0 更新总览
 
-- 历经五轮 Meteoric Reboot 重构，基于 Psych Engine 深度魔改
+- 历经五轮 NovaComet Reboot 重构，基于 Psych Engine 深度魔改
 - 新增 **Replay v2 回放系统**（按键注入式回放）
 - 新增 **Phigros 玩法** 后已移除（见 [后续维护](#后续维护--回放重写--hud-重构--稳定性)）
 - 新增 **联机功能**（当前暂时屏蔽，代码保留）
@@ -1335,7 +1335,7 @@
 
 ---
 
-## Meteoric Reboot 1 —— 环境搭建与基础优化
+## NovaComet Reboot 1 —— 环境搭建与基础优化
 
 - **编译环境搭建**：安装 Haxe 4.2.5、HaxeFlixel、SScript 等依赖，在 M4 MacBook Air 上完成 FNF Psych Engine 0.6.3 编译
 - **底层逻辑优化**：提升帧率与运行稳定性；启用 `-release` 增量编译模式，大幅缩短编译时间
@@ -1344,13 +1344,13 @@
 - **移除 alphabet 渲染**：全部界面改为普通字体渲染（修复设置界面崩溃、黑屏卡启动等问题）
 - **主界面鼠标点击操控**：加入鼠标点击控制方式
 
-## Meteoric Reboot 2 —— 交互与字体
+## NovaComet Reboot 2 —— 交互与字体
 
 - **全界面鼠标点击控制**：所有界面加入鼠标点击操作
 - **修复 neko 残留**：彻底修复 neko 构建并清理残留
 - **字体显示不全修复**：修复暂停界面等字体截断问题（如"Phitty Nic"缺少尾部字符）
 
-## Meteoric Reboot 3 —— 界面全面重构
+## NovaComet Reboot 3 —— 界面全面重构
 
 - **暂停界面重写**：全新圆角磨砂玻璃面板，修复文本截断；右侧新增统计面板（当前分数、失误数、评分、准确度等）
 - **Freeplay 界面重写**：圆角磨砂设计，修复小图标过大/错位；改为选中曲目后在信息区显示大图标
@@ -1367,7 +1367,7 @@
 - **磨砂玻璃返回按钮**：圆形 `<` 样式，透明保持可见度，悬浮发光
 - **暂停界面翻译**：返回游戏/重新开始/更换难度/自动游玩/设置/返回主菜单
 
-## Meteoric Reboot 4 —— 玩法、性能与编辑器
+## NovaComet Reboot 4 —— 玩法、性能与编辑器
 
 ### 玩法与判定
 - **新版音符判定（KE 判定）**：Kade Engine 手感（提前窗口更短），旧版判定命名为 **PE 判定**，可在游玩设置切换
@@ -1424,7 +1424,7 @@
 - 修复多个 `Null Object Reference` 崩溃
 - 按键设置、脚本管理等界面文字显示修复
 
-## Meteoric Reboot 5 —— 安卓端与模组兼容
+## NovaComet Reboot 5 —— 安卓端与模组兼容
 
 - **接 Reboot 4 尾巴**：修复小图标不跟血量条滑动的问题
 - **性能优化**：加入「提前渲染」设置；自动游玩加载时预演；重写机器人/音符渲染逻辑为批处理命中
@@ -1475,9 +1475,9 @@
 
 | 平台 | 命令 | 产物 |
 |------|------|------|
-| Windows (x64) | `./compile-windows.sh` | `export/release/windows/bin/Meteoric.exe` |
-| macOS | `./compile-mac.sh` | `export/release/macos/bin/Meteoric.app` |
-| Android | `./compile-android.sh` | `export/release/android/bin/app/build/outputs/apk/debug/Meteoric-debug.apk` |
+| Windows (x64) | `./compile-windows.sh` | `export/release/windows/bin/NovaComet.exe` |
+| macOS | `./compile-mac.sh` | `export/release/macos/bin/NovaComet.app` |
+| Android | `./compile-android.sh` | `export/release/android/bin/app/build/outputs/apk/debug/NovaComet-debug.apk` |
 
 ---
 

@@ -280,7 +280,7 @@ class TitleState extends MusicBeatState
 
 	function checkForUpdates()
 	{
-		var http = new haxe.Http("https://api.gitproxy.dev/github.com/Bonus-XK/FNF-MeteoricEngine/raw/refs/heads/master/gitVersion.txt");
+		var http = new haxe.Http("https://api.gitproxy.dev/github.com/Bonus-XK/FNF-NovaCometEngine/raw/refs/heads/master/gitVersion.txt");
 		http.cnxTimeout = 4;
 
 		http.onData = function (data:String)
@@ -306,7 +306,7 @@ class TitleState extends MusicBeatState
 
 		http.onError = function (error) {
 			trace('update check failed (gitproxy): $error, retrying direct...');
-			var http2 = new haxe.Http("https://raw.githubusercontent.com/Bonus-XK/FNF-MeteoricEngine/master/gitVersion.txt");
+			var http2 = new haxe.Http("https://raw.githubusercontent.com/Bonus-XK/FNF-NovaCometEngine/master/gitVersion.txt");
 			http2.cnxTimeout = 4;
 			http2.onData = http.onData;
 			http2.onError = function (error2) {

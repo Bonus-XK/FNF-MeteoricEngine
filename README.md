@@ -1,6 +1,6 @@
 <div align="center">
 
-# Meteoric Engine
+# NovaComet Engine
 
 **基于 Psych Engine 0.7.1h 深度重构的 Friday Night Funkin' 模组引擎**
 
@@ -22,7 +22,7 @@
 
 ## 这是什么
 
-Meteoric Engine 不是换皮的 Psych——它把 Psych 0.7.1h 的脚本、加载、UI、回放与工程化底座  
+NovaComet Engine 不是换皮的 Psych——它把 Psych 0.7.1h 的脚本、加载、UI、回放与工程化底座  
 全部翻新了一遍，并把脚本语言能力推进到与 Codename Engine 同级、部分领先的水平：
 
 - 自研 HScript 方言 **[hscript-meteoric](https://github.com/Bonus-XK/hscript-meteoric)**  
