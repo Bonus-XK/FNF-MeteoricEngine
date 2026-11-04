@@ -1,8 +1,9 @@
-# AGENTS.md — Meteoric Engine
+# AGENTS.md — NovaComet Engine
 
 ## 项目
 
-Meteoric Engine —— 基于 **Psych Engine 0.7.1h** 二次开发的 FNF 模组引擎（Haxe / OpenFL / Lime / hxcpp）。
+NovaComet Engine —— 基于 **Psych Engine 0.7.1h** 二次开发的 FNF 模组引擎（Haxe / OpenFL / Lime / hxcpp）。
+对外名称是 **NovaComet Engine**；内部代号 / 构建产物 / 环境变量**沿用 Meteoric**（`METEORIC_*`、`Meteoric.app`、`com.bonusxk.meteoric`）——下方文档里的命令是真实命令，**勿顺手改名**。
 仓库根：`/Users/raidbounce/Documents/FNF-MeteoricEngine`，分支 `master`，remote `git@github.com:Bonus-XK/FNF-MeteoricEngine.git`。
 上游是 Psych，**不要**按原版 FNF / 旧版 Psych 的写法想当然。
 
