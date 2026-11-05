@@ -141,19 +141,28 @@ jobs:
           # （参照 Seiun 的 append-mirror-links composite action 做法）。
           # 平台清单（五端全为发布阻塞端）
           NOTES=/tmp/release-notes.md
-          {
-            printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n'
-            printf -- '- Windows x64 / Windows x86（zip，解压即用）\n'
-            printf -- '- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n'
-            printf -- '- Android arm64（APK）\n'
-            printf -- '- Linux x86_64（tar.gz，解压后运行 bin/Meteoric；视频支持暂缺）\n'
-            printf -- '- iOS（未签名 IPA，AltStore/Sideloadly 侧载自动重签）\n'
-            printf '\nSHA256 见 SHA256SUMS.txt\n\n构建信息：commit %s · run %s/%s\n' \
-              "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}"
-          } > "$NOTES"
+          # 发布说明优先用仓库根目录的 RELEASE_NOTES.md（随版本提交，便于审阅与本地预览）；
+          # 不存在时回退到内置平台清单模板。标题取说明的 H1（无说明则用版本号）。
+          TITLE="Pre-release v$VERSION"
+          if [ -f RELEASE_NOTES.md ]; then
+            cp RELEASE_NOTES.md "$NOTES"
+            H1="$(sed -n 's/^# //p' RELEASE_NOTES.md | head -1)"
+            if [ -n "$H1" ]; then TITLE="$H1"; fi
+          else
+            {
+              printf 'Meteoric Engine 自动构建预发布版\n\n包含平台：\n'
+              printf -- '- Windows x64 / Windows x86（zip，解压即用）\n'
+              printf -- '- macOS x86_64 / macOS arm64（zip 内含 Meteoric.app）\n'
+              printf -- '- Android arm64（APK）\n'
+              printf -- '- Linux x86_64（tar.gz，解压后运行 bin/Meteoric；视频支持暂缺）\n'
+              printf -- '- iOS（未签名 IPA，AltStore/Sideloadly 侧载自动重签）\n'
+              printf '\nSHA256 见 SHA256SUMS.txt\n\n构建信息：commit %s · run %s/%s\n' \
+                "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}"
+            } > "$NOTES"
+          fi
           gh release create "v$VERSION" \
             --prerelease \
-            --title "Pre-release v$VERSION" \
+            --title "$TITLE" \
             --notes-file "$NOTES" \
             dist/*
           echo "已发布: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
