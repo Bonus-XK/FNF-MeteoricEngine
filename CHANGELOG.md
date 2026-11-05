@@ -4,6 +4,20 @@
 
 ## 未发布
 
+- **【新功能】全局 CRT 着色器换用 Timothy Lottes 原版移植**：来源 libretro/glsl-shaders
+  `crt-lottes.glsl`（public domain），Gaussian 滤波 / 扫描线 / shadow mask / bloom / gamma
+  保留上游实现，仅做 FlxShader 接口适配与固定 360 行模拟分辨率；5 个脚本 uniform 与
+  编译失败兜底不变，Lua/HScript API 零破坏。
+- **【修复】全局 shader 顶部黑带**：`FlxGame` 里隐藏的音量条（隐藏时 `y=-64`）被 openfl
+  `__getRenderBounds` 计入渲染边界（`visible=false` 不跳过），根级 `ShaderFilter` 的离屏
+  纹理比窗口高 64px，顶部空白被采样成宽黑带。`GlobalShaderHandler.enable()` 把
+  `FlxG.game.scrollRect` 钉成逻辑视口矩形，disable() 复原、每帧比对自动跟随窗口变化；
+  shader 关闭时零行为变化。
+- **【修复】音量提示音快速连按叠加连响**：平滑音量渐变（0.15s）期间 volume 尚未到位，
+  连按 +/- 时每次 `changeVolume` 都判为有效变更并新建一个 beep `FlxSound`
+  （`autoDestroy=false` 永不销毁，`FlxG.sound.list` 无限堆积）。改为常驻单实例
+  `stop()` + `play(true)` ForceRestart：同一时刻最多一声、单次调整仍完整一声、
+  边界静音规则与音量渐变逻辑零改动。
 - **【新功能】弹窗立体层开关（`popup3D`）**：开启后，评分（Sick/Good…）与连击（数字 +
   Combo 词）弹窗从 **HUD 层**移到**游戏世界层**（`camGame`，即舞台/角色所在的下一层）。
   于是弹窗会**跟随舞台镜头一起移动与缩放**，观感上像场景里的物体而不是贴在屏幕上的 UI，
