@@ -4,6 +4,7 @@ package flixel.system.ui;
 import backend.Paths;
 import backend.DesignTokens;
 import flixel.FlxG;
+import flixel.sound.FlxSound;
 import flixel.system.FlxAssets;
 import openfl.Lib;
 import openfl.display.Sprite;
@@ -83,6 +84,9 @@ class FlxSoundTray extends Sprite
 
 	/**Whether or not changing the volume should make noise.**/
 	public var silent:Bool = false;
+
+	/** 常驻提示音实例（复用不回收，见 show() 内注释）。 */
+	var beepSound:FlxSound = null;
 
 	var labelTxt:TextField;
 	var pctTxt:TextField;
@@ -350,7 +354,20 @@ class FlxSoundTray extends Sprite
 		{
 			var sound = FlxAssets.getSound(up ? volumeUpSound : volumeDownSound);
 			if (sound != null)
-				FlxG.sound.load(sound).play();
+			{
+				// 常驻单实例 + ForceRestart：每次有效调整仍触发一次提示音，但同一时刻
+				// 最多一声在响（上一次被立即替换）。快速连按 +/- 时不再把 N 声 beep
+				// 叠加成"持续响"；单次调整仍是完整一声。实例常驻不再让
+				// FlxG.sound.list 每次调整都堆积一个永不销毁的死 FlxSound。
+				if (beepSound == null)
+					beepSound = FlxG.sound.load(sound, 1.0, false, null, false);
+				else
+					beepSound.stop();
+				beepSound.play(true);
+				// 注意：volumeUpSound / volumeDownSound 当前是同一资源；若未来改成不同源，
+				// 需要在这里重建实例（loadEmbedded 会 destroy 置 exists=false，
+				// 直接复用旧实例 play 会静音）。
+			}
 		}
 
 		_timer = 1;
