@@ -3,6 +3,7 @@ package shaders;
 import flixel.system.FlxAssets.FlxShader;
 import openfl.filters.ShaderFilter;
 import openfl.events.Event;
+import openfl.geom.Rectangle;
 import openfl.Lib;
 
 /**
@@ -27,6 +28,8 @@ class GlobalShaderHandler
 	static var shader:FlxShader = null;
 	static var shaderName:String = '';
 	static var tickActive:Bool = false;
+	/** enable() 之前的 scrollRect（正常为 null），disable() 时原位复原。 */
+	static var savedScrollRect:Rectangle = null;
 
 	public static function isActive():Bool
 	{
@@ -77,6 +80,19 @@ class GlobalShaderHandler
 		shader = newShader;
 		shaderName = name;
 		// 根级 filter：整画面合成后过滤一次
+		//
+		// ⚠ scrollRect 不是可选项：FlxGame 里藏着「屏幕外的音量条」（FlxSoundTray 隐藏时
+		// y = -64），openfl 的 __getRenderBounds **不会跳过 invisible 子对象**，于是
+		// FlxGame.getBounds() = (-0.95, -64, 1221.9, 785) —— filter 的离屏纹理被迫比窗口
+		// 高 64px，顶部那 64px 是空白。shader 按 0..1 采样就吃到空白，表现为画面顶部
+		// 一条黑带（约窗口高度 8%，与 curvature/边框逻辑无关；关掉 shader 直接绘制时
+		// 该子对象在屏幕外，所以看不到）。把 scrollRect 钉成窗口矩形，让纹理==窗口。
+		if (FlxG.game.scrollRect != null)
+			savedScrollRect = FlxG.game.scrollRect.clone();
+		else
+			savedScrollRect = null;
+		applyClip();
+
 		FlxG.game.setFilters([new ShaderFilter(newShader)]);
 		startTick();
 		backend.CrashHandler.logEvent('globalShader enable: $name');
@@ -88,7 +104,11 @@ class GlobalShaderHandler
 	{
 		stopTick();
 		if (FlxG.game != null)
+		{
 			FlxG.game.setFilters(null);
+			FlxG.game.scrollRect = savedScrollRect;
+		}
+		savedScrollRect = null;
 		if (shader != null)
 		{
 			backend.CrashHandler.logEvent('globalShader disable: $shaderName');
@@ -120,6 +140,23 @@ class GlobalShaderHandler
 	}
 
 	// ==================== 内部 ====================
+
+	/**
+	 * 把根对象的 scrollRect 钉成当前逻辑视口（FlxG.width × FlxG.height）。
+	 * 作用有两个：① 让 filter 离屏纹理的 bounds 恰好等于窗口（见 enable() 里的黑带说明）；
+	 * ② 窗口尺寸变化（缩放模式切换 / 改窗口大小）后自动跟上，不必重建 shader。
+	 */
+	static function applyClip():Void
+	{
+		if (FlxG.game == null)
+			return;
+		var w:Float = Math.ceil(FlxG.width);
+		var h:Float = Math.ceil(FlxG.height);
+		var r:Rectangle = FlxG.game.scrollRect;
+		if (r != null && r.x == 0 && r.y == 0 && r.width == w && r.height == h)
+			return;
+		FlxG.game.scrollRect = new Rectangle(0, 0, w, h);
+	}
 
 	/** 从 Lua table / HScript 对象里读一个数值参数（照 setShaderFloatArray 的装箱规整经验）。 */
 	static function tryApplyParam(target:FlxShader, src:Dynamic, key:String):Void
@@ -177,5 +214,6 @@ class GlobalShaderHandler
 			return;
 		}
 		setFloat('time', Lib.getTimer() / 1000.0);
+		applyClip();
 	}
 }
