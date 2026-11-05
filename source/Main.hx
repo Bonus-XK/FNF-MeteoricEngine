@@ -450,6 +450,24 @@ class Main extends Sprite
 		});
 		#end
 
+		#if (windows && sys)
+		// 【DPI 诊断】Windows 字体糊排查用：首帧打印缩放链路关键值。
+		// 正常应为 scale≈1.25/1.5（真实 DPI/96）、window=物理像素、stage=逻辑 1280×720；
+		// 若 scale=1 且 window=1280x720 → ndll 未带 DPI 补丁或「高清渲染」关闭。
+		var dpiLogged:Bool = false;
+		stage.addEventListener(Event.ENTER_FRAME, function(_)
+		{
+			if (dpiLogged || stage.stageWidth <= 0)
+				return;
+			dpiLogged = true;
+			var win = stage.window;
+			trace('[DPI] scale=' + win.scale
+				+ ' window=' + win.width + 'x' + win.height
+				+ ' stage=' + stage.stageWidth + 'x' + stage.stageHeight
+				+ ' pixelRatio=' + (win.scale > 0 ? win.scale : 1.0));
+		});
+		#end
+
 		// 使用系统鼠标光标，而不是 Flixel 自绘光标
 		FlxG.mouse.useSystemCursor = true;
 
