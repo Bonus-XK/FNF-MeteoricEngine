@@ -35,6 +35,58 @@ namespace lime {
 	// 启动/构造时各读一次并缓存，避免每帧 I/O。
 	static bool meteoricHighDpiEnabled = true;
 
+#ifdef HX_WINDOWS
+	// 【Meteoric 高清渲染 2026-11-05】SDL3 3.2.8 的 Windows 视频驱动只做了进程
+	// DPI 感知（WIN_InitDPIAwareness），但没把 DPI 接进 display_scale：
+	// GetWindowContentScale 只有 Wayland 实现，Windows 没有 WM_DPICHANGED 传导，
+	// SDL_GetWindowDisplayScale / SDL_GetDisplayContentScale 在 Windows 恒 1.0。
+	// 依赖它的一切 —— 窗口放大、逻辑尺寸折算、OpenFL pixelRatio（文本高清光栅化）
+	// —— 在 Windows 全链失效：文本按 1x 位图生成再被全屏/拉伸放大 = 「Windows 字体糊」。
+	// 这里绕过 SDL 直接读窗口真实 DPI（进程已 permonitorv2，GetDpiForWindow 返回
+	// 窗口所在显示器的实际缩放；window==NULL 时用主显示器 DC，供 SDL_Init 前预估）。
+	static double MeteoricWindowsDpiScale (SDL_Window *window) {
+
+		// GetDpiForWindow 需 Win10 1607+；动态解析，老系统走 GetDeviceCaps 兜底。
+		typedef UINT (WINAPI *GetDpiForWindowProc) (HWND);
+		static GetDpiForWindowProc getDpiForWindow = NULL;
+		static bool resolved = false;
+		if (!resolved) {
+
+			resolved = true;
+			HMODULE user32 = GetModuleHandleW (L"user32.dll");
+			if (user32 != NULL)
+				getDpiForWindow = (GetDpiForWindowProc) (void *) GetProcAddress (user32, "GetDpiForWindow");
+
+		}
+
+		HWND hwnd = NULL;
+
+		if (window != NULL) {
+
+			SDL_PropertiesID props = SDL_GetWindowProperties (window);
+			if (props != 0)
+				hwnd = (HWND) SDL_GetPointerProperty (props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+
+			if (hwnd != NULL && getDpiForWindow != NULL) {
+
+				UINT dpi = getDpiForWindow (hwnd);
+				if (dpi > 0) return (double) dpi / 96.0;
+
+			}
+
+		}
+
+		// 兜底：DC 的 LOGPIXELSX。permonitorv2 进程里窗口 DC = 该显示器真实 DPI；
+		// hwnd==NULL 的屏幕 DC = 主显示器 DPI（SDL_Init 前的窗口溢出预估用）。
+		HDC dc = GetDC (hwnd);
+		if (dc == NULL) return 1.0;
+		int logPixels = GetDeviceCaps (dc, LOGPIXELSX);
+		ReleaseDC (hwnd, dc);
+		return logPixels > 0 ? (double) logPixels / 96.0 : 1.0;
+
+	}
+#endif
+
 
 	bool SDLWindow::MeteoricHighDpiEnabled () {
 
@@ -63,7 +115,13 @@ namespace lime {
 
 		if (!meteoricHighDpiEnabled || window == NULL) return 1.0;
 
+		#ifdef HX_WINDOWS
+		// SDL_GetWindowDisplayScale 在 Windows 恒 1.0（见 MeteoricWindowsDpiScale 注释），
+		// 改读窗口真实 DPI；其他平台维持 SDL 原值（macOS Cocoa 正常）。
+		double scale = MeteoricWindowsDpiScale (window);
+		#else
 		double scale = SDL_GetWindowDisplayScale (window);
+		#endif
 		return scale > 0.0 ? scale : 1.0;
 
 	}
@@ -78,6 +136,10 @@ namespace lime {
 		if (display == 0) return false;
 
 		double scale = SDL_GetDisplayContentScale (display);
+		#ifdef HX_WINDOWS
+		// SDL_GetDisplayContentScale 在 Windows 恒 1.0（SDL3 3.2.8 无实现），改用主屏真实 DPI。
+		scale = MeteoricWindowsDpiScale (NULL);
+		#endif
 		if (!(scale > 0.0)) return false;
 		if (scale <= 1.0) return true; // 无需放大，不存在溢出问题
 
@@ -253,6 +315,8 @@ namespace lime {
 				int physicalH = (int)(height * scale + 0.5);
 				if (physicalW != width || physicalH != height)
 					SDL_SetWindowSize (sdlWindow, physicalW, physicalH);
+
+					printf ("[Meteoric DPI] scale=%.3f window=%dx%d\n", scale, physicalW, physicalH);
 
 			}
 
